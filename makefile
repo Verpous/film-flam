@@ -13,10 +13,45 @@
 # You should have received a copy of the GNU General Public License
 # along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
+FLAM_DIR=~/.film_flam
+PKG=filmflam
+BIN=bin
+
+PYLINT_IGNORE += C0301 # line-too-long
+PYLINT_IGNORE += C0114 # missing-module-docstring
+PYLINT_IGNORE += C0115 # missing-class-docstring
+PYLINT_IGNORE += C0116 # missing-function-docstring
+PYLINT_IGNORE += R0402 # consider-using-from-import
+PYLINT_IGNORE += C0303 # trailing-whitespace
+PYLINT_IGNORE += R1708 # stop-iteration-return
+PYLINT_IGNORE += C0103 # invalid-name
+PYLINT_IGNORE += R0902 # too-many-instance-attributes
+PYLINT_IGNORE += C0411 # wrong-import-order
+PYLINT_IGNORE += C0415 # import-outside-toplevel
+PYLINT_IGNORE += W0124 # confusing-with-statement
+PYLINT_IGNORE += W1514 # unspecified-encoding
+PYLINT_IGNORE += C0104 # disallowed-name
+PYLINT_IGNORE += R0903 # too-few-public-methods
+
+.PHONY: install clean wipe typecheck
+
 all: install
 
 install:
 	pip install -e .
 
+uninstall:
+	pip uninstall $(PKG)
+
 clean:
-	pip uninstall filmflam
+	rm -rf $(FLAM_DIR)
+
+typecheck:
+	MYPY_FORCE_COLOR=1 mypy --disallow-untyped-defs --disallow-incomplete-defs $(BIN)/flam.py | grep -Ev 'flam.py.*no-untyped-def'
+
+pylint:
+	pylint --output-format=colorized --disable="$$(printf %s, $(PYLINT_IGNORE))" $(BIN)/*.py $(PKG)/*.py |  less -R
+
+# Not really a target, but want to put this someplace for now.
+# profile:
+# 	python -m cProfile $(BIN)/flam.py fetch imdb-id=540302193

@@ -15,11 +15,159 @@
 # You should have received a copy of the GNU General Public License
 # along with this program. If not, see <https://www.gnu.org/licenses/>.
 
+import argparse
+import filmflam.repo as repo
+import filmflam.fetching as fetching
+import filmflam.common as common
 
-import filmflam.flam as flam
+def subcommand_config(ctx, args):
+    print('config')
+
+def subcommand_clean(ctx, args):
+    print('clean')
+
+def subcommand_fetch(ctx, args):
+    fetching.fetch(args.LIST_DEF if len(args.LIST_DEF) != 0 else [common.LISTDEF_DEFAULTS], ctx, refetch_pattern=args.refetch, quiet=False)
+
+def subcommand_find(ctx, args):
+    print('find')
+
+def subcommand_chart(ctx, args):
+    print('chart')
 
 def main():
-    flam.helloworld()
+    parser = argparse.ArgumentParser(
+        formatter_class=argparse.RawTextHelpFormatter,
+        description='I dunno lol.')
+    parser.add_argument('-C', '--flam-dir', metavar='PATH', default=repo.FlamContext.DEFAULT_FLAM_DIR, action='store', help=
+        'Use %(metavar)s as the flam directory. Uses FLAM_DIR environment variable by default, or ~/.film_flam if it is not defined.')
+
+    subparsers = parser.add_subparsers(required=True)
+
+    # Config options.
+    config_parser = subparsers.add_parser('config', formatter_class=argparse.RawTextHelpFormatter)
+    config_parser.set_defaults(function=subcommand_config)
+
+    # Clean options.
+    # TODO: still gotta figure this one out. Maybe it should just be flags in the other commands?
+    clean_parser = subparsers.add_parser('clean', formatter_class=argparse.RawTextHelpFormatter)
+    clean_parser.set_defaults(function=subcommand_clean)
+    clean_parser.add_argument('-t', '--tempfiles', action='store_true', help='Deletes tempfiles related to the %(dest)s as well')
+    clean_parser.add_argument('-f', '--fetched', action='store_true', help='Deletes tempfiles related to the %(dest)s as well')
+    clean_parser.add_argument('-a', '--all', action='store_true', help='Delete everything fetched or stored by this program')
+
+    clean_parser.add_argument('LIST_DEF', nargs='*', action='store', help=
+        '''Like find. Will delete ''')
+
+    # Fetch options.
+    fetch_parser = subparsers.add_parser('fetch', formatter_class=argparse.RawTextHelpFormatter)
+    fetch_parser.set_defaults(function=subcommand_fetch)
+    fetch_parser.add_argument('-r', '--refetch', metavar='PATTERN', default=None, action='store', help=
+        '''Forces titles that match %(metavar)s (case-insensitive) to be redownloaded even if they are already locally stored.
+It's enough for %(metavar)s to match any part of the title, not necessarily the whole title.
+%(metavar)s uses regex syntax from python's re library, which is identical to egrep unless you use very advanced features.
+This feature is intended for redownloading shows after a new season has come out.''')
+
+    fetch_parser.add_argument('LIST_DEF', nargs='*', action='store', help=
+        '''Each %(dest)s describes a list to fetch. Supports, in order of priority:
+1. Configured list name (type: list)
+2. Configured compound list name (will fetch all lists under it) (type: compound)
+3. Address to fetch the list from (IMDb list id for instance). But for these the type is not inferred, you must specify it.
+
+To avoid ambiguity and for downloading addresses directly, you can specify the %(dest)s type by writing <type>=%(dest)s. Supported types are:
+* 'list'
+* 'compound'
+* 'imdb-id'
+* 'imdb-private-id'
+* 'imdb-csv'
+* Any custom types you define...
+
+If no %(dest)s provided, fetches all lists configured as defaults.''')
+
+    find_parser = subparsers.add_parser('find', formatter_class=argparse.RawTextHelpFormatter)
+    find_parser.set_defaults(function=subcommand_find)
+
+    # The idea is that we have movie-specific attributes, person-specific attributes, and role-specific attributes. Instead of the idea that an attribute "merges" when you go from roles->people,
+    # these are just 3 exclusive sets of attributes and when you find movies, you can only query (or print) movie-specific attributes (like the title of the film),
+    # when you find people, you can only query people-specific attributes (like if the movies they've been in contains one matching a title),
+    # and when you find roles, you can query attributes on the movie, on the person, or on the role like which crew type is it.
+
+    # TODO: flam movies/roles/people as a subcommand shorthand for flam find movies/roles/people
+
+    # What if you find people/movies/roles and the question of which crew types is a filter, not a "what"?
+    # For "lesser" attributes, a --split option will suffice. --what is only for movies/people/roles.
+
+    # Some decisions:
+    # 1. movies that get filtered don't affect attributes of a person related to that movie. For instance, the average rating still factors in that movie.
+    # 2. the way to omit movies from the computation entirely is to define a metalist for them
+    # 3. metalists are only for movies. You cannot save into the metalist that it's actually about roles or people
+    find_parser.add_argument('-s', '--sort', metavar='KEYS', type=None, default=['leaving', 'runtime', 'alpha', 'dunnolol'], action='store', help= # TODO: type=sort_aliases
+        f'''Sort movies according to %(metavar)s, which is a comma-delimited list of keys to sort by, in decreasing priority. Defaults to 'leaving,runtime,alphabetical'.
+        Valid sort keys: ...''')
+    find_parser.add_argument('-g', '--group', metavar='CREWS', type=None, default='', action='store', help= # TODO: type=crew_aliases
+        f'''Force apply grouping for these crew types''')
+    find_parser.add_argument('-G', '--ungroup', metavar='CREWS', type=None, default='', action='store', help= # TODO: type=crew_aliases
+        f'''Force apply non-grouping for these crew types''')
+    find_parser.add_argument('-c', '--color', choices=['always', 'auto', 'never'], default='auto', action='store', help=
+        'Set whether columns should be colored. Defaults to %(default)s')
+    find_parser.add_argument('-d', '--dsv', metavar='DELIM', default=None, action='store', help=
+        "Output in delimiter-separated values format (DSV).")
+    find_parser.add_argument('-C', '--columns', metavar='COLUMNS', type=None, action='store', default=(True, []), help= # TODO: type=column_aliases
+        'List of columns to print, delimited by commas. Defaults to \'title,leaving,runtime,released,rating,metascore,director\','
+        f''' with a few other "smart" columns which activate when a condition is met.
+This option overrides the defaults and smart columns. Only the columns you specify will be printed.
+Beginning this string with a '+' will cause the columns to be added to the default (and smart) columns instead of replacing them.
+If %(metavar)s is '*', will print all columns.
+Valid column names: ...''')
+    find_parser.add_argument('-v', '--verbose', default=False, action='store_true', help=
+        'Use verbose output, like writing the full release date instead of just the year, and not chopping long strings')
+    find_parser.add_argument('-r', '--reverse', default=False, action='store_true', help=
+        'Reverse the sort order. By default some sort keys are ascending and some descending based on what makes sense to me. This reverses those defaults')
+    find_parser.add_argument('-S', '--spacious', default=False, action='store_true', help=
+        'Add an empty line between entries')
+    find_parser.add_argument('-P', '--paginate', choices=['always', 'auto', 'never'], default='auto', action='store', help=
+        'Choose whether to paginate with less. Defaults to %(default)s, which depends on the size of the output')
+    find_parser.add_argument('-f', '--date-format', metavar='FORMAT', default=None, action='store', help=
+        'Override format for date columns. Default depends on verbosity and which column. See python datetime.strftime documentation for format syntax')
+    find_parser.add_argument('-t', '--no-titles', default=False, action='store_true', help=
+        'Don\'t print a row with the column titles')
+
+    find_parser.add_argument('WHAT', choices=['movies', 'people', 'roles'], action='store', help=
+        '''Choose what to find: movies, people, or roles. Roles have all the attributes of the movie and the person, and then a few role-specific ones.''')
+    find_parser.add_argument('LIST_DEF', nargs='+', action='store', help=
+        '''Like fetch but with different defaults, and if the LIST_DEFs aren't already fetched, it fails with a nice error message.''')
+    find_parser.add_argument('FILTER', nargs='*', action='store', help=
+        '''find-like expression featuring predicates like -crew, -cast, -release...''')
+
+    # Chart options.
+    chart_parser = subparsers.add_parser('chart', formatter_class=argparse.RawTextHelpFormatter)
+    chart_parser.set_defaults(function=subcommand_chart)
+
+    chart_parser.add_argument('-o', '--omit-zeroes', choices=['always', 'auto', 'never'], default='auto', action='store', help=
+        'Choose whether to omit buckets with 0 movies. Defaults to %(default)s, which uses a mode that depends on DISTRIBUTION.')
+    chart_parser.add_argument('-v', '--value-sort', default=False, action='store_true', help='Sort based on the table values, not the keys.')
+    chart_parser.add_argument('-n', '--no-number', default=False, action='store_true', help="Don't append the numerical value to each bar.")
+    chart_parser.add_argument('-S', '--spacious', default=False, action='store_true', help='Space out the table.')
+    chart_parser.add_argument('-t', '--no-title', default=False, action='store_true', help="Don't print a title.")
+    chart_parser.add_argument('-k', '--no-prefix-key', default=False, action='store_true', help="Don't write the key at the start of each bar.")
+    chart_parser.add_argument('-K', '--suffix-key', default=False, action='store_true', help='Append the key to the end of each bar.')
+    
+    # TODO: Not sure about these options yet:
+    # '-c', '--crew-types',  CREWS      Comma-delimited list of crew types to count in crew-size distribution. Defaults to '*', which means all crew types.
+#     chart_parser.add_argument('-f', '--factor', metavar='FACTOR', type=int, action='store', default=0, help=
+#         '''Define custom scaling factor to apply to the table. Defaults to %(default)s, which means a value will be computed to make the table fit in the terminal width.
+# Positive numbers stretch, negatives squish.''')
+
+    chart_parser.add_argument('DISTRIBUTION', action='store', help=
+        '''Which distribution to view (also option for custom distribution based on a field?)''')
+    chart_parser.add_argument('LIST_DEF', nargs='+', action='store', help=
+        '''Like find''')
+    chart_parser.add_argument('FILTER', nargs='*', action='store', help=
+        '''find-like expression featuring predicates like -crew, -cast, -release...''')
+
+    args = parser.parse_args()
+    ctx = repo.FlamContext(args.flam_dir)
+    args.function(ctx, args)
 
 if __name__ == '__main__':
     main()
