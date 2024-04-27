@@ -13,16 +13,17 @@
 # You should have received a copy of the GNU General Public License
 # along with this program. If not, see <https://www.gnu.org/licenses/>.
 
+import typing
 import colorama # type: ignore
 
-class FlamError:
+class FlamError(Exception):
     pass
 
 class InputError(FlamError):
     pass
 
 class FilterSyntaxError(InputError):
-    def __init__(self, message, tokens, error_indices=-1, is_terminal=False):
+    def __init__(self, message: str, tokens: list[str], error_indices: int | typing.Iterable[int] = -1, is_terminal: bool = False) -> None:
         self.message = message
         self.tokens = tokens
         self.error_indices = error_indices
@@ -34,18 +35,18 @@ class FilterSyntaxError(InputError):
         # Anyone who calls a function which raises nonterminal exceptions, should handle them directly.
         self.is_terminal = is_terminal
 
-    def __str__(self):
+    def __str__(self) -> str:
         return f'FILTER syntax error: {self.message}\nIn: {self._join_tokens()}'
 
     # shlex.join wouldn't allow us to color the quotes around error tokens that need quoting, so we need a custom solution.
-    def _join_tokens(self):
+    def _join_tokens(self) -> str:
         error_indices_set = (set(self.error_indices) if not isinstance(self.error_indices, int)
             else set() if self.error_indices == -1
             else {self.error_indices})
         return ' '.join(self.format_token(t, i in error_indices_set) for i, t in enumerate(self.tokens))
 
     @classmethod
-    def format_token(cls, token, is_error=False):
+    def format_token(cls, token: str, is_error: bool = False) -> str:
         # shlex.quote will quote tokens like (, &, etc., and also create a horrible mess of backslashes if the token contains single/double quotation marks.
         # We don't need output that can be safely fed into a shell, only output that is readable. So we go with much simpler rules for when/how to quote.
         quoted = f"'{token}'" if any(c.isspace() for c in token) else token

@@ -58,7 +58,7 @@ class Filter(FilterMember):
         if len(tokens) == 0:
             return cls(None)
 
-        pipeline, until = Pipeline.eat(tokens, 0, expect_eat_everything=True)
+        pipeline, _ = Pipeline.eat(tokens, 0, expect_eat_everything=True)
         return cls(pipeline)
 
     def excrete(self, item, general):
@@ -227,7 +227,7 @@ class Disjoined(FilterMember):
         return cls(value), until
 
     def excrete(self, item, general):
-        return value.excrete(item, general)
+        return self.value.excrete(item, general)
 
     def regurgitate(self):
         yield min(self.DISJOIN)
@@ -246,11 +246,11 @@ class Predicate(FilterMember):
         # and eat the name token right here and let the predicate eat its arguments alone.
         if name not in PREDICATES:
             if name in Positive.RPAREN:
-                raise EinGafrurError(f'right parenthesis has no matching left parenthesis.', tokens=tokens, error_indices=at)
-            else:
-                close_matches = difflib.get_close_matches(name, PREDICATES.keys())
-                suggestions = f' (did you mean: {", ".join(close_matches)}?)' if len(close_matches) > 0 else ''
-                raise EinGafrurError(f"expected valid predicate name, but got: '{name}'{suggestions}.", tokens=tokens, error_indices=at)
+                raise EinGafrurError('right parenthesis has no matching left parenthesis.', tokens=tokens, error_indices=at)
+                
+            close_matches = difflib.get_close_matches(name, PREDICATES.keys())
+            suggestions = f' (did you mean: {", ".join(close_matches)}?)' if len(close_matches) > 0 else ''
+            raise EinGafrurError(f"expected valid predicate name, but got: '{name}'{suggestions}.", tokens=tokens, error_indices=at)
 
         return PREDICATES[name].eat(tokens, at + 1)
 
@@ -301,10 +301,11 @@ class RolePredicate(Predicate):
 # TODO: think about how to make this support custom extensions.
 PREDICATES = {cls.predicate_name(): cls for cls in [TruePredicate, FalsePredicate]}
 
-def compile(tokens):
+# Named this way to avoid shadowing the builtin compile.
+def compile_filter(tokens):
     return Filter.eat(tokens)
 
-def decompile(_filter):
+def decompile_filter(_filter):
     return list(_filter.regurgitate())
 
 def test_compile(line):

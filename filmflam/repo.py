@@ -18,15 +18,25 @@ import msgspec
 import typing
 import types
 import uuid
-import dataclasses
 
 import filmflam._utils as utils
 import filmflam.exceptions as exceptions
 
-@dataclasses.dataclass(frozen=True)
-class CanonListdef:
+class CanonListdef(typing.NamedTuple):
     fetcher_type: str
     address: str
+
+    @property
+    def is_special(self) -> bool:
+        return self.fetcher_type in SPECIAL_FETCHER_TYPES
+
+    @property
+    def is_abstract(self) -> bool:
+        return self.fetcher_type == RemoteList.FETCHER_TYPE or self.fetcher_type == CompoundList.FETCHER_TYPE
+
+    @property
+    def is_concrete(self) -> bool:
+        return not self.is_special
 
     def __str__(self) -> str:
         return f'{self.fetcher_type}={self.address}'
@@ -149,6 +159,11 @@ class ListFile(_FlamSerializable):
     movies_by_uid:          dict[str, ListFileMovie]
     people_by_uid:          dict[str, ListFilePerson]
 
+    @property
+    def abstract_listdef(self) -> CanonListdef:
+        assert not isinstance(self.fetcher_type, UnsetType) and not isinstance(self.address, UnsetType)
+        return CanonListdef(self.fetcher_type, self.address)
+
     # A few things to make sure the file is proper. The "big" checks happen by msgspec when it encodes/decodes things.
     def sanity_checks(self) -> None:
         obj_with_unset, unset_field = self.get_first_unset()
@@ -170,6 +185,15 @@ class RemoteList(_FlamSerializable):
     is_default_fetch:       bool
     is_default_find:        bool
 
+    @property
+    def abstract_listdef(self) -> CanonListdef:
+        assert not isinstance(self.uid, UnsetType)
+        return CanonListdef(self.FETCHER_TYPE, self.uid)
+
+    @property
+    def concrete_listdef(self) -> CanonListdef:
+        return CanonListdef(self.fetcher_type, self.address)
+
 class CompoundList(_FlamSerializable):
     FETCHER_TYPE: typing.ClassVar[str] = 'compound'
 
@@ -180,6 +204,11 @@ class CompoundList(_FlamSerializable):
     is_default_fetch:       bool
     is_default_find:        bool
 
+    @property
+    def abstract_listdef(self) -> CanonListdef:
+        assert not isinstance(self.uid, UnsetType)
+        return CanonListdef(self.FETCHER_TYPE, self.uid)
+
 class Configuration(_FlamSerializable):
     _remote_lists:          list[RemoteList]
     _compound_lists:        list[CompoundList]
@@ -188,26 +217,35 @@ class Configuration(_FlamSerializable):
     def get_remote_list_by_uid(self, uid: str) -> RemoteList:
         try:
             return next(rl for rl in self._remote_lists if rl.uid == uid)
-        except StopIteration:
-            raise exceptions.InputError(f"Invalid list UID: '{uid}'")
+        except StopIteration as e:
+            raise exceptions.InputError(f"Invalid list UID: '{uid}'") from e
 
     def get_compound_list_by_uid(self, uid: str) -> CompoundList:
         try:
             return next(cl for cl in self._compound_lists if cl.uid == uid)
-        except StopIteration:
-            raise exceptions.InputError(f"Invalid compound list UID: '{uid}'")
+        except StopIteration as e:
+            raise exceptions.InputError(f"Invalid compound list UID: '{uid}'") from e
 
     def get_remote_list_by_name(self, name: str) -> RemoteList:
         try:
             return next(rl for rl in self._remote_lists if rl.name == name)
-        except StopIteration:
-            raise exceptions.InputError(f"Invalid list name: '{name}'")
+        except StopIteration as e:
+            raise exceptions.InputError(f"Invalid list name: '{name}'") from e
 
     def get_compound_list_by_name(self, name: str) -> CompoundList:
         try:
             return next(cl for cl in self._compound_lists if cl.name == name)
-        except StopIteration:
-            raise exceptions.InputError(f"Invalid compound list name: '{name}'")
+        except StopIteration as e:
+            raise exceptions.InputError(f"Invalid compound list name: '{name}'") from e
+
+    def get_list_by_abstract_listdef(self, abstract_listdef: CanonListdef) -> RemoteList | CompoundList:
+        match abstract_listdef.fetcher_type:
+            case RemoteList.FETCHER_TYPE:
+                return self.get_remote_list_by_uid(abstract_listdef.address)
+            case CompoundList.FETCHER_TYPE:
+                return self.get_compound_list_by_uid(abstract_listdef.address)
+            case _:
+                raise ValueError(f"Invalid LISTDEF: '{abstract_listdef}' type is not any kind of list.")
 
     @property
     def remote_lists(self) -> typing.Iterable[RemoteList]:
@@ -221,16 +259,27 @@ class Configuration(_FlamSerializable):
         obj_with_unset, unset_field = self.get_first_unset()
 
         if obj_with_unset is not None:
-            raise RuntimeError(f'Invalid configuration: found object of type: {type(obj_with_unset)} with unset field: {unset_field}.')
+            raise exceptions.InputError(f'Invalid config: found object of type: {type(obj_with_unset)} with unset field: {unset_field}.')
 
-        if len(set(rl.name for rl in self._remote_lists)) != len(self._remote_lists):
-            raise RuntimeError(f'Invalid configuration: remote list names are not unique.') # TODO: print which ones!
+        for rl in self._remote_lists:
+            if sum(1 for rl2 in self._remote_lists if rl.name == rl2.name) > 1:
+                raise exceptions.InputError(f"Invalid config: found multiple lists named '{rl.name}'.")
 
-        if not SPECIAL_FETCHER_TYPES.isdisjoint(rl.fetcher_type for rl in self._remote_lists):
-            raise RuntimeError(f'Invalid configuration: found disallowed remote list fetcher types.') # TODO: print which ones!
+            if rl.concrete_listdef.is_special:
+                raise exceptions.InputError(f"Invalid config: LISTDEF '{rl.concrete_listdef}' type must not be one of: {', '.join(SPECIAL_FETCHER_TYPES)}.")
 
-        if len(set(cl.name for cl in self._compound_lists)) != len(self._compound_lists):
-            raise RuntimeError(f'Invalid configuration: compound list names are not unique.') # TODO: print which ones!
+        for cl in self._compound_lists:
+            if sum(1 for cl2 in self._compound_lists if cl.name == cl2.name) > 1:
+                raise exceptions.InputError(f"Invalid config: found multiple compound lists named '{cl.name}'.")
+
+            if len(cl.remote_list_uids) == 0:
+                raise exceptions.InputError(f"Invalid config: compound list '{cl.name}' is made up of 0 lists.")
+                
+            for uid in cl.remote_list_uids:
+                try:
+                    self.get_remote_list_by_uid(uid)
+                except exceptions.InputError as e:
+                    raise exceptions.InputError(f"Invalid config: compound list '{cl.name}' references unknown remote list: '{uid}'.") from e
 
 # This object represents the repository itself mainly. Any creating/writing/reading files from the flam directory should go through here.
 # For users who just want to work with volatile memory and not load or save anything, we support a "contextless" mode.
@@ -256,7 +305,6 @@ class FlamContext:
     def _make_flam_dir(self) -> None:
         assert self._flam_dir is not None
 
-        # TODO: if this gets too annoying make an easy way to ignore FileExistsError.
         try:
             os.mkdir(self._flam_dir)
         except FileExistsError:
@@ -268,24 +316,23 @@ class FlamContext:
             pass
 
     # List files.
-    def load_list_file(self, fetcher_type: str, address: str, must_exist: bool = True) -> ListFile:
-        if not must_exist and (self._flam_dir is None or not os.path.exists(self._get_list_file_path(fetcher_type, address))):
+    def load_list_file(self, abstract_listdef: CanonListdef, must_exist: bool = True) -> ListFile:
+        if not must_exist and (self._flam_dir is None or not os.path.exists(self._get_list_file_path(abstract_listdef))):
             return ListFile.create()
 
-        return ListFile.load(self._get_list_file_path(fetcher_type, address))
+        return ListFile.load(self._get_list_file_path(abstract_listdef))
 
     def write_list_file(self, list_file: ListFile) -> None:
         if self._flam_dir is not None:
-            assert not isinstance(list_file.fetcher_type, UnsetType) and not isinstance(list_file.address, UnsetType)
-            list_file.write(self._get_list_file_path(list_file.fetcher_type, list_file.address))
+            list_file.write(self._get_list_file_path(list_file.abstract_listdef))
 
     # After much deliberation, I decided that files for named lists should be named according to the list type and UID,
     # and unnamed lists' files should be named according to the fetcher type and address.
     # This is mostly as opposed to storing all lists according to the concrete fetcher_type and address.
     # The reason: this lets us change lists to a different fetcher type with a compatible ID type.
-    def _get_list_file_path(self, fetcher_type: str, address: str) -> str:
+    def _get_list_file_path(self, abstract_listdef: CanonListdef) -> str:
         assert self._flam_dir is not None
-        filename = utils.slugify(f'{fetcher_type}_{address}.json')
+        filename = utils.slugify(f'{abstract_listdef.fetcher_type}_{abstract_listdef.address}.json')
         return os.path.join(self._flam_dir, self._LISTFILES_DIR, filename)
 
     # Configuration.
@@ -295,15 +342,17 @@ class FlamContext:
 
     def add_remote_list(self, remote_list: RemoteList) -> None:
         remote_list.uid = str(uuid.uuid4())
-        self.cfg._remote_lists.append(remote_list)
+        self.cfg._remote_lists.append(remote_list) # pylint: disable=protected-access
 
-        # If the list file already exists but as an unnamed list, rename it.
+        # See if the list was already fetched before it was named, and "claim" the file.
         if self._flam_dir is not None:
-            anonymous_filename = self._get_list_file_path(remote_list.fetcher_type, remote_list.address)
-            defined_filename = self._get_list_file_path(RemoteList.FETCHER_TYPE, remote_list.uid)
+            concrete_filename = self._get_list_file_path(remote_list.concrete_listdef)
+            abstract_filename = self._get_list_file_path(remote_list.abstract_listdef)
             
-            if os.path.exists(anonymous_filename):
-                os.rename(anonymous_filename, defined_filename)
+            try:
+                os.rename(concrete_filename, abstract_filename)
+            except FileNotFoundError:
+                pass
 
     def delete_remote_list(self, uid: str) -> None:
         remote_list = self.cfg.get_remote_list_by_uid(uid)
@@ -314,18 +363,21 @@ class FlamContext:
         if len(dependents) > 0:
             raise exceptions.InputError(f"Failed to delete list '{remote_list.name}' because it is depended on by compound lists: {', '.join(dependents)}")
 
-        # TODO: consider if we really want to delete the file when deleting the list. Maybe keep it under an anonymous list name?
         if self._flam_dir is not None:
+            # Deleting a list doesn't delete it from local storage, only gets it renamed to be anonymous.
+            concrete_filename = self._get_list_file_path(remote_list.concrete_listdef)
+            abstract_filename = self._get_list_file_path(remote_list.abstract_listdef)
+
             try:
-                os.remove(self._get_list_file_path(RemoteList.FETCHER_TYPE, uid))
+                os.rename(abstract_filename, concrete_filename)
             except FileNotFoundError:
                 pass
 
-        self.cfg._remote_lists.remove(remote_list)
+        self.cfg._remote_lists.remove(remote_list) # pylint: disable=protected-access
 
     def add_compound_list(self, compound_list: CompoundList) -> None:
         compound_list.uid = str(uuid.uuid4())
-        self.cfg._compound_lists.append(compound_list)
+        self.cfg._compound_lists.append(compound_list) # pylint: disable=protected-access
 
     def delete_compound_list(self, uid: str) -> None:
         compound_list = self.cfg.get_compound_list_by_uid(uid)
@@ -334,7 +386,7 @@ class FlamContext:
             # TODO: delete files
             pass
 
-        self.cfg._compound_lists.remove(compound_list)
+        self.cfg._compound_lists.remove(compound_list) # pylint: disable=protected-access
 
     def write_cfg(self) -> None:
         if self._flam_dir is not None:
@@ -357,29 +409,36 @@ class FlamContext:
                 raise exceptions.InputError(f"Invalid LISTDEF: '{listdef}' must have nothing after the equal sign.")
 
             return CanonListdef(before_eq, after_eq)
+
         # For remote lists we need to convert the name to a uid.
-        elif eq_idx != -1 and before_eq == RemoteList.FETCHER_TYPE:
-            return CanonListdef(before_eq, self.cfg.get_remote_list_by_name(after_eq).uid)
+        if eq_idx != -1 and before_eq == RemoteList.FETCHER_TYPE:
+            return self.cfg.get_remote_list_by_name(after_eq).abstract_listdef
+        
         # Same for compound lists.
-        elif eq_idx != -1 and before_eq == CompoundList.FETCHER_TYPE:
-            return CanonListdef(before_eq, self.cfg.get_compound_list_by_name(after_eq).uid)
+        if eq_idx != -1 and before_eq == CompoundList.FETCHER_TYPE:
+            return self.cfg.get_compound_list_by_name(after_eq).abstract_listdef
+        
         # The generic case where it's whatever=whatever.
-        elif eq_idx != -1:
+        if eq_idx != -1:
             return CanonListdef(before_eq, after_eq)
+        
         # If no '=' sign then we'll treat it as a list or compound list, and try to determine which.
-        elif (list_obj := self._get_implicit_list(before_eq)) is not None:
-            return CanonListdef(type(list_obj).FETCHER_TYPE, list_obj.uid)
+        if (list_obj := self._get_implicit_list(before_eq)) is not None:
+            return list_obj.abstract_listdef
 
         raise exceptions.InputError(f"Invalid LISTDEF: '{listdef}'.")
 
-    def canonicalize_listdefs_and_expand_all(self, listdefs: typing.Iterable[str]) -> typing.Iterator[CanonListdef]:
+    def canonicalize_listdefs_with_all_expansion(self, listdefs: typing.Iterable[str]) -> typing.Iterator[CanonListdef]:
         for ldef in listdefs:
-            cldef = canonicalize_listdef(ldef)
+            cldef = self.canonicalize_listdef(ldef)
 
             if cldef.fetcher_type == LISTDEF_ALL:
-                yield from (CanonListdef(rl.FETCHER_TYPE, rl.uid) for rl in self.cfg.remote_lists)
+                yield from (rl.abstract_listdef for rl in self.cfg.remote_lists)
             else:
                 yield cldef
+
+    def canon_listdef_pretty(self, canon_listdef: CanonListdef) -> str:
+        return str(canon_listdef._replace(address=self.cfg.get_list_by_abstract_listdef(canon_listdef).name) if canon_listdef.is_abstract else canon_listdef)
 
     def _get_implicit_list(self, name: str) -> None | RemoteList | CompoundList:
         try:

@@ -59,11 +59,11 @@ class PublicListFetcher(fetching.ListFetcher):
     def id_type(self) -> str:
         return _ID_TYPE
 
-    def fetch(self, list_file: repo.ListFile) -> None:
+    def fetch_into_file(self, list_file: repo.ListFile) -> None:
         try:
-            movies_csv_file = urllib.request.urlopen(_get_csv_url(self.address))
+            movies_csv_file = urllib.request.urlopen(_get_csv_url(self.concrete_listdef.address))
         except urllib.error.HTTPError as e:
-            raise exceptions.InputError(f"Failed to download LISTDEF: '{self.concrete_canon_listdef}' from IMDb with error: {e}. Are you sure the address is valid?")
+            raise exceptions.InputError(f"Failed to download LISTDEF: '{self.concrete_listdef}' from IMDb with error: {e}. Are you sure the address is valid?")
 
         with movies_csv_file:
             movies_csv = _read_csv(codecs.iterdecode(movies_csv_file, encoding='utf-8'))
@@ -78,7 +78,7 @@ class PrivateListFetcher(fetching.ListFetcher):
     def id_type(self) -> str:
         return _ID_TYPE
 
-    def fetch(self, list_file: repo.ListFile) -> None:
+    def fetch_into_file(self, list_file: repo.ListFile) -> None:
         NUM_RETRIES = 1 # TODO: if we never experience timeouts, get rid of this.
         CSV_DOWNLOAD_TIMEOUT_SECS = 20
         DOWNLOADS_DIR = os.getenv('FLAM_DOWNLOADS', os.path.join(os.path.expanduser('~'), 'Downloads'))
@@ -90,13 +90,13 @@ class PrivateListFetcher(fetching.ListFetcher):
         for i in range(NUM_RETRIES):
             try:
                 latest_csv = utils.download_file_using_browser(
-                    url=_get_csv_url(self.address),
+                    url=_get_csv_url(self.concrete_listdef.address),
                     file_extension='csv',
                     downloads_dir=DOWNLOADS_DIR,
                     timeout_secs=CSV_DOWNLOAD_TIMEOUT_SECS)
-            except TimeoutError:
+            except TimeoutError as e:
                 if i == NUM_RETRIES - 1:
-                    raise exceptions.InputError(f"Timed out trying to download LISTDEF: '{self.concrete_canon_listdef}' from IMDb. Are you sure the address is valid?")
+                    raise exceptions.InputError(f"Timed out trying to download LISTDEF: '{self.concrete_listdef}' from IMDb. Are you sure the address is valid?") from e
 
         # CSV documentation says to use newline=''.
         with open(latest_csv, 'r', newline='') as movies_csv_file:
@@ -113,11 +113,11 @@ class CsvListFetcher(fetching.ListFetcher):
     def id_type(self) -> str:
         return _ID_TYPE
 
-    def fetch(self, list_file: repo.ListFile) -> None:
+    def fetch_into_file(self, list_file: repo.ListFile) -> None:
         try:
-            movies_csv_file = open(self.address, 'r', newline='')
-        except FileNotFoundError:
-            raise exceptions.InputError(f"Invalid LISTDEF: {self.concrete_canon_listdef}: no such file.")
+            movies_csv_file = open(self.concrete_listdef.address, 'r', newline='')
+        except FileNotFoundError as e:
+            raise exceptions.InputError(f"Invalid LISTDEF: {self.concrete_listdef}: no such file.") from e
 
         with movies_csv_file:
             movies_csv = _read_csv(movies_csv_file)

@@ -76,18 +76,10 @@ def config_list_print(ctx, args):
 
 def config_list_edit(ctx, args, remote_list):
     if args.rename is not None and args.rename != remote_list.name:
-        # If we don't catch this here we'll catch it later but with a less nice error.
-        if args.rename in (rl.name for rl in ctx.cfg.remote_lists):
-            raise exceptions.InputError(f"Invalid NEW_NAME: '{args.rename}': a list by that name already exists.")
-
         remote_list.name = args.rename
 
     if args.LISTDEF is not None:
         cldef = ctx.canonicalize_listdef(args.LISTDEF)
-
-        if cldef.fetcher_type in ctx.SPECIAL_FETCHER_TYPES:
-            raise exceptions.InputError(f"Invalid LISTDEF: '{args.LISTDEF}': must not be one of: {', '.join(ctx.SPECIAL_FETCHER_TYPES)}.")
-
         remote_list.fetcher_type = cldef.fetcher_type
         remote_list.address = cldef.address
 
@@ -103,16 +95,10 @@ def config_list_create(ctx, args):
     if args.NAME is None:
         raise exceptions.InputError(f"Must specify a NAME to create or edit a list.")
 
-    if args.rename in (rl.name for rl in ctx.cfg.remote_lists):
-        raise exceptions.InputError(f"Invalid NAME: '{args.rename}': a list by that name already exists.")
-
     if args.LISTDEF is None:
         raise exceptions.InputError(f"List '{args.NAME}' doesn't exist, so LISTDEF is required.")
 
     cldef = ctx.canonicalize_listdef(args.LISTDEF)
-
-    if cldef.fetcher_type in ctx.SPECIAL_FETCHER_TYPES:
-        raise exceptions.InputError(f"Invalid LISTDEF: '{args.LISTDEF}': must not be one of: {', '.join(ctx.SPECIAL_FETCHER_TYPES)}.")
 
     remote_list = repo.RemoteList.create(
         name = args.NAME,
@@ -154,10 +140,6 @@ def config_compound_print(ctx, args):
 
 def config_compound_edit(ctx, args, compound_list):
     if args.rename is not None:
-        # If we don't catch this here we'll catch it later but with a less nice error.
-        if args.rename in (cl.name for cl in ctx.cfg.compound_lists):
-            raise exceptions.InputError(f"Invalid NEW_NAME: '{args.rename}': a compound list by that name already exists.")
-
         compound_list.name = args.rename
 
     remote_list_names, filter_tokens = split_at_filter(args.LIST + args.FILTER)
@@ -183,17 +165,11 @@ def config_compound_create(ctx, args):
     if args.NAME is None:
         raise exceptions.InputError(f"Must specify a NAME to create or edit a compound list.")
 
-    if args.rename in (cl.name for cl in ctx.cfg.compound_lists):
-        raise exceptions.InputError(f"Invalid NAME: '{args.rename}': a compound list by that name already exists.")
-
     remote_list_names, filter_tokens = split_at_filter(args.LIST + args.FILTER)
-
-    if len(remote_list_names) == 0:
-        raise exceptions.InputError(f"Compound list '{args.NAME}' doesn't exist, so LISTs are required.")
 
     compound_list = repo.CompoundList.create(
         name = args.NAME,
-        remote_list_uids = [ctx.get_remote_list_by_name(rl_name).uid for rl_name in remote_list_names],
+        remote_list_uids = [ctx.cfg.get_remote_list_by_name(rl_name).uid for rl_name in remote_list_names],
         filter_tokens = filter_tokens,
         is_default_fetch = args.default_fetch == Choice.YES,
         is_default_find = args.default_find == Choice.YES,
@@ -206,16 +182,11 @@ def subcommand_clean(ctx, args):
     print('clean')
 
 def subcommand_fetch(ctx, args):
-    canon_listdefs = ctx.canonicalize_listdefs_and_expand_all(args.LISTDEF)
-    fetch_expanded = fetching.expand_listdefs_for_fetch(canon_listdefs)
+    fetchers = fetching.parse_listdefs(args.LISTDEF if len(args.LISTDEF) != 0 else [repo.LISTDEF_DEFAULTS], ctx)
 
-    fetching.fetch(
-        args.LISTDEF if len(args.LISTDEF) != 0 else [repo.LISTDEF_DEFAULTS],
-        ctx,
-        refetch_pattern=args.refetch,
-        from_scratch=args.from_scratch,
-        quiet=False
-    )
+    for fetcher in fetchers:
+        print(f"Fetching {ctx.canon_listdef_pretty(fetcher.abstract_listdef)}...")
+        list_file, is_changed = fetcher.fetch(ctx, refetch_pattern=args.refetch, from_scratch=args.from_scratch, quiet=False)
 
 def subcommand_find(ctx, args):
     print('find')
@@ -405,8 +376,7 @@ Valid column names: ...''')
         args.function(ctx, args)
     except (exceptions.InputError, exceptions.FetchInterrupt) as e:
         # No ugly tracebacks for input errors. Only for internal errors.
-        print(f'{os.path.basename(__file__)}: error: {e}', sys.stderr)
-        exit(1)
+        sys.exit(f'{os.path.basename(__file__)}: error: {e}')
 
 if __name__ == '__main__':
     main()
