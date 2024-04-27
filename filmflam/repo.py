@@ -17,13 +17,24 @@ import os
 import msgspec
 import typing
 import types
+import uuid
+import dataclasses
 
 import filmflam._utils as utils
+import filmflam.exceptions as exceptions
+
+@dataclasses.dataclass(frozen=True)
+class CanonListdef:
+    fetcher_type: str
+    address: str
+
+    def __str__(self) -> str:
+        return f'{self.fetcher_type}={self.address}'
 
 # Other modules need to know about these, mainly for type checking reasons, but I don't want them to have to know about msgspec.
 UnsetType = msgspec.UnsetType
 
-class _ListFileMixin(msgspec.Struct, forbid_unknown_fields=True):
+class _FlamSerializable(msgspec.Struct, forbid_unknown_fields=True):
     @classmethod
     def _defaults(cls) -> typing.Iterator[tuple[str, typing.Any]]:
         for field in msgspec.structs.fields(cls):
@@ -45,6 +56,24 @@ class _ListFileMixin(msgspec.Struct, forbid_unknown_fields=True):
         field_values = dict(cls._defaults())
         field_values.update(kwargs)
         return cls(**field_values)
+
+    @classmethod
+    def load(cls, file: str) -> typing.Self:
+        with open(file, 'rb') as f:
+            obj = msgspec.json.decode(f.read(), type=cls)
+
+        obj.sanity_checks()
+        return obj
+    
+    def write(self, file: str) -> None:
+        self.sanity_checks()
+        encoded = msgspec.json.format(msgspec.json.encode(self))
+
+        with open(file, 'wb') as f:
+            f.write(encoded)
+
+    def sanity_checks(self) -> None:
+        pass
 
     # Sorts all lists recursively so that we can compare for equality.
     def canonicalize(self) -> None:
@@ -73,22 +102,22 @@ class _ListFileMixin(msgspec.Struct, forbid_unknown_fields=True):
         for field in msgspec.structs.fields(self):
             value = getattr(self, field.name)
             
-            if isinstance(value, list) and len(value) > 0 and isinstance(value[0], _ListFileMixin):
+            if isinstance(value, list) and len(value) > 0 and isinstance(value[0], _FlamSerializable):
                 yield from (descendant for child in value for descendant in child.depth_first_iter())
-            elif isinstance(value, dict) and len(value) > 0 and isinstance(next(iter(value.values())), _ListFileMixin):
+            elif isinstance(value, dict) and len(value) > 0 and isinstance(next(iter(value.values())), _FlamSerializable):
                 yield from (descendant for child in value.values() for descendant in child.depth_first_iter())
 
         yield self
 
-class ListFileRole(_ListFileMixin):
+class ListFileRole(_FlamSerializable):
     person_uid:             str
     characters:             list[str]
 
-class ListFileCrew(_ListFileMixin):
+class ListFileCrew(_FlamSerializable):
     crew_type:              str
     roles_by_uid:           dict[str, ListFileRole]
 
-class ListFilePerson(_ListFileMixin):
+class ListFilePerson(_FlamSerializable):
     uid:                    str
     name:                   UnsetType | str
 
@@ -96,7 +125,7 @@ class ListFilePerson(_ListFileMixin):
     # gender
     # nationality
 
-class ListFileMovie(_ListFileMixin):
+class ListFileMovie(_FlamSerializable):
     uid:                    str
     title:                  UnsetType | str
     watch_date:             UnsetType | None | str
@@ -112,34 +141,13 @@ class ListFileMovie(_ListFileMixin):
     crew:                   dict[str, ListFileCrew]
     # TODO: consider adding languages, countries
 
-class ListFile(_ListFileMixin):
+class ListFile(_FlamSerializable):
     fetcher_type:           UnsetType | str
     address:                UnsetType | str
     id_type:                UnsetType | str
 
     movies_by_uid:          dict[str, ListFileMovie]
     people_by_uid:          dict[str, ListFilePerson]
-
-    @classmethod
-    def load(cls, file: str) -> typing.Self:
-        # The beauty of msgspec:
-        # 1. It doesn't have shitty security vulnerabilities like jsonpickle.
-        # 2. It verifies the json matches the type: if it encounters an unknown field, or a known field with the wrong type, it raises an exception.
-        #    Because of this we don't have to even store the version of the file. If we change the file format, msgspec will catch it.
-        #    Note: we do not wish to support what msgspec calls "schema evolution" (adding new fields without breaking the ability to decode old files)
-        #    This is because if we add a new field, you may need to refetch the whole movie anyway.
-        with open(file, 'rb') as f:
-            list_file = msgspec.json.decode(f.read(), type=cls)
-
-        list_file.sanity_checks()
-        return list_file
-
-    def write(self, file: str) -> None:
-        self.sanity_checks()
-
-        with open(file, 'wb') as f:
-            encoded = msgspec.json.format(msgspec.json.encode(self))
-            f.write(encoded)
 
     # A few things to make sure the file is proper. The "big" checks happen by msgspec when it encodes/decodes things.
     def sanity_checks(self) -> None:
@@ -152,38 +160,79 @@ class ListFile(_ListFileMixin):
             if len(CREW_TYPES) != len(movie.crew) or not CREW_TYPES.issuperset(movie.crew.keys()):
                 raise RuntimeError(f'Invalid ListFile: found movie: {movie.uid} with bad crew types: {movie.crew.keys()}.')
 
-class RemoteList:
-    FETCHER_TYPE = 'list'
+class RemoteList(_FlamSerializable):
+    FETCHER_TYPE: typing.ClassVar[str] = 'list'
     
-    def __init__(self) -> None:
-        self.name = None
-        self.fetcher_type = None
-        self.address = None
-        self.is_default_fetch = False
-        self.is_default_find = False
+    uid:                    UnsetType | str
+    name:                   str
+    fetcher_type:           str
+    address:                str
+    is_default_fetch:       bool
+    is_default_find:        bool
 
-class CompoundList:
-    FETCHER_TYPE = 'compound'
+class CompoundList(_FlamSerializable):
+    FETCHER_TYPE: typing.ClassVar[str] = 'compound'
 
-    def __init__(self) -> None:
-        self.name = None
-        self.remote_list_names = []
-        self.filters = []
-        self.is_default_find = False
+    uid:                    UnsetType | str
+    name:                   str
+    remote_list_uids:       list[str]
+    filter_tokens:          list[str]
+    is_default_fetch:       bool
+    is_default_find:        bool
 
-class Configuration:
-    def __init__(self) -> None:
-        self.remote_lists = []
-        self.compound_lists = []
+class Configuration(_FlamSerializable):
+    _remote_lists:          list[RemoteList]
+    _compound_lists:        list[CompoundList]
+    extensions:             list[str]
 
-    @classmethod
-    def load(cls, file: str) -> typing.Self:
-        pass
-    
-    def write(self, file: str) -> None:
-        pass
+    def get_remote_list_by_uid(self, uid: str) -> RemoteList:
+        try:
+            return next(rl for rl in self._remote_lists if rl.uid == uid)
+        except StopIteration:
+            raise exceptions.InputError(f"Invalid list UID: '{uid}'")
 
-# This object represents the repository itself mainly. typing.Any creating/writing/reading files from the flam directory should go through here.
+    def get_compound_list_by_uid(self, uid: str) -> CompoundList:
+        try:
+            return next(cl for cl in self._compound_lists if cl.uid == uid)
+        except StopIteration:
+            raise exceptions.InputError(f"Invalid compound list UID: '{uid}'")
+
+    def get_remote_list_by_name(self, name: str) -> RemoteList:
+        try:
+            return next(rl for rl in self._remote_lists if rl.name == name)
+        except StopIteration:
+            raise exceptions.InputError(f"Invalid list name: '{name}'")
+
+    def get_compound_list_by_name(self, name: str) -> CompoundList:
+        try:
+            return next(cl for cl in self._compound_lists if cl.name == name)
+        except StopIteration:
+            raise exceptions.InputError(f"Invalid compound list name: '{name}'")
+
+    @property
+    def remote_lists(self) -> typing.Iterable[RemoteList]:
+        return iter(self._remote_lists)
+
+    @property
+    def compound_lists(self) -> typing.Iterable[CompoundList]:
+        return iter(self._compound_lists)
+
+    def sanity_checks(self) -> None:
+        obj_with_unset, unset_field = self.get_first_unset()
+
+        if obj_with_unset is not None:
+            raise RuntimeError(f'Invalid configuration: found object of type: {type(obj_with_unset)} with unset field: {unset_field}.')
+
+        if len(set(rl.name for rl in self._remote_lists)) != len(self._remote_lists):
+            raise RuntimeError(f'Invalid configuration: remote list names are not unique.') # TODO: print which ones!
+
+        if not SPECIAL_FETCHER_TYPES.isdisjoint(rl.fetcher_type for rl in self._remote_lists):
+            raise RuntimeError(f'Invalid configuration: found disallowed remote list fetcher types.') # TODO: print which ones!
+
+        if len(set(cl.name for cl in self._compound_lists)) != len(self._compound_lists):
+            raise RuntimeError(f'Invalid configuration: compound list names are not unique.') # TODO: print which ones!
+
+# This object represents the repository itself mainly. Any creating/writing/reading files from the flam directory should go through here.
 # For users who just want to work with volatile memory and not load or save anything, we support a "contextless" mode.
 # All the ugly if checks for that are encapsulated in this class.
 class FlamContext:
@@ -193,35 +242,21 @@ class FlamContext:
     _CONFIGURATION_FILE = 'config.json'
 
     def __init__(self, flam_dir: None | str = DEFAULT_FLAM_DIR) -> None:
+        # TODO: do we need to canonicalize this? what if FLAM_DIR has a different type of backslashes?
         self._flam_dir = flam_dir
 
         if self._flam_dir is None:
-            self._cfg = Configuration()
+            self._cfg = Configuration.create()
         else:
             self._make_flam_dir()
 
             cfg_path = self._get_cfg_path()
-            self._cfg = Configuration.load(cfg_path) if os.path.exists(cfg_path) else Configuration()
-
-    def load_list_file(self, id_type: str, address: str, must_exist: bool = True) -> ListFile:
-        if not must_exist and (self._flam_dir is None or not os.path.exists(self._get_list_file_path(id_type, address))):
-            return ListFile.create()
-
-        return ListFile.load(self._get_list_file_path(id_type, address))
-
-    def write_list_file(self, list_file: ListFile) -> None:
-        if self._flam_dir is not None:
-            assert not isinstance(list_file.id_type, UnsetType) and not isinstance(list_file.address, UnsetType)
-            list_file.write(self._get_list_file_path(list_file.id_type, list_file.address))
-        
-    @property
-    def cfg(self) -> Configuration:
-        return self._cfg
+            self._cfg = Configuration.load(cfg_path) if os.path.exists(cfg_path) else Configuration.create()
 
     def _make_flam_dir(self) -> None:
         assert self._flam_dir is not None
 
-        # TODO: if this gets too annoying there's a with contextmanager to suppress specific errors.
+        # TODO: if this gets too annoying make an easy way to ignore FileExistsError.
         try:
             os.mkdir(self._flam_dir)
         except FileExistsError:
@@ -232,15 +267,133 @@ class FlamContext:
         except FileExistsError:
             pass
 
-    def _get_list_file_path(self, id_type: str, address: str) -> str:
+    # List files.
+    def load_list_file(self, fetcher_type: str, address: str, must_exist: bool = True) -> ListFile:
+        if not must_exist and (self._flam_dir is None or not os.path.exists(self._get_list_file_path(fetcher_type, address))):
+            return ListFile.create()
+
+        return ListFile.load(self._get_list_file_path(fetcher_type, address))
+
+    def write_list_file(self, list_file: ListFile) -> None:
+        if self._flam_dir is not None:
+            assert not isinstance(list_file.fetcher_type, UnsetType) and not isinstance(list_file.address, UnsetType)
+            list_file.write(self._get_list_file_path(list_file.fetcher_type, list_file.address))
+
+    # After much deliberation, I decided that files for named lists should be named according to the list type and UID,
+    # and unnamed lists' files should be named according to the fetcher type and address.
+    # This is mostly as opposed to storing all lists according to the concrete fetcher_type and address.
+    # The reason: this lets us change lists to a different fetcher type with a compatible ID type.
+    def _get_list_file_path(self, fetcher_type: str, address: str) -> str:
         assert self._flam_dir is not None
-        filename = utils.slugify(f'{id_type}_{address}.json')
+        filename = utils.slugify(f'{fetcher_type}_{address}.json')
         return os.path.join(self._flam_dir, self._LISTFILES_DIR, filename)
 
+    # Configuration.
+    @property
+    def cfg(self) -> Configuration:
+        return self._cfg
+
+    def add_remote_list(self, remote_list: RemoteList) -> None:
+        remote_list.uid = str(uuid.uuid4())
+        self.cfg._remote_lists.append(remote_list)
+
+        # If the list file already exists but as an unnamed list, rename it.
+        if self._flam_dir is not None:
+            anonymous_filename = self._get_list_file_path(remote_list.fetcher_type, remote_list.address)
+            defined_filename = self._get_list_file_path(RemoteList.FETCHER_TYPE, remote_list.uid)
+            
+            if os.path.exists(anonymous_filename):
+                os.rename(anonymous_filename, defined_filename)
+
+    def delete_remote_list(self, uid: str) -> None:
+        remote_list = self.cfg.get_remote_list_by_uid(uid)
+
+        # We don't mess with removing the list from its dependent compound lists. Let the user do that.
+        dependents = [cl.name for cl in self.cfg.compound_lists if uid in cl.remote_list_uids]
+
+        if len(dependents) > 0:
+            raise exceptions.InputError(f"Failed to delete list '{remote_list.name}' because it is depended on by compound lists: {', '.join(dependents)}")
+
+        # TODO: consider if we really want to delete the file when deleting the list. Maybe keep it under an anonymous list name?
+        if self._flam_dir is not None:
+            try:
+                os.remove(self._get_list_file_path(RemoteList.FETCHER_TYPE, uid))
+            except FileNotFoundError:
+                pass
+
+        self.cfg._remote_lists.remove(remote_list)
+
+    def add_compound_list(self, compound_list: CompoundList) -> None:
+        compound_list.uid = str(uuid.uuid4())
+        self.cfg._compound_lists.append(compound_list)
+
+    def delete_compound_list(self, uid: str) -> None:
+        compound_list = self.cfg.get_compound_list_by_uid(uid)
+
+        if self._flam_dir is not None:
+            # TODO: delete files
+            pass
+
+        self.cfg._compound_lists.remove(compound_list)
+
+    def write_cfg(self) -> None:
+        if self._flam_dir is not None:
+            self.cfg.write(self._get_cfg_path())
+        
     def _get_cfg_path(self) -> str:
         assert self._flam_dir is not None
         return os.path.join(self._flam_dir, self._CONFIGURATION_FILE)
-        
+
+    # Listdefs.
+    def canonicalize_listdef(self, listdef: str) -> CanonListdef:
+        eq_idx = listdef.find('=')
+        before_eq, after_eq = (listdef[:eq_idx], listdef[eq_idx + 1:]) if eq_idx != -1 else (listdef, '')
+
+        # First case, DEFAULTS or ALL.
+        if before_eq == LISTDEF_DEFAULTS or before_eq == LISTDEF_ALL:
+            # We (reluctantly) support a trailing '=' for ALL and DEFAULTS,
+            # because this way CanonListdef.__str__ and canonicalize_listdef inverse each other. But it must be trailing.
+            if after_eq != '':
+                raise exceptions.InputError(f"Invalid LISTDEF: '{listdef}' must have nothing after the equal sign.")
+
+            return CanonListdef(before_eq, after_eq)
+        # For remote lists we need to convert the name to a uid.
+        elif eq_idx != -1 and before_eq == RemoteList.FETCHER_TYPE:
+            return CanonListdef(before_eq, self.cfg.get_remote_list_by_name(after_eq).uid)
+        # Same for compound lists.
+        elif eq_idx != -1 and before_eq == CompoundList.FETCHER_TYPE:
+            return CanonListdef(before_eq, self.cfg.get_compound_list_by_name(after_eq).uid)
+        # The generic case where it's whatever=whatever.
+        elif eq_idx != -1:
+            return CanonListdef(before_eq, after_eq)
+        # If no '=' sign then we'll treat it as a list or compound list, and try to determine which.
+        elif (list_obj := self._get_implicit_list(before_eq)) is not None:
+            return CanonListdef(type(list_obj).FETCHER_TYPE, list_obj.uid)
+
+        raise exceptions.InputError(f"Invalid LISTDEF: '{listdef}'.")
+
+    def canonicalize_listdefs_and_expand_all(self, listdefs: typing.Iterable[str]) -> typing.Iterator[CanonListdef]:
+        for ldef in listdefs:
+            cldef = canonicalize_listdef(ldef)
+
+            if cldef.fetcher_type == LISTDEF_ALL:
+                yield from (CanonListdef(rl.FETCHER_TYPE, rl.uid) for rl in self.cfg.remote_lists)
+            else:
+                yield cldef
+
+    def _get_implicit_list(self, name: str) -> None | RemoteList | CompoundList:
+        try:
+            return self.cfg.get_remote_list_by_name(name)
+        except exceptions.InputError:
+            pass
+
+        try:
+            return self.cfg.get_compound_list_by_name(name)
+        except exceptions.InputError:
+            pass
+
+        return None
+
 CREW_TYPES = {
     'cast',
     'director',
@@ -251,3 +404,7 @@ CREW_TYPES = {
     'editor',
     'stunt performer',
 }
+
+LISTDEF_ALL = '*'
+LISTDEF_DEFAULTS = 'defaults'
+SPECIAL_FETCHER_TYPES = {LISTDEF_DEFAULTS, LISTDEF_ALL, RemoteList.FETCHER_TYPE, CompoundList.FETCHER_TYPE}

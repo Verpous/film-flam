@@ -16,18 +16,206 @@
 # along with this program. If not, see <https://www.gnu.org/licenses/>.
 
 import argparse
+import enum
+import os
+import sys
+
 import filmflam.repo as repo
 import filmflam.fetching as fetching
-import filmflam.common as common
+import filmflam.filtering as filtering
+import filmflam.exceptions as exceptions
 
-def subcommand_config(ctx, args):
-    print('config')
+class Choice(enum.StrEnum):
+    YES     = 'yes'
+    NO      = 'no'
+    ALWAYS  = 'always'
+    NEVER   = 'never'
+    AUTO    = 'auto'
+
+    @classmethod
+    def always_auto_never(cls) -> list[str]:
+        return [cls.ALWAYS, cls.AUTO, cls.NEVER]
+
+    @classmethod
+    def yes_no_auto(cls) -> list[str]:
+        return [cls.YES, cls.NO, cls.AUTO]
+
+    def __repr__(self) -> str:
+        return str(self)
+
+def split_at_filter(positional_args):
+    filter_begin = next((i for i, arg in enumerate(positional_args) if filtering.is_filter_member(arg)), len(positional_args))
+    return positional_args[:filter_begin], positional_args[filter_begin:]
+
+def subcommand_config_list(ctx, args):
+    if args.delete:
+        config_list_delete(ctx, args)
+    elif args.print:
+        config_list_print(ctx, args)
+    # Default edit/create.
+    elif (remote_list := next((rl for rl in ctx.cfg.remote_lists if rl.name == args.NAME), None)) is not None:
+        config_list_edit(ctx, args, remote_list)
+    else:
+        config_list_create(ctx, args)
+
+def config_list_delete(ctx, args):
+    if args.NAME is None:
+        raise exceptions.InputError(f"Must specify a NAME to delete a list.")
+
+    remote_list = ctx.cfg.get_remote_list_by_name(args.NAME)
+    ctx.delete_remote_list(remote_list.uid)
+    ctx.write_cfg()
+
+def config_list_print(ctx, args):
+    # TODO: improve this in the future
+    if args.NAME is None:
+        for rl in ctx.cfg.remote_lists:
+            print(rl)
+    else:
+        print(ctx.get_remote_list_by_name(args.NAME))
+
+def config_list_edit(ctx, args, remote_list):
+    if args.rename is not None and args.rename != remote_list.name:
+        # If we don't catch this here we'll catch it later but with a less nice error.
+        if args.rename in (rl.name for rl in ctx.cfg.remote_lists):
+            raise exceptions.InputError(f"Invalid NEW_NAME: '{args.rename}': a list by that name already exists.")
+
+        remote_list.name = args.rename
+
+    if args.LISTDEF is not None:
+        cldef = ctx.canonicalize_listdef(args.LISTDEF)
+
+        if cldef.fetcher_type in ctx.SPECIAL_FETCHER_TYPES:
+            raise exceptions.InputError(f"Invalid LISTDEF: '{args.LISTDEF}': must not be one of: {', '.join(ctx.SPECIAL_FETCHER_TYPES)}.")
+
+        remote_list.fetcher_type = cldef.fetcher_type
+        remote_list.address = cldef.address
+
+    if args.default_fetch != Choice.AUTO:
+        remote_list.is_default_fetch = args.default_fetch == Choice.YES
+
+    if args.default_find != Choice.AUTO:
+        remote_list.is_default_find = args.default_find == Choice.YES
+
+    ctx.write_cfg()
+
+def config_list_create(ctx, args):
+    if args.NAME is None:
+        raise exceptions.InputError(f"Must specify a NAME to create or edit a list.")
+
+    if args.rename in (rl.name for rl in ctx.cfg.remote_lists):
+        raise exceptions.InputError(f"Invalid NAME: '{args.rename}': a list by that name already exists.")
+
+    if args.LISTDEF is None:
+        raise exceptions.InputError(f"List '{args.NAME}' doesn't exist, so LISTDEF is required.")
+
+    cldef = ctx.canonicalize_listdef(args.LISTDEF)
+
+    if cldef.fetcher_type in ctx.SPECIAL_FETCHER_TYPES:
+        raise exceptions.InputError(f"Invalid LISTDEF: '{args.LISTDEF}': must not be one of: {', '.join(ctx.SPECIAL_FETCHER_TYPES)}.")
+
+    remote_list = repo.RemoteList.create(
+        name = args.NAME,
+        fetcher_type = cldef.fetcher_type,
+        address = cldef.address,
+        is_default_fetch = args.default_fetch != Choice.NO,
+        is_default_find = args.default_find == Choice.YES,
+    )
+
+    ctx.add_remote_list(remote_list)
+    ctx.write_cfg()
+
+def subcommand_config_compound(ctx, args):
+    if args.delete:
+        config_compound_delete(ctx, args)
+    elif args.print:
+        config_compound_print(ctx, args)
+    # Default edit/create.
+    elif (compound_list := next((cl for cl in ctx.cfg.compound_lists if cl.name == args.NAME), None)) is not None:
+        config_compound_edit(ctx, args, compound_list)
+    else:
+        config_compound_create(ctx, args)
+
+def config_compound_delete(ctx, args):
+    if args.NAME is None:
+        raise exceptions.InputError(f"Must specify a NAME to delete a compound list.")
+
+    compound_list = ctx.cfg.get_compound_list_by_name(args.NAME)
+    ctx.delete_compound_list(compound_list.uid)
+    ctx.write_cfg()
+
+def config_compound_print(ctx, args):
+    # TODO: improve this in the future
+    if args.NAME is None:
+        for cl in ctx.cfg.compound_lists:
+            print(cl)
+    else:
+        print(ctx.cfg.get_compound_list_by_name(args.NAME))
+
+def config_compound_edit(ctx, args, compound_list):
+    if args.rename is not None:
+        # If we don't catch this here we'll catch it later but with a less nice error.
+        if args.rename in (cl.name for cl in ctx.cfg.compound_lists):
+            raise exceptions.InputError(f"Invalid NEW_NAME: '{args.rename}': a compound list by that name already exists.")
+
+        compound_list.name = args.rename
+
+    remote_list_names, filter_tokens = split_at_filter(args.LIST + args.FILTER)
+
+    if len(remote_list_names) > 0:
+        compound_list.remote_list_uids = [ctx.get_remote_list_by_name(rl_name).uid for rl_name in remote_list_names]
+
+    if len(filter_tokens) > 0:
+        # Don't have anything to do with this for now, but we can raise an exception if it doesn't compile.
+        filtering.compile(filter_tokens)
+        compound_list.filter_tokens = filter_tokens
+
+    if args.default_fetch != Choice.AUTO:
+        compound_list.is_default_fetch = args.default_fetch == Choice.YES
+
+    if args.default_find != Choice.AUTO:
+        compound_list.is_default_find = args.default_find == Choice.YES
+
+    # TODO: regenerate the compound list/mark it dirty so it gets regenerated?
+    ctx.write_cfg()
+
+def config_compound_create(ctx, args):
+    if args.NAME is None:
+        raise exceptions.InputError(f"Must specify a NAME to create or edit a compound list.")
+
+    if args.rename in (cl.name for cl in ctx.cfg.compound_lists):
+        raise exceptions.InputError(f"Invalid NAME: '{args.rename}': a compound list by that name already exists.")
+
+    remote_list_names, filter_tokens = split_at_filter(args.LIST + args.FILTER)
+
+    if len(remote_list_names) == 0:
+        raise exceptions.InputError(f"Compound list '{args.NAME}' doesn't exist, so LISTs are required.")
+
+    compound_list = repo.CompoundList.create(
+        name = args.NAME,
+        remote_list_uids = [ctx.get_remote_list_by_name(rl_name).uid for rl_name in remote_list_names],
+        filter_tokens = filter_tokens,
+        is_default_fetch = args.default_fetch == Choice.YES,
+        is_default_find = args.default_find == Choice.YES,
+    )
+
+    ctx.add_compound_list(compound_list)
+    ctx.write_cfg()
 
 def subcommand_clean(ctx, args):
     print('clean')
 
 def subcommand_fetch(ctx, args):
-    fetching.fetch(args.LIST_DEF if len(args.LIST_DEF) != 0 else [common.LISTDEF_DEFAULTS], ctx, refetch_pattern=args.refetch, quiet=False)
+    canon_listdefs = ctx.canonicalize_listdefs_and_expand_all(args.LISTDEF)
+    fetch_expanded = fetching.expand_listdefs_for_fetch(canon_listdefs)
+
+    fetching.fetch(
+        args.LISTDEF if len(args.LISTDEF) != 0 else [repo.LISTDEF_DEFAULTS],
+        ctx,
+        refetch_pattern=args.refetch,
+        from_scratch=args.from_scratch,
+        quiet=False
+    )
 
 def subcommand_find(ctx, args):
     print('find')
@@ -46,7 +234,43 @@ def main():
 
     # Config options.
     config_parser = subparsers.add_parser('config', formatter_class=argparse.RawTextHelpFormatter)
-    config_parser.set_defaults(function=subcommand_config)
+
+    config_subparsers = config_parser.add_subparsers(required=True)
+
+    # Config list.
+    config_list_parser = config_subparsers.add_parser('list', formatter_class=argparse.RawTextHelpFormatter)
+    config_list_parser.set_defaults(function=subcommand_config_list)
+
+    config_list_parser_action_group = config_list_parser.add_mutually_exclusive_group(required=False)
+    config_list_parser_action_group.add_argument('-E', '--edit', action='store_true', help='edit or create a list. This is the default behavior.')
+    config_list_parser_action_group.add_argument('-D', '--delete', action='store_true', help='delete the list.')
+    config_list_parser_action_group.add_argument('-P', '--print', action='store_true', help='print the list, or if NAME not provided, print all lists.')
+
+    config_list_parser.add_argument('-n', '--rename', metavar='NEW_NAME', default=None, action='store', help='if renaming a list, this will be the new name %(metavar)s')
+    config_list_parser.add_argument('-i', '--default-find', choices=Choice.yes_no_auto(), default=Choice.AUTO, action='store', help='decide if this list should be default for flam find')
+    config_list_parser.add_argument('-e', '--default-fetch', choices=Choice.yes_no_auto(), default=Choice.AUTO, action='store', help='decide if this list should be fetched by default')
+    config_list_parser.add_argument('NAME', action='store', nargs='?', default=None, help='Operate on the list named %(dest)s')
+    config_list_parser.add_argument('LISTDEF', action='store', nargs='?', default=None, help='set the list type and address to %(dest)s')
+
+    # Config compound list.
+    config_compound_parser = config_subparsers.add_parser('compound', formatter_class=argparse.RawTextHelpFormatter)
+    config_compound_parser.set_defaults(function=subcommand_config_compound)
+
+    config_compound_parser_action_group = config_compound_parser.add_mutually_exclusive_group(required=False)
+    config_compound_parser_action_group.add_argument('-E', '--edit', action='store_true', help='edit or create a compound list. This is the default behavior.')
+    config_compound_parser_action_group.add_argument('-D', '--delete', action='store_true', help='delete the list.')
+    config_compound_parser_action_group.add_argument('-P', '--print', action='store_true', help='print the list, or if NAME not provided, print all lists.')
+
+    config_compound_parser.add_argument('-n', '--rename', metavar='NEW_NAME', default=None, action='store', help='if renaming a list, this will be the new name %(metavar)s')
+    config_compound_parser.add_argument('-i', '--default-find', choices=Choice.yes_no_auto(), default=Choice.AUTO, action='store', help='decide if this list should be default for flam find %(metavar)s')
+    config_compound_parser.add_argument('-e', '--default-fetch', choices=Choice.yes_no_auto(), default=Choice.AUTO, action='store', help='decide if this list should be fetched by default %(metavar)s')
+    config_compound_parser.add_argument('NAME', nargs='?', action='store', default=None, help='Operate on the list named %(dest)s')
+    config_compound_parser.add_argument('LIST', nargs='*', action='store', help='Set the list names to %(dest)s')
+    config_compound_parser.add_argument('FILTER', nargs='*', action='store', help='Set the FILTER to %(dest)s')
+
+    # argparse.REMAINDER is an undocumented but very important feature.
+    # Basically it's the only way to make positional arguments that start with dashes not be treated as bad options.
+    config_compound_parser.add_argument('REMAINDER', nargs=argparse.REMAINDER, action='store') # TODO: somehow don't show this in the help
 
     # Clean options.
     # TODO: still gotta figure this one out. Maybe it should just be flags in the other commands?
@@ -56,19 +280,20 @@ def main():
     clean_parser.add_argument('-f', '--fetched', action='store_true', help='Deletes tempfiles related to the %(dest)s as well')
     clean_parser.add_argument('-a', '--all', action='store_true', help='Delete everything fetched or stored by this program')
 
-    clean_parser.add_argument('LIST_DEF', nargs='*', action='store', help=
+    clean_parser.add_argument('LISTDEF', nargs='*', action='store', help=
         '''Like find. Will delete ''')
 
     # Fetch options.
     fetch_parser = subparsers.add_parser('fetch', formatter_class=argparse.RawTextHelpFormatter)
     fetch_parser.set_defaults(function=subcommand_fetch)
+    fetch_parser.add_argument('-s', '--from-scratch', action='store_true', help="Don't try to update existing fetched lists. Refetch everything from scratch.")
     fetch_parser.add_argument('-r', '--refetch', metavar='PATTERN', default=None, action='store', help=
         '''Forces titles that match %(metavar)s (case-insensitive) to be redownloaded even if they are already locally stored.
 It's enough for %(metavar)s to match any part of the title, not necessarily the whole title.
 %(metavar)s uses regex syntax from python's re library, which is identical to egrep unless you use very advanced features.
 This feature is intended for redownloading shows after a new season has come out.''')
 
-    fetch_parser.add_argument('LIST_DEF', nargs='*', action='store', help=
+    fetch_parser.add_argument('LISTDEF', nargs='*', action='store', help=
         '''Each %(dest)s describes a list to fetch. Supports, in order of priority:
 1. Configured list name (type: list)
 2. Configured compound list name (will fetch all lists under it) (type: compound)
@@ -108,7 +333,7 @@ If no %(dest)s provided, fetches all lists configured as defaults.''')
         f'''Force apply grouping for these crew types''')
     find_parser.add_argument('-G', '--ungroup', metavar='CREWS', type=None, default='', action='store', help= # TODO: type=crew_aliases
         f'''Force apply non-grouping for these crew types''')
-    find_parser.add_argument('-c', '--color', choices=['always', 'auto', 'never'], default='auto', action='store', help=
+    find_parser.add_argument('-c', '--color', choices=Choice.always_auto_never(), default=Choice.AUTO, action='store', help=
         'Set whether columns should be colored. Defaults to %(default)s')
     find_parser.add_argument('-d', '--dsv', metavar='DELIM', default=None, action='store', help=
         "Output in delimiter-separated values format (DSV).")
@@ -125,25 +350,28 @@ Valid column names: ...''')
         'Reverse the sort order. By default some sort keys are ascending and some descending based on what makes sense to me. This reverses those defaults')
     find_parser.add_argument('-S', '--spacious', default=False, action='store_true', help=
         'Add an empty line between entries')
-    find_parser.add_argument('-P', '--paginate', choices=['always', 'auto', 'never'], default='auto', action='store', help=
+    find_parser.add_argument('-P', '--paginate', choices=Choice.always_auto_never(), default=Choice.AUTO, action='store', help=
         'Choose whether to paginate with less. Defaults to %(default)s, which depends on the size of the output')
     find_parser.add_argument('-f', '--date-format', metavar='FORMAT', default=None, action='store', help=
         'Override format for date columns. Default depends on verbosity and which column. See python datetime.strftime documentation for format syntax')
     find_parser.add_argument('-t', '--no-titles', default=False, action='store_true', help=
         'Don\'t print a row with the column titles')
 
+    # TODO: future problem: REMAINDER doesn't work if there are no positional arguments before it. If we add the shorthand subcommands a la "flam WHAT",
+    # the WHAT won't be a positional argument anymore and REMAINDER won't work.
     find_parser.add_argument('WHAT', choices=['movies', 'people', 'roles'], action='store', help=
         '''Choose what to find: movies, people, or roles. Roles have all the attributes of the movie and the person, and then a few role-specific ones.''')
-    find_parser.add_argument('LIST_DEF', nargs='+', action='store', help=
-        '''Like fetch but with different defaults, and if the LIST_DEFs aren't already fetched, it fails with a nice error message.''')
+    find_parser.add_argument('LISTDEF', nargs='*', action='store', help=
+        '''Like fetch but with different defaults, and if the LISTDEFs aren't already fetched, it fails with a nice error message.''')
     find_parser.add_argument('FILTER', nargs='*', action='store', help=
         '''find-like expression featuring predicates like -crew, -cast, -release...''')
+    find_parser.add_argument('REMAINDER', nargs=argparse.REMAINDER, action='store')
 
     # Chart options.
     chart_parser = subparsers.add_parser('chart', formatter_class=argparse.RawTextHelpFormatter)
     chart_parser.set_defaults(function=subcommand_chart)
 
-    chart_parser.add_argument('-o', '--omit-zeroes', choices=['always', 'auto', 'never'], default='auto', action='store', help=
+    chart_parser.add_argument('-o', '--omit-zeroes', choices=Choice.always_auto_never(), default=Choice.AUTO, action='store', help=
         'Choose whether to omit buckets with 0 movies. Defaults to %(default)s, which uses a mode that depends on DISTRIBUTION.')
     chart_parser.add_argument('-v', '--value-sort', default=False, action='store_true', help='Sort based on the table values, not the keys.')
     chart_parser.add_argument('-n', '--no-number', default=False, action='store_true', help="Don't append the numerical value to each bar.")
@@ -160,35 +388,28 @@ Valid column names: ...''')
 
     chart_parser.add_argument('DISTRIBUTION', action='store', help=
         '''Which distribution to view (also option for custom distribution based on a field?)''')
-    chart_parser.add_argument('LIST_DEF', nargs='+', action='store', help=
+    chart_parser.add_argument('LISTDEF', nargs='+', action='store', help=
         '''Like find''')
     chart_parser.add_argument('FILTER', nargs='*', action='store', help=
         '''find-like expression featuring predicates like -crew, -cast, -release...''')
 
     args = parser.parse_args()
+
+    # We use the FILTER, REMAINDER trick a lot so we take care of it generically.
+    if hasattr(args, 'FILTER') and hasattr(args, 'REMAINDER'):
+        args.FILTER += args.REMAINDER
+
     ctx = repo.FlamContext(args.flam_dir)
-    args.function(ctx, args)
+
+    try:
+        args.function(ctx, args)
+    except (exceptions.InputError, exceptions.FetchInterrupt) as e:
+        # No ugly tracebacks for input errors. Only for internal errors.
+        print(f'{os.path.basename(__file__)}: error: {e}', sys.stderr)
+        exit(1)
 
 if __name__ == '__main__':
     main()
-
-
-# Subcommands:
-# flam config
-# Define your lists, categories, maybe where the movie folder is, etc.
-# Similar field-by-field prompts like gh release?
-
-# flam fetch <list-def>...
-# Downloads lists and generates files from those lists, I'm thinking of generating more than just list JSONs to accelerate things like grouping,
-# also possibly output in a file format made to be more quickly machine-readable than JSON,
-# because I want to avoid pre-generating mprint outputs and instead favor dynamically whipping up whichever prompt you have.
-# OR only generate the bare minimum, and in browse/grep cache the additional files.
-# Also write it with an abstraction layer that will let us replace which API we use instead of cinemagoer,
-# so that we'll be able to add support for letterboxd, or if cinemagoer shits the bed one day.
-# The idea is <list-def> can be a configured list name, or a list id, or a csv file, and we will use the right "ListLoader" for the type of list address.
-# I want this part to be extensible, so that people can add their own ListLoaders.
-# To avoid amguity, maybe allow to specify the def-type to override the usual priority order, like: name=movies, csv=... or listid=...
-# Problem: how to distinguish lists to download with the browser vs lists to download via curl?
 
 # flam browse
 # mbrowse but with pivoting around either people, or movies, or both, and possibly with find-like filter syntax as explained below

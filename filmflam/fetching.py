@@ -21,16 +21,27 @@ import typing
 import contextlib
 
 import filmflam.repo as repo
-import filmflam.common as common
+import filmflam.exceptions as exceptions
 import filmflam._utils as utils
 
 class ListFetcher(abc.ABC):
-    def __init__(self, canon_listdef: common.CanonListdef) -> None:
-        self._canon_listdef = canon_listdef
+    def __init__(self, address: str, remote_list_uid: None | str) -> None:
+        self._address = address
+        self._remote_list_uid = remote_list_uid
 
     @property
-    def canon_listdef(self) -> common.CanonListdef:
-        return self._canon_listdef
+    def address(self) -> str:
+        return self._address
+
+    @property
+    def remote_list_uid(self) -> None | str:
+        return self._remote_list_uid
+
+    def abstract_canon_listdef(self) -> repo.CanonListdef:
+        return repo.CanonListdef(repo.RemoteList.FETCHER_TYPE, self._remote_list_uid) if self._remote_list_uid is not None else self.concrete_canon_listdef()
+
+    def concrete_canon_listdef(self) -> repo.CanonListdef:
+        return repo.CanonListdef(self.fetcher_type(), self.address)
 
     @classmethod
     @abc.abstractmethod
@@ -46,15 +57,26 @@ class ListFetcher(abc.ABC):
         # Populates list_file with data. It may already have preexisting data if the file already existed.
         pass
 
-def fetch(listdefs: list[str], ctx: repo.FlamContext, refetch_pattern: None | str = None, quiet: bool = True) -> list[tuple[bool, repo.ListFile]]:
-    fetchers = _parse_listdefs(common.canonicalize_listdefs(listdefs, ctx), ctx)
-    refetch_re = re.compile(refetch_pattern, flags=re.IGNORECASE) if refetch_pattern is not None else None
+# TODO: not sure about "from scratch". It could be part of flam clean, or if we want it as a fetch option in the CLI we can delete the files and then call fetch.
+def fetch(listdefs: list[str], ctx: repo.FlamContext, refetch_pattern: None | str = None, from_scratch: bool = False, quiet: bool = True) -> list[tuple[bool, repo.ListFile]]:
+    fetchers = _parse_listdefs(listdefs, ctx)
     fetched_remote_lists = []
 
+    try:
+        refetch_re = re.compile(refetch_pattern, flags=re.IGNORECASE) if refetch_pattern is not None else None
+    except re.error as e:
+        raise exceptions.InputError(f"Invalid PATTERN: '{refetch_pattern}': {e}")
+
     for fetcher in fetchers:
-        id_type = fetcher.id_type()
-        list_file = ctx.load_list_file(id_type, fetcher.canon_listdef.address, must_exist=False)
+        abstract_cldef = fetcher.abstract_canon_listdef()
+        list_file = ListFile.create() if from_scratch else ctx.load_list_file(*abstract_cldef, must_exist=False)
         list_file_before = copy.deepcopy(list_file)
+        id_type = fetcher.id_type()
+        interrupt_error = None
+
+        if not isinstance(list_file_before.id_type, repo.UnsetType) and list_file_before.id_type != id_type:
+            raise RuntimeError(f"Cannot fetch '{abstract_cldef}' because it's already fetched with a different ID type. Old type: {list_file_before.id_type}, new type: {id_type}."
+                "This can happen if you changed a list's LISTDEF to a nonmatching type. You can resolve it by fetching the list from scratch.")
 
         if refetch_re is not None:
             list_file.movies_by_uid = {uid: movie_lf
@@ -63,15 +85,19 @@ def fetch(listdefs: list[str], ctx: repo.FlamContext, refetch_pattern: None | st
             _remove_unused_people(list_file)
 
         with open(os.devnull, 'w') as devnull, contextlib.redirect_stdout(devnull) if quiet else contextlib.nullcontext():
-            print(f'Fetching {fetcher.canon_listdef.fetcher_type}={fetcher.canon_listdef.address}...')
-            fetcher.fetch(list_file)
+            print(f'Fetching {abstract_cldef}...')
+
+            try:
+                fetcher.fetch(list_file)
+            except FetchInterrupt as e:
+                interrupt_error = e
 
         # Fetcher may have removed some movies from the list. Over here we remove people who are orphaned because of that.
         _remove_unused_people(list_file)
 
         list_file.id_type = id_type
-        list_file.fetcher_type = fetcher.canon_listdef.fetcher_type
-        list_file.address = fetcher.canon_listdef.address
+        list_file.fetcher_type = abstract_cldef.fetcher_type
+        list_file.address = abstract_cldef.address
 
         # Must canonicalize before comparing for equality.
         list_file.canonicalize()
@@ -83,54 +109,67 @@ def fetch(listdefs: list[str], ctx: repo.FlamContext, refetch_pattern: None | st
         if is_diff:
             ctx.write_list_file(list_file)
 
+        # TODO: I think this is kind of ugly and indicates I could've structed the code better?
+        if interrupt_error is not None:
+            raise exceptions.FetchInterrupt(f"Fetching of {abstract_cldef} got interrupted due to error: {e}. You may retry to pick up where it left off.")
+
         fetched_remote_lists.append((is_diff, list_file))
 
     return fetched_remote_lists
 
-def _get_fetcher(canon_listdef: common.CanonListdef) -> ListFetcher:
+def _get_fetcher(canon_listdef: repo.CanonListdef, ctx: repo.FlamContext) -> ListFetcher:
     # Avoid cyclic dependency by importing fetchers only here. Incidentally this is also what we do for custom fetchers, but for different reasons.
     # The import may seem unused but we obtain imported classes via subclasses_recursive.
     import filmflam._imdb # pylint: disable=unused-import, cyclic-import
+    
+    if canon_listdef.fetcher_type == repo.RemoteList.FETCHER_TYPE:
+        rl_uid = canon_listdef.address
+        rl = ctx.cfg.get_remote_list_by_uid(rl_uid)
+        fetcher_type = rl.fetcher_type
+        address = rl.address
+    else:
+        rl_uid = None
+        fetcher_type, address = canon_listdef
 
     for _ in range(2):
         for fetcher_cls in utils.subclasses_recursive(ListFetcher):
             fetcher_cls_safe = typing.cast(typing.Type[ListFetcher], fetcher_cls)
 
-            if canon_listdef.fetcher_type == fetcher_cls_safe.fetcher_type():
-                return fetcher_cls_safe(canon_listdef)
+            if fetcher_type == fetcher_cls_safe.fetcher_type():
+                return fetcher_cls_safe(address, rl_uid)
 
         # Failed to find it in the first iteration. It may still be a non-builtin type though.
         # Try importing a custom module named with a convention that means it should have the fetcher we seek, then seek again.
         # This way we don't import any random file named with this convention without the user explicitly asking for it, which would be a security risk.
         try:
-            utils.import_from_path(f'flam_fetcher_{canon_listdef.fetcher_type}')
+            utils.import_from_path(f'flam_fetcher_{fetcher_type}')
         except ImportError:
             break
 
-    raise KeyError(f'Invalid fetcher type: {canon_listdef.fetcher_type}.')
+    raise exceptions.InputError(f"unknown fetcher type: '{fetcher_type}'.")
 
-def _expand_listdefs(canon_listdefs: typing.Iterable[common.CanonListdef], ctx: repo.FlamContext) -> typing.Iterator[common.CanonListdef]:
-    for cldef in canon_listdefs:
-        match cldef.fetcher_type:
-            case common.LISTDEF_DEFAULTS:
-                yield from (common.CanonListdef(fetcher_type=rl.FETCHER_TYPE, address=rl.name) for rl in ctx.cfg.remote_lists if rl.is_default_fetch)
-            case repo.RemoteList.FETCHER_TYPE:
-                remote_list = next(rl for rl in ctx.cfg.remote_lists if rl.name == cldef.address)
-                yield common.CanonListdef(fetcher_type=remote_list.fetcher_type, address=remote_list.address)
-            case repo.CompoundList.FETCHER_TYPE:
-                compound_list = next(cl for cl in ctx.cfg.remote_lists if cl.name == cldef.address)
-
-                for rl_name in compound_list.remote_list_names:
-                    remote_list = next(rl for rl in ctx.cfg.remote_lists if rl.name == rl_name)
-                    yield common.CanonListdef(fetcher_type=remote_list.fetcher_type, address=remote_list.address)
-            case _:
-                yield cldef
-
-def _parse_listdefs(canon_listdefs: typing.Iterable[common.CanonListdef], ctx: repo.FlamContext) -> list[ListFetcher]:
-    expanded_listdefs = set(_expand_listdefs(canon_listdefs, ctx))
+def _parse_listdefs(listdefs: typing.Iterable[str], ctx: repo.FlamContext) -> list[ListFetcher]:
+    cldefs = ctx.canonicalize_listdefs_and_expand_all(listdefs)
+    expanded = set(_expand_listdefs(cldefs, ctx))
 
     # Returns a list not a generator so that if one of the listdefs doesn't parse good we will raise an error now and not before fetching a few.
-    return [_get_fetcher(cldef) for cldef in expanded_listdefs]
+    return [_get_fetcher(cldef, ctx) for cldef in expanded]
+
+def _expand_listdefs(canon_listdefs: typing.Iterable[repo.CanonListdef], ctx: repo.FlamContext) -> typing.Iterator[repo.CanonListdef]:
+    for cldef in canon_listdefs:
+        match cldef.fetcher_type:
+            case repo.LISTDEF_DEFAULTS:
+                yield from (repo.CanonListdef(rl.FETCHER_TYPE, rl.uid) for rl in ctx.cfg.remote_lists if rl.is_default_fetch)
+
+                # Default compound lists... yeah.
+                yield from (repo.CanonListdef(repo.RemoteList.FETCHER_TYPE, rl_uid)
+                            for cl in ctx.cfg.compound_lists if cl.is_default_fetch
+                                for rl_uid in cl.remote_list_uids)
+            case repo.CompoundList.FETCHER_TYPE:
+                compound_list = ctx.cfg.get_compound_list_by_uid(cldef.address)
+                yield from (repo.CanonListdef(repo.RemoteList.FETCHER_TYPE, rl_uid) for rl_uid in compound_list.remote_list_uids)
+            case _: # RemoteList.FETCHER_TYPE or a "concrete" type.
+                yield cldef
 
 def _get_all_used_person_uids(list_file: repo.ListFile) -> typing.Iterator[str]:
     for movie_lf in list_file.movies_by_uid.values():

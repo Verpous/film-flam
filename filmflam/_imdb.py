@@ -19,45 +19,37 @@ import imdb # type: ignore
 import urllib.request
 import codecs
 import typing
-from collections import namedtuple
+import dataclasses
 
 import filmflam.repo as repo
 import filmflam.fetching as fetching
 import filmflam._utils as utils
+import filmflam.exceptions as exceptions
 
 _ID_TYPE = 'imdb'
 
-class CsvRow(namedtuple('_CsvRow', 
-        # Order of the fields MUST match up with what is actually served by IMDb.
-        [
-            'list_index',
-            'uid_', # namedtuple fields not allowed to start with an underscore.
-            'watch_date',
-            'modified',
-            'description',
-            'title',
-            'url',
-            'type',
-            'rating',
-            'runtime_minutes',
-            'year',
-            'genres',
-            'votes',
-            'release_date',
-            'directors',
-            'myrating',
-            'myrating_date',
-        ],
-        # Defaults are applied to the last fields in the list. Myrating fields are only present in some CSVs so they need defaults.
-        defaults=[
-            None,
-            None,
-        ])):
+@dataclasses.dataclass
+class CsvRow:
+    # Order of the fields *must* match up with what is actually served by IMDb.
+    list_index:         str
+    uid:                str
+    watch_date:         str
+    modified:           str
+    description:        str
+    title:              str
+    url:                str
+    _type:              str
+    rating:             str
+    runtime_minutes:    str
+    year:               str
+    genres:             str
+    votes:              str
+    release_date:       str
+    directors:          str
 
-    # The first 2 characters of the uid are a prefix that we wish to discard.
-    @property
-    def uid(self) -> str:
-        return self.uid_[2:]
+    # These only appear in CSVs of lists made by the logged in user.
+    myrating:           None | str = None
+    myrating_date:      None | str = None
 
 class PublicListFetcher(fetching.ListFetcher):
     @classmethod
@@ -68,7 +60,12 @@ class PublicListFetcher(fetching.ListFetcher):
         return _ID_TYPE
 
     def fetch(self, list_file: repo.ListFile) -> None:
-        with urllib.request.urlopen(_get_csv_url(self.canon_listdef.address)) as movies_csv_file:
+        try:
+            movies_csv_file = urllib.request.urlopen(_get_csv_url(self.address))
+        except urllib.error.HTTPError as e:
+            raise exceptions.InputError(f"Failed to download LISTDEF: '{self.concrete_canon_listdef}' from IMDb with error: {e}. Are you sure the address is valid?")
+
+        with movies_csv_file:
             movies_csv = _read_csv(codecs.iterdecode(movies_csv_file, encoding='utf-8'))
 
         _fetch_movies_in_csv(movies_csv, list_file)
@@ -86,19 +83,23 @@ class PrivateListFetcher(fetching.ListFetcher):
         CSV_DOWNLOAD_TIMEOUT_SECS = 20
         DOWNLOADS_DIR = os.getenv('FLAM_DOWNLOADS', os.path.join(os.path.expanduser('~'), 'Downloads'))
 
+        if not os.path.isdir(DOWNLOADS_DIR):
+            raise exceptions.InputError(f"Invalid FLAM_DOWNLOADS: '{DOWNLOADS_DIR}': not a directory.")
+
         # We do retries because of a particularly horrible issue that makes the download sometimes fail.
         for i in range(NUM_RETRIES):
             try:
                 latest_csv = utils.download_file_using_browser(
-                    url=_get_csv_url(self.canon_listdef.address),
+                    url=_get_csv_url(self.address),
                     file_extension='csv',
                     downloads_dir=DOWNLOADS_DIR,
                     timeout_secs=CSV_DOWNLOAD_TIMEOUT_SECS)
             except TimeoutError:
                 if i == NUM_RETRIES - 1:
-                    raise
+                    raise exceptions.InputError(f"Timed out trying to download LISTDEF: '{self.concrete_canon_listdef}' from IMDb. Are you sure the address is valid?")
 
-        with open(latest_csv, 'r') as movies_csv_file:
+        # CSV documentation says to use newline=''.
+        with open(latest_csv, 'r', newline='') as movies_csv_file:
             movies_csv = _read_csv(movies_csv_file)
 
         os.remove(latest_csv)
@@ -113,7 +114,12 @@ class CsvListFetcher(fetching.ListFetcher):
         return _ID_TYPE
 
     def fetch(self, list_file: repo.ListFile) -> None:
-        with open(self.canon_listdef.address, 'r') as movies_csv_file:
+        try:
+            movies_csv_file = open(self.address, 'r', newline='')
+        except FileNotFoundError:
+            raise exceptions.InputError(f"Invalid LISTDEF: {self.concrete_canon_listdef}: no such file.")
+
+        with movies_csv_file:
             movies_csv = _read_csv(movies_csv_file)
 
         _fetch_movies_in_csv(movies_csv, list_file)
@@ -125,7 +131,13 @@ def _read_csv(movies_csv_file: typing.Iterable[str]) -> list[CsvRow]:
     reader = csv.reader(movies_csv_file)
 
     # Drop the titles row.
-    return [CsvRow(*row) for row in reader][1:]
+    movies_csv = [CsvRow(*row) for row in reader][1:]
+    
+    # The first 2 characters of the uid are a prefix that we wish to discard.
+    for movie in movies_csv:
+        movie.uid = movie.uid[2:]
+
+    return movies_csv
 
 def _fetch_movies_in_csv(movies_csv: list[CsvRow], list_file: repo.ListFile) -> None:
     # First we will build the list of all movies that we already have fetched, and overwrite list_file with this immediately.
@@ -134,20 +146,28 @@ def _fetch_movies_in_csv(movies_csv: list[CsvRow], list_file: repo.ListFile) -> 
     list_file.movies_by_uid = {uid: m for uid, m in list_file.movies_by_uid.items() if uid in csv_uids}
 
     ia = imdb.Cinemagoer()
+    imdb_error = None
 
-    # Now we do a pass where we fetch fields using Cinemagoer.
-    # Note that we not only skip movies that were previously fetched, but also duplicates in case the same movie appears in the CSV twice.
-    with utils.ProgressBar([m for m in movies_csv if m.uid not in list_file.movies_by_uid],
-            desc='Downloading',
-            keyfunc=lambda m: m.title) as bar:
-        for movie_csv in bar:
-            try:
+    try:
+        # Now we do a pass where we fetch fields using Cinemagoer.
+        # Note that we not only skip movies that were previously fetched, but also duplicates in case the same movie appears in the CSV twice.
+        with utils.ProgressBar([m for m in movies_csv if m.uid not in list_file.movies_by_uid],
+                desc='Downloading',
+                keyfunc=lambda m: m.title) as bar:
+            for movie_csv in bar:
                 _fetch_movie(movie_csv, list_file, ia)
-            except imdb.IMDbError as e:
-                print(e)
-                break
 
-    # Now a pass where we add CSV fields.
+        # We have this "bad names" problem with cinemagoer, so here we refetch any people with bad names.
+        with utils.ProgressBar([p for p in list_file.people_by_uid.values() if _is_person_name_bad(p.name)],
+                desc='Cleansing data',
+                keyfunc=lambda p: p.uid) as bar:
+            for person_lf in bar:
+                _refetch_person(person_lf, ia)
+    # If _fetch_movie or _refetch_person raise an IMDb error, it will break us out of that loop, seal the progress bar nicely, and then we'll handle the exception here.
+    except imdb.IMDbError as e:
+        imdb_error = e
+        
+    # Now a pass where we add CSV fields. We reach this even if an IMDb error took place, it's not in a finally block because we don't want to do it for just any exception.
     for movie_csv in movies_csv:
         # This shouldn't happen unless we hit an exception earlier.
         if movie_csv.uid not in list_file.movies_by_uid:
@@ -165,16 +185,8 @@ def _fetch_movies_in_csv(movies_csv: list[CsvRow], list_file: repo.ListFile) -> 
         movie_lf.release_date       = movie_csv.release_date
         movie_lf.myrating           = float(movie_csv.myrating) if (movie_csv.myrating is not None and movie_csv.myrating != '') else None
 
-    # We have this "bad names" problem with cinemagoer, so here we refetch any people with bad names.
-    with utils.ProgressBar([p for p in list_file.people_by_uid.values() if _is_person_name_bad(p.name)],
-            desc='Cleansing data',
-            keyfunc=lambda p: p.uid) as bar:
-        for person_lf in bar:
-            try:
-                _refetch_person(person_lf, ia)
-            except imdb.IMDbError as e:
-                print(e)
-                break
+    if imdb_error is not None:
+        raise exceptions.FetchInterrupt(str(imdb_error))
 
 def _fetch_movie(movie_csv: CsvRow, list_file: repo.ListFile, ia: imdb.Cinemagoer) -> None:
     NUM_RETRIES = 5
