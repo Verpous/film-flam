@@ -44,7 +44,7 @@ class Choice(enum.StrEnum):
         return str(self)
 
 def split_at_filter(positional_args):
-    filter_begin = next((i for i, arg in enumerate(positional_args) if filtering.is_filter_member(arg)), len(positional_args))
+    filter_begin = next((i for i, arg in enumerate(positional_args) if filtering.is_filter_token(arg)), len(positional_args))
     return positional_args[:filter_begin], positional_args[filter_begin:]
 
 def subcommand_config_list(ctx, args):
