@@ -20,16 +20,17 @@ import urllib.request
 import codecs
 import typing
 import dataclasses
+import datetime
 
 import filmflam.repo as repo
 import filmflam.fetching as fetching
 import filmflam._utils as utils
 import filmflam.exceptions as exceptions
 
-_ID_TYPE = 'imdb'
+_UID_TYPE = 'imdb'
 
 @dataclasses.dataclass
-class CsvRow:
+class _CsvRow:
     # Order of the fields *must* match up with what is actually served by IMDb.
     list_index:         str
     uid:                str
@@ -37,6 +38,7 @@ class CsvRow:
     modified:           str
     description:        str
     title:              str
+    original_title:     str
     url:                str
     _type:              str
     rating:             str
@@ -47,37 +49,23 @@ class CsvRow:
     release_date:       str
     directors:          str
 
-    # These only appear in CSVs of lists made by the logged in user.
+    # These have defaults because they only appear in CSVs of lists made by the logged in user.
     myrating:           None | str = None
     myrating_date:      None | str = None
 
-class PublicListFetcher(fetching.ListFetcher):
-    @classmethod
-    def fetcher_type(cls) -> str:
-        return 'imdb-id'
-
-    def id_type(self) -> str:
-        return _ID_TYPE
-
+class PublicListFetcher(fetching.ListFetcher, fetcher_type='imdb-id', uid_type=_UID_TYPE):
     def fetch_into_file(self, list_file: repo.ListFile) -> None:
         try:
             movies_csv_file = urllib.request.urlopen(_get_csv_url(self.concrete_listdef.address))
         except urllib.error.HTTPError as e:
-            raise exceptions.InputError(f"Failed to download LISTDEF: '{self.concrete_listdef}' from IMDb with error: {e}. Are you sure the address is valid?")
+            raise exceptions.InputError(f"Failed to download LISTDEF '{self.concrete_listdef}' from IMDb with error: {e}. Are you sure the address is valid?")
 
         with movies_csv_file:
             movies_csv = _read_csv(codecs.iterdecode(movies_csv_file, encoding='utf-8'))
 
         _fetch_movies_in_csv(movies_csv, list_file)
 
-class PrivateListFetcher(fetching.ListFetcher):
-    @classmethod
-    def fetcher_type(cls) -> str:
-        return 'imdb-private-id'
-
-    def id_type(self) -> str:
-        return _ID_TYPE
-
+class PrivateListFetcher(fetching.ListFetcher, fetcher_type='imdb-private-id', uid_type=_UID_TYPE):
     def fetch_into_file(self, list_file: repo.ListFile) -> None:
         NUM_RETRIES = 1 # TODO: if we never experience timeouts, get rid of this.
         CSV_DOWNLOAD_TIMEOUT_SECS = 20
@@ -96,7 +84,7 @@ class PrivateListFetcher(fetching.ListFetcher):
                     timeout_secs=CSV_DOWNLOAD_TIMEOUT_SECS)
             except TimeoutError as e:
                 if i == NUM_RETRIES - 1:
-                    raise exceptions.InputError(f"Timed out trying to download LISTDEF: '{self.concrete_listdef}' from IMDb. Are you sure the address is valid?") from e
+                    raise exceptions.InputError(f"Timed out trying to download LISTDEF '{self.concrete_listdef}' from IMDb. Are you sure the address is valid?") from e
 
         # CSV documentation says to use newline=''.
         with open(latest_csv, 'r', newline='') as movies_csv_file:
@@ -105,19 +93,12 @@ class PrivateListFetcher(fetching.ListFetcher):
         os.remove(latest_csv)
         _fetch_movies_in_csv(movies_csv, list_file)
 
-class CsvListFetcher(fetching.ListFetcher):
-    @classmethod
-    def fetcher_type(cls) -> str:
-        return 'imdb-csv'
-
-    def id_type(self) -> str:
-        return _ID_TYPE
-
+class CsvListFetcher(fetching.ListFetcher, fetcher_type='imdb-csv', uid_type=_UID_TYPE):
     def fetch_into_file(self, list_file: repo.ListFile) -> None:
         try:
             movies_csv_file = open(self.concrete_listdef.address, 'r', newline='')
         except FileNotFoundError as e:
-            raise exceptions.InputError(f"Invalid LISTDEF: {self.concrete_listdef}: no such file.") from e
+            raise exceptions.InputError(f"Invalid LISTDEF {self.concrete_listdef}: no such file.") from e
 
         with movies_csv_file:
             movies_csv = _read_csv(movies_csv_file)
@@ -127,11 +108,11 @@ class CsvListFetcher(fetching.ListFetcher):
 def _get_csv_url(list_id: str) -> str:
     return f'https://www.imdb.com/list/ls{list_id}/export?ref_=ttls_exp'
 
-def _read_csv(movies_csv_file: typing.Iterable[str]) -> list[CsvRow]:
+def _read_csv(movies_csv_file: typing.Iterable[str]) -> list[_CsvRow]:
     reader = csv.reader(movies_csv_file)
 
-    # Drop the titles row.
-    movies_csv = [CsvRow(*row) for row in reader][1:]
+    # Drop the titles row. If the CSV format doesn't match up we should fail on creating one of the rows.
+    movies_csv = [_CsvRow(*row) for row in reader][1:]
     
     # The first 2 characters of the uid are a prefix that we wish to discard.
     for movie in movies_csv:
@@ -139,7 +120,7 @@ def _read_csv(movies_csv_file: typing.Iterable[str]) -> list[CsvRow]:
 
     return movies_csv
 
-def _fetch_movies_in_csv(movies_csv: list[CsvRow], list_file: repo.ListFile) -> None:
+def _fetch_movies_in_csv(movies_csv: list[_CsvRow], list_file: repo.ListFile) -> None:
     # First we will build the list of all movies that we already have fetched, and overwrite list_file with this immediately.
     # This lets us bail in the middle if an exception occurs and not lose progress.
     csv_uids = {m.uid for m in movies_csv}
@@ -175,20 +156,24 @@ def _fetch_movies_in_csv(movies_csv: list[CsvRow], list_file: repo.ListFile) -> 
 
         movie_lf = list_file.movies_by_uid[movie_csv.uid]
 
+        # If any of the conversions fail we simply propagate the error.
         movie_lf.list_index         = int(movie_csv.list_index)
-        movie_lf.watch_date         = movie_csv.watch_date
         movie_lf.description        = movie_csv.description
         movie_lf.rating             = float(movie_csv.rating)
         movie_lf.runtime_minutes    = int(movie_csv.runtime_minutes)
         movie_lf.genres             = movie_csv.genres.split(', ')
         movie_lf.votes              = int(movie_csv.votes)
-        movie_lf.release_date       = movie_csv.release_date
         movie_lf.myrating           = float(movie_csv.myrating) if (movie_csv.myrating is not None and movie_csv.myrating != '') else None
+
+        # IMDb already serves the dates in the correct format but it's good to validate.
+        # TODO: IMDb now sometimes serves these in %Y-%m or just %Y.
+        movie_lf.watch_date         = datetime.date.fromisoformat(movie_csv.watch_date).strftime('%Y-%m-%d')
+        movie_lf.release_date       = datetime.date.fromisoformat(movie_csv.release_date).strftime('%Y-%m-%d')
 
     if imdb_error is not None:
         raise exceptions.FetchInterrupt(str(imdb_error))
 
-def _fetch_movie(movie_csv: CsvRow, list_file: repo.ListFile, ia: imdb.Cinemagoer) -> None:
+def _fetch_movie(movie_csv: _CsvRow, list_file: repo.ListFile, ia: imdb.Cinemagoer) -> None:
     NUM_RETRIES = 5
     info_to_fetch = (*imdb.Movie.Movie.default_info, 'critic reviews', 'full credits')
 
@@ -202,7 +187,7 @@ def _fetch_movie(movie_csv: CsvRow, list_file: repo.ListFile, ia: imdb.Cinemagoe
 
     movie_lf = repo.ListFileMovie.create(uid=movie_csv.uid)
 
-    # Prefer to get the title from Cinemagoer because in the CSV it's more often in English, but it's good to have a fallback (not that we ever need it).
+    # Prefer to get the title from Cinemagoer because they have better titles for foreign language films, but it's good to have a fallback (not that we ever need it).
     movie_lf.title = _safe_get(movie_imdb, 'title', default=movie_csv.title) 
     movie_lf.metascore = _safe_get(movie_imdb, 'metascore')
 

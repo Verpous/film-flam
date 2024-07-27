@@ -20,6 +20,7 @@ import glob
 import time
 import types
 import typing
+import shutil
 import webbrowser
 import unicodedata
 import importlib.util
@@ -47,7 +48,7 @@ class ProgressBar:
         # The most flexible part is the bar itself, which is computed to take up all the space the others haven't.
         self._bar_width = 0
         empty_bar = self._build_bar(0, None)
-        self._bar_width = max(os.get_terminal_size().columns - len(empty_bar), 0)
+        self._bar_width = max(shutil.get_terminal_size().columns - len(empty_bar), 0) # os.get_terminal_size fails if output is not a tty.
 
     def _build_bar(self, idx: int, elem: typing.Any) -> str:
         fill_amt = int((float(idx) / float(self._num_of)) * self._bar_width) if idx != self._num_of else self._bar_width

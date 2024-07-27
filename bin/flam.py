@@ -43,38 +43,39 @@ class Choice(enum.StrEnum):
     def __repr__(self) -> str:
         return str(self)
 
-def split_at_filter(positional_args):
+def split_at_filter(positional_args: list[str]) -> tuple[list[str], list[str]]:
     filter_begin = next((i for i, arg in enumerate(positional_args) if filtering.is_filter_token(arg)), len(positional_args))
     return positional_args[:filter_begin], positional_args[filter_begin:]
 
-def subcommand_config_list(ctx, args):
+def subcommand_config_list(ctx: repo.FlamContext, args: argparse.Namespace) -> None:
     if args.delete:
         config_list_delete(ctx, args)
     elif args.print:
         config_list_print(ctx, args)
     # Default edit/create.
-    elif (remote_list := next((rl for rl in ctx.cfg.remote_lists if rl.name == args.NAME), None)) is not None:
+    elif (remote_list := ctx.remote_lists.get_by_name_or_none(args.NAME)) is not None:
         config_list_edit(ctx, args, remote_list)
     else:
         config_list_create(ctx, args)
 
-def config_list_delete(ctx, args):
+def config_list_delete(ctx: repo.FlamContext, args: argparse.Namespace) -> None:
     if args.NAME is None:
         raise exceptions.InputError(f"Must specify a NAME to delete a list.")
 
-    remote_list = ctx.cfg.get_remote_list_by_name(args.NAME)
+    remote_list = ctx.remote_lists.get_by_name(args.NAME)
+    assert not isinstance(remote_list.uid, repo.UnsetType)
     ctx.delete_remote_list(remote_list.uid)
     ctx.write_cfg()
 
-def config_list_print(ctx, args):
+def config_list_print(ctx: repo.FlamContext, args: argparse.Namespace) -> None:
     # TODO: improve this in the future
     if args.NAME is None:
-        for rl in ctx.cfg.remote_lists:
+        for rl in ctx.remote_lists:
             print(rl)
     else:
-        print(ctx.get_remote_list_by_name(args.NAME))
+        print(ctx.remote_lists.get_by_name(args.NAME))
 
-def config_list_edit(ctx, args, remote_list):
+def config_list_edit(ctx: repo.FlamContext, args: argparse.Namespace, remote_list: repo.RemoteList) -> None:
     if args.rename is not None and args.rename != remote_list.name:
         remote_list.name = args.rename
 
@@ -91,7 +92,7 @@ def config_list_edit(ctx, args, remote_list):
 
     ctx.write_cfg()
 
-def config_list_create(ctx, args):
+def config_list_create(ctx: repo.FlamContext, args: argparse.Namespace) -> None:
     if args.NAME is None:
         raise exceptions.InputError(f"Must specify a NAME to create or edit a list.")
 
@@ -111,41 +112,43 @@ def config_list_create(ctx, args):
     ctx.add_remote_list(remote_list)
     ctx.write_cfg()
 
-def subcommand_config_compound(ctx, args):
+def subcommand_config_compound(ctx: repo.FlamContext, args: argparse.Namespace) -> None:
     if args.delete:
         config_compound_delete(ctx, args)
     elif args.print:
         config_compound_print(ctx, args)
     # Default edit/create.
-    elif (compound_list := next((cl for cl in ctx.cfg.compound_lists if cl.name == args.NAME), None)) is not None:
+    elif (compound_list := ctx.compound_lists.get_by_name_or_none(args.NAME)) is not None:
         config_compound_edit(ctx, args, compound_list)
     else:
         config_compound_create(ctx, args)
 
-def config_compound_delete(ctx, args):
+def config_compound_delete(ctx: repo.FlamContext, args: argparse.Namespace) -> None:
     if args.NAME is None:
         raise exceptions.InputError(f"Must specify a NAME to delete a compound list.")
 
-    compound_list = ctx.cfg.get_compound_list_by_name(args.NAME)
+    compound_list = ctx.compound_lists.get_by_name(args.NAME)
+    assert not isinstance(compound_list.uid, repo.UnsetType)
     ctx.delete_compound_list(compound_list.uid)
     ctx.write_cfg()
 
-def config_compound_print(ctx, args):
+def config_compound_print(ctx: repo.FlamContext, args: argparse.Namespace) -> None:
     # TODO: improve this in the future
     if args.NAME is None:
-        for cl in ctx.cfg.compound_lists:
+        for cl in ctx.compound_lists:
             print(cl)
     else:
-        print(ctx.cfg.get_compound_list_by_name(args.NAME))
+        print(ctx.compound_lists.get_by_name(args.NAME))
 
-def config_compound_edit(ctx, args, compound_list):
+def config_compound_edit(ctx: repo.FlamContext, args: argparse.Namespace, compound_list: repo.CompoundList) -> None:
     if args.rename is not None:
         compound_list.name = args.rename
 
     remote_list_names, filter_tokens = split_at_filter(args.LIST + args.FILTER)
 
     if len(remote_list_names) > 0:
-        compound_list.remote_list_uids = [ctx.get_remote_list_by_name(rl_name).uid for rl_name in remote_list_names]
+        # The unset check should always be true, but the type checker wants it.
+        compound_list.remote_list_uids = [rl_uid for rl_name in remote_list_names if not isinstance(rl_uid := ctx.remote_lists.get_by_name(rl_name).uid, repo.UnsetType)]
 
     if len(filter_tokens) > 0:
         # Don't have anything to do with this for now, but we can raise an exception if it doesn't compile.
@@ -158,10 +161,10 @@ def config_compound_edit(ctx, args, compound_list):
     if args.default_find != Choice.AUTO:
         compound_list.is_default_find = args.default_find == Choice.YES
 
-    # TODO: regenerate the compound list/mark it dirty so it gets regenerated?
+    # TODO: regenerate the compound list/mark it dirty so it gets regenerated? Probably should be an internal thing to the API.
     ctx.write_cfg()
 
-def config_compound_create(ctx, args):
+def config_compound_create(ctx: repo.FlamContext, args: argparse.Namespace) -> None:
     if args.NAME is None:
         raise exceptions.InputError(f"Must specify a NAME to create or edit a compound list.")
 
@@ -169,7 +172,7 @@ def config_compound_create(ctx, args):
 
     compound_list = repo.CompoundList.create(
         name = args.NAME,
-        remote_list_uids = [ctx.cfg.get_remote_list_by_name(rl_name).uid for rl_name in remote_list_names],
+        remote_list_uids = [ctx.remote_lists.get_by_name(rl_name).uid for rl_name in remote_list_names],
         filter_tokens = filter_tokens,
         is_default_fetch = args.default_fetch == Choice.YES,
         is_default_find = args.default_find == Choice.YES,
@@ -178,28 +181,37 @@ def config_compound_create(ctx, args):
     ctx.add_compound_list(compound_list)
     ctx.write_cfg()
 
-def subcommand_clean(ctx, args):
+def subcommand_clean(ctx: repo.FlamContext, args: argparse.Namespace) -> None:
     print('clean')
 
-def subcommand_fetch(ctx, args):
+def subcommand_fetch(ctx: repo.FlamContext, args: argparse.Namespace) -> None:
     fetchers = fetching.parse_listdefs(args.LISTDEF if len(args.LISTDEF) != 0 else [repo.LISTDEF_DEFAULTS], ctx)
 
-    for fetcher in fetchers:
-        print(f"Fetching {ctx.canon_listdef_pretty(fetcher.abstract_listdef)}...")
-        list_file, is_changed = fetcher.fetch(ctx, refetch_pattern=args.refetch, from_scratch=args.from_scratch, quiet=False)
+    if args.undo:
+        for fetcher in fetchers:
+            try:
+                ctx.restore_list_file_to_previous(fetcher.abstract_listdef)
+                print(f'Restored {ctx.canon_listdef_pretty(fetcher.abstract_listdef)}.')
+            except FileNotFoundError:
+                print(f'No backup for {ctx.canon_listdef_pretty(fetcher.abstract_listdef)}.')
+    else:
+        for fetcher in fetchers:
+            print(f"Fetching {ctx.canon_listdef_pretty(fetcher.abstract_listdef)}...")
+            list_file, is_changed = fetcher.fetch(ctx, refetch_pattern=args.refetch, from_scratch=args.from_scratch, quiet=False)
 
-def subcommand_find(ctx, args):
+def subcommand_find(ctx: repo.FlamContext, args: argparse.Namespace) -> None:
     print('find')
 
-def subcommand_chart(ctx, args):
+def subcommand_chart(ctx: repo.FlamContext, args: argparse.Namespace) -> None:
     print('chart')
 
-def main():
+def main() -> None:
     parser = argparse.ArgumentParser(
         formatter_class=argparse.RawTextHelpFormatter,
         description='I dunno lol.')
     parser.add_argument('-C', '--flam-dir', metavar='PATH', default=repo.FlamContext.DEFAULT_FLAM_DIR, action='store', help=
         'Use %(metavar)s as the flam directory. Uses FLAM_DIR environment variable by default, or ~/.film_flam if it is not defined.')
+    parser.add_argument('--debug', action='store_true', help=argparse.SUPPRESS)
 
     subparsers = parser.add_subparsers(required=True)
 
@@ -257,6 +269,8 @@ def main():
     # Fetch options.
     fetch_parser = subparsers.add_parser('fetch', formatter_class=argparse.RawTextHelpFormatter)
     fetch_parser.set_defaults(function=subcommand_fetch)
+    fetch_parser.add_argument('-u', '--undo', action='store_true', help="Restore LISTDEFs to their previous versions."
+        "Fetch can be expensive so if something goes wrong and files get messed up this is good to have.")
     fetch_parser.add_argument('-s', '--from-scratch', action='store_true', help="Don't try to update existing fetched lists. Refetch everything from scratch.")
     fetch_parser.add_argument('-r', '--refetch', metavar='PATTERN', default=None, action='store', help=
         '''Forces titles that match %(metavar)s (case-insensitive) to be redownloaded even if they are already locally stored.
@@ -297,18 +311,18 @@ If no %(dest)s provided, fetches all lists configured as defaults.''')
     # 1. movies that get filtered don't affect attributes of a person related to that movie. For instance, the average rating still factors in that movie.
     # 2. the way to omit movies from the computation entirely is to define a metalist for them
     # 3. metalists are only for movies. You cannot save into the metalist that it's actually about roles or people
-    find_parser.add_argument('-s', '--sort', metavar='KEYS', type=None, default=['leaving', 'runtime', 'alpha', 'dunnolol'], action='store', help= # TODO: type=sort_aliases
+    find_parser.add_argument('-s', '--sort', metavar='KEYS', type=str, default=['leaving', 'runtime', 'alpha', 'dunnolol'], action='store', help= # TODO: type=sort_aliases
         f'''Sort movies according to %(metavar)s, which is a comma-delimited list of keys to sort by, in decreasing priority. Defaults to 'leaving,runtime,alphabetical'.
         Valid sort keys: ...''')
-    find_parser.add_argument('-g', '--group', metavar='CREWS', type=None, default='', action='store', help= # TODO: type=crew_aliases
+    find_parser.add_argument('-g', '--group', metavar='CREWS', type=str, default='', action='store', help= # TODO: type=crew_aliases
         f'''Force apply grouping for these crew types''')
-    find_parser.add_argument('-G', '--ungroup', metavar='CREWS', type=None, default='', action='store', help= # TODO: type=crew_aliases
+    find_parser.add_argument('-G', '--ungroup', metavar='CREWS', type=str, default='', action='store', help= # TODO: type=crew_aliases
         f'''Force apply non-grouping for these crew types''')
     find_parser.add_argument('-c', '--color', choices=Choice.always_auto_never(), default=Choice.AUTO, action='store', help=
         'Set whether columns should be colored. Defaults to %(default)s')
     find_parser.add_argument('-d', '--dsv', metavar='DELIM', default=None, action='store', help=
         "Output in delimiter-separated values format (DSV).")
-    find_parser.add_argument('-C', '--columns', metavar='COLUMNS', type=None, action='store', default=(True, []), help= # TODO: type=column_aliases
+    find_parser.add_argument('-C', '--columns', metavar='COLUMNS', type=str, action='store', default=(True, []), help= # TODO: type=column_aliases
         'List of columns to print, delimited by commas. Defaults to \'title,leaving,runtime,released,rating,metascore,director\','
         f''' with a few other "smart" columns which activate when a condition is met.
 This option overrides the defaults and smart columns. Only the columns you specify will be printed.
@@ -374,7 +388,10 @@ Valid column names: ...''')
 
     try:
         args.function(ctx, args)
-    except (exceptions.InputError, exceptions.FetchInterrupt) as e:
+    except exceptions.FlamError as e:
+        if args.debug:
+            raise
+
         # No ugly tracebacks for input errors. Only for internal errors.
         sys.exit(f'{os.path.basename(__file__)}: error: {e}')
 

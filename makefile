@@ -35,6 +35,7 @@ PYLINT_IGNORE += R1708 # stop-iteration-return
 PYLINT_IGNORE += R1714 # consider-using-in
 
 PYLINT_IGNORE += W0124 # confusing-with-statement
+PYLINT_IGNORE += W0511 # fixme
 PYLINT_IGNORE += W0622 # redefined-builtin
 PYLINT_IGNORE += W1514 # unspecified-encoding
 
@@ -56,7 +57,7 @@ cfg:
 	$(CLI) config compound testcomp testlist -true
 
 mypy:
-	MYPY_FORCE_COLOR=1 mypy --disallow-untyped-defs --disallow-incomplete-defs $(CLI) | grep -Ev 'flam.py.*(no-untyped-def|if function does not return a value)'
+	MYPY_FORCE_COLOR=1 mypy --disallow-untyped-defs --disallow-incomplete-defs $(CLI)
 
 pylint:
 	find -name '*.py' -print0 | xargs -0 git ls-files -z | xargs -0 pylint --output-format=colorized --disable="$$(printf %s, $(PYLINT_IGNORE))" |  less -R

@@ -45,7 +45,6 @@ EinGafrurError = exceptions.FilterSyntaxError
 
 # We represent filters as an AST of FilterMembers.
 class FilterMember(abc.ABC):
-    
     # TODO: annotate this better once I know how.
     # Takes in a found item (movie, person, or role) and returns true if it passes the filter.
     @abc.abstractmethod
@@ -250,6 +249,11 @@ class Disjoined(FilterMember):
 
 class Predicate(FilterMember):
     PREFIX = '-'
+    name: str
+    
+    def __init_subclass__(cls, name: str, **kwargs: typing.Any) -> None:
+        super().__init_subclass__(**kwargs)
+        cls.name = name
 
     @classmethod
     def eat(cls, tokens: list[str], at: int) -> tuple[Predicate, int]:
@@ -262,7 +266,7 @@ class Predicate(FilterMember):
         # Instead of going predicate by predicate and checking for EinGafrurError,
         # it's more optimal to pick the only possibly right predicate from a dictionary,
         # and eat the name token right here and let the predicate eat its arguments alone.
-        if prefixed_name == name or name not in PREDICATES:
+        if name == prefixed_name or name not in PREDICATES:
             if prefixed_name in Positive.RPAREN:
                 raise EinGafrurError('Right parenthesis has no matching left parenthesis.', tokens=tokens, error_indices=at)
                 
@@ -274,52 +278,36 @@ class Predicate(FilterMember):
         # I don't like this, but it's the best way to get mypy to shut up about this line.
         return PREDICATES[name].eat(tokens, at + 1)
 
-    @classmethod
-    @abc.abstractmethod
-    def predicate_name(cls) -> str:
-        pass
+    def regurgitate(self) -> typing.Iterable[str]:
+        yield self.PREFIX + self.name
 
-class TruePredicate(Predicate):
+class TruePredicate(Predicate, name='true'):
     @classmethod
     def eat(cls, tokens: list[str], at: int) -> tuple[Predicate, int]:
         return cls(), at
-
-    @classmethod
-    def predicate_name(cls) -> str:
-        return 'true'
 
     def excrete(self, item: typing.Any, general: typing.Any) -> bool:
         return True
 
-    def regurgitate(self) -> typing.Iterable[str]:
-        yield self.predicate_name()
-
-class FalsePredicate(Predicate):
+class FalsePredicate(Predicate, name='false'):
     @classmethod
     def eat(cls, tokens: list[str], at: int) -> tuple[Predicate, int]:
         return cls(), at
 
-    @classmethod
-    def predicate_name(cls) -> str:
-        return 'false'
-
     def excrete(self, item: typing.Any, general: typing.Any) -> bool:
         return False
 
-    def regurgitate(self) -> typing.Iterable[str]:
-        yield self.predicate_name()
-
-class MoviePredicate(Predicate):
-    pass
+# class MoviePredicate(Predicate):
+#     pass
         
-class PersonPredicate(Predicate):
-    pass
+# class PersonPredicate(Predicate):
+#     pass
 
-class RolePredicate(Predicate):
-    pass
+# class RolePredicate(Predicate):
+#     pass
 
 # TODO: think about how to make this support custom extensions.
-PREDICATES = {cls.predicate_name(): cls for cls in [TruePredicate, FalsePredicate]}
+PREDICATES = {cls.name: cls for cls in [TruePredicate, FalsePredicate]}
 
 def compile(tokens: list[str]) -> Filter:
     return Filter.eat(tokens)

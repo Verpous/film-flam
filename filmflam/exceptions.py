@@ -55,3 +55,6 @@ class FilterSyntaxError(InputError):
 
 class FetchInterrupt(FlamError):
     pass
+
+class FileValidationError(FlamError):
+    pass
