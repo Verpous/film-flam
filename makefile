@@ -37,6 +37,7 @@ PYLINT_IGNORE += R1714 # consider-using-in
 PYLINT_IGNORE += W0124 # confusing-with-statement
 PYLINT_IGNORE += W0511 # fixme
 PYLINT_IGNORE += W0622 # redefined-builtin
+PYLINT_IGNORE += W0702 # bare-except
 PYLINT_IGNORE += W1514 # unspecified-encoding
 
 .PHONY: install clean wipe typecheck

@@ -216,6 +216,7 @@ def main() -> None:
     subparsers = parser.add_subparsers(required=True)
 
     # Config options.
+    # TODO: config things like downloads dir, default browser, etc? Or since they're specific to a fetcher they should just be env vars?
     config_parser = subparsers.add_parser('config', formatter_class=argparse.RawTextHelpFormatter)
 
     config_subparsers = config_parser.add_subparsers(required=True)
@@ -256,7 +257,7 @@ def main() -> None:
     config_compound_parser.add_argument('REMAINDER', nargs=argparse.REMAINDER, action='store') # TODO: somehow don't show this in the help
 
     # Clean options.
-    # TODO: still gotta figure this one out. Maybe it should just be flags in the other commands?
+    # TODO: still gotta figure this one out. Maybe it should just be flags in the other commands? I don't want to complicate this program with "not user friendly" subcommands.
     clean_parser = subparsers.add_parser('clean', formatter_class=argparse.RawTextHelpFormatter)
     clean_parser.set_defaults(function=subcommand_clean)
     clean_parser.add_argument('-t', '--tempfiles', action='store_true', help='Deletes tempfiles related to the %(dest)s as well')

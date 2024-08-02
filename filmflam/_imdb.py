@@ -16,18 +16,40 @@
 import os
 import csv
 import imdb # type: ignore
-import urllib.request
-import codecs
 import typing
 import dataclasses
 import datetime
+import multiprocessing
+import queue
+import time
+import webbrowser
+import traceback
+import abc
+import atexit
 
 import filmflam.repo as repo
 import filmflam.fetching as fetching
 import filmflam._utils as utils
 import filmflam.exceptions as exceptions
 
+from selenium import webdriver
+from selenium.common.exceptions import NoSuchElementException
+from selenium.common.exceptions import ElementClickInterceptedException
+from selenium.webdriver.common.by import By
+from selenium.webdriver.remote.webdriver import WebDriver
+from selenium.webdriver.remote.webelement import WebElement
+from selenium.webdriver.chromium.options import ChromiumOptions
+
 _UID_TYPE = 'imdb'
+
+_REQUEST_QUIT = 'quit'
+
+_AUTO = 'auto'
+_CHROME = 'chrome'
+_EDGE = 'edge'
+_FIREFOX = 'firefox'
+
+#region Fetching
 
 @dataclasses.dataclass
 class _CsvRow:
@@ -53,22 +75,15 @@ class _CsvRow:
     myrating:           None | str = None
     myrating_date:      None | str = None
 
-class PublicListFetcher(fetching.ListFetcher, fetcher_type='imdb-id', uid_type=_UID_TYPE):
+class SeleniumListFetcher(fetching.ListFetcher, fetcher_type='imdb-id', uid_type=_UID_TYPE):
+    exports_server: None | multiprocessing.Process = None
+    requests_queue = multiprocessing.Queue()
+
     def fetch_into_file(self, list_file: repo.ListFile) -> None:
-        try:
-            movies_csv_file = urllib.request.urlopen(_get_csv_url(self.concrete_listdef.address))
-        except urllib.error.HTTPError as e:
-            raise exceptions.InputError(f"Failed to download LISTDEF '{self.concrete_listdef}' from IMDb with error: {e}. Are you sure the address is valid?")
+        self.spin_server_if_needed()
 
-        with movies_csv_file:
-            movies_csv = _read_csv(codecs.iterdecode(movies_csv_file, encoding='utf-8'))
-
-        _fetch_movies_in_csv(movies_csv, list_file)
-
-class PrivateListFetcher(fetching.ListFetcher, fetcher_type='imdb-private-id', uid_type=_UID_TYPE):
-    def fetch_into_file(self, list_file: repo.ListFile) -> None:
         NUM_RETRIES = 1 # TODO: if we never experience timeouts, get rid of this.
-        CSV_DOWNLOAD_TIMEOUT_SECS = 20
+        CSV_DOWNLOAD_TIMEOUT_SECS = 40
         DOWNLOADS_DIR = os.getenv('FLAM_DOWNLOADS', os.path.join(os.path.expanduser('~'), 'Downloads'))
 
         if not os.path.isdir(DOWNLOADS_DIR):
@@ -78,7 +93,7 @@ class PrivateListFetcher(fetching.ListFetcher, fetcher_type='imdb-private-id', u
         for i in range(NUM_RETRIES):
             try:
                 latest_csv = utils.download_file_using_browser(
-                    url=_get_csv_url(self.concrete_listdef.address),
+                    download_cmd=lambda: SeleniumListFetcher.requests_queue.put_nowait(self.concrete_listdef.address),
                     file_extension='csv',
                     downloads_dir=DOWNLOADS_DIR,
                     timeout_secs=CSV_DOWNLOAD_TIMEOUT_SECS)
@@ -92,6 +107,35 @@ class PrivateListFetcher(fetching.ListFetcher, fetcher_type='imdb-private-id', u
 
         os.remove(latest_csv)
         _fetch_movies_in_csv(movies_csv, list_file)
+
+    @classmethod
+    def spin_server_if_needed(cls) -> None:
+        if cls.exports_server is not None and cls.exports_server.is_alive():
+            return
+
+        BROWSER = os.getenv('FLAM_BROWSER', _AUTO)
+        PROFILE = os.getenv('FLAM_BROWSER_PROFILE', '')
+
+        # On re-spins create a new queue. The first go-around it's already instantiated to give mypy an easier time.
+        if cls.exports_server is not None:
+            cls.requests_queue = multiprocessing.Queue()
+
+        # TODO: Consider a mechanism that blocks until the server informs that the browser is running and it's ready to take requests.
+        # TODO: If python doesn't cleanly terminate the server, we'll need to send it a quit message ourselves.
+        cls.exports_server = multiprocessing.Process(target=export_lists_handler, args=(cls.requests_queue, BROWSER, PROFILE), daemon=True)
+        cls.exports_server.start()
+    
+# Python devs made a dumbass decision to terminate multiprocesses in a way that doesn't run exit handlers,
+# and we must kill it cleanly to kill the browser.
+# TODO: Use Connections instead of queue to determine from the child if the parent is dead? Make the child not a daemon, but instead periodically check if orphaned and if so then die.
+@atexit.register
+def exports_server_cleanup():
+    if SeleniumListFetcher.exports_server is not None and SeleniumListFetcher.exports_server.is_alive():
+        SeleniumListFetcher.requests_queue.put_nowait(_REQUEST_QUIT)
+
+        # Join is needed because the subprocess is a daemon, which means it dies when we die,
+        # and we don't want it to die before it handles this request.
+        SeleniumListFetcher.exports_server.join()
 
 class CsvListFetcher(fetching.ListFetcher, fetcher_type='imdb-csv', uid_type=_UID_TYPE):
     def fetch_into_file(self, list_file: repo.ListFile) -> None:
@@ -164,11 +208,8 @@ def _fetch_movies_in_csv(movies_csv: list[_CsvRow], list_file: repo.ListFile) ->
         movie_lf.genres             = movie_csv.genres.split(', ')
         movie_lf.votes              = int(movie_csv.votes)
         movie_lf.myrating           = float(movie_csv.myrating) if (movie_csv.myrating is not None and movie_csv.myrating != '') else None
-
-        # IMDb already serves the dates in the correct format but it's good to validate.
-        # TODO: IMDb now sometimes serves these in %Y-%m or just %Y.
-        movie_lf.watch_date         = datetime.date.fromisoformat(movie_csv.watch_date).strftime('%Y-%m-%d')
-        movie_lf.release_date       = datetime.date.fromisoformat(movie_csv.release_date).strftime('%Y-%m-%d')
+        movie_lf.watch_date         = _format_date_from_csv(movie_csv.watch_date)
+        movie_lf.release_date       = _format_date_from_csv(movie_csv.release_date)
 
     if imdb_error is not None:
         raise exceptions.FetchInterrupt(str(imdb_error))
@@ -264,3 +305,197 @@ def _safe_get(obj: typing.Any, key: str, default: typing.Any = None) -> typing.A
         val = default
 
     return val
+
+def _format_date_from_csv(date: str) -> str:
+    # IMDb used to only serve %Y-%m-%d, but now it sometimes serves a partial date.
+    for fmt in ('%Y-%m-%d', '%Y-%m', '%Y'):
+        try:
+            return datetime.datetime.strptime(date, fmt).strftime('%Y-%m-%d')
+        except ValueError:
+            pass
+
+    raise ValueError(f'Invalid date: {date}')
+
+#endregion
+
+#region Selenium server
+
+class _BrowserController(abc.ABC):
+    @abc.abstractmethod
+    def set_profile(self, profile: str) -> None:
+        pass
+
+    @abc.abstractmethod
+    def launch(self) -> WebDriver:
+        pass
+
+class _ChromeController(_BrowserController):
+    # Since Edge is also chromium-based, it shares a lot of code with Chrome.
+    @classmethod
+    def set_chromium_basic_options(cls, options: ChromiumOptions) -> None:
+        options.add_argument('--no-sandbox') # Otherwise get an error.
+        options.add_experimental_option('excludeSwitches', ['enable-logging']) # Suppress annoying startup message.
+
+    @classmethod
+    def set_chromium_profile(cls, options: ChromiumOptions, profile: str) -> None:
+        # When you set user-data-dir to a dir that is already in use, this doesn't work. There's no solution but to create a copy of the profile which I don't want to do.
+        # Instead users should be suggested to either use Firefox, or create a new profile exclusively for this.
+        user_data_dir = os.path.dirname(profile)
+        profile_directory = os.path.basename(profile)
+        options.add_argument(f'--user-data-dir={user_data_dir}')
+        options.add_argument(f'--profile-directory={profile_directory}')
+
+    def __init__(self) -> None:
+        self.options = webdriver.ChromeOptions()
+        _ChromeController.set_chromium_basic_options(self.options)
+
+    def set_profile(self, profile: str) -> None:
+        _ChromeController.set_chromium_profile(self.options, profile)
+
+    def launch(self) -> WebDriver:
+        return webdriver.Chrome(options=self.options)
+        
+class _EdgeController(_BrowserController):
+    def __init__(self) -> None:
+        self.options = webdriver.EdgeOptions()
+        _ChromeController.set_chromium_basic_options(self.options)
+
+    def set_profile(self, profile: str) -> None:
+        _ChromeController.set_chromium_profile(self.options, profile)
+
+    def launch(self) -> WebDriver:
+        return webdriver.Edge(options=self.options)
+
+class _FirefoxController(_BrowserController):
+    def __init__(self) -> None:
+        self.options = webdriver.FirefoxOptions()
+
+    def set_profile(self, profile: str) -> None:
+        # Takes a super long time to load fat profiles, and there's no way around it. Users are advised to create a lean profile just for this.
+        self.options.profile = profile # type: ignore
+
+    def launch(self) -> WebDriver:
+        return webdriver.Firefox(options=self.options)
+
+def _get_default_browser() -> str:
+    try:
+        import winreg
+        
+        with winreg.OpenKey(winreg.HKEY_CURRENT_USER, r"Software\\Microsoft\\Windows\\Shell\\Associations\\UrlAssociations\\http\\UserChoice") as key:
+            browser_id = winreg.QueryValueEx(key, 'ProgId')[0]
+
+        if 'ChromeHTML' in browser_id:
+            return _CHROME
+        if 'AppXq0fevzme2pys62n3e0fbqa7peapykr8v' in browser_id: # WTF Microsoft.
+            return _EDGE
+        if 'FirefoxURL' in browser_id:
+            return _FIREFOX
+    except ModuleNotFoundError:
+        # On Windows this is an empty string, thanks webbrowser.
+        browser_name = webbrowser.get().name
+
+        for name in (_CHROME, _EDGE, _FIREFOX):
+            if name in browser_name:
+                return name
+
+    # Default to edge. Sorry linux users.
+    return _EDGE
+
+def _do_with_retries(action: typing.Callable[[], typing.Any], num_retries: int = 10, sleep_between_retries: float = 1.0) -> typing.Any: # pylint: disable=inconsistent-return-statements
+    for i in range(num_retries):
+        try:
+            return action()
+        except:
+            if i == num_retries - 1:
+                raise
+
+            time.sleep(sleep_between_retries)
+
+def _is_browser_alive(driver: WebDriver) -> bool:
+    try:
+        driver.title # pylint: disable=pointless-statement
+        return True
+    except:
+        return False
+
+def _click_export_button(driver: WebDriver, export_button: WebElement) -> None:
+    # Annoying popup that asks you to sign in hides the export button sometimes.
+    try:
+        export_button.click()
+    except ElementClickInterceptedException:
+        close_popup_button = driver.find_element(By.XPATH, "//button[@aria-label='Close']")
+        close_popup_button.click()
+        raise
+
+def _get_download_button(driver: WebDriver) -> WebElement:
+    # Try obtain the "in progress" text from the page. If it's there, that means the list isn't ready yet so we raise an exception.
+    try:
+        driver.find_element(By.XPATH, "//span[text()='In progress']")
+        raise RuntimeError('List export status is still in progress.')
+    # If there's no more "in progress" element in the page, we return the topmost download button.
+    except NoSuchElementException:
+        return driver.find_element(By.XPATH, "//button[contains(@aria-label, 'Start download for')]")
+    # If still in progress or failed to find it due to an unexpected exception type, refresh the page and propagate the exception so we'll retry.
+    except:
+        driver.refresh()
+        raise
+
+def _export_list(driver: WebDriver, list_id: str) -> None:
+    driver.get(f'https://www.imdb.com/list/ls{list_id}')
+
+    # Begin exporting.
+    export_button = _do_with_retries(
+        lambda: driver.find_element(By.XPATH, "//button[@aria-label='Export']"))
+    _do_with_retries(lambda: _click_export_button(driver, export_button))
+
+    # Go to exports page once the popup tells us.
+    exports_page_link = _do_with_retries(
+        lambda: driver.find_element(By.XPATH, "//a[@aria-label='Open exports page']"))
+    _do_with_retries(exports_page_link.click)
+
+    # Hit the download button once the list is ready.
+    download_button = _do_with_retries(lambda: _get_download_button(driver))
+    _do_with_retries(download_button.click)
+
+def export_lists_handler(requests_queue: multiprocessing.Queue, browser_name: str = _AUTO, browser_profile_path: str = '') -> None:
+    if browser_name == _AUTO:
+        browser_name = _get_default_browser()
+
+    # Match statements suck. Don't try to refactor this.
+    controller = (
+        _ChromeController() if browser_name == _CHROME else
+        _EdgeController() if browser_name == _EDGE else
+        _FirefoxController() if browser_name == _FIREFOX else
+        None
+    )
+
+    assert controller is not None
+
+    # Use empty instead of None as default because it's easier for callers to use.
+    # TODO: auto detect the default profile for all browsers?
+    if browser_profile_path != '':
+        controller.set_profile(browser_profile_path)
+
+    # RATIONALE: we spin a server instead of running this code once per list ID because launching the browser takes time and we don't want to pay that cost multiple times.
+    # NOTE: I wanted to minimize the browser window but it causes things to fail.
+    with controller.launch() as driver:
+        while True:
+            # TODO: consider spinning a new browser instance instead?
+            assert _is_browser_alive(driver)
+
+            try:
+                # We use a timeout so we can periodically check if the browser is still alive.
+                request = requests_queue.get(block=True, timeout=1)
+            except queue.Empty:
+                continue
+
+            if request == _REQUEST_QUIT:
+                return
+
+            try:
+                _export_list(driver, request)
+            except:
+                # TODO: Nicer error printing except in debug runs?
+                traceback.print_exc()
+
+#endregion

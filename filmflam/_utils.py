@@ -21,7 +21,6 @@ import time
 import types
 import typing
 import shutil
-import webbrowser
 import unicodedata
 import importlib.util
 
@@ -91,14 +90,13 @@ class ProgressBar:
         print()
 
 class Timeout:
-    def __init__(self, timeout_secs: float = float('inf'), operation: str = 'N/A') -> None:
+    def __init__(self, timeout_secs: float = float('inf')) -> None:
         self._timeout_secs = timeout_secs
-        self._operation = operation
         self._enter_time = float('nan')
 
     def tick(self) -> None:
         if time.time() - self._enter_time > self._timeout_secs:
-            raise TimeoutError(f"Operation: {self._operation} timed out after: {self._timeout_secs} seconds.")
+            raise TimeoutError(f"Operation timed out after {self._timeout_secs} seconds.")
 
     def __enter__(self) -> typing.Self:
         self._enter_time = time.time()
@@ -117,16 +115,16 @@ def subclasses_recursive(cls: type) -> set[type]:
     classes = set(cls.__subclasses__())
     return classes.union(sc for c in classes for sc in subclasses_recursive(c))
 
-def download_file_using_browser(url: str, file_extension: str, downloads_dir: str, timeout_secs: float = float('inf')) -> str:
+def download_file_using_browser(download_cmd: typing.Callable[[], typing.Any], file_extension: str, downloads_dir: str, timeout_secs: float = float('inf')) -> str:
     # We do a little closures.
     def get_latest_in_downloads() -> None | str:
         files_in_dowloads = glob.glob(os.path.join(downloads_dir, f'*.{file_extension}'))
         latest_file = max(files_in_dowloads, key=os.path.getctime, default=None)
         return latest_file
 
-    with Timeout(timeout_secs, f"download URL '{url}'") as timeout:
+    with Timeout(timeout_secs) as timeout:
         latest_file_before = get_latest_in_downloads()
-        webbrowser.open(url)
+        download_cmd()
 
         # We hit a URL in the browser that should download a CSV. Now we'll monitor the downloads directory until the latest CSV there is different than what it was before.
         # When that happens, we will have the CSV that was downloaded.
