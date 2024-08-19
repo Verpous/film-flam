@@ -19,6 +19,7 @@ import argparse
 import enum
 import os
 import sys
+import typing
 
 import filmflam.repo as repo
 import filmflam.fetching as fetching
@@ -33,12 +34,12 @@ class Choice(enum.StrEnum):
     AUTO    = 'auto'
 
     @classmethod
-    def always_auto_never(cls) -> list[str]:
-        return [cls.ALWAYS, cls.AUTO, cls.NEVER]
+    def always_auto_never(cls) -> typing.Iterable[str]:
+        return (cls.ALWAYS, cls.AUTO, cls.NEVER)
 
     @classmethod
-    def yes_no_auto(cls) -> list[str]:
-        return [cls.YES, cls.NO, cls.AUTO]
+    def yes_no_auto(cls) -> typing.Iterable[str]:
+        return (cls.YES, cls.NO, cls.AUTO)
 
     def __repr__(self) -> str:
         return str(self)

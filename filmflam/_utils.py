@@ -129,6 +129,7 @@ def download_file_using_browser(download_cmd: typing.Callable[[], typing.Any], f
         # We hit a URL in the browser that should download a CSV. Now we'll monitor the downloads directory until the latest CSV there is different than what it was before.
         # When that happens, we will have the CSV that was downloaded.
         while (latest_file := get_latest_in_downloads()) == latest_file_before or latest_file is None:
+            time.sleep(0.5) # Sleep between ticks otherwise the computer goes into turbo mode busy-waiting.
             timeout.tick()
 
         # When the file is created it's sometimes empty for a bit. At some point it jumps to being fully written, without any inbetween.
@@ -142,6 +143,7 @@ def download_file_using_browser(download_cmd: typing.Callable[[], typing.Any], f
                 break
 
             try:
+                time.sleep(0.2)
                 timeout.tick()
             except TimeoutError:
                 # For the same reason as the sleep above, we do a trick: we'll check if a different file with a similar name has appeared, and return it.

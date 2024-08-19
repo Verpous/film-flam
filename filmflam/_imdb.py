@@ -77,7 +77,7 @@ class _CsvRow:
 
 class SeleniumListFetcher(fetching.ListFetcher, fetcher_type='imdb-id', uid_type=_UID_TYPE):
     exports_server: None | multiprocessing.Process = None
-    requests_queue = multiprocessing.Queue()
+    requests_queue: multiprocessing.Queue = multiprocessing.Queue()
 
     def fetch_into_file(self, list_file: repo.ListFile) -> None:
         self.spin_server_if_needed()
@@ -98,6 +98,7 @@ class SeleniumListFetcher(fetching.ListFetcher, fetcher_type='imdb-id', uid_type
                     downloads_dir=DOWNLOADS_DIR,
                     timeout_secs=CSV_DOWNLOAD_TIMEOUT_SECS)
             except TimeoutError as e:
+                # TODO: Don't fail terminally, inform the user of the error but carry on to the next list? Not sure, since a rerun to fix things really hurts now.
                 if i == NUM_RETRIES - 1:
                     raise exceptions.InputError(f"Timed out trying to download LISTDEF '{self.concrete_listdef}' from IMDb. Are you sure the address is valid?") from e
 
@@ -127,9 +128,10 @@ class SeleniumListFetcher(fetching.ListFetcher, fetcher_type='imdb-id', uid_type
     
 # Python devs made a dumbass decision to terminate multiprocesses in a way that doesn't run exit handlers,
 # and we must kill it cleanly to kill the browser.
-# TODO: Use Connections instead of queue to determine from the child if the parent is dead? Make the child not a daemon, but instead periodically check if orphaned and if so then die.
+# NOTE: I tried instead to make the child process terminate itself when it detects that it's orphaned,
+# but multiprocess doesn't actually let you orphan children, because fuck you that's why.
 @atexit.register
-def exports_server_cleanup():
+def exports_server_cleanup() -> None:
     if SeleniumListFetcher.exports_server is not None and SeleniumListFetcher.exports_server.is_alive():
         SeleniumListFetcher.requests_queue.put_nowait(_REQUEST_QUIT)
 
@@ -457,6 +459,7 @@ def _export_list(driver: WebDriver, list_id: str) -> None:
     download_button = _do_with_retries(lambda: _get_download_button(driver))
     _do_with_retries(download_button.click)
 
+# TODO: Selenium errors are ugly and quite possible for users to encounter. We should hide that ugly from users, while not losing it for troubleshooting purposes.
 def export_lists_handler(requests_queue: multiprocessing.Queue, browser_name: str = _AUTO, browser_profile_path: str = '') -> None:
     if browser_name == _AUTO:
         browser_name = _get_default_browser()

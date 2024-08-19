@@ -271,8 +271,8 @@ class Predicate(FilterMember):
                 raise EinGafrurError('Right parenthesis has no matching left parenthesis.', tokens=tokens, error_indices=at)
                 
             close_matches = difflib.get_close_matches(prefixed_name, (Predicate.PREFIX + k for k in PREDICATES.keys()))
-            suggestions = f' (did you mean: {", ".join(close_matches)}?)' if len(close_matches) > 0 else ''
-            raise EinGafrurError(f"Expected valid predicate name, but got: '{prefixed_name}'{suggestions}.", tokens=tokens, error_indices=at)
+            suggestions = f' (did you mean: {", ".join(close_matches)}?)' if len(close_matches) > 0 else '.'
+            raise EinGafrurError(f"Expected valid predicate name, but got: '{prefixed_name}'{suggestions}", tokens=tokens, error_indices=at)
 
         # Throughout this file we annotate return types with the class name and not typing.Self.
         # I don't like this, but it's the best way to get mypy to shut up about this line.
@@ -343,3 +343,24 @@ def is_filter_token(token: str) -> bool:
 # test_compile('( ( -true | -true ) ) ! -false')
 # test_compile('( -true " "')
 # test_compile('true')
+
+# TODO: Predicate ideas:
+# Generic predicates:
+# * -<attribute-name> [=|+|-|++|--]<value> (obviously. = for eq and is default, +/- for ge/le, ++/-- for strictly gt/lt. Not all attributes support anything other than =.
+#                                           Worth noting that if you want to compare equality to a negative number, you can avoid ambiguity by specifying the "=".
+#                                           If attribute is array type, compare against first element I think, and false if no first element.
+#                                           The names in a group are an array attribute that we don't have to treat special.)
+# * -contains <array attribute name> [=|+|-|++|--]<value>
+# * -all <array attribute name> [=|+|-|++|--]<value>
+# * -size <array attribute name> [=|+|-|++|--]<value> (array len check)
+# 
+# Person predicates:
+# * -appeared-in <pipeline with movie predicates> (searches all crew types)
+# * -<crew-type>-in <pipeline with movie predicates> (ex: cast-in, director-in, etc. IDEA: "-cast-in -true" as a way to check if a person is an actor at all)
+#
+# Movie predicates:
+# * -crew-contains <crew-type> <pipeline with person predicates>
+# * -crews-contain <pipeline with person predicates> (searches all crew types, beware of people who appear in multiple crew types!)
+#
+# Role predicates:
+# * -crew <crew-type>

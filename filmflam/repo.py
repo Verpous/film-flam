@@ -152,6 +152,7 @@ class _FlamSerializable(msgspec.Struct, forbid_unknown_fields=True):
     def _validation_error(cls, message: str) -> exceptions.FileValidationError:
         return exceptions.FileValidationError(f'Invalid {cls.__name__}: {message}')
 
+# TODO: Don't like the name "list", could too easily be confused with too many things. Maybe I should just invent a word and call it a "Flist"?
 # ListFile-related objects go here.
 class ListFileRole(_FlamSerializable):
     person_uid:             str
@@ -251,6 +252,7 @@ class Configuration(_FlamSerializable):
     _compound_lists:        list[CompoundList]
     extensions:             list[str]
 
+    # TODO: Forbid special characters in list names that might be confused for a filter token.
     def sanity_checks(self) -> None:
         super().sanity_checks()
 
@@ -305,6 +307,12 @@ class ConfigurationLists(typing.Generic[LT]):
     def get_by_name_or_none(self, name: str) -> None | LT:
         return next((l for l in self._lists if l.name == name), None)
 
+# TODO: Register extension attributes, predicates, fetchers, etc. to the context. API goes something like: init context, register extensions, then use context.
+# Have a default global context that everything gets registered to if you don't create your own context to isolate it.
+# Problem: how to make this compatible with default-imported extensions, we want them to be a feature of flam the API not flam the CLI tool,
+# which means we need a way to register them to the specific context.
+# Maybe not such a problem, extensions will register to the global context, if you initialize your own context then that's like saying you want to isolate from the global stuff.
+
 # This object represents the repository itself mainly. Any creating/writing/reading files from the flam directory should go through here.
 # For users who just want to work with volatile memory and not load or save anything, we support a "contextless" mode.
 # All the ugly if checks for that are encapsulated in this class.
@@ -313,6 +321,7 @@ class FlamContext:
     _LISTFILES_DIR = 'list_files'
     _CONFIGURATION_FILE = 'config.json'
 
+    # TODO: Acquire OS lock on the flam_dir so that you can't have multiple contexts operating on it at once?
     def __init__(self, flam_dir: None | str = DEFAULT_FLAM_DIR) -> None:
         self._flam_dir = flam_dir
 
@@ -330,6 +339,11 @@ class FlamContext:
         # The solution I've got is to wrap those lists in this Context.
         self.remote_lists = ConfigurationLists(self.cfg._remote_lists, 'list')
         self.compound_lists = ConfigurationLists(self.cfg._compound_lists, 'compound list')
+
+        # Registered extensions.
+        self.fetchers = []
+        self.predicates = []
+        self.attributes = []
 
     def _make_flam_dir(self) -> None:
         assert self._flam_dir is not None
@@ -525,6 +539,17 @@ class FlamContext:
             pass
 
         return None
+
+    # Registration.
+    # TODO: avoid duplicates, better data structures, whatever? Also get functions and everything, and maybe make the lists private.
+    def register_fetcher(self, fetcher: fetching.ListFetcher) -> None:
+        self.fetchers.append(fetcher)
+
+    def register_predicate(self, predicate: filtering.Predicate) -> None:
+        self.predicates.append(predicate)
+
+    def register_attribute(self, attribute: attributes.Attribute) -> None:
+        self.attributes.append(attribute)
 
 CREW_TYPES = {
     'cast',

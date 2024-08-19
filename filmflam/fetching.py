@@ -128,6 +128,8 @@ def _get_fetcher(canon_listdef: repo.CanonListdef, ctx: repo.FlamContext) -> Lis
         # Failed to find it in the first iteration. It may still be a non-builtin type though.
         # Try importing a custom module named with a convention that means it should have the fetcher we seek, then seek again.
         # This way we don't import any random file named with this convention without the user explicitly asking for it, which would be a security risk.
+        # TODO: unified extensions method based on decorators to register fetchers, attributes, etc.?
+        # No more voodo detecting subclasses, just auto import scripts which register extensions. Screw security, maybe it's not so bad.
         try:
             utils.import_from_path(f'flam_fetcher_{concrete_listdef.fetcher_type}')
         except ImportError:
