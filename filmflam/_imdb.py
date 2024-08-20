@@ -27,8 +27,7 @@ import traceback
 import abc
 import atexit
 
-import filmflam.repo as repo
-import filmflam.fetching as fetching
+import filmflam.infra as ff
 import filmflam._utils as utils
 import filmflam.exceptions as exceptions
 
@@ -75,11 +74,11 @@ class _CsvRow:
     myrating:           None | str = None
     myrating_date:      None | str = None
 
-class SeleniumListFetcher(fetching.ListFetcher, fetcher_type='imdb-id', uid_type=_UID_TYPE):
+class SeleniumListFetcher(ff.ListFetcher, fetcher_type='imdb-id', uid_type=_UID_TYPE):
     exports_server: None | multiprocessing.Process = None
     requests_queue: multiprocessing.Queue = multiprocessing.Queue()
 
-    def fetch_into_file(self, list_file: repo.ListFile) -> None:
+    def fetch_into_file(self, list_file: ff.ListFile) -> None:
         self.spin_server_if_needed()
 
         NUM_RETRIES = 1 # TODO: if we never experience timeouts, get rid of this.
@@ -139,8 +138,8 @@ def exports_server_cleanup() -> None:
         # and we don't want it to die before it handles this request.
         SeleniumListFetcher.exports_server.join()
 
-class CsvListFetcher(fetching.ListFetcher, fetcher_type='imdb-csv', uid_type=_UID_TYPE):
-    def fetch_into_file(self, list_file: repo.ListFile) -> None:
+class CsvListFetcher(ff.ListFetcher, fetcher_type='imdb-csv', uid_type=_UID_TYPE):
+    def fetch_into_file(self, list_file: ff.ListFile) -> None:
         try:
             movies_csv_file = open(self.concrete_listdef.address, 'r', newline='')
         except FileNotFoundError as e:
@@ -166,7 +165,7 @@ def _read_csv(movies_csv_file: typing.Iterable[str]) -> list[_CsvRow]:
 
     return movies_csv
 
-def _fetch_movies_in_csv(movies_csv: list[_CsvRow], list_file: repo.ListFile) -> None:
+def _fetch_movies_in_csv(movies_csv: list[_CsvRow], list_file: ff.ListFile) -> None:
     # First we will build the list of all movies that we already have fetched, and overwrite list_file with this immediately.
     # This lets us bail in the middle if an exception occurs and not lose progress.
     csv_uids = {m.uid for m in movies_csv}
@@ -216,7 +215,7 @@ def _fetch_movies_in_csv(movies_csv: list[_CsvRow], list_file: repo.ListFile) ->
     if imdb_error is not None:
         raise exceptions.FetchInterrupt(str(imdb_error))
 
-def _fetch_movie(movie_csv: _CsvRow, list_file: repo.ListFile, ia: imdb.Cinemagoer) -> None:
+def _fetch_movie(movie_csv: _CsvRow, list_file: ff.ListFile, ia: imdb.Cinemagoer) -> None:
     NUM_RETRIES = 5
     info_to_fetch = (*imdb.Movie.Movie.default_info, 'critic reviews', 'full credits')
 
@@ -228,26 +227,26 @@ def _fetch_movie(movie_csv: _CsvRow, list_file: repo.ListFile, ia: imdb.Cinemago
             if i == NUM_RETRIES - 1:
                 raise
 
-    movie_lf = repo.ListFileMovie.create(uid=movie_csv.uid)
+    movie_lf = ff.ListFileMovie.create(uid=movie_csv.uid)
 
     # Prefer to get the title from Cinemagoer because they have better titles for foreign language films, but it's good to have a fallback (not that we ever need it).
     movie_lf.title = _safe_get(movie_imdb, 'title', default=movie_csv.title) 
     movie_lf.metascore = _safe_get(movie_imdb, 'metascore')
 
-    for crew_type in repo.CREW_TYPES:
+    for crew_type in ff.CREW_TYPES:
         # Building this list as a dictionary solves two problems:
         # 1. Sometimes you get empty people, so those are discarded.
         # 2. Sometimes you get the same person twice. Also discarded.
         crew_imdb_by_uid = {p.getID(): p for p in _safe_get(movie_imdb, crew_type, default=[]) if p}
 
-        movie_lf.crew[crew_type] = repo.ListFileCrew.create(
+        movie_lf.crew[crew_type] = ff.ListFileCrew.create(
             crew_type=crew_type,
             roles_by_uid={r.person_uid: r for r in _build_roles(crew_imdb_by_uid)})
         _update_people_by_uid(list_file.people_by_uid, ((p.uid, p) for p in _build_people(crew_imdb_by_uid)))
 
     list_file.movies_by_uid[movie_csv.uid] = movie_lf
 
-def _refetch_person(person_lf: repo.ListFilePerson, ia: imdb.Cinemagoer) -> None:
+def _refetch_person(person_lf: ff.ListFilePerson, ia: imdb.Cinemagoer) -> None:
     NUM_RETRIES = 5
 
     for i in range(NUM_RETRIES):
@@ -271,22 +270,22 @@ def _build_characters(current_role: typing.Any) -> typing.Iterator[None | str]:
     elif isinstance(current_role, imdb.utils.RolesList):
         yield from (_safe_get(role_imdb, 'name') for role_imdb in current_role)
 
-def _build_roles(crew_imdb_by_uid: dict[str, imdb.Person.Person]) -> typing.Iterable[repo.ListFileRole]:
+def _build_roles(crew_imdb_by_uid: dict[str, imdb.Person.Person]) -> typing.Iterable[ff.ListFileRole]:
     for person_imdb in crew_imdb_by_uid.values():
-        role_lf = repo.ListFileRole.create(
+        role_lf = ff.ListFileRole.create(
             person_uid=person_imdb.getID(),
             characters=[c for c in _build_characters(person_imdb.currentRole) if c is not None])
 
         yield role_lf
 
-def _build_people(crew_imdb_by_uid: dict[str, imdb.Person.Person]) -> typing.Iterable[repo.ListFilePerson]:
+def _build_people(crew_imdb_by_uid: dict[str, imdb.Person.Person]) -> typing.Iterable[ff.ListFilePerson]:
     for person_imdb in crew_imdb_by_uid.values():
-        person_lf = repo.ListFilePerson.create(uid=person_imdb.getID())
+        person_lf = ff.ListFilePerson.create(uid=person_imdb.getID())
         person_lf.name = _safe_get(person_imdb, 'name', person_lf.uid)
         yield person_lf
 
 # Because of this deal with bad names, when we merge two people dictionaries we want to keep the person with the good name if there is one.
-def _update_people_by_uid(dst_people: dict[str, repo.ListFilePerson], src_people: typing.Iterable[tuple[str, repo.ListFilePerson]]) -> None:
+def _update_people_by_uid(dst_people: dict[str, ff.ListFilePerson], src_people: typing.Iterable[tuple[str, ff.ListFilePerson]]) -> None:
     # NOT src_people.items(). That's the responsibility of the callers.
     dst_people.update((uid, p) for uid, p in src_people if uid not in dst_people or _is_person_name_bad(dst_people[uid].name))
 
@@ -295,8 +294,8 @@ def _update_people_by_uid(dst_people: dict[str, repo.ListFilePerson], src_people
 # We fix this by trying to find people with a name like that and replacing it with the correct name.
 # By doing this after everything is downloaded and not when the name was added to the dictionary,
 # we are able to optimize by using the same person's appearance in something else instead of doing the big download when possible.
-def _is_person_name_bad(name: repo.UnsetType | str) -> bool:
-    assert not isinstance(name, repo.UnsetType)
+def _is_person_name_bad(name: ff.UnsetType | str) -> bool:
+    assert not isinstance(name, ff.UnsetType)
     return '\n' in name or ' episode' in name.lower()
 
 def _safe_get(obj: typing.Any, key: str, default: typing.Any = None) -> typing.Any:

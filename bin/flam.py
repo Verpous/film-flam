@@ -21,9 +21,8 @@ import os
 import sys
 import typing
 
-import filmflam.repo as repo
-import filmflam.fetching as fetching
-import filmflam.filtering as filtering
+# TODO: I'd rather the module's __init__.py makes "import filmflam" import all infra.
+import filmflam.infra as ff
 import filmflam.exceptions as exceptions
 
 class Choice(enum.StrEnum):
@@ -45,10 +44,10 @@ class Choice(enum.StrEnum):
         return str(self)
 
 def split_at_filter(positional_args: list[str]) -> tuple[list[str], list[str]]:
-    filter_begin = next((i for i, arg in enumerate(positional_args) if filtering.is_filter_token(arg)), len(positional_args))
+    filter_begin = next((i for i, arg in enumerate(positional_args) if ff.is_filter_token(arg)), len(positional_args))
     return positional_args[:filter_begin], positional_args[filter_begin:]
 
-def subcommand_config_list(ctx: repo.FlamContext, args: argparse.Namespace) -> None:
+def subcommand_config_list(ctx: ff.FlamContext, args: argparse.Namespace) -> None:
     if args.delete:
         config_list_delete(ctx, args)
     elif args.print:
@@ -59,16 +58,16 @@ def subcommand_config_list(ctx: repo.FlamContext, args: argparse.Namespace) -> N
     else:
         config_list_create(ctx, args)
 
-def config_list_delete(ctx: repo.FlamContext, args: argparse.Namespace) -> None:
+def config_list_delete(ctx: ff.FlamContext, args: argparse.Namespace) -> None:
     if args.NAME is None:
         raise exceptions.InputError(f"Must specify a NAME to delete a list.")
 
     remote_list = ctx.remote_lists.get_by_name(args.NAME)
-    assert not isinstance(remote_list.uid, repo.UnsetType)
+    assert not isinstance(remote_list.uid, ff.UnsetType)
     ctx.delete_remote_list(remote_list.uid)
     ctx.write_cfg()
 
-def config_list_print(ctx: repo.FlamContext, args: argparse.Namespace) -> None:
+def config_list_print(ctx: ff.FlamContext, args: argparse.Namespace) -> None:
     # TODO: improve this in the future
     if args.NAME is None:
         for rl in ctx.remote_lists:
@@ -76,7 +75,7 @@ def config_list_print(ctx: repo.FlamContext, args: argparse.Namespace) -> None:
     else:
         print(ctx.remote_lists.get_by_name(args.NAME))
 
-def config_list_edit(ctx: repo.FlamContext, args: argparse.Namespace, remote_list: repo.RemoteList) -> None:
+def config_list_edit(ctx: ff.FlamContext, args: argparse.Namespace, remote_list: ff.RemoteList) -> None:
     if args.rename is not None and args.rename != remote_list.name:
         remote_list.name = args.rename
 
@@ -93,7 +92,7 @@ def config_list_edit(ctx: repo.FlamContext, args: argparse.Namespace, remote_lis
 
     ctx.write_cfg()
 
-def config_list_create(ctx: repo.FlamContext, args: argparse.Namespace) -> None:
+def config_list_create(ctx: ff.FlamContext, args: argparse.Namespace) -> None:
     if args.NAME is None:
         raise exceptions.InputError(f"Must specify a NAME to create or edit a list.")
 
@@ -102,7 +101,7 @@ def config_list_create(ctx: repo.FlamContext, args: argparse.Namespace) -> None:
 
     cldef = ctx.canonicalize_listdef(args.LISTDEF)
 
-    remote_list = repo.RemoteList.create(
+    remote_list = ff.RemoteList.create(
         name = args.NAME,
         fetcher_type = cldef.fetcher_type,
         address = cldef.address,
@@ -113,7 +112,7 @@ def config_list_create(ctx: repo.FlamContext, args: argparse.Namespace) -> None:
     ctx.add_remote_list(remote_list)
     ctx.write_cfg()
 
-def subcommand_config_compound(ctx: repo.FlamContext, args: argparse.Namespace) -> None:
+def subcommand_config_compound(ctx: ff.FlamContext, args: argparse.Namespace) -> None:
     if args.delete:
         config_compound_delete(ctx, args)
     elif args.print:
@@ -124,16 +123,16 @@ def subcommand_config_compound(ctx: repo.FlamContext, args: argparse.Namespace) 
     else:
         config_compound_create(ctx, args)
 
-def config_compound_delete(ctx: repo.FlamContext, args: argparse.Namespace) -> None:
+def config_compound_delete(ctx: ff.FlamContext, args: argparse.Namespace) -> None:
     if args.NAME is None:
         raise exceptions.InputError(f"Must specify a NAME to delete a compound list.")
 
     compound_list = ctx.compound_lists.get_by_name(args.NAME)
-    assert not isinstance(compound_list.uid, repo.UnsetType)
+    assert not isinstance(compound_list.uid, ff.UnsetType)
     ctx.delete_compound_list(compound_list.uid)
     ctx.write_cfg()
 
-def config_compound_print(ctx: repo.FlamContext, args: argparse.Namespace) -> None:
+def config_compound_print(ctx: ff.FlamContext, args: argparse.Namespace) -> None:
     # TODO: improve this in the future
     if args.NAME is None:
         for cl in ctx.compound_lists:
@@ -141,7 +140,7 @@ def config_compound_print(ctx: repo.FlamContext, args: argparse.Namespace) -> No
     else:
         print(ctx.compound_lists.get_by_name(args.NAME))
 
-def config_compound_edit(ctx: repo.FlamContext, args: argparse.Namespace, compound_list: repo.CompoundList) -> None:
+def config_compound_edit(ctx: ff.FlamContext, args: argparse.Namespace, compound_list: ff.CompoundList) -> None:
     if args.rename is not None:
         compound_list.name = args.rename
 
@@ -149,11 +148,11 @@ def config_compound_edit(ctx: repo.FlamContext, args: argparse.Namespace, compou
 
     if len(remote_list_names) > 0:
         # The unset check should always be true, but the type checker wants it.
-        compound_list.remote_list_uids = [rl_uid for rl_name in remote_list_names if not isinstance(rl_uid := ctx.remote_lists.get_by_name(rl_name).uid, repo.UnsetType)]
+        compound_list.remote_list_uids = [rl_uid for rl_name in remote_list_names if not isinstance(rl_uid := ctx.remote_lists.get_by_name(rl_name).uid, ff.UnsetType)]
 
     if len(filter_tokens) > 0:
         # Don't have anything to do with this for now, but we can raise an exception if it doesn't compile.
-        filtering.compile(filter_tokens)
+        ff.compile(filter_tokens)
         compound_list.filter_tokens = filter_tokens
 
     if args.default_fetch != Choice.AUTO:
@@ -165,13 +164,13 @@ def config_compound_edit(ctx: repo.FlamContext, args: argparse.Namespace, compou
     # TODO: regenerate the compound list/mark it dirty so it gets regenerated? Probably should be an internal thing to the API.
     ctx.write_cfg()
 
-def config_compound_create(ctx: repo.FlamContext, args: argparse.Namespace) -> None:
+def config_compound_create(ctx: ff.FlamContext, args: argparse.Namespace) -> None:
     if args.NAME is None:
         raise exceptions.InputError(f"Must specify a NAME to create or edit a compound list.")
 
     remote_list_names, filter_tokens = split_at_filter(args.LIST + args.FILTER)
 
-    compound_list = repo.CompoundList.create(
+    compound_list = ff.CompoundList.create(
         name = args.NAME,
         remote_list_uids = [ctx.remote_lists.get_by_name(rl_name).uid for rl_name in remote_list_names],
         filter_tokens = filter_tokens,
@@ -182,11 +181,11 @@ def config_compound_create(ctx: repo.FlamContext, args: argparse.Namespace) -> N
     ctx.add_compound_list(compound_list)
     ctx.write_cfg()
 
-def subcommand_clean(ctx: repo.FlamContext, args: argparse.Namespace) -> None:
+def subcommand_clean(ctx: ff.FlamContext, args: argparse.Namespace) -> None:
     print('clean')
 
-def subcommand_fetch(ctx: repo.FlamContext, args: argparse.Namespace) -> None:
-    fetchers = fetching.parse_listdefs(args.LISTDEF if len(args.LISTDEF) != 0 else [repo.LISTDEF_DEFAULTS], ctx)
+def subcommand_fetch(ctx: ff.FlamContext, args: argparse.Namespace) -> None:
+    fetchers = ff.parse_listdefs(args.LISTDEF if len(args.LISTDEF) != 0 else [ff.LISTDEF_DEFAULTS], ctx)
 
     if args.undo:
         for fetcher in fetchers:
@@ -200,17 +199,17 @@ def subcommand_fetch(ctx: repo.FlamContext, args: argparse.Namespace) -> None:
             print(f"Fetching {ctx.canon_listdef_pretty(fetcher.abstract_listdef)}...")
             list_file, is_changed = fetcher.fetch(ctx, refetch_pattern=args.refetch, from_scratch=args.from_scratch, quiet=False)
 
-def subcommand_find(ctx: repo.FlamContext, args: argparse.Namespace) -> None:
+def subcommand_find(ctx: ff.FlamContext, args: argparse.Namespace) -> None:
     print('find')
 
-def subcommand_chart(ctx: repo.FlamContext, args: argparse.Namespace) -> None:
+def subcommand_chart(ctx: ff.FlamContext, args: argparse.Namespace) -> None:
     print('chart')
 
 def main() -> None:
     parser = argparse.ArgumentParser(
         formatter_class=argparse.RawTextHelpFormatter,
         description='I dunno lol.')
-    parser.add_argument('-C', '--flam-dir', metavar='PATH', default=repo.FlamContext.DEFAULT_FLAM_DIR, action='store', help=
+    parser.add_argument('-C', '--flam-dir', metavar='PATH', default=ff.FlamContext.DEFAULT_FLAM_DIR, action='store', help=
         'Use %(metavar)s as the flam directory. Uses FLAM_DIR environment variable by default, or ~/.film_flam if it is not defined.')
     parser.add_argument('--debug', action='store_true', help=argparse.SUPPRESS)
 
@@ -386,7 +385,7 @@ Valid column names: ...''')
     if hasattr(args, 'FILTER') and hasattr(args, 'REMAINDER'):
         args.FILTER += args.REMAINDER
 
-    ctx = repo.FlamContext(args.flam_dir)
+    ctx = ff.FlamContext(args.flam_dir)
 
     try:
         args.function(ctx, args)
