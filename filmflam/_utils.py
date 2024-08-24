@@ -15,7 +15,6 @@
 
 import re
 import os
-import sys
 import glob
 import time
 import types
@@ -168,23 +167,11 @@ def slugify(value: str) -> str:
     value = re.sub(r'[^\w\s.-]', '', value.lower())
     return re.sub(r'[-\s]+', '-', value).strip('-_')
 
-def import_from_path(module_name: str) -> types.ModuleType:
-    file_name = f'{module_name}.py'
+def import_file(file: str) -> types.ModuleType:
+    module_name = os.path.splitext(os.path.basename(file))[0]
+    spec = importlib.util.spec_from_file_location(module_name, file)
+    assert spec is not None and spec.loader is not None
 
-    for path in os.getenv('PATH', '').split(os.pathsep):
-        file_path = os.path.join(path, file_name)
-
-        if not os.path.exists(file_path):
-            continue
-        
-        spec = importlib.util.spec_from_file_location(module_name, file_path)
-
-        if spec is None or spec.loader is None:
-            continue
-
-        module = importlib.util.module_from_spec(spec)
-        sys.modules[module_name] = module
-        spec.loader.exec_module(module)
-        return module
-
-    raise ImportError(f'Failed to import module named {module_name} from PATH.')
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    return module

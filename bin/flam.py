@@ -152,7 +152,7 @@ def config_compound_edit(ctx: ff.FlamContext, args: argparse.Namespace, compound
 
     if len(filter_tokens) > 0:
         # Don't have anything to do with this for now, but we can raise an exception if it doesn't compile.
-        ff.compile(filter_tokens)
+        ctx.compile(filter_tokens)
         compound_list.filter_tokens = filter_tokens
 
     if args.default_fetch != Choice.AUTO:
@@ -185,19 +185,13 @@ def subcommand_clean(ctx: ff.FlamContext, args: argparse.Namespace) -> None:
     print('clean')
 
 def subcommand_fetch(ctx: ff.FlamContext, args: argparse.Namespace) -> None:
-    fetchers = ff.parse_listdefs(args.LISTDEF if len(args.LISTDEF) != 0 else [ff.LISTDEF_DEFAULTS], ctx)
-
+    # TODO: Hate this feature. It should either be scratched or changed to be a CLI feature that we backup the entire folder
     if args.undo:
-        for fetcher in fetchers:
-            try:
-                ctx.restore_list_file_to_previous(fetcher.abstract_listdef)
-                print(f'Restored {ctx.canon_listdef_pretty(fetcher.abstract_listdef)}.')
-            except FileNotFoundError:
-                print(f'No backup for {ctx.canon_listdef_pretty(fetcher.abstract_listdef)}.')
+        pass
     else:
-        for fetcher in fetchers:
-            print(f"Fetching {ctx.canon_listdef_pretty(fetcher.abstract_listdef)}...")
-            list_file, is_changed = fetcher.fetch(ctx, refetch_pattern=args.refetch, from_scratch=args.from_scratch, quiet=False)
+        # TODO: maybe defaults shouldn't be configured on the API side, maybe it's more of a CLI thing and we should have our own separate configuration for it.
+        listdefs = args.LISTDEF if len(args.LISTDEF) != 0 else [ff.LISTDEF_DEFAULTS]
+        ctx.fetch(listdefs, refetch_pattern=args.refetch, quiet=False)
 
 def subcommand_find(ctx: ff.FlamContext, args: argparse.Namespace) -> None:
     print('find')
@@ -272,7 +266,7 @@ def main() -> None:
     fetch_parser.set_defaults(function=subcommand_fetch)
     fetch_parser.add_argument('-u', '--undo', action='store_true', help="Restore LISTDEFs to their previous versions."
         "Fetch can be expensive so if something goes wrong and files get messed up this is good to have.")
-    fetch_parser.add_argument('-s', '--from-scratch', action='store_true', help="Don't try to update existing fetched lists. Refetch everything from scratch.")
+    fetch_parser.add_argument('-s', '--from-scratch', action='store_true', help="Don't try to update existing fetched lists. Refetch everything from scratch.") # TODO: re-implement some nicer way
     fetch_parser.add_argument('-r', '--refetch', metavar='PATTERN', default=None, action='store', help=
         '''Forces titles that match %(metavar)s (case-insensitive) to be redownloaded even if they are already locally stored.
 It's enough for %(metavar)s to match any part of the title, not necessarily the whole title.

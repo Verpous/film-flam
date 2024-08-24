@@ -24,8 +24,10 @@ PYLINT_IGNORE += C0114 # missing-module-docstring
 PYLINT_IGNORE += C0115 # missing-class-docstring
 PYLINT_IGNORE += C0116 # missing-function-docstring
 PYLINT_IGNORE += C0301 # line-too-long
+PYLINT_IGNORE += C0302 # too-many-lines
 PYLINT_IGNORE += C0303 # trailing-whitespace
 PYLINT_IGNORE += C0411 # wrong-import-order
+PYLINT_IGNORE += C0413 # wrong-import-position
 PYLINT_IGNORE += C0415 # import-outside-toplevel
 
 PYLINT_IGNORE += R0402 # consider-using-from-import
@@ -35,6 +37,7 @@ PYLINT_IGNORE += R1708 # stop-iteration-return
 PYLINT_IGNORE += R1714 # consider-using-in
 
 PYLINT_IGNORE += W0124 # confusing-with-statement
+PYLINT_IGNORE += W0212 # protected-access
 PYLINT_IGNORE += W0511 # fixme
 PYLINT_IGNORE += W0622 # redefined-builtin
 PYLINT_IGNORE += W0702 # bare-except

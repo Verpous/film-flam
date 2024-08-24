@@ -22,12 +22,12 @@ import msgspec
 import typing
 import types
 import uuid
-import shutil
 import re
 import copy
 import contextlib
 import difflib
 import enum
+import importlib
 
 import filmflam._utils as utils
 import filmflam.exceptions as exceptions
@@ -247,7 +247,7 @@ class Configuration(_FlamSerializable):
                 raise self._validation_error(f"Found multiple lists named '{rl.name}'.")
 
             if rl.concrete_listdef.is_special:
-                raise self._validation_error(f"LISTDEF '{rl.concrete_listdef}' type must not be one of: {', '.join(SPECIAL_FETCHER_TYPES)}.")
+                raise self._validation_error(f"LISTDEF '{rl.concrete_listdef}' type must not be one of: {', '.join(_SPECIAL_FETCHER_TYPES)}.")
 
         for cl in self._compound_lists:
             if sum(1 for cl2 in self._compound_lists if cl.name == cl2.name) > 1:
@@ -295,115 +295,6 @@ class ListFetcher(abc.ABC):
         # Must leave no field unset. Even if it's an optional field it must explicitly be set to None.
         pass
 
-    # TODO: Not a big fan of "from scratch". Maybe callers should just clean up the file before calling fetch.
-    def fetch(self, ctx: FlamContext, refetch_pattern: None | str = None, from_scratch: bool = False, quiet: bool = True) -> tuple[ListFile, bool]:
-        try:
-            refetch_re = re.compile(refetch_pattern, flags=re.IGNORECASE) if refetch_pattern is not None else None
-        except re.error as e:
-            raise exceptions.InputError(f"Invalid PATTERN: '{refetch_pattern}': {e}")
-
-        list_file = ListFile.create() if from_scratch else ctx.load_list_file(self.abstract_listdef, must_exist=False)
-        list_file_before = copy.deepcopy(list_file)
-        interrupt_error = None
-
-        if not isinstance(list_file_before.uid_type, UnsetType) and list_file_before.uid_type != self.uid_type:
-            raise exceptions.InputError(f"Cannot fetch '{ctx.canon_listdef_pretty(self.abstract_listdef)}' because it's already fetched with a different ID type "
-                f"(old: '{list_file_before.uid_type}', new: '{self.uid_type}'). "
-                "This can happen if you changed a list's LISTDEF to a nonmatching type. You can resolve it by fetching the list from scratch, or reverting the list to its old type.")
-
-        if refetch_re is not None:
-            list_file.movies_by_uid = {
-                uid: movie_lf
-                for uid, movie_lf in list_file.movies_by_uid.items()
-                if not isinstance(movie_lf.title, UnsetType) and not refetch_re.search(movie_lf.title)
-            }
-            _remove_unused_people(list_file)
-
-        with open(os.devnull, 'w') as devnull, contextlib.redirect_stdout(devnull) if quiet else contextlib.nullcontext():
-            try:
-                self.fetch_into_file(list_file)
-            except exceptions.FetchInterrupt as e:
-                interrupt_error = e
-
-        # Fetcher may have removed some movies from the list. Over here we remove people who are orphaned because of that.
-        _remove_unused_people(list_file)
-
-        list_file.uid_type = self.uid_type
-        list_file.fetcher_type = self.abstract_listdef.fetcher_type
-        list_file.address = self.abstract_listdef.address
-
-        # Must canonicalize before comparing for equality.
-        list_file.canonicalize()
-
-        # We'll only write the new contents if they're different than before, and we'll return whether there was a diff or not.
-        # This allows us to check the file mtime to know if it's dirty and dependent files need to be regenerated.
-        is_changed = list_file_before != list_file
-
-        if is_changed:
-            ctx.write_list_file(list_file)
-
-        if interrupt_error is not None:
-            raise exceptions.FetchInterrupt(f"Fetching of {ctx.canon_listdef_pretty(self.abstract_listdef)} got interrupted due to error: {interrupt_error}. "
-                "You may retry to pick up where it left off.")
-
-        return list_file, is_changed
-
-def _get_fetcher(canon_listdef: CanonListdef, ctx: FlamContext) -> ListFetcher:
-    # Avoid cyclic dependency by importing fetchers only here. Incidentally this is also what we do for custom fetchers, but for different reasons.
-    # The import may seem unused but we obtain imported classes via subclasses_recursive.
-    import filmflam._imdb # pylint: disable=unused-import, cyclic-import
-    
-    if canon_listdef.is_abstract:
-        # Assume it's a RemoteList.
-        abstract_listdef = canon_listdef
-        concrete_listdef = ctx.remote_lists.get_by_uid(abstract_listdef.address).concrete_listdef
-    else:
-        abstract_listdef = concrete_listdef = canon_listdef
-
-    for _ in range(2):
-        # Lookup a fetcher with a matching type.
-        for fetcher_cls in utils.subclasses_recursive(ListFetcher):
-            fetcher_cls_safe = typing.cast(type[ListFetcher], fetcher_cls)
-
-            if concrete_listdef.fetcher_type == fetcher_cls_safe.fetcher_type:
-                return fetcher_cls_safe(concrete_listdef, abstract_listdef)
-
-        # Failed to find it in the first iteration. It may still be a non-builtin type though.
-        # Try importing a custom module named with a convention that means it should have the fetcher we seek, then seek again.
-        # This way we don't import any random file named with this convention without the user explicitly asking for it, which would be a security risk.
-        # TODO: unified extensions method based on decorators to register fetchers, attributes, etc.?
-        # No more voodo detecting subclasses, just auto import scripts which register extensions. Screw security, maybe it's not so bad.
-        try:
-            utils.import_from_path(f'flam_fetcher_{concrete_listdef.fetcher_type}')
-        except ImportError:
-            break
-
-    raise exceptions.InputError(f"Invalid LISTDEF '{concrete_listdef}': type is unknown.")
-
-def parse_listdefs(listdefs: typing.Iterable[str], ctx: FlamContext) -> list[ListFetcher]:
-    cldefs = ctx.canonicalize_listdefs_with_all_expansion(listdefs)
-    expanded = set(_expand_listdefs(cldefs, ctx))
-
-    # Returns a list not a generator so that if one of the listdefs doesn't parse good we will raise an error now and not before fetching a few.
-    return [_get_fetcher(cldef, ctx) for cldef in expanded]
-
-def _expand_listdefs(canon_listdefs: typing.Iterable[CanonListdef], ctx: FlamContext) -> typing.Iterator[CanonListdef]:
-    for cldef in canon_listdefs:
-        if cldef.fetcher_type == LISTDEF_DEFAULTS:
-            yield from (rl.abstract_listdef for rl in ctx.remote_lists if rl.is_default_fetch)
-
-            # Default compound lists... yeah.
-            yield from (
-                CanonListdef(RemoteList.FETCHER_TYPE, rl_uid)
-                for cl in ctx.compound_lists if cl.is_default_fetch
-                    for rl_uid in cl.remote_list_uids
-            )
-        elif cldef.fetcher_type == CompoundList.FETCHER_TYPE:
-            compound_list = ctx.compound_lists.get_by_uid(cldef.address)
-            yield from (CanonListdef(RemoteList.FETCHER_TYPE, rl_uid) for rl_uid in compound_list.remote_list_uids)
-        else: # RemoteList.FETCHER_TYPE or a "concrete" type.
-            yield cldef
-
 def _get_all_used_person_uids(list_file: ListFile) -> typing.Iterator[str]:
     for movie_lf in list_file.movies_by_uid.values():
         for crew in movie_lf.crew.values():
@@ -435,7 +326,7 @@ def _remove_unused_people(list_file: ListFile) -> None:
 # )         := )  | ]    | -rparen
 
 # This one's for you, mayer.
-EinGafrurError = exceptions.FilterSyntaxError
+_EinGafrurError = exceptions.FilterSyntaxError
 
 # We represent filters as an AST of FilterMembers.
 class FilterMember(abc.ABC):
@@ -452,44 +343,44 @@ class FilterMember(abc.ABC):
 
 class Filter(FilterMember):
     def __init__(self, pipeline: None | Pipeline) -> None:
-        self.pipeline = pipeline
+        self._pipeline = pipeline
 
     # We compile by defining "eat" classmethods for all the FilterMembers (and some classes which aren't FilterMembers).
     # Generally, eat receives the *full* tokenized expression, and the index where "uneaten" tokens begin.
     # It "eats" tokens starting from that point and returns the FilterMember object created from them, and the index where it stopped eating.
     # Filter is the root object so it's a little different, it expects to eat everything to it doesn't need start or end indices.
     @classmethod
-    def eat(cls, tokens: list[str]) -> Filter:
+    def eat(cls, tokens: list[str], ctx: FlamContext) -> Filter:
         if len(tokens) == 0:
             return cls(None)
 
-        pipeline, _ = Pipeline.eat(tokens, 0, expect_eat_everything=True)
+        pipeline, _ = Pipeline.eat(tokens, 0, ctx, expect_eat_everything=True)
         return cls(pipeline)
 
     def excrete(self, item: typing.Any, general: typing.Any) -> bool:
-        return True if self.pipeline is None else self.pipeline.excrete(item, general)
+        return True if self._pipeline is None else self._pipeline.excrete(item, general)
 
     def regurgitate(self) -> typing.Iterable[str]:
-        if self.pipeline is not None:
+        if self._pipeline is not None:
             # Parentheses around the whole filter are useless, and they make it so if you repeatedly compile(regurgitate(compile(regurgitate...))),
             # each iteration wraps the expression in an additional parentheses.
-            yield from self.pipeline.regurgitate(parenthesize=False)
+            yield from self._pipeline.regurgitate(parenthesize=False)
 
 class Pipeline(FilterMember):
     # Yes the type annotations are a little ugly, but there's no way to alias them due to their recursive nature.
     def __init__(self, value: Predicate | Negative | Pipeline, joinables: list[Disjoined | Predicate | Negative | Pipeline]) -> None:
-        self.value = value
-        self.joinables = joinables
+        self._value = value
+        self._joinables = joinables
         
     @classmethod
-    def eat(cls, tokens: list[str], at: int, expect_eat_everything: bool = False) -> tuple[Pipeline, int]:
-        value, until = Value.eat(tokens, at)
+    def eat(cls, tokens: list[str], at: int, ctx: FlamContext, expect_eat_everything: bool = False) -> tuple[Pipeline, int]:
+        value, until = Value.eat(tokens, at, ctx)
         joinables = []
 
         while until < len(tokens):
             try:
-                swallow, until = Joinable.eat(tokens, until)
-            except EinGafrurError:
+                swallow, until = Joinable.eat(tokens, until, ctx)
+            except _EinGafrurError:
                 # Doing it this way "breaks" the model (by giving Pipeline a unique eat signature),
                 # but it lets us raise a meaningful error instead of some cryptic "some tokens weren't eaten".
                 if expect_eat_everything:
@@ -502,9 +393,9 @@ class Pipeline(FilterMember):
         return cls(value, joinables), until
 
     def excrete(self, item: typing.Any, general: typing.Any) -> bool:
-        accept = self.value.excrete(item, general)
+        accept = self._value.excrete(item, general)
         
-        for joinable in self.joinables:
+        for joinable in self._joinables:
             # Conjunction is the default, so only disjunction must be specified.
             if isinstance(joinable, Negative | Predicate | Pipeline):
                 accept = accept and joinable.excrete(item, general)
@@ -520,8 +411,8 @@ class Pipeline(FilterMember):
             # We use min because these are sets so next(iter(...)) returns different things every time.
             yield min(Positive.LPAREN)
 
-        yield from self.value.regurgitate()
-        yield from (tok for jable in self.joinables for tok in jable.regurgitate())
+        yield from self._value.regurgitate()
+        yield from (tok for jable in self._joinables for tok in jable.regurgitate())
 
         if parenthesize:
             yield min(Positive.RPAREN)
@@ -529,117 +420,117 @@ class Pipeline(FilterMember):
 # Some "FilterMembers" (as defined in the BNF) don't need to be instantiated. Eating a "Value" directly returns what its "child" would be.
 class Value:
     @classmethod
-    def eat(cls, tokens: list[str], at: int) -> tuple[Predicate | Negative | Pipeline, int]:
+    def eat(cls, tokens: list[str], at: int, ctx: FlamContext) -> tuple[Predicate | Negative | Pipeline, int]:
         # The order is important for raising the most meaningful exception.
         try:
-            return Negative.eat(tokens, at)
-        except EinGafrurError as e:
+            return Negative.eat(tokens, at, ctx)
+        except _EinGafrurError as e:
             # If the exception was that there isn't a 'not' symbol, we want to try parsing this as a Positive.
             # Otherwise, there's no point to even try, and the most meaningful exception we can raise is this one.
             if e.is_terminal:
                 raise
 
-        return Positive.eat(tokens, at)
+        return Positive.eat(tokens, at, ctx)
 
 class Positive:
     LPAREN = {'(', '[', '-lparen'}
     RPAREN = {')', ']', '-rparen'}
 
     @classmethod
-    def eat(cls, tokens: list[str], at: int) -> tuple[Predicate | Pipeline, int]:
+    def eat(cls, tokens: list[str], at: int, ctx: FlamContext) -> tuple[Predicate | Pipeline, int]:
         # Only raise parenthesis errors if we have reason to believe this was meant to be a parenthesis expression.
         if at < len(tokens) and tokens[at] in cls.LPAREN:
-            pipeline, until = Pipeline.eat(tokens, at + 1)
+            pipeline, until = Pipeline.eat(tokens, at + 1, ctx)
             
             if until >= len(tokens):
-                raise EinGafrurError('Expected matching right parenthesis, but reached the end of input.', tokens=tokens, error_indices=at)
+                raise _EinGafrurError('Expected matching right parenthesis, but reached the end of input.', tokens=tokens, error_indices=at)
 
             if tokens[until] not in cls.RPAREN:
-                raise EinGafrurError(f"Expected matching right parenthesis, but got: '{tokens[until]}'.", tokens=tokens, error_indices=[at, until])
+                raise _EinGafrurError(f"Expected matching right parenthesis, but got: '{tokens[until]}'.", tokens=tokens, error_indices=[at, until])
 
             return pipeline, until + 1
 
-        return Predicate.eat(tokens, at)
+        return Predicate.eat(tokens, at, ctx)
 
 class Negative(FilterMember):
     NEGATE = {'!', '-n', '-not'}
 
     def __init__(self, positive: Predicate | Pipeline) -> None:
-        self.positive = positive
+        self._positive = positive
 
     @classmethod
-    def eat(cls, tokens: list[str], at: int) -> tuple[Negative, int]:
+    def eat(cls, tokens: list[str], at: int, ctx: FlamContext) -> tuple[Negative, int]:
         if at >= len(tokens):
-            raise EinGafrurError("Expected 'not' symbol, but reached the end of input.", is_terminal=False, tokens=tokens)
+            raise _EinGafrurError("Expected 'not' symbol, but reached the end of input.", is_terminal=False, tokens=tokens)
 
         if tokens[at] not in cls.NEGATE:
-            raise EinGafrurError(f"Expected 'not' symbol, but got: '{tokens[at]}'.", is_terminal=False, tokens=tokens, error_indices=at)
+            raise _EinGafrurError(f"Expected 'not' symbol, but got: '{tokens[at]}'.", is_terminal=False, tokens=tokens, error_indices=at)
 
-        positive, until = Positive.eat(tokens, at + 1)
+        positive, until = Positive.eat(tokens, at + 1, ctx)
         return cls(positive), until
 
     def excrete(self, item: typing.Any, general: typing.Any) -> bool:
-        return not self.positive.excrete(item, general)
+        return not self._positive.excrete(item, general)
 
     def regurgitate(self) -> typing.Iterable[str]:
         yield min(self.NEGATE)
-        yield from self.positive.regurgitate()
+        yield from self._positive.regurgitate()
 
 class Joinable(FilterMember):
     @classmethod
-    def eat(cls, tokens: list[str], at: int) -> tuple[Disjoined | Predicate | Negative | Pipeline, int]:
+    def eat(cls, tokens: list[str], at: int, ctx: FlamContext) -> tuple[Disjoined | Predicate | Negative | Pipeline, int]:
         # Ordered this way so we raise the most meaningful exception possible.
         try:
-            return Disjoined.eat(tokens, at)
-        except EinGafrurError as e:
+            return Disjoined.eat(tokens, at, ctx)
+        except _EinGafrurError as e:
             if e.is_terminal:
                 raise
 
         try:
-            return Conjoined.eat(tokens, at)
-        except EinGafrurError as e:
+            return Conjoined.eat(tokens, at, ctx)
+        except _EinGafrurError as e:
             if e.is_terminal:
                 raise
 
-        return Value.eat(tokens, at)
+        return Value.eat(tokens, at, ctx)
 
 class Conjoined:
     CONJOIN = {'&', '-a', '-and'}
 
     @classmethod
-    def eat(cls, tokens: list[str], at: int) -> tuple[Predicate | Negative | Pipeline, int]:
+    def eat(cls, tokens: list[str], at: int, ctx: FlamContext) -> tuple[Predicate | Negative | Pipeline, int]:
         if at >= len(tokens):
-            raise EinGafrurError("Expected 'and' symbol, but reached the end of input.", is_terminal=False, tokens=tokens)
+            raise _EinGafrurError("Expected 'and' symbol, but reached the end of input.", is_terminal=False, tokens=tokens)
 
         if tokens[at] not in cls.CONJOIN:
-            raise EinGafrurError(f"Expected 'and' symbol, but got: '{tokens[at]}'.", is_terminal=False, tokens=tokens, error_indices=at)
+            raise _EinGafrurError(f"Expected 'and' symbol, but got: '{tokens[at]}'.", is_terminal=False, tokens=tokens, error_indices=at)
 
         # There is no need to return a Coinjoined object because conjoining is the default behavior when boolean operators are omitted.
-        return Value.eat(tokens, at + 1)
+        return Value.eat(tokens, at + 1, ctx)
 
 class Disjoined(FilterMember):
     DISJOIN = {'|', '-o', '-or'}
 
     def __init__(self, value: Predicate | Negative | Pipeline) -> None:
-        self.value = value
+        self._value = value
 
     @classmethod
-    def eat(cls, tokens: list[str], at: int) -> tuple[Disjoined, int]:
+    def eat(cls, tokens: list[str], at: int, ctx: FlamContext) -> tuple[Disjoined, int]:
         if at >= len(tokens):
-            raise EinGafrurError("Expected 'or' symbol, but reached the end of input.", is_terminal=False, tokens=tokens)
+            raise _EinGafrurError("Expected 'or' symbol, but reached the end of input.", is_terminal=False, tokens=tokens)
 
         if tokens[at] not in cls.DISJOIN:
-            raise EinGafrurError(f"Expected 'or' symbol, but got: '{tokens[at]}'.", is_terminal=False, tokens=tokens, error_indices=at)
+            raise _EinGafrurError(f"Expected 'or' symbol, but got: '{tokens[at]}'.", is_terminal=False, tokens=tokens, error_indices=at)
 
-        value, until = Value.eat(tokens, at + 1)
+        value, until = Value.eat(tokens, at + 1, ctx)
         return cls(value), until
 
     def excrete(self, item: typing.Any, general: typing.Any) -> bool:
-        return self.value.excrete(item, general)
+        return self._value.excrete(item, general)
 
     def regurgitate(self) -> typing.Iterable[str]:
         yield min(self.DISJOIN)
-        yield from self.value.regurgitate()
+        yield from self._value.regurgitate()
 
 class Predicate(FilterMember):
     PREFIX = '-'
@@ -650,76 +541,36 @@ class Predicate(FilterMember):
         cls.name = name
 
     @classmethod
-    def eat(cls, tokens: list[str], at: int) -> tuple[Predicate, int]:
+    def eat(cls, tokens: list[str], at: int, ctx: FlamContext) -> tuple[Predicate, int]:
         if at >= len(tokens):
-            raise EinGafrurError('Expected a predicate name, but reached the end of input.', tokens=tokens)
+            raise _EinGafrurError('Expected a predicate name, but reached the end of input.', tokens=tokens)
 
         prefixed_name = tokens[at]
         name = prefixed_name.removeprefix(Predicate.PREFIX)
 
-        # Instead of going predicate by predicate and checking for EinGafrurError,
-        # it's more optimal to pick the only possibly right predicate from a dictionary,
-        # and eat the name token right here and let the predicate eat its arguments alone.
-        if name == prefixed_name or name not in PREDICATES:
-            if prefixed_name in Positive.RPAREN:
-                raise EinGafrurError('Right parenthesis has no matching left parenthesis.', tokens=tokens, error_indices=at)
-                
-            close_matches = difflib.get_close_matches(prefixed_name, (Predicate.PREFIX + k for k in PREDICATES.keys()))
-            suggestions = f' (did you mean: {", ".join(close_matches)}?)' if len(close_matches) > 0 else '.'
-            raise EinGafrurError(f"Expected valid predicate name, but got: '{prefixed_name}'{suggestions}", tokens=tokens, error_indices=at)
+        if name != prefixed_name:
+            # Instead of going predicate by predicate and checking for _EinGafrurError,
+            # it's more optimal to pick the only possibly right predicate from a dictionary,
+            # and eat the name token right here and let the predicate eat its arguments alone.
+            for registry in ctx.registries_to_try():
+                if registry.has_predicate(name):
+                    # Throughout this file we annotate return types with the class name and not typing.Self.
+                    # I don't like this, but it's the best way to get mypy to shut up about this line.
+                    return registry.get_predicate(name).eat(tokens, at + 1, ctx)
 
-        # Throughout this file we annotate return types with the class name and not typing.Self.
-        # I don't like this, but it's the best way to get mypy to shut up about this line.
-        return PREDICATES[name].eat(tokens, at + 1)
+        if prefixed_name in Positive.RPAREN:
+            raise _EinGafrurError('Right parenthesis has no matching left parenthesis.', tokens=tokens, error_indices=at)
+            
+        all_pred_names = (Predicate.PREFIX + k for registry in ctx.registries_to_try() for k in registry.predicate_keys())
+        close_matches = difflib.get_close_matches(prefixed_name, all_pred_names)
+        suggestions = f' (did you mean: {", ".join(close_matches)}?)' if len(close_matches) > 0 else '.'
+        raise _EinGafrurError(f"Expected valid predicate name, but got: '{prefixed_name}'{suggestions}", tokens=tokens, error_indices=at)
 
     def regurgitate(self) -> typing.Iterable[str]:
         yield self.PREFIX + self.name
 
-# TODO: Predicates except the base Predicate class might be possible to push into a different file.
-class TruePredicate(Predicate, name='true'):
-    @classmethod
-    def eat(cls, tokens: list[str], at: int) -> tuple[Predicate, int]:
-        return cls(), at
-
-    def excrete(self, item: typing.Any, general: typing.Any) -> bool:
-        return True
-
-class FalsePredicate(Predicate, name='false'):
-    @classmethod
-    def eat(cls, tokens: list[str], at: int) -> tuple[Predicate, int]:
-        return cls(), at
-
-    def excrete(self, item: typing.Any, general: typing.Any) -> bool:
-        return False
-
-# class MoviePredicate(Predicate):
-#     pass
-        
-# class PersonPredicate(Predicate):
-#     pass
-
-# class RolePredicate(Predicate):
-#     pass
-
-# TODO: think about how to make this support custom extensions.
-PREDICATES = {cls.name: cls for cls in [TruePredicate, FalsePredicate]}
-
-def compile(tokens: list[str]) -> Filter:
-    return Filter.eat(tokens)
-
 def decompile(filter: Filter) -> list[str]:
     return list(filter.regurgitate())
-
-def test_compile(line: str) -> None:
-    import shlex
-    tokens = shlex.split(line)
-
-    try:
-        filtr = compile(tokens)
-        regurg = ' '.join(EinGafrurError.format_token(t) for t in filtr.regurgitate())
-        print(line, '->', regurg)
-    except EinGafrurError as e:
-        print(e)
 
 # Doesn't guarantee that token is valid, only indicates that it looks like it should be.
 def is_filter_token(token: str) -> bool:
@@ -729,36 +580,6 @@ def is_filter_token(token: str) -> bool:
             or token in Conjoined.CONJOIN
             or token in Positive.LPAREN
             or token in Positive.RPAREN)
-
-# test_compile('')
-# test_compile('-true')
-# test_compile('-true -true -false')
-# test_compile('-true -o ( -false ) )')
-# test_compile('-ftrual | -tue\\" -o ( -false )')
-# test_compile('( ( -true | -true ) ) ! -false')
-# test_compile('( -true " "')
-# test_compile('true')
-
-# TODO: Predicate ideas:
-# Generic predicates:
-# * -<attribute-name> [=|+|-|++|--]<value> (obviously. = for eq and is default, +/- for ge/le, ++/-- for strictly gt/lt. Not all attributes support anything other than =.
-#                                           Worth noting that if you want to compare equality to a negative number, you can avoid ambiguity by specifying the "=".
-#                                           If attribute is array type, compare against first element I think, and false if no first element.
-#                                           The names in a group are an array attribute that we don't have to treat special.)
-# * -contains <array attribute name> [=|+|-|++|--]<value>
-# * -all <array attribute name> [=|+|-|++|--]<value>
-# * -size <array attribute name> [=|+|-|++|--]<value> (array len check)
-# 
-# Person predicates:
-# * -appeared-in <pipeline with movie predicates> (searches all crew types)
-# * -<crew-type>-in <pipeline with movie predicates> (ex: cast-in, director-in, etc. IDEA: "-cast-in -true" as a way to check if a person is an actor at all)
-#
-# Movie predicates:
-# * -crew-contains <crew-type> <pipeline with person predicates>
-# * -crews-contain <pipeline with person predicates> (searches all crew types, beware of people who appear in multiple crew types!)
-#
-# Role predicates:
-# * -crew <crew-type>
 
 #endregion filters
 
@@ -827,6 +648,57 @@ class ConfigurationLists(typing.Generic[LT]):
     def get_by_name_or_none(self, name: str) -> None | LT:
         return next((l for l in self._lists if l.name == name), None)
 
+# TODO: concerns:
+# * We might want a predicate that has 1 per attribute, maybe need to treat it special? Might need to register attributes before predicates?
+# * Might want to lock any further extensions once a context is in use
+# * Might want to prevent registering something that is already registered
+class Registry:
+    def __init__(self) -> None:
+        self._fetchers: dict[str, type[ListFetcher]] = {}
+        self._predicates: dict[str, type[Predicate]] = {}
+        self._attributes: dict[str, Attribute] = {}
+
+    def register_fetcher(self, fetcher_cls: type[ListFetcher]) -> None:
+        self._fetchers[fetcher_cls.fetcher_type] = fetcher_cls
+
+    # TODO: Still not quite sure if we should register classes or instances.
+    def register_predicate(self, predicate_cls: type[Predicate]) -> None:
+        self._predicates[predicate_cls.name] = predicate_cls
+
+    def register_attribute(self, attribute: Attribute) -> None:
+        self._attributes[attribute.name] = attribute
+
+    def register(self, obj: typing.Any) -> None:
+        if isinstance(obj, type) and issubclass(obj, ListFetcher):
+            self.register_fetcher(obj)
+        elif isinstance(obj, type) and issubclass(obj, Predicate):
+            self.register_predicate(obj)
+        elif isinstance(obj, Attribute):
+            self.register_attribute(obj)
+        else:
+            raise exceptions.InputError(f"Invalid object for registration: {obj}.")
+
+    def get_fetcher(self, fetcher_type: str) -> type[ListFetcher]:
+        return self._fetchers[fetcher_type]
+
+    def get_predicate(self, name: str) -> type[Predicate]:
+        return self._predicates[name]
+
+    def get_attribute(self, name: str) -> Attribute:
+        return self._attributes[name]
+
+    def has_fetcher(self, fetcher_type: str) -> bool:
+        return fetcher_type in self._fetchers
+
+    def has_predicate(self, name: str) -> bool:
+        return name in self._predicates
+
+    def has_attribute(self, name: str) -> bool:
+        return name in self._attributes
+
+    def predicate_keys(self) -> typing.Iterable[str]:
+        return iter(self._predicates)
+
 # TODO: Register extension attributes, predicates, fetchers, etc. to the context. API goes something like: init context, register extensions, then use context.
 # Have a default global context that everything gets registered to if you don't create your own context to isolate it.
 # Problem: how to make this compatible with default-imported extensions, we want them to be a feature of flam the API not flam the CLI tool,
@@ -846,6 +718,7 @@ class FlamContext:
     # TODO: Acquire OS lock on the flam_dir so that you can't have multiple contexts operating on it at once?
     def __init__(self, flam_dir: None | str = DEFAULT_FLAM_DIR, import_extensions: bool = False) -> None:
         self._flam_dir = flam_dir
+        self._list_files: list[ListFile] = []
 
         if self._flam_dir is None:
             self._cfg = Configuration.create()
@@ -862,15 +735,20 @@ class FlamContext:
         self.remote_lists = ConfigurationLists(self.cfg._remote_lists, 'list')
         self.compound_lists = ConfigurationLists(self.cfg._compound_lists, 'compound list')
 
-        # Registered extensions.
-        self.fetchers = []
-        self.predicates = []
-        self.attributes = []
+        self._extensions = Registry()
+
+        # import_extensions does 2 things: import all configured extensions, and subscribe to any globally registered extensions.
+        # It's good to make this an option with default false for security, and I prefer to keep the two options as one for simplicity.
+        self._use_global_extensions = import_extensions
 
         if import_extensions:
-            # TODO: this option does 2 things: import all configured extensions, and subscribe to any globally registered extensions.
-            # It's good to make this an option with default false for security, and I prefer to keep the two options as one for simplicity.
-            pass
+            for extension in self.cfg.extensions:
+                # Try both ways.
+                # TODO: Raise InputError?
+                try:
+                    importlib.import_module(extension)
+                except ModuleNotFoundError:
+                    utils.import_file(extension)
 
     def _make_flam_dir(self) -> None:
         assert self._flam_dir is not None
@@ -888,42 +766,32 @@ class FlamContext:
                 pass
 
     # List files.
-    def load_list_file(self, abstract_listdef: CanonListdef, must_exist: bool = True) -> ListFile:
+    def get_list_file(self, abstract_listdef: CanonListdef) -> ListFile:
+        # First try to get it from memory.
+        list_file = next((lf for lf in self._list_files if lf.abstract_listdef == abstract_listdef), None)
+
+        if list_file is not None:
+            return list_file
+
+        # Memory didn't work out, try to load it from disk.
         if self._flam_dir is not None:
             try:
-                return ListFile.load(self._get_list_file_path(abstract_listdef))
+                list_file = ListFile.load(self._get_list_file_path(abstract_listdef))
+                self._list_files.append(list_file)
             except FileNotFoundError:
-                if must_exist:
-                    raise
+                pass
             except exceptions.FileValidationError as e:
                 raise exceptions.FileValidationError(f"{e} You may need to fetch '{self.canon_listdef_pretty(abstract_listdef)}' again from scratch.") from e
+                
+        if list_file is None:
+            raise exceptions.InputError(f"No fetched file for LISTDEF '{self.canon_listdef_pretty(abstract_listdef)}'.")
 
-        if must_exist:
-            raise FileNotFoundError(f"No existing file for LISTDEF '{self.canon_listdef_pretty(abstract_listdef)}' because we're in contextless mode.")
+        return list_file
 
-        return ListFile.create()
-
-    def write_list_file(self, list_file: ListFile) -> None:
+    def _write_list_file(self, list_file: ListFile) -> None:
         # We use devnull in contextless mode, so that we still go through the file validity checks even if we don't write it anywhere.
-        if self._flam_dir is None:
-            list_file.write(os.devnull)
-            return
-
-        file = self._get_list_file_path(list_file.abstract_listdef)
-        
-        try:
-            shutil.copyfile(file, f'{file}.bak')
-        except FileNotFoundError:
-            pass
-        finally:
-            # No backup error is worth not writing what we've got.
-            list_file.write(file)
-
-    def restore_list_file_to_previous(self, abstract_listdef: CanonListdef) -> None:
-        if self._flam_dir is not None:
-            file = self._get_list_file_path(abstract_listdef)
-            shutil.copyfile(f'{file}.bak', file)
-            # TODO: Mark categories dirty.
+        file = self._get_list_file_path(list_file.abstract_listdef) if self._flam_dir is not None else os.devnull
+        list_file.write(file)
 
     # After much deliberation, I decided that files for named lists should be named according to the list type and UID,
     # and unnamed lists' files should be named according to the fetcher type and address.
@@ -1068,15 +936,135 @@ class FlamContext:
         return None
 
     # Registration.
-    # TODO: avoid duplicates, better data structures, whatever? Also get functions and everything, and maybe make the lists private.
-    def register_fetcher(self, fetcher: ListFetcher) -> None:
-        self.fetchers.append(fetcher)
+    @property
+    def extensions(self) -> Registry:
+        return self._extensions
 
-    def register_predicate(self, predicate: Predicate) -> None:
-        self.predicates.append(predicate)
+    def registries_to_try(self) -> typing.Iterable[Registry]:
+        yield _builtins
 
-    def register_attribute(self, attribute: Attribute) -> None:
-        self.attributes.append(attribute)
+        if self._use_global_extensions:
+            yield _global_extensions
+
+        yield self._extensions
+
+    # Fetching.
+    def fetch(self, listdefs: typing.Iterable[str], refetch_pattern: None | str = None, quiet: bool = True) -> list[ListFile]:
+        fetchers = self._parse_listdefs_into_fetchers(listdefs)
+        list_files = []
+
+        try:
+            refetch_re = re.compile(refetch_pattern, flags=re.IGNORECASE) if refetch_pattern is not None else None
+        except re.error as e:
+            raise exceptions.InputError(f"Invalid PATTERN: '{refetch_pattern}': {e}")
+
+        for fetcher in fetchers:
+            try:
+                list_file = self.get_list_file(fetcher.abstract_listdef)
+                is_new = False
+            except exceptions.InputError:
+                list_file = ListFile.create()
+                is_new = True
+                
+            list_file_before = copy.deepcopy(list_file)
+            interrupt_error = None
+
+            if not isinstance(list_file_before.uid_type, UnsetType) and list_file_before.uid_type != fetcher.uid_type:
+                raise exceptions.InputError(f"Cannot fetch '{self.canon_listdef_pretty(fetcher.abstract_listdef)}' because it's already fetched with a different ID type "
+                    f"(old: '{list_file_before.uid_type}', new: '{fetcher.uid_type}'). "
+                    "This can happen if you changed a list's LISTDEF to a nonmatching type. You can resolve it by fetching the list from scratch, or reverting the list to its old type.")
+
+            if refetch_re is not None:
+                list_file.movies_by_uid = {
+                    uid: movie_lf
+                    for uid, movie_lf in list_file.movies_by_uid.items()
+                    if not isinstance(movie_lf.title, UnsetType) and not refetch_re.search(movie_lf.title)
+                }
+
+                _remove_unused_people(list_file)
+
+            with open(os.devnull, 'w') as devnull, contextlib.redirect_stdout(devnull) if quiet else contextlib.nullcontext():
+                print(f"Fetching {self.canon_listdef_pretty(fetcher.abstract_listdef)}...")
+
+                try:
+                    fetcher.fetch_into_file(list_file)
+                except exceptions.FetchInterrupt as e:
+                    interrupt_error = e
+
+            # Fetcher may have removed some movies from the list. Over here we remove people who are orphaned because of that.
+            _remove_unused_people(list_file)
+
+            list_file.uid_type = fetcher.uid_type
+            list_file.fetcher_type = fetcher.abstract_listdef.fetcher_type
+            list_file.address = fetcher.abstract_listdef.address
+
+            # Must canonicalize before comparing for equality.
+            list_file.canonicalize()
+
+            # We'll only write the new contents if they're different than before, and we'll return whether there was a diff or not.
+            # This allows us to check the file mtime to know if it's dirty and dependent files need to be regenerated.
+            if list_file_before != list_file:
+                self._write_list_file(list_file)
+
+            if is_new:
+                self._list_files.append(list_file)
+
+            if interrupt_error is not None:
+                raise exceptions.FetchInterrupt(f"Fetching of {self.canon_listdef_pretty(fetcher.abstract_listdef)} got interrupted due to error: {interrupt_error}. "
+                    "You may retry to pick up where it left off.")
+
+            list_files.append(list_file)
+
+        return list_files
+
+    def _parse_listdefs_into_fetchers(self, listdefs: typing.Iterable[str]) -> list[ListFetcher]:
+        cldefs = self.canonicalize_listdefs_with_all_expansion(listdefs)
+        expanded = set(self._expand_listdefs_for_fetch(cldefs))
+
+        # Returns a list not a generator so that if one of the listdefs doesn't parse good we will raise an error now and not before fetching a few.
+        return [self._get_fetcher(cldef) for cldef in expanded]
+
+    def _expand_listdefs_for_fetch(self, canon_listdefs: typing.Iterable[CanonListdef]) -> typing.Iterator[CanonListdef]:
+        for cldef in canon_listdefs:
+            if cldef.fetcher_type == LISTDEF_DEFAULTS:
+                yield from (rl.abstract_listdef for rl in self.remote_lists if rl.is_default_fetch)
+
+                # Default compound lists... yeah.
+                yield from (
+                    CanonListdef(RemoteList.FETCHER_TYPE, rl_uid)
+                    for cl in self.compound_lists if cl.is_default_fetch
+                        for rl_uid in cl.remote_list_uids
+                )
+            elif cldef.fetcher_type == CompoundList.FETCHER_TYPE:
+                compound_list = self.compound_lists.get_by_uid(cldef.address)
+                yield from (CanonListdef(RemoteList.FETCHER_TYPE, rl_uid) for rl_uid in compound_list.remote_list_uids)
+            else: # RemoteList.FETCHER_TYPE or a "concrete" type.
+                yield cldef
+
+    def _get_fetcher(self, canon_listdef: CanonListdef) -> ListFetcher:        
+        if canon_listdef.is_abstract:
+            # Assume it's a RemoteList.
+            abstract_listdef = canon_listdef
+            concrete_listdef = self.remote_lists.get_by_uid(abstract_listdef.address).concrete_listdef
+        else:
+            abstract_listdef = concrete_listdef = canon_listdef
+
+        fetcher_cls = None
+
+        for registry in self.registries_to_try():
+            try:
+                fetcher_cls = registry.get_fetcher(concrete_listdef.fetcher_type)
+            except KeyError:
+                pass
+
+        if fetcher_cls is None:
+            raise exceptions.InputError(f"Invalid LISTDEF '{concrete_listdef}': type is unknown.")
+
+        return fetcher_cls(concrete_listdef, abstract_listdef)
+
+    # Filtering.
+    def compile(self, tokens: list[str]) -> Filter:
+        return Filter.eat(tokens, self)
 
 #endregion context
 
@@ -1089,7 +1077,7 @@ class CanonListdef(typing.NamedTuple):
 
     @property
     def is_special(self) -> bool:
-        return self.fetcher_type in SPECIAL_FETCHER_TYPES
+        return self.fetcher_type in _SPECIAL_FETCHER_TYPES
 
     # RemoteList/CompoundList listdefs are abstract because they can't be fetched directly, only through the underlying "concrete" type.
     @property
@@ -1117,6 +1105,26 @@ CREW_TYPES = {
 
 LISTDEF_ALL = '*'
 LISTDEF_DEFAULTS = 'defaults'
-SPECIAL_FETCHER_TYPES = {LISTDEF_DEFAULTS, LISTDEF_ALL, RemoteList.FETCHER_TYPE, CompoundList.FETCHER_TYPE}
+_SPECIAL_FETCHER_TYPES = {LISTDEF_DEFAULTS, LISTDEF_ALL, RemoteList.FETCHER_TYPE, CompoundList.FETCHER_TYPE}
+
+#region registration
+
+_builtins = Registry()
+_global_extensions = Registry()
+
+def _register_builtin(obj: typing.Any) -> typing.Any:
+    _builtins.register(obj)
+    return obj
+
+def register(obj: typing.Any) -> typing.Any:
+    _global_extensions.register(obj)
+    return obj
+
+# Import builtin extensions only here to avoid cyclic dependency issues.
+import filmflam._imdb # pylint: disable=unused-import, cyclic-import
+import filmflam._predicates # pylint: disable=unused-import, cyclic-import
+import filmflam._attributes # pylint: disable=unused-import, cyclic-import
+
+#endregion registration
 
 #endregion general
