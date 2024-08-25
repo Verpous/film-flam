@@ -194,7 +194,20 @@ def subcommand_fetch(ctx: ff.FlamContext, args: argparse.Namespace) -> None:
         ctx.fetch(listdefs, refetch_pattern=args.refetch, quiet=False)
 
 def subcommand_find(ctx: ff.FlamContext, args: argparse.Namespace) -> None:
-    print('find')
+    # Parse filter
+    listdefs, filter_tokens = split_at_filter(args.LISTDEF + args.FILTER)
+    filtr = ctx.compile(filter_tokens)
+    
+    # 1. Parse the listdefs for finding (generally means no compound list expansion, and maybe even no uniqueing).
+    # 2. Load all the relevant data, which includes the list file and, if people (or roles?) also cached grouping files, or compute the grouping now if not cached
+    # 3. Put the data through filtering
+    # 4. Sort the data according to desired sorting
+    # 5. Extract list of stringified attributes from the data and add titles row (TODO: do this sooner in order to have a "row regex matches" filter?
+    #    Only do it sooner if that filter token exists?) On second thought, probably not because filtering shouldn't even know about columnating
+    # 6. Format in a table
+    # 7. Print
+
+    # I would say that steps 1,2 are a single operation, and every other step is a separate function
 
 def subcommand_chart(ctx: ff.FlamContext, args: argparse.Namespace) -> None:
     print('chart')
@@ -205,6 +218,8 @@ def main() -> None:
         description='I dunno lol.')
     parser.add_argument('-C', '--flam-dir', metavar='PATH', default=ff.FlamContext.DEFAULT_FLAM_DIR, action='store', help=
         'Use %(metavar)s as the flam directory. Uses FLAM_DIR environment variable by default, or ~/.film_flam if it is not defined.')
+    parser.add_argument('-e', '--no-extensions', action='store_true', help=
+        "Don't import configured extensions.")
     parser.add_argument('--debug', action='store_true', help=argparse.SUPPRESS)
 
     subparsers = parser.add_subparsers(required=True)
@@ -379,7 +394,7 @@ Valid column names: ...''')
     if hasattr(args, 'FILTER') and hasattr(args, 'REMAINDER'):
         args.FILTER += args.REMAINDER
 
-    ctx = ff.FlamContext(args.flam_dir)
+    ctx = ff.FlamContext(args.flam_dir, import_extensions=not args.no_extensions)
 
     try:
         args.function(ctx, args)

@@ -37,14 +37,81 @@ class FalsePredicate(ff.Predicate, name='false'):
     def excrete(self, item: typing.Any, general: typing.Any) -> bool:
         return False
 
-# class MoviePredicate(Predicate):
-#     pass
-        
-# class PersonPredicate(Predicate):
-#     pass
+@ff._register_builtin
+class All(ff.Predicate, name='all'):
+    def __init__(self, attribute: ff.Attribute, cmp: ff.ComparisonOp, value) -> None:
+        self._attribute = attribute
+        self._cmp = cmp
+        self._value = value
+    
+    @classmethod
+    def eat(cls, tokens: list[str], at: int, ctx: ff.FlamContext) -> tuple[ff.Predicate, int]:
+        attribute = cls.eat_attribute(tokens, at, ctx, is_array=True)
+        cmp, value_str = cls.eat_cmp_value(tokens, at + 1)
+        value = None # TODO: use attribute to parse value_str into the attribute's type. Possibly also check if attribute supports the comparator?
+        return cls(attribute, cmp, value), at + 2
 
-# class RolePredicate(Predicate):
-#     pass
+    def excrete(self, item: typing.Any, general: typing.Any) -> bool:
+        # TODO: If array type, extract first element only.
+        actual = self._attribute.extract(None) # TODO: not None of course.
+        return all(self._cmp.compare(elem, self._value) for elem in actual)
+
+    def regurgitate(self) -> typing.Iterable[str]:
+        yield from super().regurgitate()
+        yield self._attribute.name
+        yield self._cmp.sign + str(self._value)
+
+@ff._register_builtin
+class Contains(ff.Predicate, name='contains'):
+    def __init__(self, attribute: ff.Attribute, cmp: ff.ComparisonOp, value) -> None:
+        self._attribute = attribute
+        self._cmp = cmp
+        self._value = value
+    
+    @classmethod
+    def eat(cls, tokens: list[str], at: int, ctx: ff.FlamContext) -> tuple[ff.Predicate, int]:
+        attribute = cls.eat_attribute(tokens, at, ctx, is_array=True)
+        cmp, value_str = cls.eat_cmp_value(tokens, at + 1)
+        value = None # TODO: use attribute to parse value_str into the attribute's type. Possibly also check if attribute supports the comparator?
+        return cls(attribute, cmp, value), at + 2
+
+    def excrete(self, item: typing.Any, general: typing.Any) -> bool:
+        # TODO: If array type, extract first element only.
+        actual = self._attribute.extract(None) # TODO: not None of course.
+        return any(self._cmp.compare(elem, self._value) for elem in actual)
+
+    def regurgitate(self) -> typing.Iterable[str]:
+        yield from super().regurgitate()
+        yield self._attribute.name
+        yield self._cmp.sign + str(self._value)
+
+@ff._register_builtin
+class Size(ff.Predicate, name='size'):
+    def __init__(self, cmp: ff.ComparisonOp, value: int) -> None:
+        self._cmp = cmp
+        self._value = value
+    
+    @classmethod
+    def eat(cls, tokens: list[str], at: int, ctx: ff.FlamContext) -> tuple[ff.Predicate, int]:
+        attribute = cls.eat_attribute(tokens, at, ctx, is_array=True)
+        cmp, value_str = cls.eat_cmp_value(tokens, at + 1)
+        
+        try:
+            value = int(value_str)
+        except ValueError:
+            raise ff.exceptions.FilterSyntaxError(f"Expected value to be an int, but got: '{value_str}'.", tokens=tokens, error_indices=at + 1)
+
+        return cls(cmp, value), at + 2
+
+    def excrete(self, item: typing.Any, general: typing.Any) -> bool:
+        # TODO: If array type, extract first element only.
+        actual = self._attribute.extract(None) # TODO: not None of course.
+        return self._cmp.compare(len(actual), self._value)
+
+    def regurgitate(self) -> typing.Iterable[str]:
+        yield from super().regurgitate()
+        yield self._attribute.name
+        yield self._cmp.sign + str(self._value)
 
 # TODO: Predicate ideas:
 # Generic predicates:
@@ -75,8 +142,8 @@ def _test_compile(line: str, ctx: None | ff.FlamContext = None) -> None:
         ctx = ff.FlamContext(flam_dir=None)
 
     try:
-        filtr = ctx.compile(tokens)
-        regurg = ' '.join(ff.exceptions.FilterSyntaxError.format_token(t) for t in filtr.regurgitate())
+        filter = ctx.compile(tokens)
+        regurg = ' '.join(ff.exceptions.FilterSyntaxError.format_token(t) for t in filter.regurgitate())
         print(line, '->', regurg)
     except ff.exceptions.FilterSyntaxError as e:
         print(e)

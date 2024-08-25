@@ -310,13 +310,13 @@ def _remove_unused_people(list_file: ListFile) -> None:
 #region filters
 
 # FILTER    := PIPELINE | <epsilon>
-# PIPELINE  := VALUE JOINABLE*
-# VALUE     := NEGATIVE | POSITIVE
+# PIPELINE  := SINGLE JOINABLE*
+# SINGLE    := NEGATIVE | POSITIVE
 # POSITIVE  := PREDICATE | ( PIPELINE )
 # NEGATIVE  := NOT POSITIVE
-# JOINABLE  := CONJOINED | DISJOINED | VALUE
-# CONJOINED := AND VALUE
-# DISJOINED := OR VALUE
+# JOINABLE  := CONJOINED | DISJOINED | SINGLE
+# CONJOINED := AND SINGLE
+# DISJOINED := OR SINGLE
 # PREDICATE := -<name> <arg1> <arg2>...
 
 # OR        := -o | -or  | `|`
@@ -341,6 +341,53 @@ class FilterMember(abc.ABC):
     def regurgitate(self) -> typing.Iterable[str]:
         pass
 
+    # Helper methods for parsing below.
+    @classmethod
+    def eat_str(cls, tokens: list[str], at: int, description: str, error_indices: int | typing.Iterable[int] = -1, is_terminal: bool = False) -> str:
+        if at >= len(tokens):
+            raise _EinGafrurError(f"Expected {description}, but reached the end of input.", tokens=tokens, is_terminal=is_terminal, error_indices=error_indices)
+
+        return tokens[at]
+
+    @classmethod
+    def eat_one_of(cls, tokens: list[str], at: int, description: str, options: set[str], is_terminal: bool = False):
+        s = cls.eat_str(tokens, at, description, is_terminal)
+        
+        if s not in options:
+            raise _EinGafrurError(f"Expected {description}, but got: '{s}'.", tokens=tokens, is_terminal=is_terminal, error_indices=at)
+
+        return s
+
+    # TODO: Also receive the attribute owner?
+    @classmethod
+    def eat_attribute(cls, tokens: list[str], at: int, ctx: FlamContext, is_array: bool = False) -> Attribute:
+        attribute_name = cls.eat_str(tokens, at)
+        attribute = next((registry.get_attribute(attribute_name) for registry in ctx.registries_to_try() if registry.has_attribute(name)), None)
+
+        if attribute is None:
+            raise _EinGafrurError(f"Expected valid attribute name, but got: '{attribute_name}'.", tokens=tokens, error_indices=at)
+
+        if is_array and not attribute.is_array:
+            # TODO: "which is of type X"? Or nah?
+            raise ff.exceptions.FilterSyntaxError(f"Expected attribute to be an array type, but got: '{attribute_name}'.", tokens=tokens, error_indices=at)
+
+        return attribute
+
+    @classmethod
+    def eat_cmp_value(cls, tokens: list[str], at: int) -> tuple[ComparisonOp, str]:
+        cmp_value = eat_str(tokens, at, 'a value')
+        # TODO: Cast value into correct type?
+        return cls.split_cmp_value(cmp_value)
+
+    @classmethod
+    def split_cmp_value(cmp_value: str) -> tuple[ComparisonOp, str]:
+        # TODO: Could be sped up with a dictionary.
+        for cmp in ComparisonOp:
+            if cmp_value.startswith(cmp.sign):
+                return cmp, cmp_value.removeprefix(cmp.sign)
+
+        return ComparisonOp.EQ, cmp_value
+
 class Filter(FilterMember):
     def __init__(self, pipeline: None | Pipeline) -> None:
         self._pipeline = pipeline
@@ -358,7 +405,7 @@ class Filter(FilterMember):
         return cls(pipeline)
 
     def excrete(self, item: typing.Any, general: typing.Any) -> bool:
-        return True if self._pipeline is None else self._pipeline.excrete(item, general)
+        return self._pipeline is None or self._pipeline.excrete(item, general)
 
     def regurgitate(self) -> typing.Iterable[str]:
         if self._pipeline is not None:
@@ -368,13 +415,13 @@ class Filter(FilterMember):
 
 class Pipeline(FilterMember):
     # Yes the type annotations are a little ugly, but there's no way to alias them due to their recursive nature.
-    def __init__(self, value: Predicate | Negative | Pipeline, joinables: list[Disjoined | Predicate | Negative | Pipeline]) -> None:
-        self._value = value
+    def __init__(self, single: Predicate | Negative | Pipeline, joinables: list[Disjoined | Predicate | Negative | Pipeline]) -> None:
+        self._single = single
         self._joinables = joinables
         
     @classmethod
     def eat(cls, tokens: list[str], at: int, ctx: FlamContext, expect_eat_everything: bool = False) -> tuple[Pipeline, int]:
-        value, until = Value.eat(tokens, at, ctx)
+        single, until = Single.eat(tokens, at, ctx)
         joinables = []
 
         while until < len(tokens):
@@ -390,10 +437,10 @@ class Pipeline(FilterMember):
 
             joinables.append(swallow)
 
-        return cls(value, joinables), until
+        return cls(single, joinables), until
 
     def excrete(self, item: typing.Any, general: typing.Any) -> bool:
-        accept = self._value.excrete(item, general)
+        accept = self._single.excrete(item, general)
         
         for joinable in self._joinables:
             # Conjunction is the default, so only disjunction must be specified.
@@ -411,14 +458,14 @@ class Pipeline(FilterMember):
             # We use min because these are sets so next(iter(...)) returns different things every time.
             yield min(Positive.LPAREN)
 
-        yield from self._value.regurgitate()
+        yield from self._single.regurgitate()
         yield from (tok for jable in self._joinables for tok in jable.regurgitate())
 
         if parenthesize:
             yield min(Positive.RPAREN)
 
-# Some "FilterMembers" (as defined in the BNF) don't need to be instantiated. Eating a "Value" directly returns what its "child" would be.
-class Value:
+# Some "FilterMembers" (as defined in the BNF) don't need to be instantiated. Eating a "Single" directly returns what its "child" would be.
+class Single:
     @classmethod
     def eat(cls, tokens: list[str], at: int, ctx: FlamContext) -> tuple[Predicate | Negative | Pipeline, int]:
         # The order is important for raising the most meaningful exception.
@@ -435,6 +482,7 @@ class Value:
 class Positive:
     LPAREN = {'(', '[', '-lparen'}
     RPAREN = {')', ']', '-rparen'}
+    _RPAREN_DESC = 'matching right parenthesis'
 
     @classmethod
     def eat(cls, tokens: list[str], at: int, ctx: FlamContext) -> tuple[Predicate | Pipeline, int]:
@@ -442,11 +490,11 @@ class Positive:
         if at < len(tokens) and tokens[at] in cls.LPAREN:
             pipeline, until = Pipeline.eat(tokens, at + 1, ctx)
             
-            if until >= len(tokens):
-                raise _EinGafrurError('Expected matching right parenthesis, but reached the end of input.', tokens=tokens, error_indices=at)
+            # Doesn't use eat_one_of because different error_indices.
+            rparen = cls.eat_str(tokens, until, cls._RPAREN_DESC, error_indices=at)
 
-            if tokens[until] not in cls.RPAREN:
-                raise _EinGafrurError(f"Expected matching right parenthesis, but got: '{tokens[until]}'.", tokens=tokens, error_indices=[at, until])
+            if rparen not in cls.RPAREN:
+                raise _EinGafrurError(f"Expected {cls._RPAREN_DESC}, but got: '{rparen}'.", tokens=tokens, error_indices=[at, until])
 
             return pipeline, until + 1
 
@@ -454,18 +502,14 @@ class Positive:
 
 class Negative(FilterMember):
     NEGATE = {'!', '-n', '-not'}
+    _DESC = "'not' symbol"
 
     def __init__(self, positive: Predicate | Pipeline) -> None:
         self._positive = positive
 
     @classmethod
     def eat(cls, tokens: list[str], at: int, ctx: FlamContext) -> tuple[Negative, int]:
-        if at >= len(tokens):
-            raise _EinGafrurError("Expected 'not' symbol, but reached the end of input.", is_terminal=False, tokens=tokens)
-
-        if tokens[at] not in cls.NEGATE:
-            raise _EinGafrurError(f"Expected 'not' symbol, but got: '{tokens[at]}'.", is_terminal=False, tokens=tokens, error_indices=at)
-
+        cls.eat_one_of(tokens, at, cls._DESC, cls.NEGATE, is_terminal=False)
         positive, until = Positive.eat(tokens, at + 1, ctx)
         return cls(positive), until
 
@@ -492,45 +536,38 @@ class Joinable(FilterMember):
             if e.is_terminal:
                 raise
 
-        return Value.eat(tokens, at, ctx)
+        return Single.eat(tokens, at, ctx)
 
 class Conjoined:
     CONJOIN = {'&', '-a', '-and'}
+    _DESC = "'and' symbol"
 
     @classmethod
     def eat(cls, tokens: list[str], at: int, ctx: FlamContext) -> tuple[Predicate | Negative | Pipeline, int]:
-        if at >= len(tokens):
-            raise _EinGafrurError("Expected 'and' symbol, but reached the end of input.", is_terminal=False, tokens=tokens)
-
-        if tokens[at] not in cls.CONJOIN:
-            raise _EinGafrurError(f"Expected 'and' symbol, but got: '{tokens[at]}'.", is_terminal=False, tokens=tokens, error_indices=at)
+        cls.eat_one_of(tokens, at, cls._DESC, cls.CONJOIN, is_terminal=False)
 
         # There is no need to return a Coinjoined object because conjoining is the default behavior when boolean operators are omitted.
-        return Value.eat(tokens, at + 1, ctx)
+        return Single.eat(tokens, at + 1, ctx)
 
 class Disjoined(FilterMember):
     DISJOIN = {'|', '-o', '-or'}
+    _DESC = "'or' symbol"
 
-    def __init__(self, value: Predicate | Negative | Pipeline) -> None:
-        self._value = value
+    def __init__(self, single: Predicate | Negative | Pipeline) -> None:
+        self._single = single
 
     @classmethod
     def eat(cls, tokens: list[str], at: int, ctx: FlamContext) -> tuple[Disjoined, int]:
-        if at >= len(tokens):
-            raise _EinGafrurError("Expected 'or' symbol, but reached the end of input.", is_terminal=False, tokens=tokens)
-
-        if tokens[at] not in cls.DISJOIN:
-            raise _EinGafrurError(f"Expected 'or' symbol, but got: '{tokens[at]}'.", is_terminal=False, tokens=tokens, error_indices=at)
-
-        value, until = Value.eat(tokens, at + 1, ctx)
-        return cls(value), until
+        cls.eat_one_of(tokens, at, cls._DESC, cls.DISJOIN, is_terminal=False)
+        single, until = Single.eat(tokens, at + 1, ctx)
+        return cls(single), until
 
     def excrete(self, item: typing.Any, general: typing.Any) -> bool:
-        return self._value.excrete(item, general)
+        return self._single.excrete(item, general)
 
     def regurgitate(self) -> typing.Iterable[str]:
         yield min(self.DISJOIN)
-        yield from self._value.regurgitate()
+        yield from self._single.regurgitate()
 
 class Predicate(FilterMember):
     PREFIX = '-'
@@ -542,10 +579,7 @@ class Predicate(FilterMember):
 
     @classmethod
     def eat(cls, tokens: list[str], at: int, ctx: FlamContext) -> tuple[Predicate, int]:
-        if at >= len(tokens):
-            raise _EinGafrurError('Expected a predicate name, but reached the end of input.', tokens=tokens)
-
-        prefixed_name = tokens[at]
+        prefixed_name = cls.eat_str(tokens, at, 'a predicate name')
         name = prefixed_name.removeprefix(Predicate.PREFIX)
 
         if name != prefixed_name:
@@ -557,17 +591,53 @@ class Predicate(FilterMember):
                     # Throughout this file we annotate return types with the class name and not typing.Self.
                     # I don't like this, but it's the best way to get mypy to shut up about this line.
                     return registry.get_predicate(name).eat(tokens, at + 1, ctx)
+                
+                # Special treatment for AttributePredicate because it's not wise to make a predicate for each attribute.
+                # TODO: Check if attribute owner matches what we're filtering?
+                if registry.has_attribute(name):
+                    return AttributePredicate.eat(tokens, at + 1, ctx, registry.get_attribute(name))
 
         if prefixed_name in Positive.RPAREN:
             raise _EinGafrurError('Right parenthesis has no matching left parenthesis.', tokens=tokens, error_indices=at)
             
-        all_pred_names = (Predicate.PREFIX + k for registry in ctx.registries_to_try() for k in registry.predicate_keys())
+        all_pred_names = (
+            Predicate.PREFIX + k
+            for registry in ctx.registries_to_try()
+                for keyvals in (registry.predicate_keyvals(), registry.attribute_keyvals())
+                    for k, _ in keyvals
+        )
+
         close_matches = difflib.get_close_matches(prefixed_name, all_pred_names)
         suggestions = f' (did you mean: {", ".join(close_matches)}?)' if len(close_matches) > 0 else '.'
         raise _EinGafrurError(f"Expected valid predicate name, but got: '{prefixed_name}'{suggestions}", tokens=tokens, error_indices=at)
 
     def regurgitate(self) -> typing.Iterable[str]:
         yield self.PREFIX + self.name
+
+# This should be the only concrete predicate that is in this file, because it's special.
+class AttributePredicate(Predicate, name='attribute'):
+    def __init__(self, attribute: Attribute, cmp: ComparisonOp, value: typing.Any) -> None: # TODO: "Any" should be the same T that the attribute is.
+        self._attribute = attribute
+        self._cmp = cmp
+        self._value = value
+
+        # Shadow the name with that of the attribute. Python lets you shadow class variables with instance variables like this.
+        self.name = _attribute.name
+
+    @classmethod
+    def eat(cls, tokens: list[str], at: int, ctx: FlamContext, attribute: Attribute) -> tuple[Predicate, int]:
+        cmp, value_str = cls.eat_cmp_value(tokens, at)
+        value = None # TODO: use attribute to parse value_str into the attribute's type. Possibly also check if attribute supports the comparator?
+        return cls(attribute, cmp, value), at + 1
+
+    def excrete(self, item: typing.Any, general: typing.Any) -> bool:
+        # TODO: If array type, extract first element only.
+        actual = self._attribute.extract(None) # TODO: not None of course.
+        return self._cmp.compare(actual, self._value)
+
+    def regurgitate(self) -> typing.Iterable[str]:
+        yield from super().regurgitate()
+        yield self._cmp.sign + str(self._value)
 
 def decompile(filter: Filter) -> list[str]:
     return list(filter.regurgitate())
@@ -593,7 +663,35 @@ class AttributeOwner(enum.Enum):
     def __init__(self, corresponding_type: type) -> None:
         self.corresponding_type = corresponding_type
 
-class Attribute(abc.ABC):
+class ComparisonOp(enum.Enum):
+    EQ = ('=',)
+    LE = ('-',)
+    GE = ('+',)
+    LT = ('--',)
+    GT = ('++',)
+
+    def __init__(self, sign: str) -> None:
+        self.sign = sign
+
+    # I wanted to give each enum a field of the dunder name (e.g. '__eq__'), but that doesn't work because types like ints don't even have the dunders.
+    def compare(self, value1: typing.Any, value2: typing.Any) -> bool:
+        match self:
+            case EQ:
+                return value1 == value2
+            case LE:
+                return value1 <= value2
+            case GE:
+                return value1 >= value2
+            case LT:
+                return value1 < value2
+            case GT:
+                return value1 > value2
+            case _:
+                raise RuntimeError(f'Missing compare implementation for: {self}')
+
+AT = typing.TypeVar('AT')
+
+class Attribute(abc.ABC, typing.Generic[AT]):
     def __init__(self, owner, name, aliases, is_columnable, is_sortable): # TODO: many more fields. Fields related to sorting, distribution,
         self.owner = owner
         self.name = name
@@ -603,15 +701,22 @@ class Attribute(abc.ABC):
         self.is_columnable = is_columnable
         self.is_sortable = is_sortable
 
-    def extract(self, obj):
+    @property
+    def is_array(self) -> bool:
+        raise NotImplementedError()
+
+    def make_predicate(self, cmp: ComparisonOp, value: str) -> Predicate:
+        raise NotImplementedError()
+
+    def extract(self, obj) -> AT:
         if not isinstance(obj, self.owner.corresponding_type):
             raise Exception(f'Invalid owner: {name} expects {self.owner}, but got {type(obj)}')
 
         self.ensure_owner_match(obj)
-        self._extract_internal(obj)
+        return self._extract_internal(obj)
 
     @abc.abstractmethod
-    def _extract_internal(self, obj):
+    def _extract_internal(self, obj) -> AT:
         pass
 
 #endregion
@@ -648,6 +753,14 @@ class ConfigurationLists(typing.Generic[LT]):
     def get_by_name_or_none(self, name: str) -> None | LT:
         return next((l for l in self._lists if l.name == name), None)
 
+class RegistryType(enum.Enum):
+    FETCHER   = (ListFileMovie,)
+    PREDICATE  = (ListFilePerson,)
+    ATTRIBUTE    = (ListFileRole,)
+
+    def __init__(self, corresponding_type: type) -> None:
+        self.corresponding_type = corresponding_type
+
 # TODO: concerns:
 # * We might want a predicate that has 1 per attribute, maybe need to treat it special? Might need to register attributes before predicates?
 # * Might want to lock any further extensions once a context is in use
@@ -658,23 +771,13 @@ class Registry:
         self._predicates: dict[str, type[Predicate]] = {}
         self._attributes: dict[str, Attribute] = {}
 
-    def register_fetcher(self, fetcher_cls: type[ListFetcher]) -> None:
-        self._fetchers[fetcher_cls.fetcher_type] = fetcher_cls
-
-    # TODO: Still not quite sure if we should register classes or instances.
-    def register_predicate(self, predicate_cls: type[Predicate]) -> None:
-        self._predicates[predicate_cls.name] = predicate_cls
-
-    def register_attribute(self, attribute: Attribute) -> None:
-        self._attributes[attribute.name] = attribute
-
     def register(self, obj: typing.Any) -> None:
         if isinstance(obj, type) and issubclass(obj, ListFetcher):
-            self.register_fetcher(obj)
+            self._fetchers[obj.fetcher_type] = obj
         elif isinstance(obj, type) and issubclass(obj, Predicate):
-            self.register_predicate(obj)
+            self._predicates[obj.name] = obj
         elif isinstance(obj, Attribute):
-            self.register_attribute(obj)
+            self._attributes[obj.name] = obj
         else:
             raise exceptions.InputError(f"Invalid object for registration: {obj}.")
 
@@ -696,8 +799,14 @@ class Registry:
     def has_attribute(self, name: str) -> bool:
         return name in self._attributes
 
-    def predicate_keys(self) -> typing.Iterable[str]:
-        return iter(self._predicates)
+    def fetcher_keyvals(self) -> typing.Iterable[str]:
+        return self._fetchers.items()
+
+    def predicate_keyvals(self) -> typing.Iterable[str]:
+        return self._predicates.items()
+
+    def attribute_keyvals(self) -> typing.Iterable[str]:
+        return self._attributes.items()
 
 # TODO: Register extension attributes, predicates, fetchers, etc. to the context. API goes something like: init context, register extensions, then use context.
 # Have a default global context that everything gets registered to if you don't create your own context to isolate it.
@@ -749,6 +858,18 @@ class FlamContext:
                     importlib.import_module(extension)
                 except ModuleNotFoundError:
                     utils.import_file(extension)
+
+    @property
+    def flam_dir(self) -> str:
+        return self._flam_dir
+
+    @property
+    def cfg(self) -> Configuration:
+        return self._cfg
+
+    @property
+    def extensions(self) -> Registry:
+        return self._extensions
 
     def _make_flam_dir(self) -> None:
         assert self._flam_dir is not None
@@ -803,10 +924,6 @@ class FlamContext:
         return os.path.join(self._flam_dir, self._LISTFILES_DIR, filename)
 
     # Configuration.
-    @property
-    def cfg(self) -> Configuration:
-        return self._cfg
-
     def lists_of_type(self, fetcher_type: str) -> ConfigurationLists[RemoteList] | ConfigurationLists[CompoundList]:
         match fetcher_type:
             case RemoteList.FETCHER_TYPE:
@@ -936,10 +1053,6 @@ class FlamContext:
         return None
 
     # Registration.
-    @property
-    def extensions(self) -> Registry:
-        return self._extensions
-
     def registries_to_try(self) -> typing.Iterable[Registry]:
         yield _builtins
 
