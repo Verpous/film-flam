@@ -192,9 +192,11 @@ class ListFile(_FlamSerializable):
 
     def sanity_checks(self) -> None:
         super().sanity_checks()
+        crew_types_set = set(ct.value for ct in CrewType)
 
         for movie in self.movies_by_uid.values():
-            if len(CREW_TYPES) != len(movie.crew) or not CREW_TYPES.issuperset(movie.crew.keys()):
+            # I verified this check works.
+            if crew_types_set != movie.crew.keys():
                 raise self._validation_error(f'Found movie: {movie.uid} with bad crew types: {movie.crew.keys()}.')
 
 # This is where Configuration objects begin.
@@ -350,7 +352,7 @@ class FilterMember(abc.ABC):
         return tokens[at]
 
     @classmethod
-    def eat_one_of(cls, tokens: list[str], at: int, description: str, options: set[str], is_terminal: bool = False):
+    def eat_one_of(cls, tokens: list[str], at: int, description: str, options: set[str], is_terminal: bool = False) -> str:
         s = cls.eat_str(tokens, at, description, is_terminal)
         
         if s not in options:
@@ -361,26 +363,27 @@ class FilterMember(abc.ABC):
     # TODO: Also receive the attribute owner?
     @classmethod
     def eat_attribute(cls, tokens: list[str], at: int, ctx: FlamContext, is_array: bool = False) -> Attribute:
-        attribute_name = cls.eat_str(tokens, at)
-        attribute = next((registry.get_attribute(attribute_name) for registry in ctx.registries_to_try() if registry.has_attribute(name)), None)
+        description = 'a valid attribute name'
+        attribute_name = cls.eat_str(tokens, at, description)
+        attribute = next((registry.get_attribute(attribute_name) for registry in ctx.registries_to_try() if registry.has_attribute(attribute_name)), None)
 
         if attribute is None:
-            raise _EinGafrurError(f"Expected valid attribute name, but got: '{attribute_name}'.", tokens=tokens, error_indices=at)
+            raise _EinGafrurError(f"Expected {description}, but got: '{attribute_name}'.", tokens=tokens, error_indices=at)
 
         if is_array and not attribute.is_array:
             # TODO: "which is of type X"? Or nah?
-            raise ff.exceptions.FilterSyntaxError(f"Expected attribute to be an array type, but got: '{attribute_name}'.", tokens=tokens, error_indices=at)
+            raise _EinGafrurError(f"Expected attribute to be an array type, but got: '{attribute_name}'.", tokens=tokens, error_indices=at)
 
         return attribute
 
     @classmethod
     def eat_cmp_value(cls, tokens: list[str], at: int) -> tuple[ComparisonOp, str]:
-        cmp_value = eat_str(tokens, at, 'a value')
+        cmp_value = cls.eat_str(tokens, at, 'a value')
         # TODO: Cast value into correct type?
         return cls.split_cmp_value(cmp_value)
 
     @classmethod
-    def split_cmp_value(cmp_value: str) -> tuple[ComparisonOp, str]:
+    def split_cmp_value(cls, cmp_value: str) -> tuple[ComparisonOp, str]:
         # TODO: Could be sped up with a dictionary.
         for cmp in ComparisonOp:
             if cmp_value.startswith(cmp.sign):
@@ -491,7 +494,7 @@ class Positive:
             pipeline, until = Pipeline.eat(tokens, at + 1, ctx)
             
             # Doesn't use eat_one_of because different error_indices.
-            rparen = cls.eat_str(tokens, until, cls._RPAREN_DESC, error_indices=at)
+            rparen = FilterMember.eat_str(tokens, until, cls._RPAREN_DESC, error_indices=at)
 
             if rparen not in cls.RPAREN:
                 raise _EinGafrurError(f"Expected {cls._RPAREN_DESC}, but got: '{rparen}'.", tokens=tokens, error_indices=[at, until])
@@ -544,7 +547,7 @@ class Conjoined:
 
     @classmethod
     def eat(cls, tokens: list[str], at: int, ctx: FlamContext) -> tuple[Predicate | Negative | Pipeline, int]:
-        cls.eat_one_of(tokens, at, cls._DESC, cls.CONJOIN, is_terminal=False)
+        FilterMember.eat_one_of(tokens, at, cls._DESC, cls.CONJOIN, is_terminal=False)
 
         # There is no need to return a Coinjoined object because conjoining is the default behavior when boolean operators are omitted.
         return Single.eat(tokens, at + 1, ctx)
@@ -595,7 +598,7 @@ class Predicate(FilterMember):
                 # Special treatment for AttributePredicate because it's not wise to make a predicate for each attribute.
                 # TODO: Check if attribute owner matches what we're filtering?
                 if registry.has_attribute(name):
-                    return AttributePredicate.eat(tokens, at + 1, ctx, registry.get_attribute(name))
+                    return AttributePredicate.eat_shit(tokens, at + 1, ctx, registry.get_attribute(name))
 
         if prefixed_name in Positive.RPAREN:
             raise _EinGafrurError('Right parenthesis has no matching left parenthesis.', tokens=tokens, error_indices=at)
@@ -622,10 +625,11 @@ class AttributePredicate(Predicate, name='attribute'):
         self._value = value
 
         # Shadow the name with that of the attribute. Python lets you shadow class variables with instance variables like this.
-        self.name = _attribute.name
+        self.name = attribute.name
 
+    # Part of being a special predicate means its "eat" has a different signature so we have to give it a different name.
     @classmethod
-    def eat(cls, tokens: list[str], at: int, ctx: FlamContext, attribute: Attribute) -> tuple[Predicate, int]:
+    def eat_shit(cls, tokens: list[str], at: int, ctx: FlamContext, attribute: Attribute) -> tuple[Predicate, int]:
         cmp, value_str = cls.eat_cmp_value(tokens, at)
         value = None # TODO: use attribute to parse value_str into the attribute's type. Possibly also check if attribute supports the comparator?
         return cls(attribute, cmp, value), at + 1
@@ -655,14 +659,6 @@ def is_filter_token(token: str) -> bool:
 
 #region attributes
 
-class AttributeOwner(enum.Enum):
-    MOVIE   = (ListFileMovie,)
-    PERSON  = (ListFilePerson,)
-    ROLE    = (ListFileRole,)
-
-    def __init__(self, corresponding_type: type) -> None:
-        self.corresponding_type = corresponding_type
-
 class ComparisonOp(enum.Enum):
     EQ = ('=',)
     LE = ('-',)
@@ -676,15 +672,15 @@ class ComparisonOp(enum.Enum):
     # I wanted to give each enum a field of the dunder name (e.g. '__eq__'), but that doesn't work because types like ints don't even have the dunders.
     def compare(self, value1: typing.Any, value2: typing.Any) -> bool:
         match self:
-            case EQ:
+            case self.EQ:
                 return value1 == value2
-            case LE:
+            case self.LE:
                 return value1 <= value2
-            case GE:
+            case self.GE:
                 return value1 >= value2
-            case LT:
+            case self.LT:
                 return value1 < value2
-            case GT:
+            case self.GT:
                 return value1 > value2
             case _:
                 raise RuntimeError(f'Missing compare implementation for: {self}')
@@ -753,60 +749,10 @@ class ConfigurationLists(typing.Generic[LT]):
     def get_by_name_or_none(self, name: str) -> None | LT:
         return next((l for l in self._lists if l.name == name), None)
 
-class RegistryType(enum.Enum):
-    FETCHER   = (ListFileMovie,)
-    PREDICATE  = (ListFilePerson,)
-    ATTRIBUTE    = (ListFileRole,)
-
-    def __init__(self, corresponding_type: type) -> None:
-        self.corresponding_type = corresponding_type
-
-# TODO: concerns:
-# * We might want a predicate that has 1 per attribute, maybe need to treat it special? Might need to register attributes before predicates?
-# * Might want to lock any further extensions once a context is in use
-# * Might want to prevent registering something that is already registered
-class Registry:
-    def __init__(self) -> None:
-        self._fetchers: dict[str, type[ListFetcher]] = {}
-        self._predicates: dict[str, type[Predicate]] = {}
-        self._attributes: dict[str, Attribute] = {}
-
-    def register(self, obj: typing.Any) -> None:
-        if isinstance(obj, type) and issubclass(obj, ListFetcher):
-            self._fetchers[obj.fetcher_type] = obj
-        elif isinstance(obj, type) and issubclass(obj, Predicate):
-            self._predicates[obj.name] = obj
-        elif isinstance(obj, Attribute):
-            self._attributes[obj.name] = obj
-        else:
-            raise exceptions.InputError(f"Invalid object for registration: {obj}.")
-
-    def get_fetcher(self, fetcher_type: str) -> type[ListFetcher]:
-        return self._fetchers[fetcher_type]
-
-    def get_predicate(self, name: str) -> type[Predicate]:
-        return self._predicates[name]
-
-    def get_attribute(self, name: str) -> Attribute:
-        return self._attributes[name]
-
-    def has_fetcher(self, fetcher_type: str) -> bool:
-        return fetcher_type in self._fetchers
-
-    def has_predicate(self, name: str) -> bool:
-        return name in self._predicates
-
-    def has_attribute(self, name: str) -> bool:
-        return name in self._attributes
-
-    def fetcher_keyvals(self) -> typing.Iterable[str]:
-        return self._fetchers.items()
-
-    def predicate_keyvals(self) -> typing.Iterable[str]:
-        return self._predicates.items()
-
-    def attribute_keyvals(self) -> typing.Iterable[str]:
-        return self._attributes.items()
+class ListHandle:
+    def __init__(self, list_file, find):
+        self._list_file = list_file
+        self._find = find
 
 # TODO: Register extension attributes, predicates, fetchers, etc. to the context. API goes something like: init context, register extensions, then use context.
 # Have a default global context that everything gets registered to if you don't create your own context to isolate it.
@@ -860,7 +806,7 @@ class FlamContext:
                     utils.import_file(extension)
 
     @property
-    def flam_dir(self) -> str:
+    def flam_dir(self) -> None | str:
         return self._flam_dir
 
     @property
@@ -887,6 +833,9 @@ class FlamContext:
                 pass
 
     # List files.
+    def get_list_handle(self, abstract_listdef: CanonListdef) -> ListHandle:
+        pass
+
     def get_list_file(self, abstract_listdef: CanonListdef) -> ListFile:
         # First try to get it from memory.
         list_file = next((lf for lf in self._list_files if lf.abstract_listdef == abstract_listdef), None)
@@ -1062,9 +1011,8 @@ class FlamContext:
         yield self._extensions
 
     # Fetching.
-    def fetch(self, listdefs: typing.Iterable[str], refetch_pattern: None | str = None, quiet: bool = True) -> list[ListFile]:
+    def fetch(self, listdefs: typing.Iterable[str], refetch_pattern: None | str = None, quiet: bool = True) -> None:
         fetchers = self._parse_listdefs_into_fetchers(listdefs)
-        list_files = []
 
         try:
             refetch_re = re.compile(refetch_pattern, flags=re.IGNORECASE) if refetch_pattern is not None else None
@@ -1125,10 +1073,6 @@ class FlamContext:
             if interrupt_error is not None:
                 raise exceptions.FetchInterrupt(f"Fetching of {self.canon_listdef_pretty(fetcher.abstract_listdef)} got interrupted due to error: {interrupt_error}. "
                     "You may retry to pick up where it left off.")
-
-            list_files.append(list_file)
-
-        return list_files
 
     def _parse_listdefs_into_fetchers(self, listdefs: typing.Iterable[str]) -> list[ListFetcher]:
         cldefs = self.canonicalize_listdefs_with_all_expansion(listdefs)
@@ -1205,22 +1149,79 @@ class CanonListdef(typing.NamedTuple):
     def __str__(self) -> str:
         return f'{self.fetcher_type}={self.address}'
 
-CREW_TYPES = {
-    'cast',
-    'director',
-    'writer',
-    'producer',
-    'composer',
-    'cinematographer',
-    'editor',
-    'stunt performer',
-}
+class Findable(enum.StrEnum):
+    MOVIES = 'movies'
+    PEOPLE = 'people'
+    ROLES = 'roles'
+
+    @property
+    def corresponding_type(self) -> type:
+        raise NotImplementedError()
+
+class CrewType(enum.StrEnum):
+    CAST = 'cast'
+    STUNTCAST = 'stuntcast'
+    DIRECTOR = 'director'
+    WRITER = 'writer'
+    PRODUCER = 'producer'
+    COMPOSER = 'composer'
+    CINEMATOGRAPHER = 'cinematographer'
+    EDITOR = 'editor'
 
 LISTDEF_ALL = '*'
 LISTDEF_DEFAULTS = 'defaults'
 _SPECIAL_FETCHER_TYPES = {LISTDEF_DEFAULTS, LISTDEF_ALL, RemoteList.FETCHER_TYPE, CompoundList.FETCHER_TYPE}
 
+#endregion general
+
 #region registration
+
+# TODO: concerns:
+# * We might want a predicate that has 1 per attribute, maybe need to treat it special? Might need to register attributes before predicates?
+# * Might want to lock any further extensions once a context is in use
+# * Might want to prevent registering something that is already registered
+class Registry:
+    def __init__(self) -> None:
+        self._fetchers: dict[str, type[ListFetcher]] = {}
+        self._predicates: dict[str, type[Predicate]] = {}
+        self._attributes: dict[str, Attribute] = {}
+
+    def register(self, obj: typing.Any) -> None:
+        if isinstance(obj, type) and issubclass(obj, ListFetcher):
+            self._fetchers[obj.fetcher_type] = obj
+        elif isinstance(obj, type) and issubclass(obj, Predicate):
+            self._predicates[obj.name] = obj
+        elif isinstance(obj, Attribute):
+            self._attributes[obj.name] = obj
+        else:
+            raise exceptions.InputError(f"Invalid object for registration: {obj}.")
+
+    def get_fetcher(self, fetcher_type: str) -> type[ListFetcher]:
+        return self._fetchers[fetcher_type]
+
+    def get_predicate(self, name: str) -> type[Predicate]:
+        return self._predicates[name]
+
+    def get_attribute(self, name: str) -> Attribute:
+        return self._attributes[name]
+
+    def has_fetcher(self, fetcher_type: str) -> bool:
+        return fetcher_type in self._fetchers
+
+    def has_predicate(self, name: str) -> bool:
+        return name in self._predicates
+
+    def has_attribute(self, name: str) -> bool:
+        return name in self._attributes
+
+    def fetcher_keyvals(self) -> typing.ItemsView[str, type[ListFetcher]]:
+        return self._fetchers.items()
+
+    def predicate_keyvals(self) -> typing.ItemsView[str, type[Predicate]]:
+        return self._predicates.items()
+
+    def attribute_keyvals(self) -> typing.ItemsView[str, Attribute]:
+        return self._attributes.items()
 
 _builtins = Registry()
 _global_extensions = Registry()
@@ -1239,5 +1240,3 @@ import filmflam._predicates # pylint: disable=unused-import, cyclic-import
 import filmflam._attributes # pylint: disable=unused-import, cyclic-import
 
 #endregion registration
-
-#endregion general

@@ -39,7 +39,7 @@ class FalsePredicate(ff.Predicate, name='false'):
 
 @ff._register_builtin
 class All(ff.Predicate, name='all'):
-    def __init__(self, attribute: ff.Attribute, cmp: ff.ComparisonOp, value) -> None:
+    def __init__(self, attribute: ff.Attribute, cmp: ff.ComparisonOp, value: typing.Any) -> None: # TODO: better annotation for value, in many places.
         self._attribute = attribute
         self._cmp = cmp
         self._value = value
@@ -63,7 +63,7 @@ class All(ff.Predicate, name='all'):
 
 @ff._register_builtin
 class Contains(ff.Predicate, name='contains'):
-    def __init__(self, attribute: ff.Attribute, cmp: ff.ComparisonOp, value) -> None:
+    def __init__(self, attribute: ff.Attribute, cmp: ff.ComparisonOp, value: typing.Any) -> None:
         self._attribute = attribute
         self._cmp = cmp
         self._value = value
@@ -87,7 +87,8 @@ class Contains(ff.Predicate, name='contains'):
 
 @ff._register_builtin
 class Size(ff.Predicate, name='size'):
-    def __init__(self, cmp: ff.ComparisonOp, value: int) -> None:
+    def __init__(self, attribute: ff.Attribute, cmp: ff.ComparisonOp, value: typing.Any) -> None:
+        self._attribute = attribute
         self._cmp = cmp
         self._value = value
     
@@ -101,7 +102,7 @@ class Size(ff.Predicate, name='size'):
         except ValueError:
             raise ff.exceptions.FilterSyntaxError(f"Expected value to be an int, but got: '{value_str}'.", tokens=tokens, error_indices=at + 1)
 
-        return cls(cmp, value), at + 2
+        return cls(attribute, cmp, value), at + 2
 
     def excrete(self, item: typing.Any, general: typing.Any) -> bool:
         # TODO: If array type, extract first element only.
@@ -122,14 +123,15 @@ class Size(ff.Predicate, name='size'):
 # * -contains <array attribute name> [=|+|-|++|--]<value>
 # * -all <array attribute name> [=|+|-|++|--]<value>
 # * -size <array attribute name> [=|+|-|++|--]<value> (array len check)
+# * -also-in <listdef> (searches for the same uid in another list by the same pivot/crew-type. I think this is only a person/movie predicate, not a role predicate)
 # 
 # Person predicates:
-# * -appeared-in <pipeline with movie predicates> (searches all crew types)
-# * -<crew-type>-in <pipeline with movie predicates> (ex: cast-in, director-in, etc. IDEA: "-cast-in -true" as a way to check if a person is an actor at all)
+# * -appeared-in <single with movie predicates> (searches all crew types)
+# * -<crew-type>-in <single with movie predicates> (ex: cast-in, director-in, etc. IDEA: "-cast-in -true" as a way to check if a person is an actor at all)
 #
 # Movie predicates:
-# * -crew-contains <crew-type> <pipeline with person predicates>
-# * -crews-contain <pipeline with person predicates> (searches all crew types, beware of people who appear in multiple crew types!)
+# * -crew-contains <crew-type> <single with role predicates>
+# * -crews-contain <single with role predicates> (searches all crew types, beware of people who appear in multiple crew types!)
 #
 # Role predicates:
 # * -crew <crew-type>

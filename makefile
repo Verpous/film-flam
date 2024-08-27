@@ -33,6 +33,7 @@ PYLINT_IGNORE += C0415 # import-outside-toplevel
 PYLINT_IGNORE += R0402 # consider-using-from-import
 PYLINT_IGNORE += R0902 # too-many-instance-attributes
 PYLINT_IGNORE += R0903 # too-few-public-methods
+PYLINT_IGNORE += R0913 # too-many-arguments
 PYLINT_IGNORE += R1708 # stop-iteration-return
 PYLINT_IGNORE += R1714 # consider-using-in
 

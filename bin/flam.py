@@ -40,9 +40,6 @@ class Choice(enum.StrEnum):
     def yes_no_auto(cls) -> typing.Iterable[str]:
         return (cls.YES, cls.NO, cls.AUTO)
 
-    def __repr__(self) -> str:
-        return str(self)
-
 def split_at_filter(positional_args: list[str]) -> tuple[list[str], list[str]]:
     filter_begin = next((i for i, arg in enumerate(positional_args) if ff.is_filter_token(arg)), len(positional_args))
     return positional_args[:filter_begin], positional_args[filter_begin:]
@@ -354,7 +351,7 @@ Valid column names: ...''')
 
     # TODO: future problem: REMAINDER doesn't work if there are no positional arguments before it. If we add the shorthand subcommands a la "flam WHAT",
     # the WHAT won't be a positional argument anymore and REMAINDER won't work.
-    find_parser.add_argument('WHAT', choices=['movies', 'people', 'roles'], action='store', help=
+    find_parser.add_argument('FINDABLE', choices=ff.Findable, action='store', help=
         '''Choose what to find: movies, people, or roles. Roles have all the attributes of the movie and the person, and then a few role-specific ones.''')
     find_parser.add_argument('LISTDEF', nargs='*', action='store', help=
         '''Like fetch but with different defaults, and if the LISTDEFs aren't already fetched, it fails with a nice error message.''')

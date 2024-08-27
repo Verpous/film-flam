@@ -123,7 +123,7 @@ class SeleniumListFetcher(ff.ListFetcher, fetcher_type='imdb-id', uid_type=_UID_
 
         # TODO: Consider a mechanism that blocks until the server informs that the browser is running and it's ready to take requests.
         # TODO: If python doesn't cleanly terminate the server, we'll need to send it a quit message ourselves.
-        cls.exports_server = multiprocessing.Process(target=export_lists_handler, args=(cls.requests_queue, BROWSER, PROFILE), daemon=True)
+        cls.exports_server = multiprocessing.Process(target=_export_lists_handler, args=(cls.requests_queue, BROWSER, PROFILE), daemon=True)
         cls.exports_server.start()
     
 # Python devs made a dumbass decision to terminate multiprocesses in a way that doesn't run exit handlers,
@@ -131,7 +131,7 @@ class SeleniumListFetcher(ff.ListFetcher, fetcher_type='imdb-id', uid_type=_UID_
 # NOTE: I tried instead to make the child process terminate itself when it detects that it's orphaned,
 # but multiprocess doesn't actually let you orphan children, because fuck you that's why.
 @atexit.register
-def exports_server_cleanup() -> None:
+def _exports_server_cleanup() -> None:
     if SeleniumListFetcher.exports_server is not None and SeleniumListFetcher.exports_server.is_alive():
         SeleniumListFetcher.requests_queue.put_nowait(_REQUEST_QUIT)
 
@@ -235,14 +235,17 @@ def _fetch_movie(movie_csv: _CsvRow, list_file: ff.ListFile, ia: imdb.Cinemagoer
     movie_lf.title = _safe_get(movie_imdb, 'title', default=movie_csv.title) 
     movie_lf.metascore = _safe_get(movie_imdb, 'metascore')
 
-    for crew_type in ff.CREW_TYPES:
+    for crew_type in ff.CrewType:
+        # I generally tried to choose the CrewType values to match imdb's, but this one goddamn type has a space in it and I don't like that.
+        imdb_crew_type = crew_type.value if crew_type != ff.CrewType.STUNTCAST else 'stunt performer'
+
         # Building this list as a dictionary solves two problems:
         # 1. Sometimes you get empty people, so those are discarded.
         # 2. Sometimes you get the same person twice. Also discarded.
-        crew_imdb_by_uid = {p.getID(): p for p in _safe_get(movie_imdb, crew_type, default=[]) if p}
+        crew_imdb_by_uid = {p.getID(): p for p in _safe_get(movie_imdb, imdb_crew_type, default=[]) if p}
 
-        movie_lf.crew[crew_type] = ff.ListFileCrew.create(
-            crew_type=crew_type,
+        movie_lf.crew[imdb_crew_type] = ff.ListFileCrew.create(
+            crew_type=imdb_crew_type,
             roles_by_uid={r.person_uid: r for r in _build_roles(crew_imdb_by_uid)})
         _update_people_by_uid(list_file.people_by_uid, ((p.uid, p) for p in _build_people(crew_imdb_by_uid)))
 
@@ -461,7 +464,7 @@ def _export_list(driver: WebDriver, list_id: str) -> None:
     _do_with_retries(download_button.click)
 
 # TODO: Selenium errors are ugly and quite possible for users to encounter. We should hide that ugly from users, while not losing it for troubleshooting purposes.
-def export_lists_handler(requests_queue: multiprocessing.Queue, browser_name: str = _AUTO, browser_profile_path: str = '') -> None:
+def _export_lists_handler(requests_queue: multiprocessing.Queue, browser_name: str = _AUTO, browser_profile_path: str = '') -> None:
     if browser_name == _AUTO:
         browser_name = _get_default_browser()
 
