@@ -265,6 +265,13 @@ class Configuration(_FlamSerializable):
                 except StopIteration as e:
                     raise self._validation_error(f"Compound list '{cl.name}' references unknown remote list: '{uid}'.") from e
 
+class _CompoundListMetadata(_FlamSerializable):
+    uid:                    str
+    dependency_mtime:       dict[str, float]
+
+class _FlamMetadata(_FlamSerializable):
+    compound_lists_by_uid:  dict[str, _CompoundListMetadata]
+
 #endregion serialization
 
 #region fetching
@@ -362,13 +369,16 @@ class FilterMember(abc.ABC):
 
     # TODO: Also receive the attribute owner?
     @classmethod
-    def eat_attribute(cls, tokens: list[str], at: int, ctx: FlamContext, is_array: bool = False) -> Attribute:
+    def eat_attribute(cls, tokens: list[str], at: int, find: FindableType, ctx: FlamContext, is_array: bool = False) -> Attribute:
         description = 'a valid attribute name'
         attribute_name = cls.eat_str(tokens, at, description)
         attribute = next((registry.get_attribute(attribute_name) for registry in ctx.registries_to_try() if registry.has_attribute(attribute_name)), None)
 
         if attribute is None:
             raise _EinGafrurError(f"Expected {description}, but got: '{attribute_name}'.", tokens=tokens, error_indices=at)
+
+        if not attribute.owner.is_compatible(find):
+            raise _EinGafrurError(f"Expected attribute of {find}, but got: '{attribute_name}' which belongs to {attribute.owner}.", tokens=tokens, error_indices=at)
 
         if is_array and not attribute.is_array:
             # TODO: "which is of type X"? Or nah?
@@ -400,11 +410,11 @@ class Filter(FilterMember):
     # It "eats" tokens starting from that point and returns the FilterMember object created from them, and the index where it stopped eating.
     # Filter is the root object so it's a little different, it expects to eat everything to it doesn't need start or end indices.
     @classmethod
-    def eat(cls, tokens: list[str], ctx: FlamContext) -> Filter:
+    def eat(cls, tokens: list[str], find: FindableType, ctx: FlamContext) -> Filter:
         if len(tokens) == 0:
             return cls(None)
 
-        pipeline, _ = Pipeline.eat(tokens, 0, ctx, expect_eat_everything=True)
+        pipeline, _ = Pipeline.eat(tokens, 0, find, ctx, expect_eat_everything=True)
         return cls(pipeline)
 
     def excrete(self, item: typing.Any, general: typing.Any) -> bool:
@@ -423,13 +433,13 @@ class Pipeline(FilterMember):
         self._joinables = joinables
         
     @classmethod
-    def eat(cls, tokens: list[str], at: int, ctx: FlamContext, expect_eat_everything: bool = False) -> tuple[Pipeline, int]:
-        single, until = Single.eat(tokens, at, ctx)
+    def eat(cls, tokens: list[str], at: int, find: FindableType, ctx: FlamContext, expect_eat_everything: bool = False) -> tuple[Pipeline, int]:
+        single, until = Single.eat(tokens, at, find, ctx)
         joinables = []
 
         while until < len(tokens):
             try:
-                swallow, until = Joinable.eat(tokens, until, ctx)
+                swallow, until = Joinable.eat(tokens, until, find, ctx)
             except _EinGafrurError:
                 # Doing it this way "breaks" the model (by giving Pipeline a unique eat signature),
                 # but it lets us raise a meaningful error instead of some cryptic "some tokens weren't eaten".
@@ -470,17 +480,17 @@ class Pipeline(FilterMember):
 # Some "FilterMembers" (as defined in the BNF) don't need to be instantiated. Eating a "Single" directly returns what its "child" would be.
 class Single:
     @classmethod
-    def eat(cls, tokens: list[str], at: int, ctx: FlamContext) -> tuple[Predicate | Negative | Pipeline, int]:
+    def eat(cls, tokens: list[str], at: int, find: FindableType, ctx: FlamContext) -> tuple[Predicate | Negative | Pipeline, int]:
         # The order is important for raising the most meaningful exception.
         try:
-            return Negative.eat(tokens, at, ctx)
+            return Negative.eat(tokens, at, find, ctx)
         except _EinGafrurError as e:
             # If the exception was that there isn't a 'not' symbol, we want to try parsing this as a Positive.
             # Otherwise, there's no point to even try, and the most meaningful exception we can raise is this one.
             if e.is_terminal:
                 raise
 
-        return Positive.eat(tokens, at, ctx)
+        return Positive.eat(tokens, at, find, ctx)
 
 class Positive:
     LPAREN = {'(', '[', '-lparen'}
@@ -488,10 +498,10 @@ class Positive:
     _RPAREN_DESC = 'matching right parenthesis'
 
     @classmethod
-    def eat(cls, tokens: list[str], at: int, ctx: FlamContext) -> tuple[Predicate | Pipeline, int]:
+    def eat(cls, tokens: list[str], at: int, find: FindableType, ctx: FlamContext) -> tuple[Predicate | Pipeline, int]:
         # Only raise parenthesis errors if we have reason to believe this was meant to be a parenthesis expression.
         if at < len(tokens) and tokens[at] in cls.LPAREN:
-            pipeline, until = Pipeline.eat(tokens, at + 1, ctx)
+            pipeline, until = Pipeline.eat(tokens, at + 1, find, ctx)
             
             # Doesn't use eat_one_of because different error_indices.
             rparen = FilterMember.eat_str(tokens, until, cls._RPAREN_DESC, error_indices=at)
@@ -501,7 +511,7 @@ class Positive:
 
             return pipeline, until + 1
 
-        return Predicate.eat(tokens, at, ctx)
+        return Predicate.eat(tokens, at, find, ctx)
 
 class Negative(FilterMember):
     NEGATE = {'!', '-n', '-not'}
@@ -511,9 +521,9 @@ class Negative(FilterMember):
         self._positive = positive
 
     @classmethod
-    def eat(cls, tokens: list[str], at: int, ctx: FlamContext) -> tuple[Negative, int]:
+    def eat(cls, tokens: list[str], at: int, find: FindableType, ctx: FlamContext) -> tuple[Negative, int]:
         cls.eat_one_of(tokens, at, cls._DESC, cls.NEGATE, is_terminal=False)
-        positive, until = Positive.eat(tokens, at + 1, ctx)
+        positive, until = Positive.eat(tokens, at + 1, find, ctx)
         return cls(positive), until
 
     def excrete(self, item: typing.Any, general: typing.Any) -> bool:
@@ -525,32 +535,32 @@ class Negative(FilterMember):
 
 class Joinable(FilterMember):
     @classmethod
-    def eat(cls, tokens: list[str], at: int, ctx: FlamContext) -> tuple[Disjoined | Predicate | Negative | Pipeline, int]:
+    def eat(cls, tokens: list[str], at: int, find: FindableType, ctx: FlamContext) -> tuple[Disjoined | Predicate | Negative | Pipeline, int]:
         # Ordered this way so we raise the most meaningful exception possible.
         try:
-            return Disjoined.eat(tokens, at, ctx)
+            return Disjoined.eat(tokens, at, find, ctx)
         except _EinGafrurError as e:
             if e.is_terminal:
                 raise
 
         try:
-            return Conjoined.eat(tokens, at, ctx)
+            return Conjoined.eat(tokens, at, find, ctx)
         except _EinGafrurError as e:
             if e.is_terminal:
                 raise
 
-        return Single.eat(tokens, at, ctx)
+        return Single.eat(tokens, at, find, ctx)
 
 class Conjoined:
     CONJOIN = {'&', '-a', '-and'}
     _DESC = "'and' symbol"
 
     @classmethod
-    def eat(cls, tokens: list[str], at: int, ctx: FlamContext) -> tuple[Predicate | Negative | Pipeline, int]:
+    def eat(cls, tokens: list[str], at: int, find: FindableType, ctx: FlamContext) -> tuple[Predicate | Negative | Pipeline, int]:
         FilterMember.eat_one_of(tokens, at, cls._DESC, cls.CONJOIN, is_terminal=False)
 
         # There is no need to return a Coinjoined object because conjoining is the default behavior when boolean operators are omitted.
-        return Single.eat(tokens, at + 1, ctx)
+        return Single.eat(tokens, at + 1, find, ctx)
 
 class Disjoined(FilterMember):
     DISJOIN = {'|', '-o', '-or'}
@@ -560,9 +570,9 @@ class Disjoined(FilterMember):
         self._single = single
 
     @classmethod
-    def eat(cls, tokens: list[str], at: int, ctx: FlamContext) -> tuple[Disjoined, int]:
+    def eat(cls, tokens: list[str], at: int, find: FindableType, ctx: FlamContext) -> tuple[Disjoined, int]:
         cls.eat_one_of(tokens, at, cls._DESC, cls.DISJOIN, is_terminal=False)
-        single, until = Single.eat(tokens, at + 1, ctx)
+        single, until = Single.eat(tokens, at + 1, find, ctx)
         return cls(single), until
 
     def excrete(self, item: typing.Any, general: typing.Any) -> bool:
@@ -581,7 +591,7 @@ class Predicate(FilterMember):
         cls.name = name
 
     @classmethod
-    def eat(cls, tokens: list[str], at: int, ctx: FlamContext) -> tuple[Predicate, int]:
+    def eat(cls, tokens: list[str], at: int, find: FindableType, ctx: FlamContext) -> tuple[Predicate, int]:
         prefixed_name = cls.eat_str(tokens, at, 'a predicate name')
         name = prefixed_name.removeprefix(Predicate.PREFIX)
 
@@ -593,7 +603,7 @@ class Predicate(FilterMember):
                 if registry.has_predicate(name):
                     # Throughout this file we annotate return types with the class name and not typing.Self.
                     # I don't like this, but it's the best way to get mypy to shut up about this line.
-                    return registry.get_predicate(name).eat(tokens, at + 1, ctx)
+                    return registry.get_predicate(name).eat(tokens, at + 1, find, ctx)
                 
                 # Special treatment for AttributePredicate because it's not wise to make a predicate for each attribute.
                 # TODO: Check if attribute owner matches what we're filtering?
@@ -660,34 +670,17 @@ def is_filter_token(token: str) -> bool:
 #region attributes
 
 class ComparisonOp(enum.Enum):
-    EQ = ('=',)
-    LE = ('-',)
-    GE = ('+',)
-    LT = ('--',)
-    GT = ('++',)
+    EQ = ('=', lambda v1, v2: v1 == v2)
+    LE = ('-', lambda v1, v2: v1 <= v2)
+    GE = ('+', lambda v1, v2: v1 >= v2)
+    LT = ('--', lambda v1, v2: v1 < v2)
+    GT = ('++', lambda v1, v2: v1 > v2)
 
-    def __init__(self, sign: str) -> None:
+    def __init__(self, sign: str, compare: typing.Callable[[typing.Any, typing.Any], bool]) -> None:
         self.sign = sign
+        self.compare = compare
 
-    # I wanted to give each enum a field of the dunder name (e.g. '__eq__'), but that doesn't work because types like ints don't even have the dunders.
-    def compare(self, value1: typing.Any, value2: typing.Any) -> bool:
-        match self:
-            case self.EQ:
-                return value1 == value2
-            case self.LE:
-                return value1 <= value2
-            case self.GE:
-                return value1 >= value2
-            case self.LT:
-                return value1 < value2
-            case self.GT:
-                return value1 > value2
-            case _:
-                raise RuntimeError(f'Missing compare implementation for: {self}')
-
-AT = typing.TypeVar('AT')
-
-class Attribute(abc.ABC, typing.Generic[AT]):
+class Attribute(abc.ABC):
     def __init__(self, owner, name, aliases, is_columnable, is_sortable): # TODO: many more fields. Fields related to sorting, distribution,
         self.owner = owner
         self.name = name
@@ -704,7 +697,7 @@ class Attribute(abc.ABC, typing.Generic[AT]):
     def make_predicate(self, cmp: ComparisonOp, value: str) -> Predicate:
         raise NotImplementedError()
 
-    def extract(self, obj) -> AT:
+    def extract(self, obj) -> typing.Any:
         if not isinstance(obj, self.owner.corresponding_type):
             raise Exception(f'Invalid owner: {name} expects {self.owner}, but got {type(obj)}')
 
@@ -712,12 +705,31 @@ class Attribute(abc.ABC, typing.Generic[AT]):
         return self._extract_internal(obj)
 
     @abc.abstractmethod
-    def _extract_internal(self, obj) -> AT:
+    def _extract_internal(self, obj) -> typing.Any:
         pass
 
 #endregion
 
 #region context
+
+class _FlamDir(abc.ABC):
+    @abc.abstractmethod
+    def write(self, file: _FlamSerializable, relative_path: str) -> None:
+        pass
+
+    @abc.abstractmethod
+    def read(self, relative_path: str) -> _FlamSerializable:
+        pass
+
+    @abc.abstractmethod
+    def get_mtime(self, relative_path: str) -> float:
+        pass
+
+    @abc.abstractmethod
+    def mkdir(self, relative_path: str) -> float:
+        pass
+
+    def rename(self, )
 
 # Data structure for using remote/compound lists generically.
 LT = typing.TypeVar('LT', RemoteList, CompoundList)
@@ -754,35 +766,40 @@ class ListHandle:
         self._list_file = list_file
         self._find = find
 
-# TODO: Register extension attributes, predicates, fetchers, etc. to the context. API goes something like: init context, register extensions, then use context.
-# Have a default global context that everything gets registered to if you don't create your own context to isolate it.
-# Problem: how to make this compatible with default-imported extensions, we want them to be a feature of flam the API not flam the CLI tool,
-# which means we need a way to register them to the specific context.
-# Maybe not such a problem, extensions will register to the global context, if you initialize your own context then that's like saying you want to isolate from the global stuff.
-# Actually, drop the global context, or at least hide it, have a global "context" that only holds global registrations.
-# actual contexts have an option to combine their local registrations with those of the global context.
+    def __iter__(self):
+        # Iterates 
+        raise NotImplementedError()
 
-# This object represents the repository itself mainly. Any creating/writing/reading files from the flam directory should go through here.
-# For users who just want to work with volatile memory and not load or save anything, we support a "contextless" mode.
-# All the ugly if checks for that are encapsulated in this class.
+    def apply_filter(self, filter: Filter):
+        pass
+
+# This class is the user's entry point to basically everything that is "built in" to this API: accessing lists, filtering, configuring.
 class FlamContext:
     DEFAULT_FLAM_DIR = os.getenv('FLAM_DIR', os.path.join(os.path.expanduser('~'), '.film_flam'))
     _LISTFILES_DIR = 'list_files'
     _CONFIGURATION_FILE = 'config.json'
+    _METADATA_FILE = 'metadata.json'
 
     # TODO: Acquire OS lock on the flam_dir so that you can't have multiple contexts operating on it at once?
     def __init__(self, flam_dir: None | str = DEFAULT_FLAM_DIR, import_extensions: bool = False) -> None:
         self._flam_dir = flam_dir
         self._list_files: list[ListFile] = []
 
+        # Support None for users who just want to work with volatile memory and not load or save anything, we call it volatile mode.
         if self._flam_dir is None:
             self._cfg = Configuration.create()
+            self._metadata = _FlamMetadata.create()
         else:
             self._flam_dir = os.path.normpath(self._flam_dir)
             self._make_flam_dir()
 
             cfg_path = self._get_cfg_path()
             self._cfg = Configuration.load(cfg_path) if os.path.exists(cfg_path) else Configuration.create()
+
+            # TODO: When creating a new metadata from an existing cfg, need to add entries for all lists and stuff?
+            # Or maybe all that should be created lazily.
+            meta_path = self._get_metadata_path()
+            self._metadata = _FlamMetadata.load(meta_path) if os.path.exists(meta_path) else _FlamMetadata.create()
 
         # Since Configuration needs to be serializable, we can't store the lists in there in some funky data structure,
         # and we can't add fields to the object that aren't meant for serialization.
@@ -836,10 +853,11 @@ class FlamContext:
     def get_list_handle(self, abstract_listdef: CanonListdef) -> ListHandle:
         pass
 
-    def get_list_file(self, abstract_listdef: CanonListdef) -> ListFile:
+    def _get_list_file(self, abstract_listdef: CanonListdef) -> ListFile:
         # First try to get it from memory.
         list_file = next((lf for lf in self._list_files if lf.abstract_listdef == abstract_listdef), None)
 
+        # TODO: If list_file type is compound it may need regeneration.
         if list_file is not None:
             return list_file
 
@@ -847,21 +865,58 @@ class FlamContext:
         if self._flam_dir is not None:
             try:
                 list_file = ListFile.load(self._get_list_file_path(abstract_listdef))
-                self._list_files.append(list_file)
             except FileNotFoundError:
                 pass
             except exceptions.FileValidationError as e:
                 raise exceptions.FileValidationError(f"{e} You may need to fetch '{self.canon_listdef_pretty(abstract_listdef)}' again from scratch.") from e
                 
+        if abstract_listdef.fetcher_type == CompoundList.FETCHER_TYPE:
+            uid = abstract_listdef.address
+            
+            if self._is_compound_list_file_outdated(uid):
+                list_file = self._generate_compound_list_file(uid)
+
+            self._metadata.compound_lists_by_uid[uid] = [...]
+
         if list_file is None:
             raise exceptions.InputError(f"No fetched file for LISTDEF '{self.canon_listdef_pretty(abstract_listdef)}'.")
 
+        self._list_files.append(list_file)
         return list_file
+    
+    def _is_compound_list_file_outdated(self, uid: str) -> bool:
+        # TODO: For now, in volatile mode compound lists are always regenerated.
+        if self._flam_dir is None:
+            return True
+
+        if uid not in self._metadata.compound_lists_by_uid:
+            return True
+
+        cl_config = self.compound_lists.get_by_uid(uid)
+        cl_meta = self._metadata.compound_lists_by_uid[uid]
+
+        for rl_uid in cl_config.remote_list_uids:
+            if rl_uid not in cl_meta.dependency_mtime:
+                return True
+
+            # TODO: is flam_dir is none I think we just can't know the answer, and what if the remote list file doesn't exist?
+            if (rl_uid not in cl_meta.dependency_mtime
+                    or os.path.getmtime(self._get_list_file_path(CanonListdef(RemoteList.FETCHER_TYPE, rl_uid))) > cl_meta.dependency_mtime[rl_uid]):
+                return True
+
+        return False
+
+    def _generate_compound_list_file(self, uid: str) -> ListFile:
+        pass
 
     def _write_list_file(self, list_file: ListFile) -> None:
-        # We use devnull in contextless mode, so that we still go through the file validity checks even if we don't write it anywhere.
-        file = self._get_list_file_path(list_file.abstract_listdef) if self._flam_dir is not None else os.devnull
-        list_file.write(file)
+        # We use devnull in volatile mode, so that we still go through the file validity checks even if we don't write it anywhere.
+        path = self._get_list_file_path(list_file.abstract_listdef) if self._flam_dir is not None else os.devnull
+        list_file.write(path)
+
+        # Flush the metadata when saving compound lists so we don't accidentally regenerate them.
+        if list_file.fetcher_type == CompoundList.FETCHER_TYPE:
+            self._write_metadata()
 
     # After much deliberation, I decided that files for named lists should be named according to the list type and UID,
     # and unnamed lists' files should be named according to the fetcher type and address.
@@ -937,13 +992,22 @@ class FlamContext:
         self.cfg._compound_lists.remove(compound_list) # pylint: disable=protected-access
 
     def write_cfg(self) -> None:
-        # We use devnull in contextless mode, so that we still go through the file validity checks even if we don't write it anywhere.
+        # We use devnull in volatile mode, so that we still go through the file validity checks even if we don't write it anywhere.
         file = self._get_cfg_path() if self._flam_dir is not None else os.devnull
         self.cfg.write(file)
         
     def _get_cfg_path(self) -> str:
         assert self._flam_dir is not None
         return os.path.join(self._flam_dir, self._CONFIGURATION_FILE)
+
+    # Metadata
+    def _write_metadata(self) -> str:
+        path = self._get_metadata_path() if self._flam_dir is not None else os.devnull
+        self._metadata.write(path)
+
+    def _get_metadata_path(self) -> str:
+        assert self._flam_dir is not None
+        return os.path.join(self._flam_dir, self._METADATA_FILE)
 
     # Listdefs.
     def canonicalize_listdef(self, listdef: str) -> CanonListdef:
@@ -1021,54 +1085,56 @@ class FlamContext:
 
         for fetcher in fetchers:
             try:
-                list_file = self.get_list_file(fetcher.abstract_listdef)
+                list_file = self._get_list_file(fetcher.abstract_listdef)
                 is_new = False
             except exceptions.InputError:
                 list_file = ListFile.create()
                 is_new = True
                 
-            list_file_before = copy.deepcopy(list_file)
-            interrupt_error = None
-
-            if not isinstance(list_file_before.uid_type, UnsetType) and list_file_before.uid_type != fetcher.uid_type:
+            if not isinstance(list_file.uid_type, UnsetType) and list_file.uid_type != fetcher.uid_type:
                 raise exceptions.InputError(f"Cannot fetch '{self.canon_listdef_pretty(fetcher.abstract_listdef)}' because it's already fetched with a different ID type "
-                    f"(old: '{list_file_before.uid_type}', new: '{fetcher.uid_type}'). "
+                    f"(old: '{list_file.uid_type}', new: '{fetcher.uid_type}'). "
                     "This can happen if you changed a list's LISTDEF to a nonmatching type. You can resolve it by fetching the list from scratch, or reverting the list to its old type.")
 
+            # We need both the old and new versions to compare at the end. But it's important that the new one is the deepcopy,
+            # so that anyone currently holding on to a list handle won't have the underlying list file changed.
+            new_list_file = copy.deepcopy(list_file)
+            interrupt_error = None
+
             if refetch_re is not None:
-                list_file.movies_by_uid = {
+                new_list_file.movies_by_uid = {
                     uid: movie_lf
-                    for uid, movie_lf in list_file.movies_by_uid.items()
+                    for uid, movie_lf in new_list_file.movies_by_uid.items()
                     if not isinstance(movie_lf.title, UnsetType) and not refetch_re.search(movie_lf.title)
                 }
 
-                _remove_unused_people(list_file)
+                _remove_unused_people(new_list_file)
 
             with open(os.devnull, 'w') as devnull, contextlib.redirect_stdout(devnull) if quiet else contextlib.nullcontext():
                 print(f"Fetching {self.canon_listdef_pretty(fetcher.abstract_listdef)}...")
 
                 try:
-                    fetcher.fetch_into_file(list_file)
+                    fetcher.fetch_into_file(new_list_file)
                 except exceptions.FetchInterrupt as e:
                     interrupt_error = e
 
             # Fetcher may have removed some movies from the list. Over here we remove people who are orphaned because of that.
-            _remove_unused_people(list_file)
+            _remove_unused_people(new_list_file)
 
-            list_file.uid_type = fetcher.uid_type
-            list_file.fetcher_type = fetcher.abstract_listdef.fetcher_type
-            list_file.address = fetcher.abstract_listdef.address
+            new_list_file.uid_type = fetcher.uid_type
+            new_list_file.fetcher_type = fetcher.abstract_listdef.fetcher_type
+            new_list_file.address = fetcher.abstract_listdef.address
 
             # Must canonicalize before comparing for equality.
-            list_file.canonicalize()
+            new_list_file.canonicalize()
 
             # We'll only write the new contents if they're different than before, and we'll return whether there was a diff or not.
             # This allows us to check the file mtime to know if it's dirty and dependent files need to be regenerated.
-            if list_file_before != list_file:
-                self._write_list_file(list_file)
+            if list_file != new_list_file:
+                self._write_list_file(new_list_file)
 
             if is_new:
-                self._list_files.append(list_file)
+                self._list_files.append(new_list_file)
 
             if interrupt_error is not None:
                 raise exceptions.FetchInterrupt(f"Fetching of {self.canon_listdef_pretty(fetcher.abstract_listdef)} got interrupted due to error: {interrupt_error}. "
@@ -1120,8 +1186,8 @@ class FlamContext:
         return fetcher_cls(concrete_listdef, abstract_listdef)
 
     # Filtering.
-    def compile(self, tokens: list[str]) -> Filter:
-        return Filter.eat(tokens, self)
+    def compile_filter(self, tokens: list[str], find: FindableType) -> Filter:
+        return Filter.eat(tokens, find, self)
 
 #endregion context
 
@@ -1149,7 +1215,7 @@ class CanonListdef(typing.NamedTuple):
     def __str__(self) -> str:
         return f'{self.fetcher_type}={self.address}'
 
-class Findable(enum.StrEnum):
+class FindableType(enum.StrEnum):
     MOVIES = 'movies'
     PEOPLE = 'people'
     ROLES = 'roles'
@@ -1157,6 +1223,10 @@ class Findable(enum.StrEnum):
     @property
     def corresponding_type(self) -> type:
         raise NotImplementedError()
+
+    def is_compatible(self, find: typing.Self) -> bool:
+        # Roles are compatible with everything because a role is associated with a person and a movie.
+        return find == self.ROLES or self == find
 
 class CrewType(enum.StrEnum):
     CAST = 'cast'

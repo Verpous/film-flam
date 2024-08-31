@@ -149,7 +149,7 @@ def config_compound_edit(ctx: ff.FlamContext, args: argparse.Namespace, compound
 
     if len(filter_tokens) > 0:
         # Don't have anything to do with this for now, but we can raise an exception if it doesn't compile.
-        ctx.compile(filter_tokens)
+        ctx.compile_filter(filter_tokens, ff.FindableType.MOVIES)
         compound_list.filter_tokens = filter_tokens
 
     if args.default_fetch != Choice.AUTO:
@@ -193,7 +193,7 @@ def subcommand_fetch(ctx: ff.FlamContext, args: argparse.Namespace) -> None:
 def subcommand_find(ctx: ff.FlamContext, args: argparse.Namespace) -> None:
     # Parse filter
     listdefs, filter_tokens = split_at_filter(args.LISTDEF + args.FILTER)
-    filtr = ctx.compile(filter_tokens)
+    filtr = ctx.compile_filter(filter_tokens, args.findable)
     
     # 1. Parse the listdefs for finding (generally means no compound list expansion, and maybe even no uniqueing).
     # 2. Load all the relevant data, which includes the list file and, if people (or roles?) also cached grouping files, or compute the grouping now if not cached
@@ -351,7 +351,7 @@ Valid column names: ...''')
 
     # TODO: future problem: REMAINDER doesn't work if there are no positional arguments before it. If we add the shorthand subcommands a la "flam WHAT",
     # the WHAT won't be a positional argument anymore and REMAINDER won't work.
-    find_parser.add_argument('FINDABLE', choices=ff.Findable, action='store', help=
+    find_parser.add_argument('FINDABLE', choices=ff.FindableType, action='store', help=
         '''Choose what to find: movies, people, or roles. Roles have all the attributes of the movie and the person, and then a few role-specific ones.''')
     find_parser.add_argument('LISTDEF', nargs='*', action='store', help=
         '''Like fetch but with different defaults, and if the LISTDEFs aren't already fetched, it fails with a nice error message.''')

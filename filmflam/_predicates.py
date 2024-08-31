@@ -22,7 +22,7 @@ import filmflam.exceptions as exceptions
 @ff._register_builtin
 class TruePredicate(ff.Predicate, name='true'):
     @classmethod
-    def eat(cls, tokens: list[str], at: int, ctx: ff.FlamContext) -> tuple[ff.Predicate, int]:
+    def eat(cls, tokens: list[str], at: int, find: ff.FindableType, ctx: ff.FlamContext) -> tuple[ff.Predicate, int]:
         return cls(), at
 
     def excrete(self, item: typing.Any, general: typing.Any) -> bool:
@@ -31,7 +31,7 @@ class TruePredicate(ff.Predicate, name='true'):
 @ff._register_builtin
 class FalsePredicate(ff.Predicate, name='false'):
     @classmethod
-    def eat(cls, tokens: list[str], at: int, ctx: ff.FlamContext) -> tuple[ff.Predicate, int]:
+    def eat(cls, tokens: list[str], at: int, find: ff.FindableType, ctx: ff.FlamContext) -> tuple[ff.Predicate, int]:
         return cls(), at
 
     def excrete(self, item: typing.Any, general: typing.Any) -> bool:
@@ -45,8 +45,8 @@ class All(ff.Predicate, name='all'):
         self._value = value
     
     @classmethod
-    def eat(cls, tokens: list[str], at: int, ctx: ff.FlamContext) -> tuple[ff.Predicate, int]:
-        attribute = cls.eat_attribute(tokens, at, ctx, is_array=True)
+    def eat(cls, tokens: list[str], at: int, find: ff.FindableType, ctx: ff.FlamContext) -> tuple[ff.Predicate, int]:
+        attribute = cls.eat_attribute(tokens, at, find, ctx, is_array=True)
         cmp, value_str = cls.eat_cmp_value(tokens, at + 1)
         value = None # TODO: use attribute to parse value_str into the attribute's type. Possibly also check if attribute supports the comparator?
         return cls(attribute, cmp, value), at + 2
@@ -69,8 +69,8 @@ class Contains(ff.Predicate, name='contains'):
         self._value = value
     
     @classmethod
-    def eat(cls, tokens: list[str], at: int, ctx: ff.FlamContext) -> tuple[ff.Predicate, int]:
-        attribute = cls.eat_attribute(tokens, at, ctx, is_array=True)
+    def eat(cls, tokens: list[str], at: int, find: ff.FindableType, ctx: ff.FlamContext) -> tuple[ff.Predicate, int]:
+        attribute = cls.eat_attribute(tokens, at, find, ctx, is_array=True)
         cmp, value_str = cls.eat_cmp_value(tokens, at + 1)
         value = None # TODO: use attribute to parse value_str into the attribute's type. Possibly also check if attribute supports the comparator?
         return cls(attribute, cmp, value), at + 2
@@ -93,8 +93,8 @@ class Size(ff.Predicate, name='size'):
         self._value = value
     
     @classmethod
-    def eat(cls, tokens: list[str], at: int, ctx: ff.FlamContext) -> tuple[ff.Predicate, int]:
-        attribute = cls.eat_attribute(tokens, at, ctx, is_array=True)
+    def eat(cls, tokens: list[str], at: int, find: ff.FindableType, ctx: ff.FlamContext) -> tuple[ff.Predicate, int]:
+        attribute = cls.eat_attribute(tokens, at, find, ctx, is_array=True)
         cmp, value_str = cls.eat_cmp_value(tokens, at + 1)
         
         try:
@@ -115,6 +115,7 @@ class Size(ff.Predicate, name='size'):
         yield self._cmp.sign + str(self._value)
 
 # TODO: Predicate ideas:
+# Don't forget for string predicates we should support regex with "anywhere in the string" matching by default!
 # Generic predicates:
 # * -<attribute-name> [=|+|-|++|--]<value> (obviously. = for eq and is default, +/- for ge/le, ++/-- for strictly gt/lt. Not all attributes support anything other than =.
 #                                           Worth noting that if you want to compare equality to a negative number, you can avoid ambiguity by specifying the "=".
@@ -136,7 +137,7 @@ class Size(ff.Predicate, name='size'):
 # Role predicates:
 # * -crew <crew-type>
 
-def _test_compile(line: str, ctx: None | ff.FlamContext = None) -> None:
+def _test_compile(line: str, find: ff.FindableType = ff.FindableType.ROLES, ctx: None | ff.FlamContext = None) -> None:
     import shlex
     tokens = shlex.split(line)
 
@@ -144,7 +145,7 @@ def _test_compile(line: str, ctx: None | ff.FlamContext = None) -> None:
         ctx = ff.FlamContext(flam_dir=None)
 
     try:
-        filter = ctx.compile(tokens)
+        filter = ctx.compile_filter(tokens, find)
         regurg = ' '.join(ff.exceptions.FilterSyntaxError.format_token(t) for t in filter.regurgitate())
         print(line, '->', regurg)
     except ff.exceptions.FilterSyntaxError as e:
