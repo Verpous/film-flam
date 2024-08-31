@@ -28,6 +28,8 @@ import contextlib
 import difflib
 import enum
 import importlib
+import tempfile
+import atexit
 
 import filmflam._utils as utils
 import filmflam.exceptions as exceptions
@@ -78,6 +80,13 @@ class _FlamSerializable(msgspec.Struct, forbid_unknown_fields=True):
 
         obj.sanity_checks()
         return obj
+
+    @classmethod
+    def load_or_create(cls, file: str, **kwargs: typing.Any) -> typing.Self:
+        try:
+            return cls.load(file)
+        except FileNotFoundError:
+            return cls.create(**kwargs)
     
     def write(self, file: str) -> None:
         self.sanity_checks()
@@ -712,25 +721,6 @@ class Attribute(abc.ABC):
 
 #region context
 
-class _FlamDir(abc.ABC):
-    @abc.abstractmethod
-    def write(self, file: _FlamSerializable, relative_path: str) -> None:
-        pass
-
-    @abc.abstractmethod
-    def read(self, relative_path: str) -> _FlamSerializable:
-        pass
-
-    @abc.abstractmethod
-    def get_mtime(self, relative_path: str) -> float:
-        pass
-
-    @abc.abstractmethod
-    def mkdir(self, relative_path: str) -> float:
-        pass
-
-    def rename(self, )
-
 # Data structure for using remote/compound lists generically.
 LT = typing.TypeVar('LT', RemoteList, CompoundList)
 
@@ -780,26 +770,22 @@ class FlamContext:
     _CONFIGURATION_FILE = 'config.json'
     _METADATA_FILE = 'metadata.json'
 
-    # TODO: Acquire OS lock on the flam_dir so that you can't have multiple contexts operating on it at once?
     def __init__(self, flam_dir: None | str = DEFAULT_FLAM_DIR, import_extensions: bool = False) -> None:
-        self._flam_dir = flam_dir
-        self._list_files: list[ListFile] = []
-
         # Support None for users who just want to work with volatile memory and not load or save anything, we call it volatile mode.
-        if self._flam_dir is None:
-            self._cfg = Configuration.create()
-            self._metadata = _FlamMetadata.create()
+        # Don't tell this to anyone but in "volatile" mode we actually just persist everything to a tempdir. It's so, so much easier.
+        if flam_dir is None:
+            tempdir = tempfile.TemporaryDirectory(prefix='.film_flam')
+            atexit.register(tempdir.cleanup) # TODO: cleanup at object's __del__ it if happens before atexit?
+            self._flam_dir = tempdir.name
         else:
-            self._flam_dir = os.path.normpath(self._flam_dir)
-            self._make_flam_dir()
+            # TODO: Acquire OS lock on the flam_dir so that you can't have multiple contexts operating on it at once?
+            self._flam_dir = os.path.normpath(flam_dir)
 
-            cfg_path = self._get_cfg_path()
-            self._cfg = Configuration.load(cfg_path) if os.path.exists(cfg_path) else Configuration.create()
+        self._make_flam_dir()
+        self._cfg = Configuration.load_or_create(self._get_cfg_path())
+        self._metadata = _FlamMetadata.load_or_create(self._get_metadata_path()) # TODO: Initialize/verify metadata? Or just fix up the file as we use it?
 
-            # TODO: When creating a new metadata from an existing cfg, need to add entries for all lists and stuff?
-            # Or maybe all that should be created lazily.
-            meta_path = self._get_metadata_path()
-            self._metadata = _FlamMetadata.load(meta_path) if os.path.exists(meta_path) else _FlamMetadata.create()
+        self._list_files: list[ListFile] = []
 
         # Since Configuration needs to be serializable, we can't store the lists in there in some funky data structure,
         # and we can't add fields to the object that aren't meant for serialization.
@@ -823,7 +809,7 @@ class FlamContext:
                     utils.import_file(extension)
 
     @property
-    def flam_dir(self) -> None | str:
+    def flam_dir(self) -> str:
         return self._flam_dir
 
     @property
@@ -835,8 +821,6 @@ class FlamContext:
         return self._extensions
 
     def _make_flam_dir(self) -> None:
-        assert self._flam_dir is not None
-
         # Make sure to keep it topologically sorted.
         directories = [
             self._flam_dir,
@@ -862,13 +846,12 @@ class FlamContext:
             return list_file
 
         # Memory didn't work out, try to load it from disk.
-        if self._flam_dir is not None:
-            try:
-                list_file = ListFile.load(self._get_list_file_path(abstract_listdef))
-            except FileNotFoundError:
-                pass
-            except exceptions.FileValidationError as e:
-                raise exceptions.FileValidationError(f"{e} You may need to fetch '{self.canon_listdef_pretty(abstract_listdef)}' again from scratch.") from e
+        try:
+            list_file = ListFile.load(self._get_list_file_path(abstract_listdef))
+        except FileNotFoundError:
+            pass
+        except exceptions.FileValidationError as e:
+            raise exceptions.FileValidationError(f"{e} You may need to fetch '{self.canon_listdef_pretty(abstract_listdef)}' again from scratch.") from e
                 
         if abstract_listdef.fetcher_type == CompoundList.FETCHER_TYPE:
             uid = abstract_listdef.address
@@ -885,10 +868,6 @@ class FlamContext:
         return list_file
     
     def _is_compound_list_file_outdated(self, uid: str) -> bool:
-        # TODO: For now, in volatile mode compound lists are always regenerated.
-        if self._flam_dir is None:
-            return True
-
         if uid not in self._metadata.compound_lists_by_uid:
             return True
 
@@ -899,7 +878,7 @@ class FlamContext:
             if rl_uid not in cl_meta.dependency_mtime:
                 return True
 
-            # TODO: is flam_dir is none I think we just can't know the answer, and what if the remote list file doesn't exist?
+            # TODO: what if the remote list file doesn't exist?
             if (rl_uid not in cl_meta.dependency_mtime
                     or os.path.getmtime(self._get_list_file_path(CanonListdef(RemoteList.FETCHER_TYPE, rl_uid))) > cl_meta.dependency_mtime[rl_uid]):
                 return True
@@ -910,9 +889,7 @@ class FlamContext:
         pass
 
     def _write_list_file(self, list_file: ListFile) -> None:
-        # We use devnull in volatile mode, so that we still go through the file validity checks even if we don't write it anywhere.
-        path = self._get_list_file_path(list_file.abstract_listdef) if self._flam_dir is not None else os.devnull
-        list_file.write(path)
+        list_file.write(self._get_list_file_path(list_file.abstract_listdef))
 
         # Flush the metadata when saving compound lists so we don't accidentally regenerate them.
         if list_file.fetcher_type == CompoundList.FETCHER_TYPE:
@@ -923,7 +900,6 @@ class FlamContext:
     # This is mostly as opposed to storing all lists according to the concrete fetcher_type and address.
     # The reason: this lets us change lists to a different fetcher type with a compatible ID type.
     def _get_list_file_path(self, abstract_listdef: CanonListdef) -> str:
-        assert self._flam_dir is not None
         filename = utils.slugify(f'{abstract_listdef.fetcher_type}_{abstract_listdef.address}.json')
         return os.path.join(self._flam_dir, self._LISTFILES_DIR, filename)
 
@@ -948,14 +924,13 @@ class FlamContext:
         self.cfg._remote_lists.append(remote_list) # pylint: disable=protected-access
 
         # See if the list was already fetched before it was named, and "claim" the file.
-        if self._flam_dir is not None:
-            concrete_filename = self._get_list_file_path(remote_list.concrete_listdef)
-            abstract_filename = self._get_list_file_path(remote_list.abstract_listdef)
-            
-            try:
-                os.rename(concrete_filename, abstract_filename)
-            except FileNotFoundError:
-                pass
+        concrete_filename = self._get_list_file_path(remote_list.concrete_listdef)
+        abstract_filename = self._get_list_file_path(remote_list.abstract_listdef)
+        
+        try:
+            os.rename(concrete_filename, abstract_filename)
+        except FileNotFoundError:
+            pass
 
     def delete_remote_list(self, uid: str) -> None:
         remote_list = self.remote_lists.get_by_uid(uid)
@@ -966,15 +941,14 @@ class FlamContext:
         if len(dependents) > 0:
             raise exceptions.InputError(f"Failed to delete list '{remote_list.name}' because it is depended on by compound lists: {', '.join(dependents)}")
 
-        if self._flam_dir is not None:
-            # Deleting a list doesn't delete it from local storage, only gets it renamed to be anonymous.
-            concrete_filename = self._get_list_file_path(remote_list.concrete_listdef)
-            abstract_filename = self._get_list_file_path(remote_list.abstract_listdef)
+        # Deleting a list doesn't delete it from local storage, only gets it renamed to be anonymous.
+        concrete_filename = self._get_list_file_path(remote_list.concrete_listdef)
+        abstract_filename = self._get_list_file_path(remote_list.abstract_listdef)
 
-            try:
-                os.rename(abstract_filename, concrete_filename)
-            except FileNotFoundError:
-                pass
+        try:
+            os.rename(abstract_filename, concrete_filename)
+        except FileNotFoundError:
+            pass
 
         self.cfg._remote_lists.remove(remote_list) # pylint: disable=protected-access
 
@@ -984,29 +958,20 @@ class FlamContext:
 
     def delete_compound_list(self, uid: str) -> None:
         compound_list = self.compound_lists.get_by_uid(uid)
-
-        if self._flam_dir is not None:
-            # TODO: delete files
-            pass
-
+        # TODO: delete files
         self.cfg._compound_lists.remove(compound_list) # pylint: disable=protected-access
 
     def write_cfg(self) -> None:
-        # We use devnull in volatile mode, so that we still go through the file validity checks even if we don't write it anywhere.
-        file = self._get_cfg_path() if self._flam_dir is not None else os.devnull
-        self.cfg.write(file)
+        self.cfg.write(self._get_cfg_path())
         
     def _get_cfg_path(self) -> str:
-        assert self._flam_dir is not None
         return os.path.join(self._flam_dir, self._CONFIGURATION_FILE)
 
     # Metadata
     def _write_metadata(self) -> str:
-        path = self._get_metadata_path() if self._flam_dir is not None else os.devnull
-        self._metadata.write(path)
+        self._metadata.write(self._get_metadata_path())
 
     def _get_metadata_path(self) -> str:
-        assert self._flam_dir is not None
         return os.path.join(self._flam_dir, self._METADATA_FILE)
 
     # Listdefs.
