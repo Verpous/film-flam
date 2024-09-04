@@ -112,68 +112,68 @@ def config_list_create(ctx: ff.FlamContext, args: argparse.Namespace) -> None:
     ctx.add_remote_list(remote_list)
     ctx.write_cfg()
 
-def subcommand_config_compound(ctx: ff.FlamContext, args: argparse.Namespace) -> None:
+def subcommand_config_composite(ctx: ff.FlamContext, args: argparse.Namespace) -> None:
     if args.delete:
-        config_compound_delete(ctx, args)
+        config_composite_delete(ctx, args)
     elif args.print:
-        config_compound_print(ctx, args)
+        config_composite_print(ctx, args)
     # Default edit/create.
     else:
         try:
-            compound_list = ctx.compound_lists.get_by_name(args.NAME)
+            composite_list = ctx.composite_lists.get_by_name(args.NAME)
         except exceptions.InputError:
-            config_compound_create(ctx, args)
+            config_composite_create(ctx, args)
         else:
-            config_compound_edit(ctx, args, compound_list)
+            config_composite_edit(ctx, args, composite_list)
 
-def config_compound_delete(ctx: ff.FlamContext, args: argparse.Namespace) -> None:
+def config_composite_delete(ctx: ff.FlamContext, args: argparse.Namespace) -> None:
     if args.NAME is None:
-        raise exceptions.InputError(f"Must specify a NAME to delete a compound list.")
+        raise exceptions.InputError(f"Must specify a NAME to delete a composite list.")
 
-    compound_list = ctx.compound_lists.get_by_name(args.NAME)
-    assert not isinstance(compound_list.uid, ff.UnsetType)
-    ctx.delete_compound_list(compound_list.uid)
+    composite_list = ctx.composite_lists.get_by_name(args.NAME)
+    assert not isinstance(composite_list.uid, ff.UnsetType)
+    ctx.delete_composite_list(composite_list.uid)
     ctx.write_cfg()
 
-def config_compound_print(ctx: ff.FlamContext, args: argparse.Namespace) -> None:
+def config_composite_print(ctx: ff.FlamContext, args: argparse.Namespace) -> None:
     # TODO: improve this in the future
     if args.NAME is None:
-        for cl in ctx.compound_lists:
+        for cl in ctx.composite_lists:
             print(cl)
     else:
-        print(ctx.compound_lists.get_by_name(args.NAME))
+        print(ctx.composite_lists.get_by_name(args.NAME))
 
-def config_compound_edit(ctx: ff.FlamContext, args: argparse.Namespace, compound_list: ff.CompoundList) -> None:
+def config_composite_edit(ctx: ff.FlamContext, args: argparse.Namespace, composite_list: ff.CompositeList) -> None:
     if args.rename is not None:
-        compound_list.name = args.rename
+        composite_list.name = args.rename
 
     remote_list_names, filter_tokens = split_at_filter(args.LIST + args.FILTER)
 
     if len(remote_list_names) > 0:
         # The unset check should always be true, but the type checker wants it.
-        compound_list.remote_list_uids = [rl_uid for rl_name in remote_list_names if not isinstance(rl_uid := ctx.remote_lists.get_by_name(rl_name).uid, ff.UnsetType)]
+        composite_list.remote_list_uids = [rl_uid for rl_name in remote_list_names if not isinstance(rl_uid := ctx.remote_lists.get_by_name(rl_name).uid, ff.UnsetType)]
 
     if len(filter_tokens) > 0:
         # Don't have anything to do with this for now, but we can raise an exception if it doesn't compile.
         ctx.compile_filter(filter_tokens, ff.FindableType.MOVIES)
-        compound_list.filter_tokens = filter_tokens
+        composite_list.filter_tokens = filter_tokens
 
     if args.default_fetch != Choice.AUTO:
-        compound_list.is_default_fetch = args.default_fetch == Choice.YES
+        composite_list.is_default_fetch = args.default_fetch == Choice.YES
 
     if args.default_find != Choice.AUTO:
-        compound_list.is_default_find = args.default_find == Choice.YES
+        composite_list.is_default_find = args.default_find == Choice.YES
 
-    # TODO: regenerate the compound list/mark it dirty so it gets regenerated? Probably should be an internal thing to the API.
+    # TODO: regenerate the composite list/mark it dirty so it gets regenerated? Probably should be an internal thing to the API.
     ctx.write_cfg()
 
-def config_compound_create(ctx: ff.FlamContext, args: argparse.Namespace) -> None:
+def config_composite_create(ctx: ff.FlamContext, args: argparse.Namespace) -> None:
     if args.NAME is None:
-        raise exceptions.InputError(f"Must specify a NAME to create or edit a compound list.")
+        raise exceptions.InputError(f"Must specify a NAME to create or edit a composite list.")
 
     remote_list_names, filter_tokens = split_at_filter(args.LIST + args.FILTER)
 
-    compound_list = ff.CompoundList.create(
+    composite_list = ff.CompositeList.create(
         name = args.NAME,
         remote_list_uids = [ctx.remote_lists.get_by_name(rl_name).uid for rl_name in remote_list_names],
         filter_tokens = filter_tokens,
@@ -181,7 +181,7 @@ def config_compound_create(ctx: ff.FlamContext, args: argparse.Namespace) -> Non
         is_default_find = args.default_find == Choice.YES,
     )
 
-    ctx.add_compound_list(compound_list)
+    ctx.add_composite_list(composite_list)
     ctx.write_cfg()
 
 def subcommand_clean(ctx: ff.FlamContext, args: argparse.Namespace) -> None:
@@ -201,7 +201,7 @@ def subcommand_find(ctx: ff.FlamContext, args: argparse.Namespace) -> None:
     listdefs, filter_tokens = split_at_filter(args.LISTDEF + args.FILTER)
     filtr = ctx.compile_filter(filter_tokens, args.findable)
     
-    # 1. Parse the listdefs for finding (generally means no compound list expansion, and maybe even no uniqueing).
+    # 1. Parse the listdefs for finding (generally means no composite list expansion, and maybe even no uniqueing).
     # 2. Load all the relevant data, which includes the list file and, if people (or roles?) also cached grouping files, or compute the grouping now if not cached
     # 3. Put the data through filtering
     # 4. Sort the data according to desired sorting
@@ -248,25 +248,25 @@ def main() -> None:
     config_list_parser.add_argument('NAME', action='store', nargs='?', default=None, help='Operate on the list named %(dest)s')
     config_list_parser.add_argument('LISTDEF', action='store', nargs='?', default=None, help='set the list type and address to %(dest)s')
 
-    # Config compound list.
-    config_compound_parser = config_subparsers.add_parser('compound', formatter_class=argparse.RawTextHelpFormatter)
-    config_compound_parser.set_defaults(function=subcommand_config_compound)
+    # Config composite list.
+    config_composite_parser = config_subparsers.add_parser('composite', formatter_class=argparse.RawTextHelpFormatter)
+    config_composite_parser.set_defaults(function=subcommand_config_composite)
 
-    config_compound_parser_action_group = config_compound_parser.add_mutually_exclusive_group(required=False)
-    config_compound_parser_action_group.add_argument('-E', '--edit', action='store_true', help='edit or create a compound list. This is the default behavior.')
-    config_compound_parser_action_group.add_argument('-D', '--delete', action='store_true', help='delete the list.')
-    config_compound_parser_action_group.add_argument('-P', '--print', action='store_true', help='print the list, or if NAME not provided, print all lists.')
+    config_composite_parser_action_group = config_composite_parser.add_mutually_exclusive_group(required=False)
+    config_composite_parser_action_group.add_argument('-E', '--edit', action='store_true', help='edit or create a composite list. This is the default behavior.')
+    config_composite_parser_action_group.add_argument('-D', '--delete', action='store_true', help='delete the list.')
+    config_composite_parser_action_group.add_argument('-P', '--print', action='store_true', help='print the list, or if NAME not provided, print all lists.')
 
-    config_compound_parser.add_argument('-n', '--rename', metavar='NEW_NAME', default=None, action='store', help='if renaming a list, this will be the new name %(metavar)s')
-    config_compound_parser.add_argument('-i', '--default-find', choices=Choice.yes_no_auto(), default=Choice.AUTO, action='store', help='decide if this list should be default for flam find %(metavar)s')
-    config_compound_parser.add_argument('-e', '--default-fetch', choices=Choice.yes_no_auto(), default=Choice.AUTO, action='store', help='decide if this list should be fetched by default %(metavar)s')
-    config_compound_parser.add_argument('NAME', nargs='?', action='store', default=None, help='Operate on the list named %(dest)s')
-    config_compound_parser.add_argument('LIST', nargs='*', action='store', help='Set the list names to %(dest)s')
-    config_compound_parser.add_argument('FILTER', nargs='*', action='store', help='Set the FILTER to %(dest)s')
+    config_composite_parser.add_argument('-n', '--rename', metavar='NEW_NAME', default=None, action='store', help='if renaming a list, this will be the new name %(metavar)s')
+    config_composite_parser.add_argument('-i', '--default-find', choices=Choice.yes_no_auto(), default=Choice.AUTO, action='store', help='decide if this list should be default for flam find %(metavar)s')
+    config_composite_parser.add_argument('-e', '--default-fetch', choices=Choice.yes_no_auto(), default=Choice.AUTO, action='store', help='decide if this list should be fetched by default %(metavar)s')
+    config_composite_parser.add_argument('NAME', nargs='?', action='store', default=None, help='Operate on the list named %(dest)s')
+    config_composite_parser.add_argument('LIST', nargs='*', action='store', help='Set the list names to %(dest)s')
+    config_composite_parser.add_argument('FILTER', nargs='*', action='store', help='Set the FILTER to %(dest)s')
 
     # argparse.REMAINDER is an undocumented but very important feature.
     # Basically it's the only way to make positional arguments that start with dashes not be treated as bad options.
-    config_compound_parser.add_argument('REMAINDER', nargs=argparse.REMAINDER, action='store') # TODO: somehow don't show this in the help
+    config_composite_parser.add_argument('REMAINDER', nargs=argparse.REMAINDER, action='store') # TODO: somehow don't show this in the help
 
     # Clean options.
     # TODO: still gotta figure this one out. Maybe it should just be flags in the other commands? I don't want to complicate this program with "not user friendly" subcommands.
@@ -294,12 +294,12 @@ This feature is intended for redownloading shows after a new season has come out
     fetch_parser.add_argument('LISTDEF', nargs='*', action='store', help=
         '''Each %(dest)s describes a list to fetch. Supports, in order of priority:
 1. Configured list name (type: list)
-2. Configured compound list name (will fetch all lists under it) (type: compound)
+2. Configured composite list name (will fetch all lists under it) (type: composite)
 3. Address to fetch the list from (IMDb list id for instance). But for these the type is not inferred, you must specify it.
 
 To avoid ambiguity and for downloading addresses directly, you can specify the %(dest)s type by writing <type>=%(dest)s. Supported types are:
 * 'list'
-* 'compound'
+* 'composite'
 * 'imdb-id'
 * 'imdb-private-id'
 * 'imdb-csv'

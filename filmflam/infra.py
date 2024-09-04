@@ -229,8 +229,8 @@ class RemoteList(_FlamSerializable):
         return CanonListdef(self.fetcher_type, self.address)
 
 # TODO: rename to CompositeList!
-class CompoundList(_FlamSerializable):
-    FETCHER_TYPE: typing.ClassVar[str] = 'compound'
+class CompositeList(_FlamSerializable):
+    FETCHER_TYPE: typing.ClassVar[str] = 'composite'
 
     uid:                    UnsetType | str
     name:                   str
@@ -247,7 +247,7 @@ class CompoundList(_FlamSerializable):
 # TODO: Maybe the configuration should use "schema evolution".
 class Configuration(_FlamSerializable):
     _remote_lists:          list[RemoteList]
-    _compound_lists:        list[CompoundList]
+    _composite_lists:        list[CompositeList]
     extensions:             list[str]
 
     # TODO: Forbid special characters in list names that might be confused for a filter token.
@@ -261,26 +261,26 @@ class Configuration(_FlamSerializable):
             if rl.concrete_listdef.is_special:
                 raise self._validation_error(f"LISTDEF '{rl.concrete_listdef}' type must not be one of: {', '.join(_SPECIAL_FETCHER_TYPES)}.")
 
-        for cl in self._compound_lists:
-            if sum(1 for cl2 in self._compound_lists if cl.name == cl2.name) > 1:
-                raise self._validation_error(f"Found multiple compound lists named '{cl.name}'.")
+        for cl in self._composite_lists:
+            if sum(1 for cl2 in self._composite_lists if cl.name == cl2.name) > 1:
+                raise self._validation_error(f"Found multiple composite lists named '{cl.name}'.")
 
             if len(cl.remote_list_uids) == 0:
-                raise self._validation_error(f"Compound list '{cl.name}' is made up of 0 lists.")
+                raise self._validation_error(f"Composite list '{cl.name}' is made up of 0 lists.")
                 
             for uid in cl.remote_list_uids:
                 try:
                     # Unfortunately the get_by_uid method is not accessible from here, see comment in FlamContext.
                     next(rl for rl in self._remote_lists if rl.uid == uid)
                 except StopIteration as e:
-                    raise self._validation_error(f"Compound list '{cl.name}' references unknown remote list: '{uid}'.") from e
+                    raise self._validation_error(f"Composite list '{cl.name}' references unknown remote list: '{uid}'.") from e
 
-class _CompoundListMetadata(_FlamSerializable):
+class _CompositeListMetadata(_FlamSerializable):
     uid:                    str
     dependency_mtime:       dict[str, float]
 
 class _FlamMetadata(_FlamSerializable):
-    compound_lists_by_uid:  dict[str, _CompoundListMetadata]
+    composite_lists_by_uid:  dict[str, _CompositeListMetadata]
 
 #endregion serialization
 
@@ -724,8 +724,8 @@ class Attribute(abc.ABC):
 
 #region context
 
-# Data structure for using remote/compound lists generically.
-LT = typing.TypeVar('LT', RemoteList, CompoundList)
+# Data structure for using remote/composite lists generically.
+LT = typing.TypeVar('LT', RemoteList, CompositeList)
 
 class ConfigurationLists(typing.Generic[LT]):
     def __init__(self, lists: list[LT], type_name: str) -> None:
@@ -791,7 +791,7 @@ class FlamContext:
         # and we can't add fields to the object that aren't meant for serialization.
         # The solution I've got is to wrap those lists in this Context.
         self._remote_lists = ConfigurationLists(self.cfg._remote_lists, 'list')
-        self._compound_lists = ConfigurationLists(self.cfg._compound_lists, 'compound list')
+        self._composite_lists = ConfigurationLists(self.cfg._composite_lists, 'composite list')
 
         self._extensions = Registry()
 
@@ -825,8 +825,8 @@ class FlamContext:
         return self._remote_lists
 
     @property
-    def compound_lists(self) -> ConfigurationLists[CompoundList]:
-        return self._compound_lists
+    def composite_lists(self) -> ConfigurationLists[CompositeList]:
+        return self._composite_lists
 
     def _make_flam_dir(self) -> None:
         # Make sure to keep it topologically sorted.
@@ -848,21 +848,21 @@ class FlamContext:
         if len(canon_listdefs) == 1:
             list_file = self._get_list_file(canon_listdefs[0])
         else:
-            list_file = self._generate_compound_list_file(canon_listdefs, filter)
-            list_file.fetcher_type = CompoundList.FETCHER_TYPE # TODO: different fetcher_type for annonymous lists?
+            list_file = self._generate_composite_list_file(canon_listdefs, filter)
+            list_file.fetcher_type = CompositeList.FETCHER_TYPE # TODO: different fetcher_type for annonymous lists?
             list_file.address = "ANNONYMOUS"
 
         return ListHandle(list_file)
 
     def _get_list_file(self, abstract_listdef: CanonListdef) -> ListFile:
-        # First we check if it's a compound list that needs regeneration. In that case even if it's cached it needs to be redone.
-        if abstract_listdef.fetcher_type == CompoundList.FETCHER_TYPE and self._is_compound_list_file_outdated(abstract_listdef.address):
+        # First we check if it's a composite list that needs regeneration. In that case even if it's cached it needs to be redone.
+        if abstract_listdef.fetcher_type == CompositeList.FETCHER_TYPE and self._is_composite_list_file_outdated(abstract_listdef.address):
             # TODO: update metadata?
-            compound_list = self._compound_lists.get_by_uid(abstract_listdef.address)
-            filter = self.compile_filter(compound_list.filter_tokens, FindableType.MOVIES)
-            dependencies = [CanonListdef(RemoteList.FETCHER_TYPE, rl_uid) for rl_uid in compound_list.remote_list_uids]
-            list_file = self._generate_compound_list_file(dependencies, filter)
-            list_file.fetcher_type = CompoundList.FETCHER_TYPE
+            composite_list = self._composite_lists.get_by_uid(abstract_listdef.address)
+            filter = self.compile_filter(composite_list.filter_tokens, FindableType.MOVIES)
+            dependencies = [CanonListdef(RemoteList.FETCHER_TYPE, rl_uid) for rl_uid in composite_list.remote_list_uids]
+            list_file = self._generate_composite_list_file(dependencies, filter)
+            list_file.fetcher_type = CompositeList.FETCHER_TYPE
             list_file.address = abstract_listdef.address
             self._list_files_cache[abstract_listdef.address] = list_file
             return list_file
@@ -883,12 +883,12 @@ class FlamContext:
         self._list_files_cache[list_file.address] = list_file
         return list_file
     
-    def _is_compound_list_file_outdated(self, uid: str) -> bool:
-        if uid not in self._metadata.compound_lists_by_uid:
+    def _is_composite_list_file_outdated(self, uid: str) -> bool:
+        if uid not in self._metadata.composite_lists_by_uid:
             return True
 
-        cl_config = self._compound_lists.get_by_uid(uid)
-        cl_meta = self._metadata.compound_lists_by_uid[uid]
+        cl_config = self._composite_lists.get_by_uid(uid)
+        cl_meta = self._metadata.composite_lists_by_uid[uid]
 
         for rl_uid in cl_config.remote_list_uids:
             if rl_uid not in cl_meta.dependency_mtime:
@@ -900,13 +900,13 @@ class FlamContext:
                 if rl_uid not in cl_meta.dependency_mtime or os.path.getmtime(rl_path) > cl_meta.dependency_mtime[rl_uid]:
                     return True
             except FileNotFoundError:
-                cl_listdef = CanonListdef(CompoundList.FETCHER_TYPE, uid)
+                cl_listdef = CanonListdef(CompositeList.FETCHER_TYPE, uid)
                 rl_listdef = CanonListdef(RemoteList.FETCHER_TYPE, rl_uid)
                 raise exceptions.InputError(f"List '{self.canon_listdef_pretty(cl_listdef)}' depends on {rl_listdef} which hasn't been fetched.")
 
         return False
 
-    def _generate_compound_list_file(self, abstract_listdefs: list[CanonListdef], filter: None | Filter) -> ListFile:
+    def _generate_composite_list_file(self, abstract_listdefs: list[CanonListdef], filter: None | Filter) -> ListFile:
         merged_list_file = ListFile.create()
         list_files = [self._get_list_file(cldef) for cldef in abstract_listdefs]
         # TODO: sciency shit to merge list_files into merged_list_file
@@ -919,8 +919,8 @@ class FlamContext:
     def _write_list_file(self, list_file: ListFile) -> None:
         list_file.write(self._get_list_file_path(list_file.abstract_listdef))
 
-        # Flush the metadata when saving compound lists so we don't accidentally regenerate them.
-        if list_file.fetcher_type == CompoundList.FETCHER_TYPE:
+        # Flush the metadata when saving composite lists so we don't accidentally regenerate them.
+        if list_file.fetcher_type == CompositeList.FETCHER_TYPE:
             self._write_metadata()
 
     # After much deliberation, I decided that files for named lists should be named according to the list type and UID,
@@ -932,16 +932,16 @@ class FlamContext:
         return os.path.join(self._flam_dir, self._LISTFILES_DIR, filename)
 
     # Configuration.
-    def lists_of_type(self, fetcher_type: str) -> ConfigurationLists[RemoteList] | ConfigurationLists[CompoundList]:
+    def lists_of_type(self, fetcher_type: str) -> ConfigurationLists[RemoteList] | ConfigurationLists[CompositeList]:
         match fetcher_type:
             case RemoteList.FETCHER_TYPE:
                 return self._remote_lists
-            case CompoundList.FETCHER_TYPE:
-                return self._compound_lists
+            case CompositeList.FETCHER_TYPE:
+                return self._composite_lists
             case _:
                 raise ValueError(f"Invalid type '{fetcher_type}': not any kind of list.")
 
-    def get_list_by_abstract_listdef(self, abstract_listdef: CanonListdef) -> RemoteList | CompoundList:
+    def get_list_by_abstract_listdef(self, abstract_listdef: CanonListdef) -> RemoteList | CompositeList:
         return self.lists_of_type(abstract_listdef.fetcher_type).get_by_uid(abstract_listdef.address)
 
     def add_remote_list(self, remote_list: RemoteList) -> None:
@@ -960,11 +960,11 @@ class FlamContext:
     def delete_remote_list(self, uid: str) -> None:
         remote_list = self._remote_lists.get_by_uid(uid)
 
-        # We don't mess with removing the list from its dependent compound lists. Let the user do that.
-        dependents = [cl.name for cl in self._compound_lists if uid in cl.remote_list_uids]
+        # We don't mess with removing the list from its dependent composite lists. Let the user do that.
+        dependents = [cl.name for cl in self._composite_lists if uid in cl.remote_list_uids]
 
         if len(dependents) > 0:
-            raise exceptions.InputError(f"Failed to delete list '{remote_list.name}' because it is depended on by compound lists: {', '.join(dependents)}")
+            raise exceptions.InputError(f"Failed to delete list '{remote_list.name}' because it is depended on by composite lists: {', '.join(dependents)}")
 
         # Deleting a list doesn't delete it from local storage, only gets it renamed to be anonymous.
         concrete_filename = self._get_list_file_path(remote_list.concrete_listdef)
@@ -977,14 +977,14 @@ class FlamContext:
 
         self.cfg._remote_lists.remove(remote_list) # pylint: disable=protected-access
 
-    def add_compound_list(self, compound_list: CompoundList) -> None:
-        compound_list.uid = str(uuid.uuid4())
-        self.cfg._compound_lists.append(compound_list) # pylint: disable=protected-access
+    def add_composite_list(self, composite_list: CompositeList) -> None:
+        composite_list.uid = str(uuid.uuid4())
+        self.cfg._composite_lists.append(composite_list) # pylint: disable=protected-access
 
-    def delete_compound_list(self, uid: str) -> None:
-        compound_list = self._compound_lists.get_by_uid(uid)
+    def delete_composite_list(self, uid: str) -> None:
+        composite_list = self._composite_lists.get_by_uid(uid)
         # TODO: delete files
-        self.cfg._compound_lists.remove(compound_list) # pylint: disable=protected-access
+        self.cfg._composite_lists.remove(composite_list) # pylint: disable=protected-access
 
     def write_cfg(self) -> None:
         self.cfg.write(self._get_cfg_path())
@@ -1013,15 +1013,15 @@ class FlamContext:
 
             return CanonListdef(before_eq, after_eq)
 
-        # For remote/compound lists we need to convert the name to a uid.
-        if eq_idx != -1 and (before_eq == RemoteList.FETCHER_TYPE or before_eq == CompoundList.FETCHER_TYPE):
+        # For remote/composite lists we need to convert the name to a uid.
+        if eq_idx != -1 and (before_eq == RemoteList.FETCHER_TYPE or before_eq == CompositeList.FETCHER_TYPE):
             return self.lists_of_type(before_eq).get_by_name(after_eq).abstract_listdef
         
         # The generic case where it's whatever=whatever.
         if eq_idx != -1:
             return CanonListdef(before_eq, after_eq)
         
-        # If no '=' sign then we'll treat it as a list or compound list, and try to determine which.
+        # If no '=' sign then we'll treat it as a list or composite list, and try to determine which.
         if (list_obj := self._get_implicit_list(before_eq)) is not None:
             return list_obj.abstract_listdef
 
@@ -1042,14 +1042,14 @@ class FlamContext:
     def canon_listdef_pretty(self, canon_listdef: CanonListdef) -> str:
         return str(canon_listdef._replace(address=self.get_list_by_abstract_listdef(canon_listdef).name) if canon_listdef.is_abstract else canon_listdef)
 
-    def _get_implicit_list(self, name: str) -> None | RemoteList | CompoundList:
+    def _get_implicit_list(self, name: str) -> None | RemoteList | CompositeList:
         try:
             return self._remote_lists.get_by_name(name)
         except exceptions.InputError:
             pass
 
         try:
-            return self._compound_lists.get_by_name(name)
+            return self._composite_lists.get_by_name(name)
         except exceptions.InputError:
             pass
 
@@ -1076,7 +1076,7 @@ class FlamContext:
         for fetcher in fetchers:
             try:
                 list_file = self._get_list_file(fetcher.abstract_listdef)
-            # If the list were compound there'd be another case where this exception is raised, but it's not possible to reach here with a compound list.
+            # If the list were composite there'd be another case where this exception is raised, but it's not possible to reach here with a composite list.
             except exceptions.InputError:
                 list_file = ListFile.create()
                 
@@ -1141,15 +1141,15 @@ class FlamContext:
             if cldef.fetcher_type == LISTDEF_DEFAULTS:
                 yield from (rl.abstract_listdef for rl in self._remote_lists if rl.is_default_fetch)
 
-                # Default compound lists... yeah.
+                # Default composite lists... yeah.
                 yield from (
                     CanonListdef(RemoteList.FETCHER_TYPE, rl_uid)
-                    for cl in self._compound_lists if cl.is_default_fetch
+                    for cl in self._composite_lists if cl.is_default_fetch
                         for rl_uid in cl.remote_list_uids
                 )
-            elif cldef.fetcher_type == CompoundList.FETCHER_TYPE:
-                compound_list = self._compound_lists.get_by_uid(cldef.address)
-                yield from (CanonListdef(RemoteList.FETCHER_TYPE, rl_uid) for rl_uid in compound_list.remote_list_uids)
+            elif cldef.fetcher_type == CompositeList.FETCHER_TYPE:
+                composite_list = self._composite_lists.get_by_uid(cldef.address)
+                yield from (CanonListdef(RemoteList.FETCHER_TYPE, rl_uid) for rl_uid in composite_list.remote_list_uids)
             else: # RemoteList.FETCHER_TYPE or a "concrete" type.
                 yield cldef
 
@@ -1191,10 +1191,10 @@ class CanonListdef(typing.NamedTuple):
     def is_special(self) -> bool:
         return self.fetcher_type in _SPECIAL_FETCHER_TYPES
 
-    # RemoteList/CompoundList listdefs are abstract because they can't be fetched directly, only through the underlying "concrete" type.
+    # RemoteList/CompositeList listdefs are abstract because they can't be fetched directly, only through the underlying "concrete" type.
     @property
     def is_abstract(self) -> bool:
-        return self.fetcher_type == RemoteList.FETCHER_TYPE or self.fetcher_type == CompoundList.FETCHER_TYPE
+        return self.fetcher_type == RemoteList.FETCHER_TYPE or self.fetcher_type == CompositeList.FETCHER_TYPE
 
     # "Concrete" listdefs have a type that directly corresponds to a ListFetcher.
     @property
@@ -1232,7 +1232,7 @@ def _is_debug() -> bool:
 
 LISTDEF_ALL = '*'
 LISTDEF_DEFAULTS = 'defaults'
-_SPECIAL_FETCHER_TYPES = {LISTDEF_DEFAULTS, LISTDEF_ALL, RemoteList.FETCHER_TYPE, CompoundList.FETCHER_TYPE}
+_SPECIAL_FETCHER_TYPES = {LISTDEF_DEFAULTS, LISTDEF_ALL, RemoteList.FETCHER_TYPE, CompositeList.FETCHER_TYPE}
 
 #endregion general
 

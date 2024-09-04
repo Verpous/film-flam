@@ -59,7 +59,7 @@ clean:
 
 cfg:
 	$(CLI) config list testlist imdb-id=540302193
-	$(CLI) config compound testcomp testlist -true
+	$(CLI) config composite testcomp testlist -true
 
 mypy:
 	MYPY_FORCE_COLOR=1 mypy --disallow-untyped-defs --disallow-incomplete-defs $(CLI)
