@@ -228,6 +228,7 @@ class RemoteList(_FlamSerializable):
     def concrete_listdef(self) -> CanonListdef:
         return CanonListdef(self.fetcher_type, self.address)
 
+# TODO: rename to CompositeList!
 class CompoundList(_FlamSerializable):
     FETCHER_TYPE: typing.ClassVar[str] = 'compound'
 
@@ -411,8 +412,13 @@ class FilterMember(abc.ABC):
         return ComparisonOp.EQ, cmp_value
 
 class Filter(FilterMember):
-    def __init__(self, pipeline: None | Pipeline) -> None:
+    def __init__(self, pipeline: None | Pipeline, find: FindableType) -> None:
         self._pipeline = pipeline
+        self._find = find
+
+    @property
+    def findable_type(self) -> FindableType:
+        return self._find
 
     # We compile by defining "eat" classmethods for all the FilterMembers (and some classes which aren't FilterMembers).
     # Generally, eat receives the *full* tokenized expression, and the index where "uneaten" tokens begin.
@@ -421,10 +427,10 @@ class Filter(FilterMember):
     @classmethod
     def eat(cls, tokens: list[str], find: FindableType, ctx: FlamContext) -> Filter:
         if len(tokens) == 0:
-            return cls(None)
+            return cls(None, find)
 
         pipeline, _ = Pipeline.eat(tokens, 0, find, ctx, expect_eat_everything=True)
-        return cls(pipeline)
+        return cls(pipeline, find)
 
     def excrete(self, item: typing.Any, general: typing.Any) -> bool:
         return self._pipeline is None or self._pipeline.excrete(item, general)
@@ -617,7 +623,7 @@ class Predicate(FilterMember):
                 # Special treatment for AttributePredicate because it's not wise to make a predicate for each attribute.
                 # TODO: Check if attribute owner matches what we're filtering?
                 if registry.has_attribute(name):
-                    return AttributePredicate.eat_shit(tokens, at + 1, ctx, registry.get_attribute(name))
+                    return AttributePredicate.eat_shit(tokens, at + 1, registry.get_attribute(name))
 
         if prefixed_name in Positive.RPAREN:
             raise _EinGafrurError('Right parenthesis has no matching left parenthesis.', tokens=tokens, error_indices=at)
@@ -648,7 +654,7 @@ class AttributePredicate(Predicate, name='attribute'):
 
     # Part of being a special predicate means its "eat" has a different signature so we have to give it a different name.
     @classmethod
-    def eat_shit(cls, tokens: list[str], at: int, ctx: FlamContext, attribute: Attribute) -> tuple[Predicate, int]:
+    def eat_shit(cls, tokens: list[str], at: int, attribute: Attribute) -> tuple[Predicate, int]:
         cmp, value_str = cls.eat_cmp_value(tokens, at)
         value = None # TODO: use attribute to parse value_str into the attribute's type. Possibly also check if attribute supports the comparator?
         return cls(attribute, cmp, value), at + 1
@@ -661,9 +667,6 @@ class AttributePredicate(Predicate, name='attribute'):
     def regurgitate(self) -> typing.Iterable[str]:
         yield from super().regurgitate()
         yield self._cmp.sign + str(self._value)
-
-def decompile(filter: Filter) -> list[str]:
-    return list(filter.regurgitate())
 
 # Doesn't guarantee that token is valid, only indicates that it looks like it should be.
 def is_filter_token(token: str) -> bool:
@@ -738,34 +741,31 @@ class ConfigurationLists(typing.Generic[LT]):
         except StopIteration as e:
             raise exceptions.InputError(f"Invalid {self._type_name} UID: '{uid}'") from e
 
-    # Had a bitch of a time trying to make this an overload of get_by_uid.
-    def get_by_uid_or_none(self, uid: str) -> None | LT:
-        return next((l for l in self._lists if l.uid == uid), None)
-
     def get_by_name(self, name: str) -> LT:
         try:
             return next(l for l in self._lists if l.name == name)
         except StopIteration as e:
             raise exceptions.InputError(f"Invalid {self._type_name} name: '{name}'") from e
 
-    def get_by_name_or_none(self, name: str) -> None | LT:
-        return next((l for l in self._lists if l.name == name), None)
-
 class ListHandle:
-    def __init__(self, list_file, find):
+    def __init__(self, list_file): # TODO: specify how to group each crew type?
         self._list_file = list_file
-        self._find = find
 
     def __iter__(self):
-        # Iterates 
-        raise NotImplementedError()
+        return self.find(FindableType.MOVIES)
 
     def apply_filter(self, filter: Filter):
         pass
 
+    def find(self, what: FindableType, filter: None | Filter = None) -> typing.Iterator[typing.Any]: # TODO: not Any!
+        assert filter is None or filter.findable_type == what
+
+    def export(self, filter: Filter) -> ListFile:
+        assert filter.findable_type == FindableType.MOVIES
+
 # This class is the user's entry point to basically everything that is "built in" to this API: accessing lists, filtering, configuring.
 class FlamContext:
-    DEFAULT_FLAM_DIR = os.getenv('FLAM_DIR', os.path.join(os.path.expanduser('~'), '.film_flam'))
+    DEFAULT_FLAM_DIR = os.environ.get('FLAM_DIR', os.path.join(os.path.expanduser('~'), '.film_flam'))
     _LISTFILES_DIR = 'list_files'
     _CONFIGURATION_FILE = 'config.json'
     _METADATA_FILE = 'metadata.json'
@@ -774,7 +774,7 @@ class FlamContext:
         # Support None for users who just want to work with volatile memory and not load or save anything, we call it volatile mode.
         # Don't tell this to anyone but in "volatile" mode we actually just persist everything to a tempdir. It's so, so much easier.
         if flam_dir is None:
-            tempdir = tempfile.TemporaryDirectory(prefix='.film_flam')
+            tempdir = tempfile.TemporaryDirectory(prefix='.film_flam', ignore_cleanup_errors=not _is_debug()) # pylint: disable=consider-using-with
             atexit.register(tempdir.cleanup) # TODO: cleanup at object's __del__ it if happens before atexit?
             self._flam_dir = tempdir.name
         else:
@@ -785,13 +785,13 @@ class FlamContext:
         self._cfg = Configuration.load_or_create(self._get_cfg_path())
         self._metadata = _FlamMetadata.load_or_create(self._get_metadata_path()) # TODO: Initialize/verify metadata? Or just fix up the file as we use it?
 
-        self._list_files: list[ListFile] = []
+        self._list_files_cache: dict[str, ListFile] = {}
 
         # Since Configuration needs to be serializable, we can't store the lists in there in some funky data structure,
         # and we can't add fields to the object that aren't meant for serialization.
         # The solution I've got is to wrap those lists in this Context.
-        self.remote_lists = ConfigurationLists(self.cfg._remote_lists, 'list')
-        self.compound_lists = ConfigurationLists(self.cfg._compound_lists, 'compound list')
+        self._remote_lists = ConfigurationLists(self.cfg._remote_lists, 'list')
+        self._compound_lists = ConfigurationLists(self.cfg._compound_lists, 'compound list')
 
         self._extensions = Registry()
 
@@ -820,6 +820,14 @@ class FlamContext:
     def extensions(self) -> Registry:
         return self._extensions
 
+    @property
+    def remote_lists(self) -> ConfigurationLists[RemoteList]:
+        return self._remote_lists
+
+    @property
+    def compound_lists(self) -> ConfigurationLists[CompoundList]:
+        return self._compound_lists
+
     def _make_flam_dir(self) -> None:
         # Make sure to keep it topologically sorted.
         directories = [
@@ -834,59 +842,79 @@ class FlamContext:
                 pass
 
     # List files.
-    def get_list_handle(self, abstract_listdef: CanonListdef) -> ListHandle:
-        pass
+    def get_list_handle(self, listdefs: str | typing.Iterable[str], filter: None | Filter = None) -> ListHandle:
+        canon_listdefs = list(self.canonicalize_listdefs_with_all_expansion(listdefs if not isinstance(listdefs, str) else (listdefs,)))
+        # TODO: expand "default" and only then make into list... is it really a "list_handle" feature? We have no clear entry point find vs anything else.
+        if len(canon_listdefs) == 1:
+            list_file = self._get_list_file(canon_listdefs[0])
+        else:
+            list_file = self._generate_compound_list_file(canon_listdefs, filter)
+            list_file.fetcher_type = CompoundList.FETCHER_TYPE # TODO: different fetcher_type for annonymous lists?
+            list_file.address = "ANNONYMOUS"
+
+        return ListHandle(list_file)
 
     def _get_list_file(self, abstract_listdef: CanonListdef) -> ListFile:
-        # First try to get it from memory.
-        list_file = next((lf for lf in self._list_files if lf.abstract_listdef == abstract_listdef), None)
-
-        # TODO: If list_file type is compound it may need regeneration.
-        if list_file is not None:
+        # First we check if it's a compound list that needs regeneration. In that case even if it's cached it needs to be redone.
+        if abstract_listdef.fetcher_type == CompoundList.FETCHER_TYPE and self._is_compound_list_file_outdated(abstract_listdef.address):
+            # TODO: update metadata?
+            compound_list = self._compound_lists.get_by_uid(abstract_listdef.address)
+            filter = self.compile_filter(compound_list.filter_tokens, FindableType.MOVIES)
+            dependencies = [CanonListdef(RemoteList.FETCHER_TYPE, rl_uid) for rl_uid in compound_list.remote_list_uids]
+            list_file = self._generate_compound_list_file(dependencies, filter)
+            list_file.fetcher_type = CompoundList.FETCHER_TYPE
+            list_file.address = abstract_listdef.address
+            self._list_files_cache[abstract_listdef.address] = list_file
             return list_file
 
+        # Now we try to get it from memory.
+        if abstract_listdef.address in self._list_files_cache:
+            return self._list_files_cache[abstract_listdef.address]
+            
         # Memory didn't work out, try to load it from disk.
         try:
             list_file = ListFile.load(self._get_list_file_path(abstract_listdef))
         except FileNotFoundError:
-            pass
+            raise exceptions.InputError(f"No fetched file for LISTDEF '{self.canon_listdef_pretty(abstract_listdef)}'.")
         except exceptions.FileValidationError as e:
             raise exceptions.FileValidationError(f"{e} You may need to fetch '{self.canon_listdef_pretty(abstract_listdef)}' again from scratch.") from e
-                
-        if abstract_listdef.fetcher_type == CompoundList.FETCHER_TYPE:
-            uid = abstract_listdef.address
-            
-            if self._is_compound_list_file_outdated(uid):
-                list_file = self._generate_compound_list_file(uid)
 
-            self._metadata.compound_lists_by_uid[uid] = [...]
-
-        if list_file is None:
-            raise exceptions.InputError(f"No fetched file for LISTDEF '{self.canon_listdef_pretty(abstract_listdef)}'.")
-
-        self._list_files.append(list_file)
+        assert not isinstance(list_file.address, UnsetType)
+        self._list_files_cache[list_file.address] = list_file
         return list_file
     
     def _is_compound_list_file_outdated(self, uid: str) -> bool:
         if uid not in self._metadata.compound_lists_by_uid:
             return True
 
-        cl_config = self.compound_lists.get_by_uid(uid)
+        cl_config = self._compound_lists.get_by_uid(uid)
         cl_meta = self._metadata.compound_lists_by_uid[uid]
 
         for rl_uid in cl_config.remote_list_uids:
             if rl_uid not in cl_meta.dependency_mtime:
                 return True
 
-            # TODO: what if the remote list file doesn't exist?
-            if (rl_uid not in cl_meta.dependency_mtime
-                    or os.path.getmtime(self._get_list_file_path(CanonListdef(RemoteList.FETCHER_TYPE, rl_uid))) > cl_meta.dependency_mtime[rl_uid]):
-                return True
+            rl_path = self._get_list_file_path(CanonListdef(RemoteList.FETCHER_TYPE, rl_uid))
+
+            try:
+                if rl_uid not in cl_meta.dependency_mtime or os.path.getmtime(rl_path) > cl_meta.dependency_mtime[rl_uid]:
+                    return True
+            except FileNotFoundError:
+                cl_listdef = CanonListdef(CompoundList.FETCHER_TYPE, uid)
+                rl_listdef = CanonListdef(RemoteList.FETCHER_TYPE, rl_uid)
+                raise exceptions.InputError(f"List '{self.canon_listdef_pretty(cl_listdef)}' depends on {rl_listdef} which hasn't been fetched.")
 
         return False
 
-    def _generate_compound_list_file(self, uid: str) -> ListFile:
-        pass
+    def _generate_compound_list_file(self, abstract_listdefs: list[CanonListdef], filter: None | Filter) -> ListFile:
+        merged_list_file = ListFile.create()
+        list_files = [self._get_list_file(cldef) for cldef in abstract_listdefs]
+        # TODO: sciency shit to merge list_files into merged_list_file
+
+        if filter is not None:
+            merged_list_file = ListHandle(merged_list_file).export(filter)
+            
+        return merged_list_file
 
     def _write_list_file(self, list_file: ListFile) -> None:
         list_file.write(self._get_list_file_path(list_file.abstract_listdef))
@@ -907,17 +935,14 @@ class FlamContext:
     def lists_of_type(self, fetcher_type: str) -> ConfigurationLists[RemoteList] | ConfigurationLists[CompoundList]:
         match fetcher_type:
             case RemoteList.FETCHER_TYPE:
-                return self.remote_lists
+                return self._remote_lists
             case CompoundList.FETCHER_TYPE:
-                return self.compound_lists
+                return self._compound_lists
             case _:
                 raise ValueError(f"Invalid type '{fetcher_type}': not any kind of list.")
 
     def get_list_by_abstract_listdef(self, abstract_listdef: CanonListdef) -> RemoteList | CompoundList:
         return self.lists_of_type(abstract_listdef.fetcher_type).get_by_uid(abstract_listdef.address)
-
-    def get_list_by_abstract_listdef_or_none(self, abstract_listdef: CanonListdef) -> None | RemoteList | CompoundList:
-        return self.lists_of_type(abstract_listdef.fetcher_type).get_by_uid_or_none(abstract_listdef.address)
 
     def add_remote_list(self, remote_list: RemoteList) -> None:
         remote_list.uid = str(uuid.uuid4())
@@ -933,10 +958,10 @@ class FlamContext:
             pass
 
     def delete_remote_list(self, uid: str) -> None:
-        remote_list = self.remote_lists.get_by_uid(uid)
+        remote_list = self._remote_lists.get_by_uid(uid)
 
         # We don't mess with removing the list from its dependent compound lists. Let the user do that.
-        dependents = [cl.name for cl in self.compound_lists if uid in cl.remote_list_uids]
+        dependents = [cl.name for cl in self._compound_lists if uid in cl.remote_list_uids]
 
         if len(dependents) > 0:
             raise exceptions.InputError(f"Failed to delete list '{remote_list.name}' because it is depended on by compound lists: {', '.join(dependents)}")
@@ -957,7 +982,7 @@ class FlamContext:
         self.cfg._compound_lists.append(compound_list) # pylint: disable=protected-access
 
     def delete_compound_list(self, uid: str) -> None:
-        compound_list = self.compound_lists.get_by_uid(uid)
+        compound_list = self._compound_lists.get_by_uid(uid)
         # TODO: delete files
         self.cfg._compound_lists.remove(compound_list) # pylint: disable=protected-access
 
@@ -1008,7 +1033,7 @@ class FlamContext:
             cldef = self.canonicalize_listdef(ldef)
 
             if cldef.fetcher_type == LISTDEF_ALL:
-                yield from (rl.abstract_listdef for rl in self.remote_lists)
+                yield from (rl.abstract_listdef for rl in self._remote_lists)
             else:
                 yield cldef
 
@@ -1019,12 +1044,12 @@ class FlamContext:
 
     def _get_implicit_list(self, name: str) -> None | RemoteList | CompoundList:
         try:
-            return self.remote_lists.get_by_name(name)
+            return self._remote_lists.get_by_name(name)
         except exceptions.InputError:
             pass
 
         try:
-            return self.compound_lists.get_by_name(name)
+            return self._compound_lists.get_by_name(name)
         except exceptions.InputError:
             pass
 
@@ -1051,10 +1076,9 @@ class FlamContext:
         for fetcher in fetchers:
             try:
                 list_file = self._get_list_file(fetcher.abstract_listdef)
-                is_new = False
+            # If the list were compound there'd be another case where this exception is raised, but it's not possible to reach here with a compound list.
             except exceptions.InputError:
                 list_file = ListFile.create()
-                is_new = True
                 
             if not isinstance(list_file.uid_type, UnsetType) and list_file.uid_type != fetcher.uid_type:
                 raise exceptions.InputError(f"Cannot fetch '{self.canon_listdef_pretty(fetcher.abstract_listdef)}' because it's already fetched with a different ID type "
@@ -1098,8 +1122,8 @@ class FlamContext:
             if list_file != new_list_file:
                 self._write_list_file(new_list_file)
 
-            if is_new:
-                self._list_files.append(new_list_file)
+            # Because it's a dictionary we easily overwrite an existing outdated cached file.
+            self._list_files_cache[new_list_file.address] = new_list_file
 
             if interrupt_error is not None:
                 raise exceptions.FetchInterrupt(f"Fetching of {self.canon_listdef_pretty(fetcher.abstract_listdef)} got interrupted due to error: {interrupt_error}. "
@@ -1115,16 +1139,16 @@ class FlamContext:
     def _expand_listdefs_for_fetch(self, canon_listdefs: typing.Iterable[CanonListdef]) -> typing.Iterator[CanonListdef]:
         for cldef in canon_listdefs:
             if cldef.fetcher_type == LISTDEF_DEFAULTS:
-                yield from (rl.abstract_listdef for rl in self.remote_lists if rl.is_default_fetch)
+                yield from (rl.abstract_listdef for rl in self._remote_lists if rl.is_default_fetch)
 
                 # Default compound lists... yeah.
                 yield from (
                     CanonListdef(RemoteList.FETCHER_TYPE, rl_uid)
-                    for cl in self.compound_lists if cl.is_default_fetch
+                    for cl in self._compound_lists if cl.is_default_fetch
                         for rl_uid in cl.remote_list_uids
                 )
             elif cldef.fetcher_type == CompoundList.FETCHER_TYPE:
-                compound_list = self.compound_lists.get_by_uid(cldef.address)
+                compound_list = self._compound_lists.get_by_uid(cldef.address)
                 yield from (CanonListdef(RemoteList.FETCHER_TYPE, rl_uid) for rl_uid in compound_list.remote_list_uids)
             else: # RemoteList.FETCHER_TYPE or a "concrete" type.
                 yield cldef
@@ -1133,7 +1157,7 @@ class FlamContext:
         if canon_listdef.is_abstract:
             # Assume it's a RemoteList.
             abstract_listdef = canon_listdef
-            concrete_listdef = self.remote_lists.get_by_uid(abstract_listdef.address).concrete_listdef
+            concrete_listdef = self._remote_lists.get_by_uid(abstract_listdef.address).concrete_listdef
         else:
             abstract_listdef = concrete_listdef = canon_listdef
 
@@ -1203,6 +1227,9 @@ class CrewType(enum.StrEnum):
     CINEMATOGRAPHER = 'cinematographer'
     EDITOR = 'editor'
 
+def _is_debug() -> bool:
+    return 'FLAM_DEBUG' in os.environ
+
 LISTDEF_ALL = '*'
 LISTDEF_DEFAULTS = 'defaults'
 _SPECIAL_FETCHER_TYPES = {LISTDEF_DEFAULTS, LISTDEF_ALL, RemoteList.FETCHER_TYPE, CompoundList.FETCHER_TYPE}
@@ -1212,7 +1239,6 @@ _SPECIAL_FETCHER_TYPES = {LISTDEF_DEFAULTS, LISTDEF_ALL, RemoteList.FETCHER_TYPE
 #region registration
 
 # TODO: concerns:
-# * We might want a predicate that has 1 per attribute, maybe need to treat it special? Might need to register attributes before predicates?
 # * Might want to lock any further extensions once a context is in use
 # * Might want to prevent registering something that is already registered
 class Registry:

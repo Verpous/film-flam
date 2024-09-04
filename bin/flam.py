@@ -50,10 +50,13 @@ def subcommand_config_list(ctx: ff.FlamContext, args: argparse.Namespace) -> Non
     elif args.print:
         config_list_print(ctx, args)
     # Default edit/create.
-    elif (remote_list := ctx.remote_lists.get_by_name_or_none(args.NAME)) is not None:
-        config_list_edit(ctx, args, remote_list)
     else:
-        config_list_create(ctx, args)
+        try:
+            remote_list = ctx.remote_lists.get_by_name(args.NAME)
+        except exceptions.InputError:
+            config_list_create(ctx, args)
+        else:
+            config_list_edit(ctx, args, remote_list)
 
 def config_list_delete(ctx: ff.FlamContext, args: argparse.Namespace) -> None:
     if args.NAME is None:
@@ -115,10 +118,13 @@ def subcommand_config_compound(ctx: ff.FlamContext, args: argparse.Namespace) ->
     elif args.print:
         config_compound_print(ctx, args)
     # Default edit/create.
-    elif (compound_list := ctx.compound_lists.get_by_name_or_none(args.NAME)) is not None:
-        config_compound_edit(ctx, args, compound_list)
     else:
-        config_compound_create(ctx, args)
+        try:
+            compound_list = ctx.compound_lists.get_by_name(args.NAME)
+        except exceptions.InputError:
+            config_compound_create(ctx, args)
+        else:
+            config_compound_edit(ctx, args, compound_list)
 
 def config_compound_delete(ctx: ff.FlamContext, args: argparse.Namespace) -> None:
     if args.NAME is None:
@@ -390,6 +396,9 @@ Valid column names: ...''')
     # We use the FILTER, REMAINDER trick a lot so we take care of it generically.
     if hasattr(args, 'FILTER') and hasattr(args, 'REMAINDER'):
         args.FILTER += args.REMAINDER
+
+    if args.debug:
+        os.environ['FLAM_DEBUG'] = "1"
 
     ctx = ff.FlamContext(args.flam_dir, import_extensions=not args.no_extensions)
 

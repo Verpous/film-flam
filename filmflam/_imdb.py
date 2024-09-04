@@ -84,7 +84,7 @@ class SeleniumListFetcher(ff.ListFetcher, fetcher_type='imdb-id', uid_type=_UID_
 
         NUM_RETRIES = 1 # TODO: if we never experience timeouts, get rid of this.
         CSV_DOWNLOAD_TIMEOUT_SECS = 40
-        DOWNLOADS_DIR = os.getenv('FLAM_DOWNLOADS', os.path.join(os.path.expanduser('~'), 'Downloads'))
+        DOWNLOADS_DIR = os.environ.get('FLAM_DOWNLOADS', os.path.join(os.path.expanduser('~'), 'Downloads'))
 
         if not os.path.isdir(DOWNLOADS_DIR):
             raise exceptions.InputError(f"Invalid FLAM_DOWNLOADS: '{DOWNLOADS_DIR}': not a directory.")
@@ -114,8 +114,8 @@ class SeleniumListFetcher(ff.ListFetcher, fetcher_type='imdb-id', uid_type=_UID_
         if cls.exports_server is not None and cls.exports_server.is_alive():
             return
 
-        BROWSER = os.getenv('FLAM_BROWSER', _AUTO)
-        PROFILE = os.getenv('FLAM_BROWSER_PROFILE', '')
+        BROWSER = os.environ.get('FLAM_BROWSER', _AUTO)
+        PROFILE = os.environ.get('FLAM_BROWSER_PROFILE', '')
 
         # On re-spins create a new queue. The first go-around it's already instantiated to give mypy an easier time.
         if cls.exports_server is not None:
