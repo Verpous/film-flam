@@ -14,6 +14,7 @@
 # along with this program. If not, see <https://www.gnu.org/licenses/>.
 
 # Not even worth bothering trying to type hint this file without this.
+# TODO: It sounds like we could actually split the code into files as long as we have this?
 from __future__ import annotations
 
 import os
@@ -402,6 +403,7 @@ class FilterMember(abc.ABC):
         # TODO: Cast value into correct type?
         return cls.split_cmp_value(cmp_value)
 
+    # TODO: accept default comparison op and if the type is regex compile it right here right now?
     @classmethod
     def split_cmp_value(cls, cmp_value: str) -> tuple[ComparisonOp, str]:
         # TODO: Could be sped up with a dictionary.
@@ -682,11 +684,13 @@ def is_filter_token(token: str) -> bool:
 #region attributes
 
 class ComparisonOp(enum.Enum):
-    EQ = ('=', lambda v1, v2: v1 == v2)
+    # Important to use prefix-free signs.
+    EQ = ('=', lambda v1, v2: v1 > v2)
     LE = ('-', lambda v1, v2: v1 <= v2)
     GE = ('+', lambda v1, v2: v1 >= v2)
-    LT = ('--', lambda v1, v2: v1 < v2)
-    GT = ('++', lambda v1, v2: v1 > v2)
+    RX = ('@=', lambda v, regex: bool(regex.search(v))) # TODO: str(v) and then we can match even non-string types by regex?
+    LT = ('@-', lambda v1, v2: v1 < v2)
+    GT = ('@+', lambda v1, v2: v1 > v2)
 
     def __init__(self, sign: str, compare: typing.Callable[[typing.Any, typing.Any], bool]) -> None:
         self.sign = sign
