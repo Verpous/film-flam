@@ -27,10 +27,6 @@ import traceback
 import abc
 import atexit
 
-import filmflam.infra as ff
-import filmflam._utils as utils
-import filmflam.exceptions as exceptions
-
 from selenium import webdriver
 from selenium.common.exceptions import NoSuchElementException
 from selenium.common.exceptions import ElementClickInterceptedException
@@ -38,6 +34,14 @@ from selenium.webdriver.common.by import By
 from selenium.webdriver.remote.webdriver import WebDriver
 from selenium.webdriver.remote.webelement import WebElement
 from selenium.webdriver.chromium.options import ChromiumOptions
+
+from . import _reg
+from . import _fetch
+from . import _xcept
+from . import _utils
+from . import _listfile
+from . import _file
+from . import _ctx
 
 _UID_TYPE = 'imdb'
 
@@ -74,12 +78,12 @@ class _CsvRow:
     myrating:           None | str = None
     myrating_date:      None | str = None
 
-@ff._register_builtin
-class SeleniumListFetcher(ff.ListFetcher, fetcher_type='imdb-id', uid_type=_UID_TYPE):
+@_reg._register_builtin
+class SeleniumListFetcher(_fetch.ListFetcher, fetcher_type='imdb-id', uid_type=_UID_TYPE):
     exports_server: None | multiprocessing.Process = None
     requests_queue: multiprocessing.Queue = multiprocessing.Queue()
 
-    def fetch_into_file(self, list_file: ff.ListFile) -> None:
+    def fetch_into_file(self, list_file: _listfile.ListFile) -> None:
         self.spin_server_if_needed()
 
         NUM_RETRIES = 1 # TODO: if we never experience timeouts, get rid of this.
@@ -87,12 +91,12 @@ class SeleniumListFetcher(ff.ListFetcher, fetcher_type='imdb-id', uid_type=_UID_
         DOWNLOADS_DIR = os.environ.get('FLAM_DOWNLOADS', os.path.join(os.path.expanduser('~'), 'Downloads'))
 
         if not os.path.isdir(DOWNLOADS_DIR):
-            raise exceptions.InputError(f"Invalid FLAM_DOWNLOADS: '{DOWNLOADS_DIR}': not a directory.")
+            raise _xcept.InputError(f"Invalid FLAM_DOWNLOADS: '{DOWNLOADS_DIR}': not a directory.")
 
         # We do retries because of a particularly horrible issue that makes the download sometimes fail.
         for i in range(NUM_RETRIES):
             try:
-                latest_csv = utils.download_file_using_browser(
+                latest_csv = _utils.download_file_using_browser(
                     download_cmd=lambda: SeleniumListFetcher.requests_queue.put_nowait(self.concrete_listdef.address),
                     file_extension='csv',
                     downloads_dir=DOWNLOADS_DIR,
@@ -100,7 +104,7 @@ class SeleniumListFetcher(ff.ListFetcher, fetcher_type='imdb-id', uid_type=_UID_
             except TimeoutError as e:
                 # TODO: Don't fail terminally, inform the user of the error but carry on to the next list? Not sure, since a rerun to fix things really hurts now.
                 if i == NUM_RETRIES - 1:
-                    raise exceptions.InputError(f"Timed out trying to download LISTDEF '{self.concrete_listdef}' from IMDb. Are you sure the address is valid?") from e
+                    raise _xcept.InputError(f"Timed out trying to download LISTDEF '{self.concrete_listdef}' from IMDb. Are you sure the address is valid?") from e
 
         # CSV documentation says to use newline=''.
         with open(latest_csv, 'r', newline='') as movies_csv_file:
@@ -139,13 +143,13 @@ def _exports_server_cleanup() -> None:
         # and we don't want it to die before it handles this request.
         SeleniumListFetcher.exports_server.join()
 
-@ff._register_builtin
-class CsvListFetcher(ff.ListFetcher, fetcher_type='imdb-csv', uid_type=_UID_TYPE):
-    def fetch_into_file(self, list_file: ff.ListFile) -> None:
+@_reg._register_builtin
+class CsvListFetcher(_fetch.ListFetcher, fetcher_type='imdb-csv', uid_type=_UID_TYPE):
+    def fetch_into_file(self, list_file: _listfile.ListFile) -> None:
         try:
             movies_csv_file = open(self.concrete_listdef.address, 'r', newline='')
         except FileNotFoundError as e:
-            raise exceptions.InputError(f"Invalid LISTDEF {self.concrete_listdef}: no such file.") from e
+            raise _xcept.InputError(f"Invalid LISTDEF {self.concrete_listdef}: no such file.") from e
 
         with movies_csv_file:
             movies_csv = _read_csv(movies_csv_file)
@@ -167,7 +171,7 @@ def _read_csv(movies_csv_file: typing.Iterable[str]) -> list[_CsvRow]:
 
     return movies_csv
 
-def _fetch_movies_in_csv(movies_csv: list[_CsvRow], list_file: ff.ListFile) -> None:
+def _fetch_movies_in_csv(movies_csv: list[_CsvRow], list_file: _listfile.ListFile) -> None:
     # First we will build the list of all movies that we already have fetched, and overwrite list_file with this immediately.
     # This lets us bail in the middle if an exception occurs and not lose progress.
     csv_uids = {m.uid for m in movies_csv}
@@ -179,14 +183,14 @@ def _fetch_movies_in_csv(movies_csv: list[_CsvRow], list_file: ff.ListFile) -> N
     try:
         # Now we do a pass where we fetch fields using Cinemagoer.
         # Note that we not only skip movies that were previously fetched, but also duplicates in case the same movie appears in the CSV twice.
-        with utils.ProgressBar([m for m in movies_csv if m.uid not in list_file.movies_by_uid],
+        with _utils.ProgressBar([m for m in movies_csv if m.uid not in list_file.movies_by_uid],
                 desc='Downloading',
                 keyfunc=lambda m: m.title) as bar:
             for movie_csv in bar:
                 _fetch_movie(movie_csv, list_file, ia)
 
         # We have this "bad names" problem with cinemagoer, so here we refetch any people with bad names.
-        with utils.ProgressBar([p for p in list_file.people_by_uid.values() if _is_person_name_bad(p.name)],
+        with _utils.ProgressBar([p for p in list_file.people_by_uid.values() if _is_person_name_bad(p.name)],
                 desc='Cleansing data',
                 keyfunc=lambda p: p.uid) as bar:
             for person_lf in bar:
@@ -215,9 +219,9 @@ def _fetch_movies_in_csv(movies_csv: list[_CsvRow], list_file: ff.ListFile) -> N
         movie_lf.release_date       = _format_date_from_csv(movie_csv.release_date)
 
     if imdb_error is not None:
-        raise exceptions.FetchInterrupt(str(imdb_error))
+        raise _xcept.FetchInterrupt(str(imdb_error))
 
-def _fetch_movie(movie_csv: _CsvRow, list_file: ff.ListFile, ia: imdb.Cinemagoer) -> None:
+def _fetch_movie(movie_csv: _CsvRow, list_file: _listfile.ListFile, ia: imdb.Cinemagoer) -> None:
     NUM_RETRIES = 5
     info_to_fetch = (*imdb.Movie.Movie.default_info, 'critic reviews', 'full credits')
 
@@ -229,29 +233,29 @@ def _fetch_movie(movie_csv: _CsvRow, list_file: ff.ListFile, ia: imdb.Cinemagoer
             if i == NUM_RETRIES - 1:
                 raise
 
-    movie_lf = ff.ListFileMovie.create(uid=movie_csv.uid)
+    movie_lf = _listfile.ListFileMovie.create(uid=movie_csv.uid)
 
     # Prefer to get the title from Cinemagoer because they have better titles for foreign language films, but it's good to have a fallback (not that we ever need it).
     movie_lf.title = _safe_get(movie_imdb, 'title', default=movie_csv.title) 
     movie_lf.metascore = _safe_get(movie_imdb, 'metascore')
 
-    for crew_type in ff.CrewType:
+    for crew_type in _ctx.CrewType:
         # I generally tried to choose the CrewType values to match imdb's, but this one goddamn type has a space in it and I don't like that.
-        imdb_crew_type = crew_type.value if crew_type != ff.CrewType.STUNTCAST else 'stunt performer'
+        imdb_crew_type = crew_type.value if crew_type != _ctx.CrewType.STUNTCAST else 'stunt performer'
 
         # Building this list as a dictionary solves two problems:
         # 1. Sometimes you get empty people, so those are discarded.
         # 2. Sometimes you get the same person twice. Also discarded.
         crew_imdb_by_uid = {p.getID(): p for p in _safe_get(movie_imdb, imdb_crew_type, default=[]) if p}
 
-        movie_lf.crew[imdb_crew_type] = ff.ListFileCrew.create(
-            crew_type=imdb_crew_type,
+        movie_lf.crew[crew_type] = _listfile.ListFileCrew.create(
+            crew_type=crew_type,
             roles_by_uid={r.person_uid: r for r in _build_roles(crew_imdb_by_uid)})
         _update_people_by_uid(list_file.people_by_uid, ((p.uid, p) for p in _build_people(crew_imdb_by_uid)))
 
     list_file.movies_by_uid[movie_csv.uid] = movie_lf
 
-def _refetch_person(person_lf: ff.ListFilePerson, ia: imdb.Cinemagoer) -> None:
+def _refetch_person(person_lf: _listfile.ListFilePerson, ia: imdb.Cinemagoer) -> None:
     NUM_RETRIES = 5
 
     for i in range(NUM_RETRIES):
@@ -275,22 +279,22 @@ def _build_characters(current_role: typing.Any) -> typing.Iterator[None | str]:
     elif isinstance(current_role, imdb.utils.RolesList):
         yield from (_safe_get(role_imdb, 'name') for role_imdb in current_role)
 
-def _build_roles(crew_imdb_by_uid: dict[str, imdb.Person.Person]) -> typing.Iterable[ff.ListFileRole]:
+def _build_roles(crew_imdb_by_uid: dict[str, imdb.Person.Person]) -> typing.Iterable[_listfile.ListFileRole]:
     for person_imdb in crew_imdb_by_uid.values():
-        role_lf = ff.ListFileRole.create(
+        role_lf = _listfile.ListFileRole.create(
             person_uid=person_imdb.getID(),
             characters=[c for c in _build_characters(person_imdb.currentRole) if c is not None])
 
         yield role_lf
 
-def _build_people(crew_imdb_by_uid: dict[str, imdb.Person.Person]) -> typing.Iterable[ff.ListFilePerson]:
+def _build_people(crew_imdb_by_uid: dict[str, imdb.Person.Person]) -> typing.Iterable[_listfile.ListFilePerson]:
     for person_imdb in crew_imdb_by_uid.values():
-        person_lf = ff.ListFilePerson.create(uid=person_imdb.getID())
+        person_lf = _listfile.ListFilePerson.create(uid=person_imdb.getID())
         person_lf.name = _safe_get(person_imdb, 'name', person_lf.uid)
         yield person_lf
 
 # Because of this deal with bad names, when we merge two people dictionaries we want to keep the person with the good name if there is one.
-def _update_people_by_uid(dst_people: dict[str, ff.ListFilePerson], src_people: typing.Iterable[tuple[str, ff.ListFilePerson]]) -> None:
+def _update_people_by_uid(dst_people: dict[str, _listfile.ListFilePerson], src_people: typing.Iterable[tuple[str, _listfile.ListFilePerson]]) -> None:
     # NOT src_people.items(). That's the responsibility of the callers.
     dst_people.update((uid, p) for uid, p in src_people if uid not in dst_people or _is_person_name_bad(dst_people[uid].name))
 
@@ -299,8 +303,8 @@ def _update_people_by_uid(dst_people: dict[str, ff.ListFilePerson], src_people: 
 # We fix this by trying to find people with a name like that and replacing it with the correct name.
 # By doing this after everything is downloaded and not when the name was added to the dictionary,
 # we are able to optimize by using the same person's appearance in something else instead of doing the big download when possible.
-def _is_person_name_bad(name: ff.UnsetType | str) -> bool:
-    assert not isinstance(name, ff.UnsetType)
+def _is_person_name_bad(name: _file.UnsetType | str) -> bool:
+    assert not isinstance(name, _file.UnsetType)
     return '\n' in name or ' episode' in name.lower()
 
 def _safe_get(obj: typing.Any, key: str, default: typing.Any = None) -> typing.Any:

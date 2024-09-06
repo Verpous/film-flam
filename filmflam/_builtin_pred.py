@@ -15,37 +15,39 @@
 
 import typing
 
-import filmflam.infra as ff
-import filmflam._utils as utils
-import filmflam.exceptions as exceptions
+from . import _ctx
+from . import _filter
+from . import _xcept
+from . import _reg
+from . import _attr
 
-@ff._register_builtin
-class TruePredicate(ff.Predicate, name='true'):
+@_reg._register_builtin
+class TruePredicate(_filter.Predicate, name='true'):
     @classmethod
-    def eat(cls, tokens: list[str], at: int, find: ff.FindableType, ctx: ff.FlamContext) -> tuple[ff.Predicate, int]:
+    def eat(cls, tokens: list[str], at: int, find: _ctx.FindableType, ctx: _ctx.FlamContext) -> tuple[_filter.Predicate, int]:
         return cls(), at
 
     def excrete(self, item: typing.Any, general: typing.Any) -> bool:
         return True
 
-@ff._register_builtin
-class FalsePredicate(ff.Predicate, name='false'):
+@_reg._register_builtin
+class FalsePredicate(_filter.Predicate, name='false'):
     @classmethod
-    def eat(cls, tokens: list[str], at: int, find: ff.FindableType, ctx: ff.FlamContext) -> tuple[ff.Predicate, int]:
+    def eat(cls, tokens: list[str], at: int, find: _ctx.FindableType, ctx: _ctx.FlamContext) -> tuple[_filter.Predicate, int]:
         return cls(), at
 
     def excrete(self, item: typing.Any, general: typing.Any) -> bool:
         return False
 
-@ff._register_builtin
-class All(ff.Predicate, name='all'):
-    def __init__(self, attribute: ff.Attribute, cmp: ff.ComparisonOp, value: typing.Any) -> None: # TODO: better annotation for value, in many places.
+@_reg._register_builtin
+class All(_filter.Predicate, name='all'):
+    def __init__(self, attribute: _attr.Attribute, cmp: _attr.ComparisonOp, value: typing.Any) -> None: # TODO: better annotation for value, in many places.
         self._attribute = attribute
         self._cmp = cmp
         self._value = value
     
     @classmethod
-    def eat(cls, tokens: list[str], at: int, find: ff.FindableType, ctx: ff.FlamContext) -> tuple[ff.Predicate, int]:
+    def eat(cls, tokens: list[str], at: int, find: _ctx.FindableType, ctx: _ctx.FlamContext) -> tuple[_filter.Predicate, int]:
         attribute = cls.eat_attribute(tokens, at, find, ctx, is_array=True)
         cmp, value_str = cls.eat_cmp_value(tokens, at + 1)
         value = None # TODO: use attribute to parse value_str into the attribute's type. Possibly also check if attribute supports the comparator?
@@ -61,15 +63,15 @@ class All(ff.Predicate, name='all'):
         yield self._attribute.name
         yield self._cmp.sign + str(self._value)
 
-@ff._register_builtin
-class Contains(ff.Predicate, name='contains'):
-    def __init__(self, attribute: ff.Attribute, cmp: ff.ComparisonOp, value: typing.Any) -> None:
+@_reg._register_builtin
+class Contains(_filter.Predicate, name='contains'):
+    def __init__(self, attribute: _attr.Attribute, cmp: _attr.ComparisonOp, value: typing.Any) -> None:
         self._attribute = attribute
         self._cmp = cmp
         self._value = value
     
     @classmethod
-    def eat(cls, tokens: list[str], at: int, find: ff.FindableType, ctx: ff.FlamContext) -> tuple[ff.Predicate, int]:
+    def eat(cls, tokens: list[str], at: int, find: _ctx.FindableType, ctx: _ctx.FlamContext) -> tuple[_filter.Predicate, int]:
         attribute = cls.eat_attribute(tokens, at, find, ctx, is_array=True)
         cmp, value_str = cls.eat_cmp_value(tokens, at + 1)
         value = None # TODO: use attribute to parse value_str into the attribute's type. Possibly also check if attribute supports the comparator?
@@ -85,22 +87,22 @@ class Contains(ff.Predicate, name='contains'):
         yield self._attribute.name
         yield self._cmp.sign + str(self._value)
 
-@ff._register_builtin
-class Size(ff.Predicate, name='size'):
-    def __init__(self, attribute: ff.Attribute, cmp: ff.ComparisonOp, value: typing.Any) -> None:
+@_reg._register_builtin
+class Size(_filter.Predicate, name='size'):
+    def __init__(self, attribute: _attr.Attribute, cmp: _attr.ComparisonOp, value: typing.Any) -> None:
         self._attribute = attribute
         self._cmp = cmp
         self._value = value
     
     @classmethod
-    def eat(cls, tokens: list[str], at: int, find: ff.FindableType, ctx: ff.FlamContext) -> tuple[ff.Predicate, int]:
+    def eat(cls, tokens: list[str], at: int, find: _ctx.FindableType, ctx: _ctx.FlamContext) -> tuple[_filter.Predicate, int]:
         attribute = cls.eat_attribute(tokens, at, find, ctx, is_array=True)
         cmp, value_str = cls.eat_cmp_value(tokens, at + 1)
         
         try:
             value = int(value_str)
         except ValueError:
-            raise ff.exceptions.FilterSyntaxError(f"Expected value to be an int, but got: '{value_str}'.", tokens=tokens, error_indices=at + 1)
+            raise _xcept.FilterSyntaxError(f"Expected value to be an int, but got: '{value_str}'.", tokens=tokens, error_indices=at + 1)
 
         return cls(attribute, cmp, value), at + 2
 
@@ -137,18 +139,18 @@ class Size(ff.Predicate, name='size'):
 # Role predicates:
 # * -crew <crew-type>
 
-def _test_compile(line: str, find: ff.FindableType = ff.FindableType.ROLES, ctx: None | ff.FlamContext = None) -> None:
+def _test_compile(line: str, find: _ctx.FindableType = _ctx.FindableType.ROLES, ctx: None | _ctx.FlamContext = None) -> None:
     import shlex
     tokens = shlex.split(line)
 
     if ctx is None:
-        ctx = ff.FlamContext(flam_dir=None)
+        ctx = _ctx.FlamContext(flam_dir=None)
 
     try:
         filter = ctx.compile_filter(tokens, find)
-        regurg = ' '.join(ff.exceptions.FilterSyntaxError.format_token(t) for t in filter.regurgitate())
+        regurg = ' '.join(_xcept.FilterSyntaxError.format_token(t) for t in filter.regurgitate())
         print(line, '->', regurg)
-    except ff.exceptions.FilterSyntaxError as e:
+    except _xcept.FilterSyntaxError as e:
         print(e)
 
 # _test_compile('')

@@ -21,9 +21,7 @@ import os
 import sys
 import typing
 
-# TODO: I'd rather the module's __init__.py makes "import filmflam" import all infra.
-import filmflam.infra as ff
-import filmflam.exceptions as exceptions
+import filmflam as ff
 
 class Choice(enum.StrEnum):
     YES     = 'yes'
@@ -53,14 +51,14 @@ def subcommand_config_list(ctx: ff.FlamContext, args: argparse.Namespace) -> Non
     else:
         try:
             remote_list = ctx.remote_lists.get_by_name(args.NAME)
-        except exceptions.InputError:
+        except ff.InputError:
             config_list_create(ctx, args)
         else:
             config_list_edit(ctx, args, remote_list)
 
 def config_list_delete(ctx: ff.FlamContext, args: argparse.Namespace) -> None:
     if args.NAME is None:
-        raise exceptions.InputError(f"Must specify a NAME to delete a list.")
+        raise ff.InputError(f"Must specify a NAME to delete a list.")
 
     remote_list = ctx.remote_lists.get_by_name(args.NAME)
     assert not isinstance(remote_list.uid, ff.UnsetType)
@@ -94,10 +92,10 @@ def config_list_edit(ctx: ff.FlamContext, args: argparse.Namespace, remote_list:
 
 def config_list_create(ctx: ff.FlamContext, args: argparse.Namespace) -> None:
     if args.NAME is None:
-        raise exceptions.InputError(f"Must specify a NAME to create or edit a list.")
+        raise ff.InputError(f"Must specify a NAME to create or edit a list.")
 
     if args.LISTDEF is None:
-        raise exceptions.InputError(f"List '{args.NAME}' doesn't exist, so LISTDEF is required.")
+        raise ff.InputError(f"List '{args.NAME}' doesn't exist, so LISTDEF is required.")
 
     cldef = ctx.canonicalize_listdef(args.LISTDEF)
 
@@ -121,14 +119,14 @@ def subcommand_config_composite(ctx: ff.FlamContext, args: argparse.Namespace) -
     else:
         try:
             composite_list = ctx.composite_lists.get_by_name(args.NAME)
-        except exceptions.InputError:
+        except ff.InputError:
             config_composite_create(ctx, args)
         else:
             config_composite_edit(ctx, args, composite_list)
 
 def config_composite_delete(ctx: ff.FlamContext, args: argparse.Namespace) -> None:
     if args.NAME is None:
-        raise exceptions.InputError(f"Must specify a NAME to delete a composite list.")
+        raise ff.InputError(f"Must specify a NAME to delete a composite list.")
 
     composite_list = ctx.composite_lists.get_by_name(args.NAME)
     assert not isinstance(composite_list.uid, ff.UnsetType)
@@ -169,7 +167,7 @@ def config_composite_edit(ctx: ff.FlamContext, args: argparse.Namespace, composi
 
 def config_composite_create(ctx: ff.FlamContext, args: argparse.Namespace) -> None:
     if args.NAME is None:
-        raise exceptions.InputError(f"Must specify a NAME to create or edit a composite list.")
+        raise ff.InputError(f"Must specify a NAME to create or edit a composite list.")
 
     remote_list_names, filter_tokens = split_at_filter(args.LIST + args.FILTER)
 
@@ -404,7 +402,7 @@ Valid column names: ...''')
 
     try:
         args.function(ctx, args)
-    except exceptions.FlamError as e:
+    except ff.FlamError as e:
         if args.debug:
             raise
 

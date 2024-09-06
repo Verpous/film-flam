@@ -13,14 +13,15 @@
 # You should have received a copy of the GNU General Public License
 # along with this program. If not, see <https://www.gnu.org/licenses/>.
 
-# from __future__ import annotations
+from __future__ import annotations
 
-# I don't want long lines and hate importing things with "from", so script names tend to be short.
-from ._reg import *
-from ._ctx import *
-from ._cfg import *
-from ._file import *
-from ._attr import *
-from ._ldef import *
-from ._xcept import *
-from ._filter import *
+import typing
+
+from . import _file
+
+class CompositeListMetadata(_file._FlamSerializable):
+    uid:                    str
+    dependency_mtime:       dict[str, float]
+
+class FlamMetadata(_file._FlamSerializable):
+    composite_lists_by_uid:  dict[str, CompositeListMetadata]
