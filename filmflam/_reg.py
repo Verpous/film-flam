@@ -33,7 +33,7 @@ class Registry:
 
     def register(self, obj: typing.Any) -> None:
         if isinstance(obj, type) and issubclass(obj, _fetch.ListFetcher):
-            self._fetchers[obj.fetcher_type] = obj
+            self._fetchers[obj.list_type] = obj
         elif isinstance(obj, type) and issubclass(obj, _filter.Predicate):
             self._predicates[obj.name] = obj
         elif isinstance(obj, _attr.Attribute):
@@ -41,8 +41,8 @@ class Registry:
         else:
             raise _xcept.InputError(f"Invalid object for registration: {obj}.")
 
-    def get_fetcher(self, fetcher_type: str) -> type[_fetch.ListFetcher]:
-        return self._fetchers[fetcher_type]
+    def get_fetcher(self, list_type: str) -> type[_fetch.ListFetcher]:
+        return self._fetchers[list_type]
 
     def get_predicate(self, name: str) -> type[_filter.Predicate]:
         return self._predicates[name]
@@ -50,8 +50,8 @@ class Registry:
     def get_attribute(self, name: str) -> _attr.Attribute:
         return self._attributes[name]
 
-    def has_fetcher(self, fetcher_type: str) -> bool:
-        return fetcher_type in self._fetchers
+    def has_fetcher(self, list_type: str) -> bool:
+        return list_type in self._fetchers
 
     def has_predicate(self, name: str) -> bool:
         return name in self._predicates

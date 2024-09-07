@@ -20,11 +20,12 @@ from . import _filter
 from . import _xcept
 from . import _reg
 from . import _attr
+from . import _list
 
 @_reg._register_builtin
 class TruePredicate(_filter.Predicate, name='true'):
     @classmethod
-    def eat(cls, tokens: list[str], at: int, find: _ctx.FindableType, ctx: _ctx.FlamContext) -> tuple[_filter.Predicate, int]:
+    def eat(cls, tokens: list[str], at: int, find: _list.FindableType, ctx: _ctx.FlamContext) -> tuple[_filter.Predicate, int]:
         return cls(), at
 
     def excrete(self, item: typing.Any, general: typing.Any) -> bool:
@@ -33,7 +34,7 @@ class TruePredicate(_filter.Predicate, name='true'):
 @_reg._register_builtin
 class FalsePredicate(_filter.Predicate, name='false'):
     @classmethod
-    def eat(cls, tokens: list[str], at: int, find: _ctx.FindableType, ctx: _ctx.FlamContext) -> tuple[_filter.Predicate, int]:
+    def eat(cls, tokens: list[str], at: int, find: _list.FindableType, ctx: _ctx.FlamContext) -> tuple[_filter.Predicate, int]:
         return cls(), at
 
     def excrete(self, item: typing.Any, general: typing.Any) -> bool:
@@ -47,7 +48,7 @@ class All(_filter.Predicate, name='all'):
         self._value = value
     
     @classmethod
-    def eat(cls, tokens: list[str], at: int, find: _ctx.FindableType, ctx: _ctx.FlamContext) -> tuple[_filter.Predicate, int]:
+    def eat(cls, tokens: list[str], at: int, find: _list.FindableType, ctx: _ctx.FlamContext) -> tuple[_filter.Predicate, int]:
         attribute = cls.eat_attribute(tokens, at, find, ctx, is_array=True)
         cmp, value_str = cls.eat_cmp_value(tokens, at + 1)
         value = None # TODO: use attribute to parse value_str into the attribute's type. Possibly also check if attribute supports the comparator?
@@ -71,7 +72,7 @@ class Contains(_filter.Predicate, name='contains'):
         self._value = value
     
     @classmethod
-    def eat(cls, tokens: list[str], at: int, find: _ctx.FindableType, ctx: _ctx.FlamContext) -> tuple[_filter.Predicate, int]:
+    def eat(cls, tokens: list[str], at: int, find: _list.FindableType, ctx: _ctx.FlamContext) -> tuple[_filter.Predicate, int]:
         attribute = cls.eat_attribute(tokens, at, find, ctx, is_array=True)
         cmp, value_str = cls.eat_cmp_value(tokens, at + 1)
         value = None # TODO: use attribute to parse value_str into the attribute's type. Possibly also check if attribute supports the comparator?
@@ -95,14 +96,14 @@ class Size(_filter.Predicate, name='size'):
         self._value = value
     
     @classmethod
-    def eat(cls, tokens: list[str], at: int, find: _ctx.FindableType, ctx: _ctx.FlamContext) -> tuple[_filter.Predicate, int]:
+    def eat(cls, tokens: list[str], at: int, find: _list.FindableType, ctx: _ctx.FlamContext) -> tuple[_filter.Predicate, int]:
         attribute = cls.eat_attribute(tokens, at, find, ctx, is_array=True)
         cmp, value_str = cls.eat_cmp_value(tokens, at + 1)
         
         try:
             value = int(value_str)
-        except ValueError:
-            raise _xcept.FilterSyntaxError(f"Expected value to be an int, but got: '{value_str}'.", tokens=tokens, error_indices=at + 1)
+        except ValueError as e:
+            raise _xcept.FilterSyntaxError(f"Expected value to be an int, but got: '{value_str}'.", tokens=tokens, error_indices=at + 1) from e
 
         return cls(attribute, cmp, value), at + 2
 
@@ -139,7 +140,7 @@ class Size(_filter.Predicate, name='size'):
 # Role predicates:
 # * -crew <crew-type>
 
-def _test_compile(line: str, find: _ctx.FindableType = _ctx.FindableType.ROLES, ctx: None | _ctx.FlamContext = None) -> None:
+def _test_compile(line: str, find: _list.FindableType = _list.FindableType.ROLES, ctx: None | _ctx.FlamContext = None) -> None:
     import shlex
     tokens = shlex.split(line)
 

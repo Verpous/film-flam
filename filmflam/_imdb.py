@@ -41,7 +41,7 @@ from . import _xcept
 from . import _utils
 from . import _listfile
 from . import _file
-from . import _ctx
+from . import _list
 
 _UID_TYPE = 'imdb'
 
@@ -79,7 +79,7 @@ class _CsvRow:
     myrating_date:      None | str = None
 
 @_reg._register_builtin
-class SeleniumListFetcher(_fetch.ListFetcher, fetcher_type='imdb-id', uid_type=_UID_TYPE):
+class SeleniumListFetcher(_fetch.ListFetcher, list_type='imdb-id', uid_type=_UID_TYPE):
     exports_server: None | multiprocessing.Process = None
     requests_queue: multiprocessing.Queue = multiprocessing.Queue()
 
@@ -144,7 +144,7 @@ def _exports_server_cleanup() -> None:
         SeleniumListFetcher.exports_server.join()
 
 @_reg._register_builtin
-class CsvListFetcher(_fetch.ListFetcher, fetcher_type='imdb-csv', uid_type=_UID_TYPE):
+class CsvListFetcher(_fetch.ListFetcher, list_type='imdb-csv', uid_type=_UID_TYPE):
     def fetch_into_file(self, list_file: _listfile.ListFile) -> None:
         try:
             movies_csv_file = open(self.concrete_listdef.address, 'r', newline='')
@@ -239,9 +239,9 @@ def _fetch_movie(movie_csv: _CsvRow, list_file: _listfile.ListFile, ia: imdb.Cin
     movie_lf.title = _safe_get(movie_imdb, 'title', default=movie_csv.title) 
     movie_lf.metascore = _safe_get(movie_imdb, 'metascore')
 
-    for crew_type in _ctx.CrewType:
+    for crew_type in _list.CrewType:
         # I generally tried to choose the CrewType values to match imdb's, but this one goddamn type has a space in it and I don't like that.
-        imdb_crew_type = crew_type.value if crew_type != _ctx.CrewType.STUNTCAST else 'stunt performer'
+        imdb_crew_type = crew_type.value if crew_type != _list.CrewType.STUNTCAST else 'stunt performer'
 
         # Building this list as a dictionary solves two problems:
         # 1. Sometimes you get empty people, so those are discarded.

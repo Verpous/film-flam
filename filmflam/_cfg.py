@@ -15,17 +15,13 @@
 
 from __future__ import annotations
 
-import typing
-
 from . import _file
 from . import _ldef
 
 class RemoteList(_file._FlamSerializable):
-    FETCHER_TYPE: typing.ClassVar[str] = 'list'
-    
     uid:                    _file.UnsetType | str
     name:                   str
-    fetcher_type:           str
+    list_type:           str
     address:                str
     is_default_fetch:       bool
     is_default_find:        bool
@@ -33,16 +29,13 @@ class RemoteList(_file._FlamSerializable):
     @property
     def abstract_listdef(self) -> _ldef.CanonListdef:
         assert not isinstance(self.uid, _file.UnsetType)
-        return _ldef.CanonListdef(self.FETCHER_TYPE, self.uid)
+        return _ldef.CanonListdef(_ldef.SpecialListType.REMOTE, self.uid)
 
     @property
     def concrete_listdef(self) -> _ldef.CanonListdef:
-        return _ldef.CanonListdef(self.fetcher_type, self.address)
+        return _ldef.CanonListdef(self.list_type, self.address)
 
-# TODO: rename to CompositeList!
 class CompositeList(_file._FlamSerializable):
-    FETCHER_TYPE: typing.ClassVar[str] = 'composite'
-
     uid:                    _file.UnsetType | str
     name:                   str
     remote_list_uids:       list[str]
@@ -53,7 +46,7 @@ class CompositeList(_file._FlamSerializable):
     @property
     def abstract_listdef(self) -> _ldef.CanonListdef:
         assert not isinstance(self.uid, _file.UnsetType)
-        return _ldef.CanonListdef(self.FETCHER_TYPE, self.uid)
+        return _ldef.CanonListdef(_ldef.SpecialListType.COMPOSITE, self.uid)
 
 # TODO: Maybe the configuration should use "schema evolution".
 class Configuration(_file._FlamSerializable):
@@ -70,7 +63,7 @@ class Configuration(_file._FlamSerializable):
                 raise self._validation_error(f"Found multiple lists named '{rl.name}'.")
 
             if rl.concrete_listdef.is_special:
-                raise self._validation_error(f"LISTDEF '{rl.concrete_listdef}' type must not be one of: {', '.join(_ldef.SPECIAL_FETCHER_TYPES)}.")
+                raise self._validation_error(f"LISTDEF '{rl.concrete_listdef}' type must not be one of: {', '.join(_ldef.SpecialListType)}.")
 
         for cl in self._composite_lists:
             if sum(1 for cl2 in self._composite_lists if cl.name == cl2.name) > 1:

@@ -30,6 +30,7 @@ PYLINT_IGNORE += C0411 # wrong-import-order
 PYLINT_IGNORE += C0413 # wrong-import-position
 PYLINT_IGNORE += C0415 # import-outside-toplevel
 
+PYLINT_IGNORE += R0401 # cyclic-import
 PYLINT_IGNORE += R0402 # consider-using-from-import
 PYLINT_IGNORE += R0902 # too-many-instance-attributes
 PYLINT_IGNORE += R0903 # too-few-public-methods

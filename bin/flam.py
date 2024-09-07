@@ -78,8 +78,8 @@ def config_list_edit(ctx: ff.FlamContext, args: argparse.Namespace, remote_list:
         remote_list.name = args.rename
 
     if args.LISTDEF is not None:
-        cldef = ctx.canonicalize_listdef(args.LISTDEF)
-        remote_list.fetcher_type = cldef.fetcher_type
+        cldef = ff.CanonListdef.parse(args.LISTDEF, ctx)
+        remote_list.list_type = cldef.list_type
         remote_list.address = cldef.address
 
     if args.default_fetch != Choice.AUTO:
@@ -97,11 +97,11 @@ def config_list_create(ctx: ff.FlamContext, args: argparse.Namespace) -> None:
     if args.LISTDEF is None:
         raise ff.InputError(f"List '{args.NAME}' doesn't exist, so LISTDEF is required.")
 
-    cldef = ctx.canonicalize_listdef(args.LISTDEF)
+    cldef = ff.CanonListdef.parse(args.LISTDEF, ctx)
 
     remote_list = ff.RemoteList.create(
         name = args.NAME,
-        fetcher_type = cldef.fetcher_type,
+        list_type = cldef.list_type,
         address = cldef.address,
         is_default_fetch = args.default_fetch != Choice.NO,
         is_default_find = args.default_find == Choice.YES,
@@ -191,7 +191,7 @@ def subcommand_fetch(ctx: ff.FlamContext, args: argparse.Namespace) -> None:
         pass
     else:
         # TODO: maybe defaults shouldn't be configured on the API side, maybe it's more of a CLI thing and we should have our own separate configuration for it.
-        listdefs = args.LISTDEF if len(args.LISTDEF) != 0 else [ff.LISTDEF_DEFAULTS]
+        listdefs = args.LISTDEF if len(args.LISTDEF) != 0 else [ff.SpecialListType.DEFAULTS]
         ctx.fetch(listdefs, refetch_pattern=args.refetch, quiet=False)
 
 def subcommand_find(ctx: ff.FlamContext, args: argparse.Namespace) -> None:

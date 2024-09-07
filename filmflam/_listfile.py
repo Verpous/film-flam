@@ -15,11 +15,9 @@
 
 from __future__ import annotations
 
-import typing
-
 from . import _file
 from . import _ldef
-from . import _ctx
+from . import _list
 
 # TODO: Don't like the name "list", could too easily be confused with too many things. Maybe I should just invent a word and call it a "Flist"?
 # ListFile-related objects go here.
@@ -58,7 +56,7 @@ class ListFileMovie(_file._FlamSerializable):
 
 class ListFile(_file._FlamSerializable):
     # These two fields are redundant, they are essentially the filename so the user must already know them to reach them. but if I'll omit them I'll regret it.
-    fetcher_type:           _file.UnsetType | str
+    list_type:           _file.UnsetType | str
     address:                _file.UnsetType | str
 
     # Files are "compatible" if they have a matching uid_type. This is because I have no good way of identifying matching items between, say, IMDb and Letterboxd.
@@ -70,12 +68,12 @@ class ListFile(_file._FlamSerializable):
 
     @property
     def abstract_listdef(self) -> _ldef.CanonListdef:
-        assert not isinstance(self.fetcher_type, _file.UnsetType) and not isinstance(self.address, _file.UnsetType)
-        return _ldef.CanonListdef(self.fetcher_type, self.address)
+        assert not isinstance(self.list_type, _file.UnsetType) and not isinstance(self.address, _file.UnsetType)
+        return _ldef.CanonListdef(self.list_type, self.address)
 
     def sanity_checks(self) -> None:
         super().sanity_checks()
-        crew_types_set = set(ct.value for ct in _ctx.CrewType)
+        crew_types_set = set(ct.value for ct in _list.CrewType)
 
         for movie in self.movies_by_uid.values():
             # I verified this check works.

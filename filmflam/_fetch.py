@@ -18,19 +18,25 @@ from __future__ import annotations
 
 import abc
 import typing
+import re
+import os
+import contextlib
 
 from . import _ldef
 from . import _listfile
+from . import _xcept
+from . import _ctx
+from . import _file
 
 class ListFetcher(abc.ABC):
-    fetcher_type: str
+    list_type: str
     uid_type: str
 
-    # Subclasses must provide a fetcher_type, and may optionally provide an uid_type if they have multiple fetchers that they want to be compatible.
-    def __init_subclass__(cls, fetcher_type: str, uid_type: None | str = None, **kwargs: typing.Any) -> None:
+    # Subclasses must provide a list_type, and may optionally provide an uid_type if they have multiple fetchers that they want to be compatible.
+    def __init_subclass__(cls, list_type: str, uid_type: None | str = None, **kwargs: typing.Any) -> None:
         super().__init_subclass__(**kwargs)
-        cls.fetcher_type = fetcher_type
-        cls.uid_type = uid_type if uid_type is not None else fetcher_type
+        cls.list_type = list_type
+        cls.uid_type = uid_type if uid_type is not None else list_type
 
     def __init__(self, concrete_listdef: _ldef.CanonListdef, abstract_listdef: _ldef.CanonListdef) -> None:
         self._concrete_listdef = concrete_listdef
@@ -44,8 +50,54 @@ class ListFetcher(abc.ABC):
     def abstract_listdef(self) -> _ldef.CanonListdef:
         return self._abstract_listdef
 
+    def fetch(self, list_file: _listfile.ListFile, ctx: _ctx.FlamContext, refetch_re: None | re.Pattern, quiet: bool) -> None:
+        if not isinstance(list_file.uid_type, _file.UnsetType) and list_file.uid_type != self.uid_type:
+            raise _xcept.InputError(f"Cannot fetch '{self.abstract_listdef.pretty(ctx)}' because it's already fetched with a different ID type "
+                f"(old: '{list_file.uid_type}', new: '{self.uid_type}'). "
+                "This can happen if you changed a list's LISTDEF to a nonmatching type. You can resolve it by fetching the list from scratch, or reverting the list to its old type.")
+
+        interrupt_error = None
+
+        if refetch_re is not None:
+            list_file.movies_by_uid = {
+                uid: movie_lf
+                for uid, movie_lf in list_file.movies_by_uid.items()
+                if not isinstance(movie_lf.title, _file.UnsetType) and not refetch_re.search(movie_lf.title)
+            }
+
+            _remove_unused_people(list_file)
+
+        with open(os.devnull, 'w') as devnull, contextlib.redirect_stdout(devnull) if quiet else contextlib.nullcontext():
+            print(f"Fetching '{self.abstract_listdef.pretty(ctx)}'...")
+
+            try:
+                self.fetch_into_file(list_file)
+            except _xcept.FetchInterrupt as e:
+                interrupt_error = e
+
+        # Fetcher may have removed some movies from the list. Over here we remove people who are orphaned because of that.
+        _remove_unused_people(list_file)
+
+        list_file.uid_type = self.uid_type
+        list_file.list_type = self.abstract_listdef.list_type
+        list_file.address = self.abstract_listdef.address
+
+        if interrupt_error is not None:
+            raise _xcept.FetchInterrupt(f"Fetching of '{self.abstract_listdef.pretty(ctx)}' got interrupted due to error: {interrupt_error}. "
+                "You may retry to pick up where it left off.")
+
     @abc.abstractmethod
     def fetch_into_file(self, list_file: _listfile.ListFile) -> None:
         # Populates list_file with data. It may already have preexisting data if updating an existing file.
         # Must leave no field unset. Even if it's an optional field it must explicitly be set to None.
         pass
+
+def _remove_unused_people(list_file: _listfile.ListFile) -> None:
+    used_person_uids = set(_get_all_used_person_uids(list_file))
+    list_file.people_by_uid = {uid: person for uid, person in list_file.people_by_uid.items() if uid in used_person_uids}
+
+def _get_all_used_person_uids(list_file: _listfile.ListFile) -> typing.Iterator[str]:
+    for movie_lf in list_file.movies_by_uid.values():
+        for crew in movie_lf.crew.values():
+            for role in crew.roles_by_uid.values():
+                yield role.person_uid

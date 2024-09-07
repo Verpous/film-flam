@@ -22,6 +22,7 @@ import difflib
 from . import _ctx
 from . import _attr
 from . import _xcept
+from . import _list
 
 # FILTER    := PIPELINE | <epsilon>
 # PIPELINE  := SINGLE JOINABLE*
@@ -74,7 +75,7 @@ class FilterMember(abc.ABC):
 
     # TODO: Also receive the attribute owner?
     @classmethod
-    def eat_attribute(cls, tokens: list[str], at: int, find: _ctx.FindableType, ctx: _ctx.FlamContext, is_array: bool = False) -> _attr.Attribute:
+    def eat_attribute(cls, tokens: list[str], at: int, find: _list.FindableType, ctx: _ctx.FlamContext, is_array: bool = False) -> _attr.Attribute:
         description = 'a valid attribute name'
         attribute_name = cls.eat_str(tokens, at, description)
         attribute = next((registry.get_attribute(attribute_name) for registry in ctx.registries_to_try() if registry.has_attribute(attribute_name)), None)
@@ -108,12 +109,12 @@ class FilterMember(abc.ABC):
         return _attr.ComparisonOp.EQ, cmp_value
 
 class Filter(FilterMember):
-    def __init__(self, pipeline: None | Pipeline, find: _ctx.FindableType) -> None:
+    def __init__(self, pipeline: None | Pipeline, find: _list.FindableType) -> None:
         self._pipeline = pipeline
         self._find = find
 
     @property
-    def findable_type(self) -> _ctx.FindableType:
+    def findable_type(self) -> _list.FindableType:
         return self._find
 
     # We compile by defining "eat" classmethods for all the FilterMembers (and some classes which aren't FilterMembers).
@@ -121,7 +122,7 @@ class Filter(FilterMember):
     # It "eats" tokens starting from that point and returns the FilterMember object created from them, and the index where it stopped eating.
     # Filter is the root object so it's a little different, it expects to eat everything to it doesn't need start or end indices.
     @classmethod
-    def eat(cls, tokens: list[str], find: _ctx.FindableType, ctx: _ctx.FlamContext) -> Filter:
+    def eat(cls, tokens: list[str], find: _list.FindableType, ctx: _ctx.FlamContext) -> Filter:
         if len(tokens) == 0:
             return cls(None, find)
 
@@ -144,7 +145,7 @@ class Pipeline(FilterMember):
         self._joinables = joinables
         
     @classmethod
-    def eat(cls, tokens: list[str], at: int, find: _ctx.FindableType, ctx: _ctx.FlamContext, expect_eat_everything: bool = False) -> tuple[Pipeline, int]:
+    def eat(cls, tokens: list[str], at: int, find: _list.FindableType, ctx: _ctx.FlamContext, expect_eat_everything: bool = False) -> tuple[Pipeline, int]:
         single, until = Single.eat(tokens, at, find, ctx)
         joinables = []
 
@@ -173,7 +174,7 @@ class Pipeline(FilterMember):
             elif isinstance(joinable, Disjoined):
                 accept = accept or joinable.excrete(item, general)
             else:
-                raise RuntimeError("this shouldn't happen")
+                raise RuntimeError(f"Pipeline ate a joinable of type: {type(joinable)}. This shouldn't happen.")
 
         return accept
 
@@ -191,7 +192,7 @@ class Pipeline(FilterMember):
 # Some "FilterMembers" (as defined in the BNF) don't need to be instantiated. Eating a "Single" directly returns what its "child" would be.
 class Single:
     @classmethod
-    def eat(cls, tokens: list[str], at: int, find: _ctx.FindableType, ctx: _ctx.FlamContext) -> tuple[Predicate | Negative | Pipeline, int]:
+    def eat(cls, tokens: list[str], at: int, find: _list.FindableType, ctx: _ctx.FlamContext) -> tuple[Predicate | Negative | Pipeline, int]:
         # The order is important for raising the most meaningful exception.
         try:
             return Negative.eat(tokens, at, find, ctx)
@@ -209,7 +210,7 @@ class Positive:
     _RPAREN_DESC = 'matching right parenthesis'
 
     @classmethod
-    def eat(cls, tokens: list[str], at: int, find: _ctx.FindableType, ctx: _ctx.FlamContext) -> tuple[Predicate | Pipeline, int]:
+    def eat(cls, tokens: list[str], at: int, find: _list.FindableType, ctx: _ctx.FlamContext) -> tuple[Predicate | Pipeline, int]:
         # Only raise parenthesis errors if we have reason to believe this was meant to be a parenthesis expression.
         if at < len(tokens) and tokens[at] in cls.LPAREN:
             pipeline, until = Pipeline.eat(tokens, at + 1, find, ctx)
@@ -232,7 +233,7 @@ class Negative(FilterMember):
         self._positive = positive
 
     @classmethod
-    def eat(cls, tokens: list[str], at: int, find: _ctx.FindableType, ctx: _ctx.FlamContext) -> tuple[Negative, int]:
+    def eat(cls, tokens: list[str], at: int, find: _list.FindableType, ctx: _ctx.FlamContext) -> tuple[Negative, int]:
         cls.eat_one_of(tokens, at, cls._DESC, cls.NEGATE, is_terminal=False)
         positive, until = Positive.eat(tokens, at + 1, find, ctx)
         return cls(positive), until
@@ -246,7 +247,7 @@ class Negative(FilterMember):
 
 class Joinable(FilterMember):
     @classmethod
-    def eat(cls, tokens: list[str], at: int, find: _ctx.FindableType, ctx: _ctx.FlamContext) -> tuple[Disjoined | Predicate | Negative | Pipeline, int]:
+    def eat(cls, tokens: list[str], at: int, find: _list.FindableType, ctx: _ctx.FlamContext) -> tuple[Disjoined | Predicate | Negative | Pipeline, int]:
         # Ordered this way so we raise the most meaningful exception possible.
         try:
             return Disjoined.eat(tokens, at, find, ctx)
@@ -267,7 +268,7 @@ class Conjoined:
     _DESC = "'and' symbol"
 
     @classmethod
-    def eat(cls, tokens: list[str], at: int, find: _ctx.FindableType, ctx: _ctx.FlamContext) -> tuple[Predicate | Negative | Pipeline, int]:
+    def eat(cls, tokens: list[str], at: int, find: _list.FindableType, ctx: _ctx.FlamContext) -> tuple[Predicate | Negative | Pipeline, int]:
         FilterMember.eat_one_of(tokens, at, cls._DESC, cls.CONJOIN, is_terminal=False)
 
         # There is no need to return a Coinjoined object because conjoining is the default behavior when boolean operators are omitted.
@@ -281,7 +282,7 @@ class Disjoined(FilterMember):
         self._single = single
 
     @classmethod
-    def eat(cls, tokens: list[str], at: int, find: _ctx.FindableType, ctx: _ctx.FlamContext) -> tuple[Disjoined, int]:
+    def eat(cls, tokens: list[str], at: int, find: _list.FindableType, ctx: _ctx.FlamContext) -> tuple[Disjoined, int]:
         cls.eat_one_of(tokens, at, cls._DESC, cls.DISJOIN, is_terminal=False)
         single, until = Single.eat(tokens, at + 1, find, ctx)
         return cls(single), until
@@ -302,7 +303,7 @@ class Predicate(FilterMember):
         cls.name = name
 
     @classmethod
-    def eat(cls, tokens: list[str], at: int, find: _ctx.FindableType, ctx: _ctx.FlamContext) -> tuple[Predicate, int]:
+    def eat(cls, tokens: list[str], at: int, find: _list.FindableType, ctx: _ctx.FlamContext) -> tuple[Predicate, int]:
         prefixed_name = cls.eat_str(tokens, at, 'a predicate name')
         name = prefixed_name.removeprefix(Predicate.PREFIX)
 
@@ -312,8 +313,7 @@ class Predicate(FilterMember):
             # and eat the name token right here and let the predicate eat its arguments alone.
             for registry in ctx.registries_to_try():
                 if registry.has_predicate(name):
-                    # Throughout this file we annotate return types with the class name and not typing.Self.
-                    # I don't like this, but it's the best way to get mypy to shut up about this line.
+                    # Mypy wouldn't like this line if we annotated with typing.Self.
                     return registry.get_predicate(name).eat(tokens, at + 1, find, ctx)
                 
                 # Special treatment for AttributePredicate because it's not wise to make a predicate for each attribute.

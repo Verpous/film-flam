@@ -20,8 +20,6 @@ import typing
 import uuid
 import re
 import copy
-import contextlib
-import enum
 import importlib
 import tempfile
 import atexit
@@ -37,30 +35,7 @@ from . import _md
 from . import _reg
 from . import _utils
 from . import _fetch
-
-# TODO: Don't really like these here.
-class FindableType(enum.StrEnum):
-    MOVIES = 'movies'
-    PEOPLE = 'people'
-    ROLES = 'roles'
-
-    @property
-    def corresponding_type(self) -> type:
-        raise NotImplementedError()
-
-    def is_compatible(self, find: typing.Self) -> bool:
-        # Roles are compatible with everything because a role is associated with a person and a movie.
-        return find == self.ROLES or self == find
-
-class CrewType(enum.StrEnum):
-    CAST = 'cast'
-    STUNTCAST = 'stuntcast'
-    DIRECTOR = 'director'
-    WRITER = 'writer'
-    PRODUCER = 'producer'
-    COMPOSER = 'composer'
-    CINEMATOGRAPHER = 'cinematographer'
-    EDITOR = 'editor'
+from . import _list
 
 # Data structure for using remote/composite lists generically.
 LT = typing.TypeVar('LT', _cfg.RemoteList, _cfg.CompositeList)
@@ -84,22 +59,6 @@ class ConfigurationLists(typing.Generic[LT]):
             return next(l for l in self._lists if l.name == name)
         except StopIteration as e:
             raise _xcept.InputError(f"Invalid {self._type_name} name: '{name}'") from e
-
-class ListHandle:
-    def __init__(self, list_file): # TODO: specify how to group each crew type?
-        self._list_file = list_file
-
-    def __iter__(self):
-        return self.find(FindableType.MOVIES)
-
-    def apply_filter(self, filter: _filter.Filter):
-        pass
-
-    def find(self, what: FindableType, filter: None | _filter.Filter = None) -> typing.Iterator[typing.Any]: # TODO: not Any!
-        assert filter is None or filter.findable_type == what
-
-    def export(self, filter: _filter.Filter) -> _listfile.ListFile:
-        assert filter.findable_type == FindableType.MOVIES
 
 # This class is the user's entry point to basically everything that is "built in" to this API: accessing lists, filtering, configuring.
 class FlamContext:
@@ -180,27 +139,28 @@ class FlamContext:
                 pass
 
     # List files.
-    def get_list_handle(self, listdefs: str | typing.Iterable[str], filter: None | _filter.Filter = None) -> ListHandle:
-        canon_listdefs = list(self.canonicalize_listdefs_with_all_expansion(listdefs if not isinstance(listdefs, str) else (listdefs,)))
-        # TODO: expand "default" and only then make into list... is it really a "list_handle" feature? We have no clear entry point find vs anything else.
-        if len(canon_listdefs) == 1:
+    def get_list_handle(self, listdefs: str | typing.Iterable[str], filter: None | _filter.Filter = None) -> _list.ListHandle:
+        listdefs_list = listdefs if not isinstance(listdefs, str) else (listdefs,)
+        canon_listdefs = list(_ldef.CanonListdef.parse_and_expand(listdefs_list, self, _ldef.ExpandFlavor.FIND))
+
+        if len(canon_listdefs) == 1 and filter is None:
             list_file = self._get_list_file(canon_listdefs[0])
         else:
             list_file = self._generate_composite_list_file(canon_listdefs, filter)
-            list_file.fetcher_type = _cfg.CompositeList.FETCHER_TYPE # TODO: different fetcher_type for annonymous lists?
-            list_file.address = "ANNONYMOUS"
+            list_file.list_type = _ldef.SpecialListType.ANNONYMOUS
+            list_file.address = ' '.join(str(cldef) for cldef in canon_listdefs)
 
-        return ListHandle(list_file)
+        return _list.ListHandle(list_file)
 
     def _get_list_file(self, abstract_listdef: _ldef.CanonListdef) -> _listfile.ListFile:
         # First we check if it's a composite list that needs regeneration. In that case even if it's cached it needs to be redone.
-        if abstract_listdef.fetcher_type == _cfg.CompositeList.FETCHER_TYPE and self._is_composite_list_file_outdated(abstract_listdef.address):
+        if abstract_listdef.list_type == _ldef.SpecialListType.COMPOSITE and self._is_composite_list_file_outdated(abstract_listdef.address):
             # TODO: update metadata?
             composite_list = self._composite_lists.get_by_uid(abstract_listdef.address)
-            filter = self.compile_filter(composite_list.filter_tokens, FindableType.MOVIES)
-            dependencies = [_ldef.CanonListdef(_cfg.RemoteList.FETCHER_TYPE, rl_uid) for rl_uid in composite_list.remote_list_uids]
+            filter = self.compile_filter(composite_list.filter_tokens, _list.FindableType.MOVIES)
+            dependencies = [_ldef.CanonListdef(_ldef.SpecialListType.REMOTE, rl_uid) for rl_uid in composite_list.remote_list_uids]
             list_file = self._generate_composite_list_file(dependencies, filter)
-            list_file.fetcher_type = _cfg.CompositeList.FETCHER_TYPE
+            list_file.list_type = _ldef.SpecialListType.COMPOSITE
             list_file.address = abstract_listdef.address
             self._list_files_cache[abstract_listdef.address] = list_file
             return list_file
@@ -212,10 +172,10 @@ class FlamContext:
         # Memory didn't work out, try to load it from disk.
         try:
             list_file = _listfile.ListFile.load(self._get_list_file_path(abstract_listdef))
-        except FileNotFoundError:
-            raise _xcept.InputError(f"No fetched file for LISTDEF '{self.canon_listdef_pretty(abstract_listdef)}'.")
+        except FileNotFoundError as e:
+            raise _xcept.InputError(f"No fetched file for LISTDEF '{abstract_listdef.pretty(self)}'.") from e
         except _xcept.FileValidationError as e:
-            raise _xcept.FileValidationError(f"{e} You may need to fetch '{self.canon_listdef_pretty(abstract_listdef)}' again from scratch.") from e
+            raise _xcept.FileValidationError(f"{e} You may need to fetch '{abstract_listdef.pretty(self)}' again from scratch.") from e
 
         assert not isinstance(list_file.address, _file.UnsetType)
         self._list_files_cache[list_file.address] = list_file
@@ -232,15 +192,15 @@ class FlamContext:
             if rl_uid not in cl_meta.dependency_mtime:
                 return True
 
-            rl_path = self._get_list_file_path(_ldef.CanonListdef(_cfg.RemoteList.FETCHER_TYPE, rl_uid))
+            rl_path = self._get_list_file_path(_ldef.CanonListdef(_ldef.SpecialListType.REMOTE, rl_uid))
 
             try:
                 if rl_uid not in cl_meta.dependency_mtime or os.path.getmtime(rl_path) > cl_meta.dependency_mtime[rl_uid]:
                     return True
-            except FileNotFoundError:
-                cl_listdef = _ldef.CanonListdef(_cfg.CompositeList.FETCHER_TYPE, uid)
-                rl_listdef = _ldef.CanonListdef(_cfg.RemoteList.FETCHER_TYPE, rl_uid)
-                raise _xcept.InputError(f"List '{self.canon_listdef_pretty(cl_listdef)}' depends on {rl_listdef} which hasn't been fetched.")
+            except FileNotFoundError as e:
+                cl_listdef = _ldef.CanonListdef(_ldef.SpecialListType.COMPOSITE, uid)
+                rl_listdef = _ldef.CanonListdef(_ldef.SpecialListType.REMOTE, rl_uid)
+                raise _xcept.InputError(f"List '{cl_listdef.pretty(self)}' depends on {rl_listdef} which hasn't been fetched.") from e
 
         return False
 
@@ -250,7 +210,7 @@ class FlamContext:
         # TODO: sciency shit to merge list_files into merged_list_file
 
         if filter is not None:
-            merged_list_file = ListHandle(merged_list_file).export(filter)
+            merged_list_file = _list.ListHandle(merged_list_file).export(filter)
             
         return merged_list_file
 
@@ -258,29 +218,29 @@ class FlamContext:
         list_file.write(self._get_list_file_path(list_file.abstract_listdef))
 
         # Flush the metadata when saving composite lists so we don't accidentally regenerate them.
-        if list_file.fetcher_type == _cfg.CompositeList.FETCHER_TYPE:
+        if list_file.list_type == _ldef.SpecialListType.COMPOSITE:
             self._write_metadata()
 
     # After much deliberation, I decided that files for named lists should be named according to the list type and UID,
-    # and unnamed lists' files should be named according to the fetcher type and address.
-    # This is mostly as opposed to storing all lists according to the concrete fetcher_type and address.
-    # The reason: this lets us change lists to a different fetcher type with a compatible ID type.
+    # and unnamed lists' files should be named according to the list type and address.
+    # This is mostly as opposed to storing all lists according to the concrete list_type and address.
+    # The reason: this lets us change lists to a different list type with a compatible ID type.
     def _get_list_file_path(self, abstract_listdef: _ldef.CanonListdef) -> str:
-        filename = _utils.slugify(f'{abstract_listdef.fetcher_type}_{abstract_listdef.address}.json')
+        filename = _utils.slugify(f'{abstract_listdef.list_type}_{abstract_listdef.address}.json')
         return os.path.join(self._flam_dir, self._LISTFILES_DIR, filename)
 
     # Configuration.
-    def lists_of_type(self, fetcher_type: str) -> ConfigurationLists[_cfg.RemoteList] | ConfigurationLists[_cfg.CompositeList]:
-        match fetcher_type:
-            case _cfg.RemoteList.FETCHER_TYPE:
+    def lists_of_type(self, list_type: str) -> ConfigurationLists[_cfg.RemoteList] | ConfigurationLists[_cfg.CompositeList]:
+        match list_type:
+            case _ldef.SpecialListType.REMOTE:
                 return self._remote_lists
-            case _cfg.CompositeList.FETCHER_TYPE:
+            case _ldef.SpecialListType.COMPOSITE:
                 return self._composite_lists
             case _:
-                raise ValueError(f"Invalid type '{fetcher_type}': not any kind of list.")
+                raise _xcept.InputError(f"Invalid list type '{list_type}': not any kind of stored list.")
 
     def get_list_by_abstract_listdef(self, abstract_listdef: _ldef.CanonListdef) -> _cfg.RemoteList | _cfg.CompositeList:
-        return self.lists_of_type(abstract_listdef.fetcher_type).get_by_uid(abstract_listdef.address)
+        return self.lists_of_type(abstract_listdef.list_type).get_by_uid(abstract_listdef.address)
 
     def add_remote_list(self, remote_list: _cfg.RemoteList) -> None:
         remote_list.uid = str(uuid.uuid4())
@@ -331,68 +291,11 @@ class FlamContext:
         return os.path.join(self._flam_dir, self._CONFIGURATION_FILE)
 
     # Metadata
-    def _write_metadata(self) -> str:
+    def _write_metadata(self) -> None:
         self._metadata.write(self._get_metadata_path())
 
     def _get_metadata_path(self) -> str:
         return os.path.join(self._flam_dir, self._METADATA_FILE)
-
-    # Listdefs.
-    # TODO: I would like to move as much of this as possible to _ldef.py. Same goes for other sections here I guess.
-    def canonicalize_listdef(self, listdef: str) -> _ldef.CanonListdef:
-        eq_idx = listdef.find('=')
-        before_eq, after_eq = (listdef[:eq_idx], listdef[eq_idx + 1:]) if eq_idx != -1 else (listdef, '')
-
-        # First case, DEFAULTS or ALL.
-        if before_eq == _ldef.LISTDEF_DEFAULTS or before_eq == _ldef.LISTDEF_ALL:
-            # We (reluctantly) support a trailing '=' for ALL and DEFAULTS,
-            # because this way CanonListdef.__str__ and canonicalize_listdef inverse each other. But it must be trailing.
-            if after_eq != '':
-                raise _xcept.InputError(f"Invalid LISTDEF: '{listdef}' must have nothing after the equal sign.")
-
-            return _ldef.CanonListdef(before_eq, after_eq)
-
-        # For remote/composite lists we need to convert the name to a uid.
-        if eq_idx != -1 and (before_eq == _cfg.RemoteList.FETCHER_TYPE or before_eq == _cfg.CompositeList.FETCHER_TYPE):
-            return self.lists_of_type(before_eq).get_by_name(after_eq).abstract_listdef
-        
-        # The generic case where it's whatever=whatever.
-        if eq_idx != -1:
-            return _ldef.CanonListdef(before_eq, after_eq)
-        
-        # If no '=' sign then we'll treat it as a list or composite list, and try to determine which.
-        if (list_obj := self._get_implicit_list(before_eq)) is not None:
-            return list_obj.abstract_listdef
-
-        raise _xcept.InputError(f"Invalid LISTDEF: '{listdef}'.")
-
-    # This is the most that we can canonicalize/expand listdefs generically. Other transformations are different for fetching vs finding vs whatever.
-    def canonicalize_listdefs_with_all_expansion(self, listdefs: typing.Iterable[str]) -> typing.Iterator[_ldef.CanonListdef]:
-        for ldef in listdefs:
-            cldef = self.canonicalize_listdef(ldef)
-
-            if cldef.fetcher_type == _ldef.LISTDEF_ALL:
-                yield from (rl.abstract_listdef for rl in self._remote_lists)
-            else:
-                yield cldef
-
-    # Internally when canonicalizing listdefs it's convenient to convert list names to UIDs,
-    # but it means that whenever we print the listdef we need to convert it back to have human-readable list names.
-    def canon_listdef_pretty(self, canon_listdef: _ldef.CanonListdef) -> str:
-        return str(canon_listdef._replace(address=self.get_list_by_abstract_listdef(canon_listdef).name) if canon_listdef.is_abstract else canon_listdef)
-
-    def _get_implicit_list(self, name: str) -> None | _cfg.RemoteList | _cfg.CompositeList:
-        try:
-            return self._remote_lists.get_by_name(name)
-        except _xcept.InputError:
-            pass
-
-        try:
-            return self._composite_lists.get_by_name(name)
-        except _xcept.InputError:
-            pass
-
-        return None
 
     # Registration.
     def registries_to_try(self) -> typing.Iterable[_reg.Registry]:
@@ -405,12 +308,16 @@ class FlamContext:
 
     # Fetching.
     def fetch(self, listdefs: typing.Iterable[str], refetch_pattern: None | str = None, quiet: bool = True) -> None:
-        fetchers = self._parse_listdefs_into_fetchers(listdefs)
+        # Use a list not a generator so that if one of the listdefs doesn't parse good we will raise an error now and not before fetching a few.
+        fetchers = [
+            self._get_fetcher(cldef)
+            for cldef in set(_ldef.CanonListdef.parse_and_expand(listdefs, self, _ldef.ExpandFlavor.FETCH))
+        ]
 
         try:
             refetch_re = re.compile(refetch_pattern, flags=re.IGNORECASE) if refetch_pattern is not None else None
         except re.error as e:
-            raise _xcept.InputError(f"Invalid PATTERN: '{refetch_pattern}': {e}")
+            raise _xcept.InputError(f"Invalid PATTERN: '{refetch_pattern}': {e}") from e
 
         for fetcher in fetchers:
             try:
@@ -419,39 +326,15 @@ class FlamContext:
             except _xcept.InputError:
                 list_file = _listfile.ListFile.create()
                 
-            if not isinstance(list_file.uid_type, _file.UnsetType) and list_file.uid_type != fetcher.uid_type:
-                raise _xcept.InputError(f"Cannot fetch '{self.canon_listdef_pretty(fetcher.abstract_listdef)}' because it's already fetched with a different ID type "
-                    f"(old: '{list_file.uid_type}', new: '{fetcher.uid_type}'). "
-                    "This can happen if you changed a list's LISTDEF to a nonmatching type. You can resolve it by fetching the list from scratch, or reverting the list to its old type.")
-
             # We need both the old and new versions to compare at the end. But it's important that the new one is the deepcopy,
             # so that anyone currently holding on to a list handle won't have the underlying list file changed.
             new_list_file = copy.deepcopy(list_file)
             interrupt_error = None
-
-            if refetch_re is not None:
-                new_list_file.movies_by_uid = {
-                    uid: movie_lf
-                    for uid, movie_lf in new_list_file.movies_by_uid.items()
-                    if not isinstance(movie_lf.title, _file.UnsetType) and not refetch_re.search(movie_lf.title)
-                }
-
-                _remove_unused_people(new_list_file)
-
-            with open(os.devnull, 'w') as devnull, contextlib.redirect_stdout(devnull) if quiet else contextlib.nullcontext():
-                print(f"Fetching {self.canon_listdef_pretty(fetcher.abstract_listdef)}...")
-
-                try:
-                    fetcher.fetch_into_file(new_list_file)
-                except _xcept.FetchInterrupt as e:
-                    interrupt_error = e
-
-            # Fetcher may have removed some movies from the list. Over here we remove people who are orphaned because of that.
-            _remove_unused_people(new_list_file)
-
-            new_list_file.uid_type = fetcher.uid_type
-            new_list_file.fetcher_type = fetcher.abstract_listdef.fetcher_type
-            new_list_file.address = fetcher.abstract_listdef.address
+            
+            try:
+                fetcher.fetch(new_list_file, self, refetch_re, quiet)
+            except _xcept.FetchInterrupt as e:
+                interrupt_error = e
 
             # Must canonicalize before comparing for equality.
             new_list_file.canonicalize()
@@ -462,35 +345,11 @@ class FlamContext:
                 self._write_list_file(new_list_file)
 
             # Because it's a dictionary we easily overwrite an existing outdated cached file.
+            assert not isinstance(new_list_file.address, _file.UnsetType)
             self._list_files_cache[new_list_file.address] = new_list_file
 
             if interrupt_error is not None:
-                raise _xcept.FetchInterrupt(f"Fetching of {self.canon_listdef_pretty(fetcher.abstract_listdef)} got interrupted due to error: {interrupt_error}. "
-                    "You may retry to pick up where it left off.")
-
-    def _parse_listdefs_into_fetchers(self, listdefs: typing.Iterable[str]) -> list[_fetch.ListFetcher]:
-        cldefs = self.canonicalize_listdefs_with_all_expansion(listdefs)
-        expanded = set(self._expand_listdefs_for_fetch(cldefs))
-
-        # Returns a list not a generator so that if one of the listdefs doesn't parse good we will raise an error now and not before fetching a few.
-        return [self._get_fetcher(cldef) for cldef in expanded]
-
-    def _expand_listdefs_for_fetch(self, canon_listdefs: typing.Iterable[_ldef.CanonListdef]) -> typing.Iterator[_ldef.CanonListdef]:
-        for cldef in canon_listdefs:
-            if cldef.fetcher_type == _ldef.LISTDEF_DEFAULTS:
-                yield from (rl.abstract_listdef for rl in self._remote_lists if rl.is_default_fetch)
-
-                # Default composite lists... yeah.
-                yield from (
-                    _ldef.CanonListdef(_cfg.RemoteList.FETCHER_TYPE, rl_uid)
-                    for cl in self._composite_lists if cl.is_default_fetch
-                        for rl_uid in cl.remote_list_uids
-                )
-            elif cldef.fetcher_type == _cfg.CompositeList.FETCHER_TYPE:
-                composite_list = self._composite_lists.get_by_uid(cldef.address)
-                yield from (_ldef.CanonListdef(_cfg.RemoteList.FETCHER_TYPE, rl_uid) for rl_uid in composite_list.remote_list_uids)
-            else: # RemoteList.FETCHER_TYPE or a "concrete" type.
-                yield cldef
+                raise interrupt_error
 
     def _get_fetcher(self, canon_listdef: _ldef.CanonListdef) -> _fetch.ListFetcher:        
         if canon_listdef.is_abstract:
@@ -504,7 +363,7 @@ class FlamContext:
 
         for registry in self.registries_to_try():
             try:
-                fetcher_cls = registry.get_fetcher(concrete_listdef.fetcher_type)
+                fetcher_cls = registry.get_fetcher(concrete_listdef.list_type)
             except KeyError:
                 pass
 
@@ -514,18 +373,8 @@ class FlamContext:
         return fetcher_cls(concrete_listdef, abstract_listdef)
 
     # Filtering.
-    def compile_filter(self, tokens: list[str], find: FindableType) -> _filter.Filter:
+    def compile_filter(self, tokens: list[str], find: _list.FindableType) -> _filter.Filter:
         return _filter.Filter.eat(tokens, find, self)
-
-def _get_all_used_person_uids(list_file: _listfile.ListFile) -> typing.Iterator[str]:
-    for movie_lf in list_file.movies_by_uid.values():
-        for crew in movie_lf.crew.values():
-            for role in crew.roles_by_uid.values():
-                yield role.person_uid
-
-def _remove_unused_people(list_file: _listfile.ListFile) -> None:
-    used_person_uids = set(_get_all_used_person_uids(list_file))
-    list_file.people_by_uid = {uid: person for uid, person in list_file.people_by_uid.items() if uid in used_person_uids}
 
 # TODO: for now we put this here.
 def _is_debug() -> bool:

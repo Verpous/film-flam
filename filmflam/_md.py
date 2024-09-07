@@ -15,8 +15,6 @@
 
 from __future__ import annotations
 
-import typing
-
 from . import _file
 
 class CompositeListMetadata(_file._FlamSerializable):

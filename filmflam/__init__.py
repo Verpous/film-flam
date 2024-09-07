@@ -22,5 +22,6 @@ from ._cfg import *
 from ._file import *
 from ._attr import *
 from ._ldef import *
+from ._list import *
 from ._xcept import *
 from ._filter import *
