@@ -18,15 +18,11 @@ from __future__ import annotations
 import typing
 import enum
 
-from . import _xcept
-from . import _attr
 from . import _filter
 from . import _ldef
-from . import _file
 from . import _listfile
 from . import _ctx
 
-# TODO: Don't really like these here.
 class FindableType(enum.StrEnum):
     MOVIES  = 'movies'
     PEOPLE  = 'people'
@@ -49,6 +45,9 @@ class CrewType(enum.StrEnum):
     COMPOSER            = 'composer'
     CINEMATOGRAPHER     = 'cinematographer'
     EDITOR              = 'editor'
+
+class Findable:
+    pass
 
 class ListHandle:
     def __init__(self, list_file): # TODO: specify how to group each crew type?

@@ -22,7 +22,8 @@ import re
 import copy
 import importlib
 import tempfile
-import atexit
+import weakref
+import shlex
 
 from . import _cfg
 from . import _xcept
@@ -72,10 +73,13 @@ class FlamContext:
         # Don't tell this to anyone but in "volatile" mode we actually just persist everything to a tempdir. It's so, so much easier.
         if flam_dir is None:
             tempdir = tempfile.TemporaryDirectory(prefix='.film_flam', ignore_cleanup_errors=not _is_debug()) # pylint: disable=consider-using-with
-            atexit.register(tempdir.cleanup) # TODO: cleanup at object's __del__ it if happens before atexit?
             self._flam_dir = tempdir.name
+
+            # Deletes the tempdir when the object is garbage collected or program exits.
+            weakref.finalize(self, tempdir.cleanup)
         else:
             # TODO: Acquire OS lock on the flam_dir so that you can't have multiple contexts operating on it at once?
+            # I'll leave this idea for later, since I think we may need a "readonly" mode to allow multiple users on the same list...
             self._flam_dir = os.path.normpath(flam_dir)
 
         self._make_flam_dir()
@@ -143,12 +147,18 @@ class FlamContext:
         listdefs_list = listdefs if not isinstance(listdefs, str) else (listdefs,)
         canon_listdefs = list(_ldef.CanonListdef.parse_and_expand(listdefs_list, self, _ldef.ExpandFlavor.FIND))
 
-        if len(canon_listdefs) == 1 and filter is None:
+        # Replace None with empty filter to make the rest of the code nicer.
+        if filter is None:
+            filter = self.compile_filter([], _list.FindableType.MOVIES)
+
+        if len(canon_listdefs) == 1 and filter.is_empty:
             list_file = self._get_list_file(canon_listdefs[0])
         else:
             list_file = self._generate_composite_list_file(canon_listdefs, filter)
+
+            # The address on annonymous lists is only present for pretty-printing purposes. It must contain all the information about how the list was built.
             list_file.list_type = _ldef.SpecialListType.ANNONYMOUS
-            list_file.address = ' '.join(str(cldef) for cldef in canon_listdefs)
+            list_file.address = shlex.join([str(cldef) for cldef in canon_listdefs] + list(filter.regurgitate()))
 
         return _list.ListHandle(list_file)
 
@@ -204,12 +214,12 @@ class FlamContext:
 
         return False
 
-    def _generate_composite_list_file(self, abstract_listdefs: list[_ldef.CanonListdef], filter: None | _filter.Filter) -> _listfile.ListFile:
+    def _generate_composite_list_file(self, abstract_listdefs: list[_ldef.CanonListdef], filter: _filter.Filter) -> _listfile.ListFile:
         merged_list_file = _listfile.ListFile.create()
         list_files = [self._get_list_file(cldef) for cldef in abstract_listdefs]
         # TODO: sciency shit to merge list_files into merged_list_file
 
-        if filter is not None:
+        if not filter.is_empty:
             merged_list_file = _list.ListHandle(merged_list_file).export(filter)
             
         return merged_list_file
@@ -244,7 +254,7 @@ class FlamContext:
 
     def add_remote_list(self, remote_list: _cfg.RemoteList) -> None:
         remote_list.uid = str(uuid.uuid4())
-        self.cfg._remote_lists.append(remote_list) # pylint: disable=protected-access
+        self.cfg._remote_lists.append(remote_list)
 
         # See if the list was already fetched before it was named, and "claim" the file.
         concrete_filename = self._get_list_file_path(remote_list.concrete_listdef)
@@ -273,16 +283,16 @@ class FlamContext:
         except FileNotFoundError:
             pass
 
-        self.cfg._remote_lists.remove(remote_list) # pylint: disable=protected-access
+        self.cfg._remote_lists.remove(remote_list)
 
     def add_composite_list(self, composite_list: _cfg.CompositeList) -> None:
         composite_list.uid = str(uuid.uuid4())
-        self.cfg._composite_lists.append(composite_list) # pylint: disable=protected-access
+        self.cfg._composite_lists.append(composite_list)
 
     def delete_composite_list(self, uid: str) -> None:
         composite_list = self._composite_lists.get_by_uid(uid)
         # TODO: delete files
-        self.cfg._composite_lists.remove(composite_list) # pylint: disable=protected-access
+        self.cfg._composite_lists.remove(composite_list)
 
     def write_cfg(self) -> None:
         self.cfg.write(self._get_cfg_path())
@@ -374,7 +384,8 @@ class FlamContext:
 
     # Filtering.
     def compile_filter(self, tokens: list[str], find: _list.FindableType) -> _filter.Filter:
-        return _filter.Filter.eat(tokens, find, self)
+        params = _filter.EatParams(tokens=tokens, find=find, ctx=self)
+        return _filter.Filter.eat(params)
 
 # TODO: for now we put this here.
 def _is_debug() -> bool:

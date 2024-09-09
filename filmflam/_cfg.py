@@ -17,6 +17,7 @@ from __future__ import annotations
 
 from . import _file
 from . import _ldef
+from . import _filter
 
 class RemoteList(_file._FlamSerializable):
     uid:                    _file.UnsetType | str
@@ -54,10 +55,11 @@ class Configuration(_file._FlamSerializable):
     _composite_lists:       list[CompositeList]
     extensions:             list[str]
 
-    # TODO: Forbid special characters in list names that might be confused for a filter token.
     def sanity_checks(self) -> None:
         super().sanity_checks()
 
+        # We permit names that satisfy is_filter_token, as the ambiguity can be defeated with explicit listdefs if the user chooses to punish himself.
+        # We permit names with wacky special characters, because we slugify everything when turning it into a filename.
         for rl in self._remote_lists:
             if sum(1 for rl2 in self._remote_lists if rl.name == rl2.name) > 1:
                 raise self._validation_error(f"Found multiple lists named '{rl.name}'.")
@@ -74,7 +76,7 @@ class Configuration(_file._FlamSerializable):
                 
             for uid in cl.remote_list_uids:
                 try:
-                    # Unfortunately the get_by_uid method is not accessible from here, see comment in FlamContext.
+                    # get_by_uid is not accessible from here.
                     next(rl for rl in self._remote_lists if rl.uid == uid)
                 except StopIteration as e:
                     raise self._validation_error(f"Composite list '{cl.name}' references unknown remote list: '{uid}'.") from e

@@ -45,7 +45,7 @@ PYLINT_IGNORE += W0622 # redefined-builtin
 PYLINT_IGNORE += W0702 # bare-except
 PYLINT_IGNORE += W1514 # unspecified-encoding
 
-.PHONY: install clean wipe typecheck
+.PHONY: all install uinstall clean cfg mypy pylint
 
 all: install
 

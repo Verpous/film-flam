@@ -80,6 +80,6 @@ def register(obj: typing.Any) -> typing.Any:
     return obj
 
 # Import builtin extensions only here to avoid cyclic dependency issues.
-from . import _imdb # pylint: disable=unused-import, cyclic-import
-from . import _builtin_attr # pylint: disable=unused-import, cyclic-import
-from . import _builtin_pred # pylint: disable=unused-import, cyclic-import
+from . import _imdb # pylint: disable=unused-import
+from . import _builtin_attr # pylint: disable=unused-import
+from . import _builtin_pred # pylint: disable=unused-import

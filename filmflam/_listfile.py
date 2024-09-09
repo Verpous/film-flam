@@ -19,7 +19,6 @@ from . import _file
 from . import _ldef
 from . import _list
 
-# TODO: Don't like the name "list", could too easily be confused with too many things. Maybe I should just invent a word and call it a "Flist"?
 # ListFile-related objects go here.
 class ListFileRole(_file._FlamSerializable):
     person_uid:             str

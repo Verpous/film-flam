@@ -126,7 +126,6 @@ class SeleniumListFetcher(_fetch.ListFetcher, list_type='imdb-id', uid_type=_UID
             cls.requests_queue = multiprocessing.Queue()
 
         # TODO: Consider a mechanism that blocks until the server informs that the browser is running and it's ready to take requests.
-        # TODO: If python doesn't cleanly terminate the server, we'll need to send it a quit message ourselves.
         cls.exports_server = multiprocessing.Process(target=_export_lists_handler, args=(cls.requests_queue, BROWSER, PROFILE), daemon=True)
         cls.exports_server.start()
     

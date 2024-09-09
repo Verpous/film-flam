@@ -18,9 +18,11 @@ from __future__ import annotations
 
 import typing
 import enum
+import shlex
 
 from . import _ctx
 from . import _xcept
+from . import _filter
 
 class SpecialListType(enum.StrEnum):
     ALL         = '*'           # *[=]
@@ -35,6 +37,7 @@ class ExpandFlavor(enum.Enum):
 
 # Users input LISTDEF strings and we turn them into this more convenient representation.
 class CanonListdef(typing.NamedTuple):
+
     list_type: str
     address: str
 
@@ -132,9 +135,14 @@ class CanonListdef(typing.NamedTuple):
     # Internally when canonicalizing listdefs it's convenient to convert list names to UIDs,
     # but it means that whenever we print the listdef we need to convert it back to have human-readable list names.
     def pretty(self, ctx: _ctx.FlamContext) -> str:
-        # Annonymous lists recurse.
+        # Annonymous lists need to separate the filter from the listdefs, and then recursively pretty the listdefs.
         if self.list_type == SpecialListType.ANNONYMOUS:
-            return str(CanonListdef(self.list_type, ' '.join(self.parse(ldef, ctx).pretty(ctx) for ldef in self.address.split(' '))))
+            listdefs_and_filter = shlex.split(self.address)
+            listdefs, filter = _filter.split_at_filter(listdefs_and_filter)
+
+            # Not shlex.joining them back together because it's ugly. Rather live with the "incorrectness".
+            listdefs_rejoined = ' '.join(self.parse(ldef, ctx).pretty(ctx) for ldef in listdefs)
+            return f"{listdefs_rejoined}{' ' if len(filter) > 0 else ''}{' '.join(filter)}"
         
         if self.is_abstract:
             # Note that we're constructing a "CanonListdef" here which technically isn't "Canon". If you were to pretty() it, it will hit an error.
@@ -145,3 +153,4 @@ class CanonListdef(typing.NamedTuple):
 
     def __str__(self) -> str:
         return f'{self.list_type}={self.address}'
+    

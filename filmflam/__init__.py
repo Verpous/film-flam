@@ -13,9 +13,7 @@
 # You should have received a copy of the GNU General Public License
 # along with this program. If not, see <https://www.gnu.org/licenses/>.
 
-# from __future__ import annotations
-
-# I don't want long lines and hate importing things with "from", so script names tend to be short.
+# I don't want long lines and hate importing specific things with "from", so script names tend to be short.
 from ._reg import *
 from ._ctx import *
 from ._cfg import *

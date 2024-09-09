@@ -33,8 +33,8 @@ class ComparisonOp(enum.Enum):
         self.compare = compare
 
 class Attribute(abc.ABC):
-    def __init__(self, owner, name, aliases, is_columnable, is_sortable): # TODO: many more fields. Fields related to sorting, distribution,
-        self.owner = owner
+    def __init__(self, findable_type, name, aliases, is_columnable, is_sortable): # TODO: many more fields. Fields related to sorting, distribution,
+        self.findable_type = findable_type
         self.name = name
         self.aliases = aliases
         
@@ -45,17 +45,28 @@ class Attribute(abc.ABC):
     @property
     def is_array(self) -> bool:
         raise NotImplementedError()
+    
+    @property
+    def default_cmp(self) -> ComparisonOp:
+        raise NotImplementedError()
 
     def make_predicate(self, cmp: ComparisonOp, value: str) -> _filter.Predicate:
         raise NotImplementedError()
 
     def extract(self, obj) -> typing.Any:
-        if not isinstance(obj, self.owner.corresponding_type):
-            raise Exception(f'Invalid owner: {name} expects {self.owner}, but got {type(obj)}')
+        if not isinstance(obj, self.findable_type.corresponding_type):
+            raise Exception(f'Invalid owner: {name} expects {self.findable_type}, but got {type(obj)}')
 
         self.ensure_owner_match(obj)
         return self._extract_internal(obj)
 
     @abc.abstractmethod
     def _extract_internal(self, obj) -> typing.Any:
+        pass
+
+    def _extract_from_movie():
+        pass
+    def _extract_from_role():
+        pass
+    def _extract_from_person():
         pass
