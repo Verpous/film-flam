@@ -17,12 +17,11 @@ from __future__ import annotations
 
 from . import _file
 from . import _ldef
-from . import _filter
 
-class RemoteList(_file._FlamSerializable):
+class SimpleList(_file._FlamSerializable):
     uid:                    _file.UnsetType | str
     name:                   str
-    list_type:           str
+    list_type:              str
     address:                str
     is_default_fetch:       bool
     is_default_find:        bool
@@ -30,7 +29,7 @@ class RemoteList(_file._FlamSerializable):
     @property
     def abstract_listdef(self) -> _ldef.CanonListdef:
         assert not isinstance(self.uid, _file.UnsetType)
-        return _ldef.CanonListdef(_ldef.SpecialListType.REMOTE, self.uid)
+        return _ldef.CanonListdef(_ldef.SpecialListType.SIMPLE, self.uid)
 
     @property
     def concrete_listdef(self) -> _ldef.CanonListdef:
@@ -39,7 +38,7 @@ class RemoteList(_file._FlamSerializable):
 class CompositeList(_file._FlamSerializable):
     uid:                    _file.UnsetType | str
     name:                   str
-    remote_list_uids:       list[str]
+    simple_list_uids:       list[str]
     filter_tokens:          list[str]
     is_default_fetch:       bool
     is_default_find:        bool
@@ -51,7 +50,7 @@ class CompositeList(_file._FlamSerializable):
 
 # TODO: Maybe the configuration should use "schema evolution".
 class Configuration(_file._FlamSerializable):
-    _remote_lists:          list[RemoteList]
+    _simple_lists:          list[SimpleList]
     _composite_lists:       list[CompositeList]
     extensions:             list[str]
 
@@ -60,23 +59,23 @@ class Configuration(_file._FlamSerializable):
 
         # We permit names that satisfy is_filter_token, as the ambiguity can be defeated with explicit listdefs if the user chooses to punish himself.
         # We permit names with wacky special characters, because we slugify everything when turning it into a filename.
-        for rl in self._remote_lists:
-            if sum(1 for rl2 in self._remote_lists if rl.name == rl2.name) > 1:
-                raise self._validation_error(f"Found multiple lists named '{rl.name}'.")
+        for sl in self._simple_lists:
+            if sum(1 for rl2 in self._simple_lists if sl.name == rl2.name) > 1:
+                raise self._validation_error(f"Found multiple lists named '{sl.name}'.")
 
-            if rl.concrete_listdef.is_special:
-                raise self._validation_error(f"LISTDEF '{rl.concrete_listdef}' type must not be one of: {', '.join(_ldef.SpecialListType)}.")
+            if sl.concrete_listdef.is_special:
+                raise self._validation_error(f"LISTDEF '{sl.concrete_listdef}' type must not be one of: {', '.join(_ldef.SpecialListType)}.")
 
         for cl in self._composite_lists:
             if sum(1 for cl2 in self._composite_lists if cl.name == cl2.name) > 1:
                 raise self._validation_error(f"Found multiple composite lists named '{cl.name}'.")
 
-            if len(cl.remote_list_uids) == 0:
+            if len(cl.simple_list_uids) == 0:
                 raise self._validation_error(f"Composite list '{cl.name}' is made up of 0 lists.")
                 
-            for uid in cl.remote_list_uids:
+            for uid in cl.simple_list_uids:
                 try:
                     # get_by_uid is not accessible from here.
-                    next(rl for rl in self._remote_lists if rl.uid == uid)
+                    next(sl for sl in self._simple_lists if sl.uid == uid)
                 except StopIteration as e:
-                    raise self._validation_error(f"Composite list '{cl.name}' references unknown remote list: '{uid}'.") from e
+                    raise self._validation_error(f"Composite list '{cl.name}' references unknown simple list: '{uid}'.") from e

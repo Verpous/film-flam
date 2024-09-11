@@ -23,7 +23,7 @@ import dataclasses
 from . import _ctx
 from . import _attr
 from . import _xcept
-from . import _list
+from . import _ml
 
 # FILTER    := PIPELINE | <epsilon>
 # PIPELINE  := SINGLE JOINABLE*
@@ -47,7 +47,7 @@ _EinGafrurError = _xcept.FilterSyntaxError
 @dataclasses.dataclass(frozen=True)
 class EatParams:
     tokens: list[str]
-    find: _list.FindableType
+    find: _ml.FindableType
     ctx: _ctx.FlamContext
 
 # We represent filters as an AST of FilterMembers.
@@ -115,12 +115,12 @@ class FilterMember(abc.ABC):
         return default_cmp, cmp_value
 
 class Filter(FilterMember):
-    def __init__(self, pipeline: None | Pipeline, find: _list.FindableType) -> None:
+    def __init__(self, pipeline: None | Pipeline, find: _ml.FindableType) -> None:
         self._pipeline = pipeline
         self._find = find
 
     @property
-    def findable_type(self) -> _list.FindableType:
+    def findable_type(self) -> _ml.FindableType:
         return self._find
 
     @property
@@ -371,7 +371,7 @@ class AttributePredicate(Predicate, name='attribute'):
         return cls(attribute, cmp, value), at + 1
 
     def excrete(self, item: typing.Any, general: typing.Any) -> bool:
-        # TODO: If array type, extract first element only.
+        # TODO: If array type, extract first element only. Or actually, if array type, do "contains"? It delivers a more similar result to something like "mgrep tarantino".
         actual = self._attribute.extract(None) # TODO: not None of course.
         return self._cmp.compare(actual, self._value)
 

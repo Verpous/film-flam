@@ -39,9 +39,9 @@ from . import _reg
 from . import _fetch
 from . import _xcept
 from . import _utils
-from . import _listfile
+from . import _mlf
 from . import _file
-from . import _list
+from . import _ml
 
 _UID_TYPE = 'imdb'
 
@@ -83,7 +83,7 @@ class SeleniumListFetcher(_fetch.ListFetcher, list_type='imdb-id', uid_type=_UID
     exports_server: None | multiprocessing.Process = None
     requests_queue: multiprocessing.Queue = multiprocessing.Queue()
 
-    def fetch_into_file(self, list_file: _listfile.ListFile) -> None:
+    def fetch_into_file(self, movie_list_file: _mlf.MovieListFile) -> None:
         self.spin_server_if_needed()
 
         NUM_RETRIES = 1 # TODO: if we never experience timeouts, get rid of this.
@@ -111,7 +111,7 @@ class SeleniumListFetcher(_fetch.ListFetcher, list_type='imdb-id', uid_type=_UID
             movies_csv = _read_csv(movies_csv_file)
 
         os.remove(latest_csv)
-        _fetch_movies_in_csv(movies_csv, list_file)
+        _fetch_movies_in_csv(movies_csv, movie_list_file)
 
     @classmethod
     def spin_server_if_needed(cls) -> None:
@@ -144,7 +144,7 @@ def _exports_server_cleanup() -> None:
 
 @_reg._register_builtin
 class CsvListFetcher(_fetch.ListFetcher, list_type='imdb-csv', uid_type=_UID_TYPE):
-    def fetch_into_file(self, list_file: _listfile.ListFile) -> None:
+    def fetch_into_file(self, movie_list_file: _mlf.MovieListFile) -> None:
         try:
             movies_csv_file = open(self.concrete_listdef.address, 'r', newline='')
         except FileNotFoundError as e:
@@ -153,7 +153,7 @@ class CsvListFetcher(_fetch.ListFetcher, list_type='imdb-csv', uid_type=_UID_TYP
         with movies_csv_file:
             movies_csv = _read_csv(movies_csv_file)
 
-        _fetch_movies_in_csv(movies_csv, list_file)
+        _fetch_movies_in_csv(movies_csv, movie_list_file)
 
 def _get_csv_url(list_id: str) -> str:
     return f'https://www.imdb.com/list/ls{list_id}/export?ref_=ttls_exp'
@@ -170,11 +170,11 @@ def _read_csv(movies_csv_file: typing.Iterable[str]) -> list[_CsvRow]:
 
     return movies_csv
 
-def _fetch_movies_in_csv(movies_csv: list[_CsvRow], list_file: _listfile.ListFile) -> None:
-    # First we will build the list of all movies that we already have fetched, and overwrite list_file with this immediately.
+def _fetch_movies_in_csv(movies_csv: list[_CsvRow], movie_list_file: _mlf.MovieListFile) -> None:
+    # First we will build the list of all movies that we already have fetched, and overwrite movie_list_file with this immediately.
     # This lets us bail in the middle if an exception occurs and not lose progress.
     csv_uids = {m.uid for m in movies_csv}
-    list_file.movies_by_uid = {uid: m for uid, m in list_file.movies_by_uid.items() if uid in csv_uids}
+    movie_list_file.movies_by_uid = {uid: m for uid, m in movie_list_file.movies_by_uid.items() if uid in csv_uids}
 
     ia = imdb.Cinemagoer()
     imdb_error = None
@@ -182,18 +182,18 @@ def _fetch_movies_in_csv(movies_csv: list[_CsvRow], list_file: _listfile.ListFil
     try:
         # Now we do a pass where we fetch fields using Cinemagoer.
         # Note that we not only skip movies that were previously fetched, but also duplicates in case the same movie appears in the CSV twice.
-        with _utils.ProgressBar([m for m in movies_csv if m.uid not in list_file.movies_by_uid],
+        with _utils.ProgressBar([m for m in movies_csv if m.uid not in movie_list_file.movies_by_uid],
                 desc='Downloading',
                 keyfunc=lambda m: m.title) as bar:
             for movie_csv in bar:
-                _fetch_movie(movie_csv, list_file, ia)
+                _fetch_movie(movie_csv, movie_list_file, ia)
 
         # We have this "bad names" problem with cinemagoer, so here we refetch any people with bad names.
-        with _utils.ProgressBar([p for p in list_file.people_by_uid.values() if _is_person_name_bad(p.name)],
+        with _utils.ProgressBar([p for p in movie_list_file.people_by_uid.values() if _is_person_name_bad(p.name)],
                 desc='Cleansing data',
                 keyfunc=lambda p: p.uid) as bar:
-            for person_lf in bar:
-                _refetch_person(person_lf, ia)
+            for mlf_person in bar:
+                _refetch_person(mlf_person, ia)
     # If _fetch_movie or _refetch_person raise an IMDb error, it will break us out of that loop, seal the progress bar nicely, and then we'll handle the exception here.
     except imdb.IMDbError as e:
         imdb_error = e
@@ -201,26 +201,26 @@ def _fetch_movies_in_csv(movies_csv: list[_CsvRow], list_file: _listfile.ListFil
     # Now a pass where we add CSV fields. We reach this even if an IMDb error took place, it's not in a finally block because we don't want to do it for just any exception.
     for movie_csv in movies_csv:
         # This shouldn't happen unless we hit an exception earlier.
-        if movie_csv.uid not in list_file.movies_by_uid:
+        if movie_csv.uid not in movie_list_file.movies_by_uid:
             continue
 
-        movie_lf = list_file.movies_by_uid[movie_csv.uid]
+        mlf_movie = movie_list_file.movies_by_uid[movie_csv.uid]
 
         # If any of the conversions fail we simply propagate the error.
-        movie_lf.list_index         = int(movie_csv.list_index)
-        movie_lf.description        = movie_csv.description
-        movie_lf.rating             = float(movie_csv.rating)
-        movie_lf.runtime_minutes    = int(movie_csv.runtime_minutes)
-        movie_lf.genres             = movie_csv.genres.split(', ')
-        movie_lf.votes              = int(movie_csv.votes)
-        movie_lf.myrating           = float(movie_csv.myrating) if (movie_csv.myrating is not None and movie_csv.myrating != '') else None
-        movie_lf.watch_date         = _format_date_from_csv(movie_csv.watch_date)
-        movie_lf.release_date       = _format_date_from_csv(movie_csv.release_date)
+        mlf_movie.list_index        = int(movie_csv.list_index)
+        mlf_movie.description       = movie_csv.description
+        mlf_movie.rating            = float(movie_csv.rating)
+        mlf_movie.runtime_minutes   = int(movie_csv.runtime_minutes)
+        mlf_movie.genres            = movie_csv.genres.split(', ')
+        mlf_movie.votes             = int(movie_csv.votes)
+        mlf_movie.myrating          = float(movie_csv.myrating) if (movie_csv.myrating is not None and movie_csv.myrating != '') else None
+        mlf_movie.watch_date        = _format_date_from_csv(movie_csv.watch_date)
+        mlf_movie.release_date      = _format_date_from_csv(movie_csv.release_date)
 
     if imdb_error is not None:
         raise _xcept.FetchInterrupt(str(imdb_error))
 
-def _fetch_movie(movie_csv: _CsvRow, list_file: _listfile.ListFile, ia: imdb.Cinemagoer) -> None:
+def _fetch_movie(movie_csv: _CsvRow, movie_list_file: _mlf.MovieListFile, ia: imdb.Cinemagoer) -> None:
     NUM_RETRIES = 5
     info_to_fetch = (*imdb.Movie.Movie.default_info, 'critic reviews', 'full credits')
 
@@ -232,40 +232,40 @@ def _fetch_movie(movie_csv: _CsvRow, list_file: _listfile.ListFile, ia: imdb.Cin
             if i == NUM_RETRIES - 1:
                 raise
 
-    movie_lf = _listfile.ListFileMovie.create(uid=movie_csv.uid)
+    mlf_movie = _mlf.MLFMovie.create(uid=movie_csv.uid)
 
     # Prefer to get the title from Cinemagoer because they have better titles for foreign language films, but it's good to have a fallback (not that we ever need it).
-    movie_lf.title = _safe_get(movie_imdb, 'title', default=movie_csv.title) 
-    movie_lf.metascore = _safe_get(movie_imdb, 'metascore')
+    mlf_movie.title = _safe_get(movie_imdb, 'title', default=movie_csv.title) 
+    mlf_movie.metascore = _safe_get(movie_imdb, 'metascore')
 
-    for crew_type in _list.CrewType:
+    for crew_type in _ml.CrewType:
         # I generally tried to choose the CrewType values to match imdb's, but this one goddamn type has a space in it and I don't like that.
-        imdb_crew_type = crew_type.value if crew_type != _list.CrewType.STUNTCAST else 'stunt performer'
+        imdb_crew_type = crew_type.value if crew_type != _ml.CrewType.STUNTCAST else 'stunt performer'
 
         # Building this list as a dictionary solves two problems:
         # 1. Sometimes you get empty people, so those are discarded.
         # 2. Sometimes you get the same person twice. Also discarded.
         crew_imdb_by_uid = {p.getID(): p for p in _safe_get(movie_imdb, imdb_crew_type, default=[]) if p}
 
-        movie_lf.crew[crew_type] = _listfile.ListFileCrew.create(
+        mlf_movie.crew[crew_type] = _mlf.MLFCrew.create(
             crew_type=crew_type,
             roles_by_uid={r.person_uid: r for r in _build_roles(crew_imdb_by_uid)})
-        _update_people_by_uid(list_file.people_by_uid, ((p.uid, p) for p in _build_people(crew_imdb_by_uid)))
+        _update_people_by_uid(movie_list_file.people_by_uid, ((p.uid, p) for p in _build_people(crew_imdb_by_uid)))
 
-    list_file.movies_by_uid[movie_csv.uid] = movie_lf
+    movie_list_file.movies_by_uid[movie_csv.uid] = mlf_movie
 
-def _refetch_person(person_lf: _listfile.ListFilePerson, ia: imdb.Cinemagoer) -> None:
+def _refetch_person(mlf_person: _mlf.MLFPerson, ia: imdb.Cinemagoer) -> None:
     NUM_RETRIES = 5
 
     for i in range(NUM_RETRIES):
         try:
-            person_imdb = ia.get_person(person_lf.uid)
+            person_imdb = ia.get_person(mlf_person.uid)
             break
         except imdb.IMDbError:
             if i == NUM_RETRIES - 1:
                 raise
 
-    person_lf.name = _safe_get(person_imdb, 'name', person_lf.name)
+    mlf_person.name = _safe_get(person_imdb, 'name', mlf_person.name)
 
 # I don't know wtf current_role might be.
 def _build_characters(current_role: typing.Any) -> typing.Iterator[None | str]:
@@ -278,22 +278,22 @@ def _build_characters(current_role: typing.Any) -> typing.Iterator[None | str]:
     elif isinstance(current_role, imdb.utils.RolesList):
         yield from (_safe_get(role_imdb, 'name') for role_imdb in current_role)
 
-def _build_roles(crew_imdb_by_uid: dict[str, imdb.Person.Person]) -> typing.Iterable[_listfile.ListFileRole]:
+def _build_roles(crew_imdb_by_uid: dict[str, imdb.Person.Person]) -> typing.Iterable[_mlf.MLFRole]:
     for person_imdb in crew_imdb_by_uid.values():
-        role_lf = _listfile.ListFileRole.create(
+        mlf_role = _mlf.MLFRole.create(
             person_uid=person_imdb.getID(),
             characters=[c for c in _build_characters(person_imdb.currentRole) if c is not None])
 
-        yield role_lf
+        yield mlf_role
 
-def _build_people(crew_imdb_by_uid: dict[str, imdb.Person.Person]) -> typing.Iterable[_listfile.ListFilePerson]:
+def _build_people(crew_imdb_by_uid: dict[str, imdb.Person.Person]) -> typing.Iterable[_mlf.MLFPerson]:
     for person_imdb in crew_imdb_by_uid.values():
-        person_lf = _listfile.ListFilePerson.create(uid=person_imdb.getID())
-        person_lf.name = _safe_get(person_imdb, 'name', person_lf.uid)
-        yield person_lf
+        mlf_person = _mlf.MLFPerson.create(uid=person_imdb.getID())
+        mlf_person.name = _safe_get(person_imdb, 'name', mlf_person.uid)
+        yield mlf_person
 
 # Because of this deal with bad names, when we merge two people dictionaries we want to keep the person with the good name if there is one.
-def _update_people_by_uid(dst_people: dict[str, _listfile.ListFilePerson], src_people: typing.Iterable[tuple[str, _listfile.ListFilePerson]]) -> None:
+def _update_people_by_uid(dst_people: dict[str, _mlf.MLFPerson], src_people: typing.Iterable[tuple[str, _mlf.MLFPerson]]) -> None:
     # NOT src_people.items(). That's the responsibility of the callers.
     dst_people.update((uid, p) for uid, p in src_people if uid not in dst_people or _is_person_name_bad(dst_people[uid].name))
 

@@ -17,23 +17,23 @@ from __future__ import annotations
 
 from . import _file
 from . import _ldef
-from . import _list
+from . import _ml
 
-# ListFile-related objects go here.
-class ListFileRole(_file._FlamSerializable):
+# MovieListFile-related objects go here.
+class MLFRole(_file._FlamSerializable):
     person_uid:             str
     characters:             list[str]
 
-class ListFileCrew(_file._FlamSerializable):
+class MLFCrew(_file._FlamSerializable):
     crew_type:              str
-    roles_by_uid:           dict[str, ListFileRole]
+    roles_by_uid:           dict[str, MLFRole]
 
-class ListFilePerson(_file._FlamSerializable):
+class MLFPerson(_file._FlamSerializable):
     uid:                    str
     name:                   _file.UnsetType | str
     # Would love to add gender, nationality but cinemagoer doesn't have them.
 
-class ListFileMovie(_file._FlamSerializable):
+class MLFMovie(_file._FlamSerializable):
     uid:                    str
     title:                  _file.UnsetType | str
     watch_date:             _file.UnsetType | None | str
@@ -51,19 +51,19 @@ class ListFileMovie(_file._FlamSerializable):
     # crew type -> crew object. It makes things much nicer when you can reference the crew type you want with this indirection,
     # but the downside (as opposed to having a field for each crew type), is that we have to check dynamically that no crew types were added or are missing.
     # msgspec supports TypedDict, but it has problems with initializing a default.
-    crew:                   dict[str, ListFileCrew]
+    crew:                   dict[str, MLFCrew]
 
-class ListFile(_file._FlamSerializable):
+class MovieListFile(_file._FlamSerializable):
     # These two fields are redundant, they are essentially the filename so the user must already know them to reach them. but if I'll omit them I'll regret it.
-    list_type:           _file.UnsetType | str
+    list_type:              _file.UnsetType | str
     address:                _file.UnsetType | str
 
     # Files are "compatible" if they have a matching uid_type. This is because I have no good way of identifying matching items between, say, IMDb and Letterboxd.
     # If a list originates from IMDb, all the uids in the file will be from IMDb, and so it will only be compatible with other IMDb-based lists.
     uid_type:               _file.UnsetType | str
 
-    movies_by_uid:          dict[str, ListFileMovie]
-    people_by_uid:          dict[str, ListFilePerson]
+    movies_by_uid:          dict[str, MLFMovie]
+    people_by_uid:          dict[str, MLFPerson]
 
     @property
     def abstract_listdef(self) -> _ldef.CanonListdef:
@@ -72,7 +72,7 @@ class ListFile(_file._FlamSerializable):
 
     def sanity_checks(self) -> None:
         super().sanity_checks()
-        crew_types_set = set(ct.value for ct in _list.CrewType)
+        crew_types_set = set(ct.value for ct in _ml.CrewType)
 
         for movie in self.movies_by_uid.values():
             # I verified this check works.

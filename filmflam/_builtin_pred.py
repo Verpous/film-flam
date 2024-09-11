@@ -20,7 +20,7 @@ from . import _filter
 from . import _xcept
 from . import _reg
 from . import _attr
-from . import _list
+from . import _ml
 
 @_reg._register_builtin
 class TruePredicate(_filter.Predicate, name='true'):
@@ -128,6 +128,7 @@ class Size(_filter.Predicate, name='size'):
 # * -all <array attribute name> [=|+|-|++|--]<value>
 # * -size <array attribute name> [=|+|-|++|--]<value> (array len check)
 # * -also-in <listdef> (searches for the same uid in another list by the same pivot/crew-type. I think this is only a person/movie predicate, not a role predicate)
+# * -has <attribute name> (check if the value is None, or generally missing)
 # 
 # Person predicates:
 # * -appeared-in <single with movie predicates> (searches all crew types)
@@ -140,7 +141,7 @@ class Size(_filter.Predicate, name='size'):
 # Role predicates:
 # * -crew <crew-type>
 
-def _test_compile(line: str, find: _list.FindableType = _list.FindableType.ROLES, ctx: None | _ctx.FlamContext = None) -> None:
+def _test_compile(line: str, find: _ml.FindableType = _ml.FindableType.ROLES, ctx: None | _ctx.FlamContext = None) -> None:
     import shlex
     tokens = shlex.split(line)
 

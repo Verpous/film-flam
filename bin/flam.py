@@ -46,43 +46,43 @@ def subcommand_config_list(ctx: ff.FlamContext, args: argparse.Namespace) -> Non
     # Default edit/create.
     else:
         try:
-            remote_list = ctx.remote_lists.get_by_name(args.NAME)
+            simple_list = ctx.simple_lists.get_by_name(args.NAME)
         except ff.InputError:
             config_list_create(ctx, args)
         else:
-            config_list_edit(ctx, args, remote_list)
+            config_list_edit(ctx, args, simple_list)
 
 def config_list_delete(ctx: ff.FlamContext, args: argparse.Namespace) -> None:
     if args.NAME is None:
         raise ff.InputError(f"Must specify a NAME to delete a list.")
 
-    remote_list = ctx.remote_lists.get_by_name(args.NAME)
-    assert not isinstance(remote_list.uid, ff.UnsetType)
-    ctx.delete_remote_list(remote_list.uid)
+    simple_list = ctx.simple_lists.get_by_name(args.NAME)
+    assert not isinstance(simple_list.uid, ff.UnsetType)
+    ctx.delete_simple_list(simple_list.uid)
     ctx.write_cfg()
 
 def config_list_print(ctx: ff.FlamContext, args: argparse.Namespace) -> None:
     # TODO: improve this in the future
     if args.NAME is None:
-        for rl in ctx.remote_lists:
-            print(rl)
+        for sl in ctx.simple_lists:
+            print(sl)
     else:
-        print(ctx.remote_lists.get_by_name(args.NAME))
+        print(ctx.simple_lists.get_by_name(args.NAME))
 
-def config_list_edit(ctx: ff.FlamContext, args: argparse.Namespace, remote_list: ff.RemoteList) -> None:
-    if args.rename is not None and args.rename != remote_list.name:
-        remote_list.name = args.rename
+def config_list_edit(ctx: ff.FlamContext, args: argparse.Namespace, simple_list: ff.SimpleList) -> None:
+    if args.rename is not None and args.rename != simple_list.name:
+        simple_list.name = args.rename
 
     if args.LISTDEF is not None:
         cldef = ff.CanonListdef.parse(args.LISTDEF, ctx)
-        remote_list.list_type = cldef.list_type
-        remote_list.address = cldef.address
+        simple_list.list_type = cldef.list_type
+        simple_list.address = cldef.address
 
     if args.default_fetch != Choice.AUTO:
-        remote_list.is_default_fetch = args.default_fetch == Choice.YES
+        simple_list.is_default_fetch = args.default_fetch == Choice.YES
 
     if args.default_find != Choice.AUTO:
-        remote_list.is_default_find = args.default_find == Choice.YES
+        simple_list.is_default_find = args.default_find == Choice.YES
 
     ctx.write_cfg()
 
@@ -95,7 +95,7 @@ def config_list_create(ctx: ff.FlamContext, args: argparse.Namespace) -> None:
 
     cldef = ff.CanonListdef.parse(args.LISTDEF, ctx)
 
-    remote_list = ff.RemoteList.create(
+    simple_list = ff.SimpleList.create(
         name = args.NAME,
         list_type = cldef.list_type,
         address = cldef.address,
@@ -103,7 +103,7 @@ def config_list_create(ctx: ff.FlamContext, args: argparse.Namespace) -> None:
         is_default_find = args.default_find == Choice.YES,
     )
 
-    ctx.add_remote_list(remote_list)
+    ctx.add_simple_list(simple_list)
     ctx.write_cfg()
 
 def subcommand_config_composite(ctx: ff.FlamContext, args: argparse.Namespace) -> None:
@@ -141,11 +141,11 @@ def config_composite_edit(ctx: ff.FlamContext, args: argparse.Namespace, composi
     if args.rename is not None:
         composite_list.name = args.rename
 
-    remote_list_names, filter_tokens = ff.split_at_filter(args.LIST + args.FILTER)
+    simple_list_names, filter_tokens = ff.split_at_filter(args.LIST + args.FILTER)
 
-    if len(remote_list_names) > 0:
+    if len(simple_list_names) > 0:
         # The unset check should always be true, but the type checker wants it.
-        composite_list.remote_list_uids = [rl_uid for rl_name in remote_list_names if not isinstance(rl_uid := ctx.remote_lists.get_by_name(rl_name).uid, ff.UnsetType)]
+        composite_list.simple_list_uids = [sl_uid for sl_name in simple_list_names if not isinstance(sl_uid := ctx.simple_lists.get_by_name(sl_name).uid, ff.UnsetType)]
 
     if len(filter_tokens) > 0:
         # Don't have anything to do with this for now, but we can raise an exception if it doesn't compile.
@@ -165,11 +165,11 @@ def config_composite_create(ctx: ff.FlamContext, args: argparse.Namespace) -> No
     if args.NAME is None:
         raise ff.InputError(f"Must specify a NAME to create or edit a composite list.")
 
-    remote_list_names, filter_tokens = ff.split_at_filter(args.LIST + args.FILTER)
+    simple_list_names, filter_tokens = ff.split_at_filter(args.LIST + args.FILTER)
 
     composite_list = ff.CompositeList.create(
         name = args.NAME,
-        remote_list_uids = [ctx.remote_lists.get_by_name(rl_name).uid for rl_name in remote_list_names],
+        simple_list_uids = [ctx.simple_lists.get_by_name(sl_name).uid for sl_name in simple_list_names],
         filter_tokens = filter_tokens,
         is_default_fetch = args.default_fetch == Choice.YES,
         is_default_find = args.default_find == Choice.YES,

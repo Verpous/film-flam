@@ -27,7 +27,7 @@ from . import _filter
 class SpecialListType(enum.StrEnum):
     ALL         = '*'           # *[=]
     DEFAULTS    = 'defaults'    # defaults[=]
-    REMOTE      = 'list'        # list=<uid>
+    SIMPLE      = 'list'        # list=<uid>
     COMPOSITE   = 'composite'   # composite=<uid>
     ANNONYMOUS  = 'annonymous'  # annonymous='<listdef1> <listdef2> ... <listdefN>' (for internal use only)
 
@@ -37,7 +37,6 @@ class ExpandFlavor(enum.Enum):
 
 # Users input LISTDEF strings and we turn them into this more convenient representation.
 class CanonListdef(typing.NamedTuple):
-
     list_type: str
     address: str
 
@@ -54,16 +53,16 @@ class CanonListdef(typing.NamedTuple):
 
             return cls(before_eq, after_eq)
 
-        # For remote/composite lists we need to convert the name to a uid.
-        if eq_idx != -1 and (before_eq == SpecialListType.REMOTE or before_eq == SpecialListType.COMPOSITE):
+        # For simple/composite lists we need to convert the name to a uid.
+        if eq_idx != -1 and (before_eq == SpecialListType.SIMPLE or before_eq == SpecialListType.COMPOSITE):
             return ctx.lists_of_type(before_eq).get_by_name(after_eq).abstract_listdef
 
         # The generic case where it's whatever=whatever. This includes SpecialListType.ANNONYMOUS.
         if eq_idx != -1:
             return cls(before_eq, after_eq)
         
-        # If no '=' sign then we'll treat it as a remote list or composite list, and try to determine which.
-        for list_type in (SpecialListType.REMOTE, SpecialListType.COMPOSITE):
+        # If no '=' sign then we'll treat it as a simple list or composite list, and try to determine which.
+        for list_type in (SpecialListType.SIMPLE, SpecialListType.COMPOSITE):
             try:
                 return ctx.lists_of_type(list_type).get_by_name(after_eq).abstract_listdef
             except _xcept.InputError:
@@ -80,14 +79,14 @@ class CanonListdef(typing.NamedTuple):
     def expand(self, ctx: _ctx.FlamContext, flavor: ExpandFlavor) -> typing.Iterator[CanonListdef]:
         match self.list_type:
             case SpecialListType.ALL:
-                yield from (rl.abstract_listdef for rl in ctx.remote_lists)
+                yield from (sl.abstract_listdef for sl in ctx.simple_lists)
             case SpecialListType.DEFAULTS:
                 match flavor:
                     case ExpandFlavor.FIND:
-                        yield from (rl.abstract_listdef for rl in ctx.remote_lists if rl.is_default_fetch)
+                        yield from (sl.abstract_listdef for sl in ctx.simple_lists if sl.is_default_fetch)
                         yield from (cl.abstract_listdef for cl in ctx.composite_lists if cl.is_default_fetch)
                     case ExpandFlavor.FETCH:
-                        yield from (rl.abstract_listdef for rl in ctx.remote_lists if rl.is_default_fetch)
+                        yield from (sl.abstract_listdef for sl in ctx.simple_lists if sl.is_default_fetch)
 
                         # Composite lists are not atomic for fetch, so after expanding to the defaults, we must double expand them.
                         yield from (
@@ -102,27 +101,27 @@ class CanonListdef(typing.NamedTuple):
                     case ExpandFlavor.FIND:
                         yield self
                     case ExpandFlavor.FETCH:
-                        # Can't fetch composite lists, they must be expanded into remote lists.
+                        # Can't fetch composite lists, they must be expanded into simple lists.
                         composite_list = ctx.composite_lists.get_by_uid(self.address)
-                        yield from (CanonListdef(SpecialListType.REMOTE, rl_uid) for rl_uid in composite_list.remote_list_uids)
+                        yield from (CanonListdef(SpecialListType.SIMPLE, sl_uid) for sl_uid in composite_list.simple_list_uids)
                     case _:
                         raise RuntimeError(f"Unsupported ExpandFlavor: {flavor}")
             case SpecialListType.ANNONYMOUS:
                 # Fully supporting annonymous lists is both unneeded and will require complicating a lot of code with recursion.
                 # This list type is only meant for internal use and we'll assume that it's made up of already expanded parts.
                 raise _xcept.InputError(f"Annonymous lists do not support expansion.")
-            case SpecialListType.REMOTE | _:
+            case SpecialListType.SIMPLE | _:
                 yield self
 
     @property
     def is_special(self) -> bool:
         return self.list_type in SpecialListType
 
-    # RemoteList/CompositeList listdefs are abstract because they can't be fetched directly, only through the underlying "concrete" type.
+    # SimpleList/CompositeList listdefs are abstract because they can't be fetched directly, only through the underlying "concrete" type.
     @property
     def is_abstract(self) -> bool:
         match self.list_type:
-            case SpecialListType.REMOTE | SpecialListType.COMPOSITE | SpecialListType.ANNONYMOUS:
+            case SpecialListType.SIMPLE | SpecialListType.COMPOSITE | SpecialListType.ANNONYMOUS:
                 return True
             case _:
                 return False
