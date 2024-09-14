@@ -23,11 +23,10 @@ import copy
 import importlib
 import tempfile
 import weakref
-import shlex
+import itertools
 
 from . import _cfg
 from . import _xcept
-from . import _attr
 from . import _filter
 from . import _ldef
 from . import _file
@@ -53,13 +52,13 @@ class ConfigurationLists(typing.Generic[LT]):
         try:
             return next(l for l in self._lists if l.uid == uid)
         except StopIteration as e:
-            raise _xcept.InputError(f"Invalid {self._type_name} UID: '{uid}'") from e
+            raise _xcept.InputError(f"Invalid {self._type_name} UID: '{uid}'.") from e
 
     def get_by_name(self, name: str) -> LT:
         try:
             return next(l for l in self._lists if l.name == name)
         except StopIteration as e:
-            raise _xcept.InputError(f"Invalid {self._type_name} name: '{name}'") from e
+            raise _xcept.InputError(f"Invalid {self._type_name} name: '{name}'.") from e
 
 # This class is the user's entry point to basically everything that is "built in" to this API: accessing lists, filtering, configuring.
 class FlamContext:
@@ -84,9 +83,9 @@ class FlamContext:
 
         self._make_flam_dir()
         self._cfg = _cfg.Configuration.load_or_create(self._get_cfg_path())
-        self._metadata = _md.FlamMetadata.load_or_create(self._get_metadata_path()) # TODO: Initialize/verify metadata? Or just fix up the file as we use it?
+        self._metadata = _md.FlamMetadata.load_or_create(self._get_metadata_path()) # TODO: Initialize/verify metadata?
 
-        self._movie_list_files_cache: dict[str, _mlf.MovieListFile] = {}
+        self._movie_list_files_cache: dict[_ldef.CanonListdef, _mlf.MovieListFile] = {}
 
         # Since Configuration needs to be serializable, we can't store the lists in there in some funky data structure,
         # and we can't add fields to the object that aren't meant for serialization.
@@ -103,11 +102,13 @@ class FlamContext:
         if import_extensions:
             for extension in self.cfg.extensions:
                 # Try both ways.
-                # TODO: Raise InputError?
                 try:
                     importlib.import_module(extension)
                 except ModuleNotFoundError:
-                    _utils.import_file(extension)
+                    try:
+                        _utils.import_file(extension)
+                    except ModuleNotFoundError as e:
+                        raise _xcept.InputError(str(e)) from e
 
     @property
     def flam_dir(self) -> str:
@@ -144,8 +145,8 @@ class FlamContext:
 
     # List files.
     def get_movie_list(self, listdefs: str | typing.Iterable[str], filter: None | _filter.Filter = None) -> _ml.MovieList:
-        listdefs_list = listdefs if not isinstance(listdefs, str) else (listdefs,)
-        canon_listdefs = list(_ldef.CanonListdef.parse_and_expand(listdefs_list, self, _ldef.ExpandFlavor.FIND))
+        listdefs_iterable = listdefs if not isinstance(listdefs, str) else (listdefs,)
+        canon_listdefs = list(_ldef.CanonListdef.parse_and_expand(listdefs_iterable, self, _ldef.ExpandFlavor.FIND))
 
         # Replace None with empty filter to make the rest of the code nicer.
         if filter is None:
@@ -154,30 +155,40 @@ class FlamContext:
         if len(canon_listdefs) == 1 and filter.is_empty:
             movie_list_file = self._get_movie_list_file(canon_listdefs[0])
         else:
-            movie_list_file = self._generate_composite_movie_list_file(canon_listdefs, filter)
+            movie_list_file = self._generate_composite_movie_list_file(canon_listdefs, filter, None)
 
-            # The address on annonymous lists is only present for pretty-printing purposes. It must contain all the information about how the list was built.
-            movie_list_file.list_type = _ldef.SpecialListType.ANNONYMOUS
-            movie_list_file.address = shlex.join([str(cldef) for cldef in canon_listdefs] + list(filter.regurgitate()))
-
-        return _ml.MovieList(movie_list_file)
+        return _ml.MovieList(movie_list_file, self)
 
     def _get_movie_list_file(self, abstract_listdef: _ldef.CanonListdef) -> _mlf.MovieListFile:
         # First we check if it's a composite list that needs regeneration. In that case even if it's cached it needs to be redone.
-        if abstract_listdef.list_type == _ldef.SpecialListType.COMPOSITE and self._is_composite_movie_list_file_outdated(abstract_listdef.address):
-            # TODO: update metadata?
+        if abstract_listdef.list_type == _ldef.SpecialListType.COMPOSITE and self._is_composite_list_outdated(abstract_listdef.address):
+            # First generate it.
             composite_list = self._composite_lists.get_by_uid(abstract_listdef.address)
             filter = self.compile_filter(composite_list.filter_tokens, _ml.FindableType.MOVIES)
             dependencies = [_ldef.CanonListdef(_ldef.SpecialListType.SIMPLE, sl_uid) for sl_uid in composite_list.simple_list_uids]
-            movie_list_file = self._generate_composite_movie_list_file(dependencies, filter)
-            movie_list_file.list_type = _ldef.SpecialListType.COMPOSITE
-            movie_list_file.address = abstract_listdef.address
-            self._movie_list_files_cache[abstract_listdef.address] = movie_list_file
+            movie_list_file = self._generate_composite_movie_list_file(dependencies, filter, abstract_listdef.address)
+
+            # Update metadata.
+            if abstract_listdef.address not in self._metadata.composite_lists_by_uid:
+                self._metadata.composite_lists_by_uid[abstract_listdef.address] = _md.CompositeListMetadata.create(uid=abstract_listdef.address)
+
+            # Assume os.path won't throw an error because it would've been caught by _is_composite_list_outdated.
+            self._metadata.composite_lists_by_uid[abstract_listdef.address].dependency_mtime = {
+                cldef.address: os.path.getmtime(self._get_movie_list_file_path(cldef))
+                for cldef in dependencies
+            }
+
+            # Writing the mlf before the metadata I think is important.
+            self._write_movie_list_file(movie_list_file)
+            self._write_metadata()
+
+            # Update cache and we can skiddadle.
+            self._movie_list_files_cache[abstract_listdef] = movie_list_file
             return movie_list_file
 
         # Now we try to get it from memory.
-        if abstract_listdef.address in self._movie_list_files_cache:
-            return self._movie_list_files_cache[abstract_listdef.address]
+        if abstract_listdef in self._movie_list_files_cache:
+            return self._movie_list_files_cache[abstract_listdef]
             
         # Memory didn't work out, try to load it from disk.
         try:
@@ -188,10 +199,10 @@ class FlamContext:
             raise _xcept.FileValidationError(f"{e} You may need to fetch '{abstract_listdef.pretty(self)}' again from scratch.") from e
 
         assert not isinstance(movie_list_file.address, _file.UnsetType)
-        self._movie_list_files_cache[movie_list_file.address] = movie_list_file
+        self._movie_list_files_cache[abstract_listdef] = movie_list_file
         return movie_list_file
     
-    def _is_composite_movie_list_file_outdated(self, uid: str) -> bool:
+    def _is_composite_list_outdated(self, uid: str) -> bool:
         if uid not in self._metadata.composite_lists_by_uid:
             return True
 
@@ -214,22 +225,41 @@ class FlamContext:
 
         return False
 
-    def _generate_composite_movie_list_file(self, abstract_listdefs: list[_ldef.CanonListdef], filter: _filter.Filter) -> _mlf.MovieListFile:
-        merged_movie_list_file = _mlf.MovieListFile.create()
-        movie_list_files = [self._get_movie_list_file(cldef) for cldef in abstract_listdefs]
-        # TODO: sciency shit to merge movie_list_files into merged_movie_list_file
+    def _generate_composite_movie_list_file(self, abstract_listdefs: list[_ldef.CanonListdef], filter: _filter.Filter, composite_uid: None | str) -> _mlf.MovieListFile:
+        dependency_mlfs = [self._get_movie_list_file(cldef) for cldef in abstract_listdefs]
+
+        merged_mlf = _mlf.MovieListFile.create()
+        merged_mlf.uid_type = dependency_mlfs[0].uid_type
+
+        # When building the list, we use the same objects from the dependency lists. At the end we deepcopy the result.
+        # In case of duplicates we arbitrarily choose which to keep. We don't allow non-uniqueness.
+        for mlf in dependency_mlfs:
+            if mlf.uid_type != merged_mlf.uid_type:
+                raise _xcept.InputError(f"Cannot merge the lists '{' '.join(cldef.pretty(self) for cldef in abstract_listdefs)}' into a composite list "
+                    f"due to an ID type mismatch: {mlf.uid_type} != {merged_mlf.uid_type}.")
+
+            # TODO: preserve information about which list each movie/person came from? Or in how many it appeared?
+            merged_mlf.movies_by_uid.update(mlf.movies_by_uid)
+            merged_mlf.people_by_uid.update(mlf.people_by_uid)
+
+        # If composite_uid is none treat it as an annonymous composite list.
+        if composite_uid is None:
+            # The address on annonymous lists is only present for pretty-printing purposes. It must contain all the information about how the list was built.
+            merged_mlf.list_type = _ldef.SpecialListType.ANNONYMOUS
+            merged_mlf.address = ' '.join(itertools.chain((cldef.pretty(self) for cldef in abstract_listdefs), filter.regurgitate()))
+        else:
+            merged_mlf.list_type = _ldef.SpecialListType.COMPOSITE
+            merged_mlf.address = composite_uid
 
         if not filter.is_empty:
-            merged_movie_list_file = _ml.MovieList(merged_movie_list_file).export(filter)
+            merged_mlf = _ml.MovieList(merged_mlf, self).export(filter)
+        else:
+            merged_mlf = copy.deepcopy(merged_mlf)
             
-        return merged_movie_list_file
+        return merged_mlf
 
     def _write_movie_list_file(self, movie_list_file: _mlf.MovieListFile) -> None:
         movie_list_file.write(self._get_movie_list_file_path(movie_list_file.abstract_listdef))
-
-        # Flush the metadata when saving composite lists so we don't accidentally regenerate them.
-        if movie_list_file.list_type == _ldef.SpecialListType.COMPOSITE:
-            self._write_metadata()
 
     # After much deliberation, I decided that files for named lists should be named according to the list type and UID,
     # and unnamed lists' files should be named according to the list type and address.
@@ -272,7 +302,7 @@ class FlamContext:
         dependents = [cl.name for cl in self._composite_lists if uid in cl.simple_list_uids]
 
         if len(dependents) > 0:
-            raise _xcept.InputError(f"Failed to delete list '{simple_list.name}' because it is depended on by composite lists: {', '.join(dependents)}")
+            raise _xcept.InputError(f"Failed to delete list '{simple_list.name}' because it is depended on by composite lists: {', '.join(dependents)}.")
 
         # Deleting a list doesn't delete it from local storage, only gets it renamed to be anonymous.
         concrete_filename = self._get_movie_list_file_path(simple_list.concrete_listdef)
@@ -295,6 +325,7 @@ class FlamContext:
         self.cfg._composite_lists.remove(composite_list)
 
     def write_cfg(self) -> None:
+        # TODO: In all the write() functions, actually write to a .partial and mov to the true dest once complete? In case the user exits in the middle.
         self.cfg.write(self._get_cfg_path())
         
     def _get_cfg_path(self) -> str:
@@ -308,7 +339,7 @@ class FlamContext:
         return os.path.join(self._flam_dir, self._METADATA_FILE)
 
     # Registration.
-    def registries_to_try(self) -> typing.Iterable[_reg.Registry]:
+    def registries_to_try(self) -> typing.Iterator[_reg.Registry]:
         yield _reg._builtins
 
         if self._use_global_extensions:
@@ -356,12 +387,12 @@ class FlamContext:
 
             # Because it's a dictionary we easily overwrite an existing outdated cached file.
             assert not isinstance(new_movie_list_file.address, _file.UnsetType)
-            self._movie_list_files_cache[new_movie_list_file.address] = new_movie_list_file
+            self._movie_list_files_cache[new_movie_list_file.abstract_listdef] = new_movie_list_file
 
             if interrupt_error is not None:
                 raise interrupt_error
 
-    def _get_fetcher(self, canon_listdef: _ldef.CanonListdef) -> _fetch.ListFetcher:        
+    def _get_fetcher(self, canon_listdef: _ldef.CanonListdef) -> _fetch.ListFetcher:
         if canon_listdef.is_abstract:
             # Assume it's a SimpleList.
             abstract_listdef = canon_listdef

@@ -22,9 +22,6 @@ from . import _fetch
 from . import _filter
 from . import _attr
 
-# TODO: concerns:
-# * Might want to lock any further extensions once a context is in use
-# * Might want to prevent registering something that is already registered
 class Registry:
     def __init__(self) -> None:
         self._fetchers: dict[str, type[_fetch.ListFetcher]] = {}
@@ -33,10 +30,19 @@ class Registry:
 
     def register(self, obj: typing.Any) -> None:
         if isinstance(obj, type) and issubclass(obj, _fetch.ListFetcher):
+            if obj.list_type in self._fetchers:
+                raise _xcept.InputError(f"Cannot register the fetcher '{obj.list_type}' because a fetcher for that list type is already registered.")
+
             self._fetchers[obj.list_type] = obj
         elif isinstance(obj, type) and issubclass(obj, _filter.Predicate):
+            if obj.name in self._predicates:
+                raise _xcept.InputError(f"Cannot register the predicate '{obj.name}' because a predicate by that name is already registered.")
+
             self._predicates[obj.name] = obj
         elif isinstance(obj, _attr.Attribute):
+            if obj.name in self._attributes:
+                raise _xcept.InputError(f"Cannot register the attribute '{obj.name}' because an attribute by that name is already registered.")
+
             self._attributes[obj.name] = obj
         else:
             raise _xcept.InputError(f"Invalid object for registration: {obj}.")

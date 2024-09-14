@@ -278,7 +278,7 @@ def _build_characters(current_role: typing.Any) -> typing.Iterator[None | str]:
     elif isinstance(current_role, imdb.utils.RolesList):
         yield from (_safe_get(role_imdb, 'name') for role_imdb in current_role)
 
-def _build_roles(crew_imdb_by_uid: dict[str, imdb.Person.Person]) -> typing.Iterable[_mlf.MLFRole]:
+def _build_roles(crew_imdb_by_uid: dict[str, imdb.Person.Person]) -> typing.Iterator[_mlf.MLFRole]:
     for person_imdb in crew_imdb_by_uid.values():
         mlf_role = _mlf.MLFRole.create(
             person_uid=person_imdb.getID(),
@@ -286,7 +286,7 @@ def _build_roles(crew_imdb_by_uid: dict[str, imdb.Person.Person]) -> typing.Iter
 
         yield mlf_role
 
-def _build_people(crew_imdb_by_uid: dict[str, imdb.Person.Person]) -> typing.Iterable[_mlf.MLFPerson]:
+def _build_people(crew_imdb_by_uid: dict[str, imdb.Person.Person]) -> typing.Iterator[_mlf.MLFPerson]:
     for person_imdb in crew_imdb_by_uid.values():
         mlf_person = _mlf.MLFPerson.create(uid=person_imdb.getID())
         mlf_person.name = _safe_get(person_imdb, 'name', mlf_person.uid)

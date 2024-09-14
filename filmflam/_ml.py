@@ -17,82 +17,253 @@ from __future__ import annotations
 
 import typing
 import enum
+import abc
+import copy
 
 from . import _filter
-from . import _ldef
 from . import _mlf
 from . import _ctx
+from . import _fetch
+from . import _attr
+from . import _xcept
 
-class FindableType(enum.StrEnum):
-    MOVIES  = 'movies'
-    PEOPLE  = 'people'
-    ROLES   = 'roles'
-
-    @property
-    def corresponding_type(self) -> type:
-        raise NotImplementedError()
-
-    def is_compatible(self, find: FindableType) -> bool:
-        # Roles are compatible with everything because a role is associated with a person and a movie.
-        return find == self.ROLES or self == find
+class GroupMode(enum.StrEnum):
+    DEFAULT             = 'default'
+    GROUP               = 'group'
+    SINGLE              = 'single'
 
 class CrewType(enum.StrEnum):
-    #                      name                 is_grouped_by_default
-    CAST                = ('cast',              False)
-    STUNTCAST           = ('stuntcast',         False)
-    DIRECTOR            = ('director',          True)
-    WRITER              = ('writer',            True)
-    PRODUCER            = ('producer',          False)
-    COMPOSER            = ('composer',          True)
-    CINEMATOGRAPHER     = ('cinematographer',   True)
-    EDITOR              = ('editor',            True)
+    #                      value                default_group_mode
+    CAST                = ('cast',              GroupMode.SINGLE)
+    STUNTCAST           = ('stuntcast',         GroupMode.SINGLE)
+    DIRECTOR            = ('director',          GroupMode.GROUP)
+    WRITER              = ('writer',            GroupMode.GROUP)
+    PRODUCER            = ('producer',          GroupMode.SINGLE)
+    COMPOSER            = ('composer',          GroupMode.GROUP)
+    CINEMATOGRAPHER     = ('cinematographer',   GroupMode.GROUP)
+    EDITOR              = ('editor',            GroupMode.GROUP)
 
     # This is how you add attributes to the enum without ruining it being primarily a StrEnum.
-    def __new__(cls, name: str, is_grouped_by_default: bool) -> CrewType:
-        obj = str.__new__(cls, name)
-        obj.is_grouped_by_default = is_grouped_by_default
+    def __new__(cls, value: str, default_group_mode: bool) -> CrewType:
+        assert default_group_mode != GroupMode.DEFAULT
+
+        obj = str.__new__(cls, value)
+        obj._value_ = value
+        obj.default_group_mode = default_group_mode
         return obj
 
     # This init only exists to convince mypy that this enum really has these fields.
-    def __init__(self, name: str, is_grouped_by_default: bool) -> None:
-        self.is_grouped_by_default = is_grouped_by_default
+    def __init__(self, value: str, default_group_mode: bool) -> None:
+        self.default_group_mode = default_group_mode
 
-class Findable:
-    def __init__(self, movie_list) -> None:
+class FindableType(enum.StrEnum):
+    MOVIES              = 'movies'
+    PEOPLE              = 'people'
+    ROLES               = 'roles'
+
+    def is_compatible(self, find: FindableType) -> bool:
+        # Roles are compatible with everything because a role is associated with people and a movie.
+        return find == self.ROLES or self == find
+
+class Findable(abc.ABC):
+    def __init__(self, movie_list: MovieList) -> None:
         self._movie_list = movie_list
+        self._cache: dict[typing.Hashable, typing.Any] = {}
+
+    @property
+    def movie_list(self) -> MovieList:
+        return self._movie_list
+
+    @abc.abstractmethod
+    def extract(self, attribute: _attr.Attribute) -> typing.Any:
+        pass
+
+    # TODO: some attributes may want to cache partial results, but we could have a special case for attributes that want to cache the entire result of extract(),
+    # where extract simply returns the cached value without asking 
+    def cache(self, key: typing.Hashable, value: typing.Any) -> None:
+        self._cache[key] = value
+
+    def get(self, key: typing.Hashable) -> typing.Any:
+        return self._cache[key]
+
+    def is_cached(self, key: typing.Hashable) -> bool:
+        return key in self._cache
 
 class Movie(Findable):
-    def __init__(self, movie_list, movie):
+    def __init__(self, movie_list: MovieList, mlf_movie: _mlf.MLFMovie) -> None:
         super().__init__(movie_list)
-        self._movie = movie
+        self._mlf_movie = mlf_movie
+
+    def extract(self, attribute: _attr.Attribute) -> typing.Any:
+        return attribute._extract_from_movie(self, self._mlf_movie)
 
 class Role(Findable):
-    pass
+    def __init__(self, movie_list: MovieList, mlf_roles: list[_mlf.MLFRole], mlf_movie: _mlf.MLFMovie, crew_type: CrewType, group_mode: GroupMode):
+        super().__init__(movie_list)
+        self._mlf_roles = mlf_roles
+        self._mlf_movie = mlf_movie
+        self._crew_type = crew_type
+        self._group_mode = group_mode
 
-# TODO: Actually represents a group? But still call it Person?
-# Actuallyyy, the idea was that "Person" is detached from any crew type, whereas a group... isn't? So a Group actually is more like a Role than a Person??
+    @property
+    def crew_type(self) -> CrewType:
+        return self._crew_type
+
+    @property
+    def group_mode(self) -> GroupMode:
+        return self._group_mode
+
+    def extract(self, attribute: _attr.Attribute) -> typing.Any:
+        # TODO: For now this is the implementation. But 1: it could be largely optimized by caching the Movie/Person objects,
+        # even possibly pulling them from a cache in MovieList so that if someone iterates over movies/people later they will be there and include things already computed on them.
+        # Also there's a more cumbersome but more powerful path: movie/person attributes will implement _extract_from_role to specify custom behavior for how to extract them from a role.
+        # Maybe we should have this as a default behavior, but allow attributes to override it with their own for the few that need it.
+        match attribute.findable_type:
+            case FindableType.ROLES:
+                return attribute._extract_from_role(self, self._mlf_roles)
+            case FindableType.MOVIES:
+                return Movie(self.movie_list, self._mlf_movie).extract(attribute)
+            case FindableType.PEOPLE:
+                mlf = self.movie_list.underlying_file
+                # TODO: if attribute is array type already, flatten it?
+                return [Person(self.movie_list, mlf.people_by_uid[mlf_role.person_uid]).extract(attribute) for mlf_role in self._mlf_roles]
+
 class Person(Findable):
-    pass
+    def __init__(self, movie_list: MovieList, mlf_person: _mlf.MLFPerson):
+        super().__init__(movie_list)
+        self._mlf_person = mlf_person
 
-# TODO: So it looks like all lists are "movie lists" and you can "find" non-movie things from them as an option.
-# First consider if this is really efficient enough, and then if so maybe we should rename the "List" in MovieListFile, MovieList to "MovieList".
-# This will solve the problem of naming variables "lists", we'll name them "mlists" instead.
+    def extract(self, attribute: _attr.Attribute) -> typing.Any:
+        return attribute._extract_from_person(self, self._mlf_person)
+
 class MovieList:
-    def __init__(self, movie_list_file): # TODO: specify how to group each crew type?
+    def __init__(self, movie_list_file: _mlf.MovieListFile, ctx: _ctx.FlamContext):
+        self._ctx = ctx
         self._movie_list_file = movie_list_file
 
-    def __iter__(self):
-        return self.find(FindableType.MOVIES)
+        self._movies: None | list[Movie] = None
+        self._people: None | list[Person] = None
+        self._roles: None | dict[tuple[CrewType, GroupMode], list[Role]] = None
 
-    def find(self, what: FindableType, filter: None | _filter.Filter = None) -> typing.Iterator[typing.Any]: # TODO: not Any!
-        assert filter is None or filter.findable_type == what
+    def __iter__(self) -> typing.Iterator[Findable]:
+        return iter(self.find(FindableType.MOVIES))
+
+    def find(self, what: FindableType, crew_type: None | CrewType = None, group_mode: GroupMode = GroupMode.DEFAULT, filter: None | _filter.Filter = None) -> typing.Iterable[Findable]:
+        if filter is None:
+            filter = self._ctx.compile_filter([], what)
+
+        if filter.findable_type != what:
+            raise _xcept.InputError(f"Requested to find {what} but filter is of type {filter.findable_type}.")
+
+        findables: list[Movie] | list[Person] | list[Role]
+        
+        match what:
+            case FindableType.MOVIES:
+                findables = self._generate_movies()
+            case FindableType.PEOPLE:
+                findables = self._generate_people()
+            case FindableType.ROLES:
+                if crew_type is None:
+                    raise _xcept.InputError(f"Cannot find {what} without specifying the crew type.")
+
+                findables = self._generate_roles(crew_type, group_mode)
+
+        if filter.is_empty:
+            yield from findables
+        else:
+            yield from (f for f in findables if filter.excrete(f, self._ctx))
+
+    def find_movies(self, filter: None | _filter.Filter = None) -> typing.Iterable[Movie]:
+        # TODO: keeping these functions has deep implications, including: {Movie,Person,Role}Attributes, {Movie,Person,Role}Filter,
+        # and as a consequence of that possibly splitting the registry by attribute type, and 3 compile_filter methods, and 3 of many things...
+        # So far it's all just to eliminate one cast. Maybe not worth it.
+        raise NotImplementedError()
+
+        if filter is None:
+            filter = self._ctx.compile_filter([], FindableType.MOVIES)
+
+        if filter.findable_type != FindableType.MOVIES:
+            raise _xcept.InputError(f"Requested to find {FindableType.MOVIES} but filter is of type {filter.findable_type}.")
+
+        movies = self._generate_movies()
+
+        if filter.is_empty:
+            yield from movies
+        else:
+            yield from (m for m in movies if filter.excrete(m, self._ctx))
+
+    def find_people(self, filter: None | _filter.Filter = None) -> typing.Iterable[Person]:
+        raise NotImplementedError()
+
+    def find_roles(self, crew_type: CrewType, group_mode: GroupMode = GroupMode.DEFAULT, filter: None | _filter.Filter = None) -> typing.Iterable[Role]:
+        raise NotImplementedError()
 
     def export(self, filter: _filter.Filter) -> _mlf.MovieListFile:
-        assert filter.findable_type == FindableType.MOVIES
+        filtered_file = copy.deepcopy(self._movie_list_file)
+
+        # Yes, casting, ugly... But the infrastracture we will need to build to eliminate this cast is, at this time, not worth it.
+        movies = typing.cast(typing.Iterable[Movie], self.find(FindableType.MOVIES, filter=filter))
+        filtered_file.movies_by_uid = {movie._mlf_movie.uid: movie._mlf_movie for movie in movies}
+        _fetch._remove_unused_people(filtered_file)
+        return filtered_file
 
     # I permit access to this and entrust users to only read from it because some attributes need it,
     # and I don't believe in going so crazy about the API being "clean" and bulletproof that I sacrifice its efficiency.
     # If you're implementing an attribute you should be allowed to peek "under the hood" more than a typical user anyway.
     @property
-    def underlying_movie_list_file(self) -> _mlf.MovieListFile:
+    def underlying_file(self) -> _mlf.MovieListFile:
         return self._movie_list_file
+
+    def _generate_movies(self) -> list[Movie]:
+        if self._movies is None:
+            self._movies = [Movie(self, mlf_movie) for mlf_movie in self._movie_list_file.movies_by_uid.values()]
+
+        return self._movies
+
+    def _generate_people(self) -> list[Person]:
+        if self._people is None:
+            self._people = [Person(self, mlf_person) for mlf_person in self._movie_list_file.people_by_uid.values()]
+
+        return self._people
+
+    def _generate_roles(self, crew_type: CrewType, group_mode: GroupMode) -> list[Role]:
+        if self._roles is None:
+            self._roles = {}
+
+        cg = (crew_type, group_mode)
+
+        if cg not in self._roles:
+            # TODO: implement grouping. For now assume not grouped.
+            self._roles[cg] = [
+                Role(self, [mlf_role], mlf_movie, crew_type, group_mode)
+                for mlf_movie in self._movie_list_file.movies_by_uid.values()
+                    for mlf_role in mlf_movie.crew[crew_type].roles_by_uid.values()
+            ]
+
+        return self._roles[cg]
+
+# Crew type, grouping, roles, people brainstorming:
+# I think we pass on allowing to group across crew types. Grouping is for a specific crew type
+# Browsing by people means browsing all the movie's crew and has no grouping
+# Browsing by "role" is actually browsing by a specific crew type, and it may be grouped
+# the CLI will support searching in multiple crew types, which actually is just searching by each of them in a for loop
+# a la: flam find cast,director -name tarantino     OR shorthand for all crew types:     flam find crew(or role?) -name tarantino
+# Searching by crew type is searching by role
+# There are no attributes or predicates specific to a crew type. They're are either for "roles" (meaning for any crew type), or for person or movie
+# When searching by crew type you can also probe attributes of the movie or the people in the group
+# The way we generalize it I suppose is: when searching by grouped roles, predicates of a person return true if they are true for any person in the group
+# But really though? The "-appeared-in" person predicate, when applied to a group, should search if that exact group appeared elsewhere no?
+# flam director -name coen
+
+# Questions:
+# * When grouping cast, do we just merge their characters into one?
+# * What about tabulation, what if you want to print a person's attribute when finding by group? I guess print comma-delimited the attribute of each person
+# * What about if I want to search something like "both directors are coen".
+# * Hmm.. we've been saying that AttributePredicate should be "contains" by default for arrays.
+#   In a group, every person attribute is an array attribute and has similar "contains" behavior
+#   Maybe the "-all" predicate should work here too, like: find director -ngroup +2 -all -name coen (to find all groups of directors > 2 where all match coen)
+#   Would this confuse people if targeting an array attribute of a person? Like you'd expect -all to seek in each array element and instead it looks at just 1 array element from each person
+#   Also, when searching by ungrouped crew, we don't need any of this, should we do it anyway for consistency?
+#   I guess maybe so because we want people to be able to search by many crew types at once with the same filter
+# * does FindableType stay as it is or have just 3 possible values?
+# * How to pass in whether to group when searching by crew type

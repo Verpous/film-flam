@@ -170,8 +170,11 @@ def slugify(value: str) -> str:
 def import_file(file: str) -> types.ModuleType:
     module_name = os.path.splitext(os.path.basename(file))[0]
     spec = importlib.util.spec_from_file_location(module_name, file)
-    assert spec is not None and spec.loader is not None
 
+    if spec is None:
+        raise ModuleNotFoundError(f"No module in path '{file}'")
+
+    assert spec.loader is not None
     module = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(module)
     return module

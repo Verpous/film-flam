@@ -28,7 +28,7 @@ class TruePredicate(_filter.Predicate, name='true'):
     def eat(cls, params: _filter.EatParams, at: int) -> tuple[_filter.Predicate, int]:
         return cls(), at
 
-    def excrete(self, item: typing.Any, general: typing.Any) -> bool:
+    def excrete(self, findable: _ml.Findable, ctx: _ctx.FlamContext) -> bool:
         return True
 
 @_reg._register_builtin
@@ -37,7 +37,7 @@ class FalsePredicate(_filter.Predicate, name='false'):
     def eat(cls, params: _filter.EatParams, at: int) -> tuple[_filter.Predicate, int]:
         return cls(), at
 
-    def excrete(self, item: typing.Any, general: typing.Any) -> bool:
+    def excrete(self, findable: _ml.Findable, ctx: _ctx.FlamContext) -> bool:
         return False
 
 @_reg._register_builtin
@@ -54,16 +54,17 @@ class All(_filter.Predicate, name='all'):
         value = None # TODO: use attribute to parse value_str into the attribute's type. Possibly also check if attribute supports the comparator?
         return cls(attribute, cmp, value), at + 2
 
-    def excrete(self, item: typing.Any, general: typing.Any) -> bool:
+    def excrete(self, findable: _ml.Findable, ctx: _ctx.FlamContext) -> bool:
         # TODO: If array type, extract first element only.
-        actual = self._attribute.extract(None) # TODO: not None of course.
+        actual = findable.extract(self._attribute)
         return all(self._cmp.compare(elem, self._value) for elem in actual)
 
-    def regurgitate(self) -> typing.Iterable[str]:
+    def regurgitate(self) -> typing.Iterator[str]:
         yield from super().regurgitate()
         yield self._attribute.name
         yield self._cmp.sign + str(self._value)
 
+# TODO: actually delete this I think, we don't need it.
 @_reg._register_builtin
 class Contains(_filter.Predicate, name='contains'):
     def __init__(self, attribute: _attr.Attribute, cmp: _attr.ComparisonOp, value: typing.Any) -> None:
@@ -78,16 +79,17 @@ class Contains(_filter.Predicate, name='contains'):
         value = None # TODO: use attribute to parse value_str into the attribute's type. Possibly also check if attribute supports the comparator?
         return cls(attribute, cmp, value), at + 2
 
-    def excrete(self, item: typing.Any, general: typing.Any) -> bool:
+    def excrete(self, findable: _ml.Findable, ctx: _ctx.FlamContext) -> bool:
         # TODO: If array type, extract first element only.
-        actual = self._attribute.extract(None) # TODO: not None of course.
+        actual = findable.extract(self._attribute)
         return any(self._cmp.compare(elem, self._value) for elem in actual)
 
-    def regurgitate(self) -> typing.Iterable[str]:
+    def regurgitate(self) -> typing.Iterator[str]:
         yield from super().regurgitate()
         yield self._attribute.name
         yield self._cmp.sign + str(self._value)
 
+# TODO: actually we probably want to have a size attribute for every array type so this isn't needed either.
 @_reg._register_builtin
 class Size(_filter.Predicate, name='size'):
     def __init__(self, attribute: _attr.Attribute, cmp: _attr.ComparisonOp, value: typing.Any) -> None:
@@ -107,12 +109,12 @@ class Size(_filter.Predicate, name='size'):
 
         return cls(attribute, cmp, value), at + 2
 
-    def excrete(self, item: typing.Any, general: typing.Any) -> bool:
+    def excrete(self, findable: _ml.Findable, ctx: _ctx.FlamContext) -> bool:
         # TODO: If array type, extract first element only.
-        actual = self._attribute.extract(None) # TODO: not None of course.
+        actual = findable.extract(self._attribute)
         return self._cmp.compare(len(actual), self._value)
 
-    def regurgitate(self) -> typing.Iterable[str]:
+    def regurgitate(self) -> typing.Iterator[str]:
         yield from super().regurgitate()
         yield self._attribute.name
         yield self._cmp.sign + str(self._value)
@@ -129,6 +131,8 @@ class Size(_filter.Predicate, name='size'):
 # * -size <array attribute name> [=|+|-|++|--]<value> (array len check)
 # * -also-in <listdef> (searches for the same uid in another list by the same pivot/crew-type. I think this is only a person/movie predicate, not a role predicate)
 # * -has <attribute name> (check if the value is None, or generally missing)
+# * -line <comma-delimited column names which are just attribute names?> <regex> (like grepping in the tabulated result)
+# * In <value>s support %<attribute> expressions which expand to the value of this attribute on this findable?
 # 
 # Person predicates:
 # * -appeared-in <single with movie predicates> (searches all crew types)
@@ -139,7 +143,7 @@ class Size(_filter.Predicate, name='size'):
 # * -crews-contain <single with role predicates> (searches all crew types, beware of people who appear in multiple crew types!)
 #
 # Role predicates:
-# * -crew <crew-type>
+# * -crewed-in <single with movie predicates> (generic version if -<crew-type>-in)
 
 def _test_compile(line: str, find: _ml.FindableType = _ml.FindableType.ROLES, ctx: None | _ctx.FlamContext = None) -> None:
     import shlex

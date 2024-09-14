@@ -52,15 +52,14 @@ class EatParams:
 
 # We represent filters as an AST of FilterMembers.
 class FilterMember(abc.ABC):
-    # TODO: annotate this better once I know how.
     # Takes in a found item (movie, person, or role) and returns true if it passes the filter.
     @abc.abstractmethod
-    def excrete(self, item: typing.Any, general: typing.Any) -> bool:
+    def excrete(self, findable: _ml.Findable, ctx: _ctx.FlamContext) -> bool:
         pass
 
     # Decompiles the filter into a list of tokens.
     @abc.abstractmethod
-    def regurgitate(self) -> typing.Iterable[str]:
+    def regurgitate(self) -> typing.Iterator[str]:
         pass
 
     # Helper methods for parsing below.
@@ -139,10 +138,10 @@ class Filter(FilterMember):
         pipeline, _ = Pipeline.eat(params, 0, expect_eat_everything=True)
         return cls(pipeline, params.find)
 
-    def excrete(self, item: typing.Any, general: typing.Any) -> bool:
-        return self._pipeline is None or self._pipeline.excrete(item, general)
+    def excrete(self, findable: _ml.Findable, ctx: _ctx.FlamContext) -> bool:
+        return self._pipeline is None or self._pipeline.excrete(findable, ctx)
 
-    def regurgitate(self) -> typing.Iterable[str]:
+    def regurgitate(self) -> typing.Iterator[str]:
         if self._pipeline is not None:
             # Parentheses around the whole filter are useless, and they make it so if you repeatedly compile(regurgitate(compile(regurgitate...))),
             # each iteration wraps the expression in an additional parentheses.
@@ -174,21 +173,21 @@ class Pipeline(FilterMember):
 
         return cls(single, joinables), until
 
-    def excrete(self, item: typing.Any, general: typing.Any) -> bool:
-        accept = self._single.excrete(item, general)
+    def excrete(self, findable: _ml.Findable, ctx: _ctx.FlamContext) -> bool:
+        accept = self._single.excrete(findable, ctx)
         
         for joinable in self._joinables:
             # Conjunction is the default, so only disjunction must be specified.
             if isinstance(joinable, Negative | Predicate | Pipeline):
-                accept = accept and joinable.excrete(item, general)
+                accept = accept and joinable.excrete(findable, ctx)
             elif isinstance(joinable, Disjoined):
-                accept = accept or joinable.excrete(item, general)
+                accept = accept or joinable.excrete(findable, ctx)
             else:
                 raise RuntimeError(f"Pipeline ate a joinable of type: {type(joinable)}. This shouldn't happen.")
 
         return accept
 
-    def regurgitate(self, parenthesize: bool = True) -> typing.Iterable[str]:
+    def regurgitate(self, parenthesize: bool = True) -> typing.Iterator[str]:
         if parenthesize:
             # We use min because these are sets so next(iter(...)) returns different things every time.
             yield min(Positive.LPAREN)
@@ -248,10 +247,10 @@ class Negative(FilterMember):
         positive, until = Positive.eat(params, at + 1)
         return cls(positive), until
 
-    def excrete(self, item: typing.Any, general: typing.Any) -> bool:
-        return not self._positive.excrete(item, general)
+    def excrete(self, findable: _ml.Findable, ctx: _ctx.FlamContext) -> bool:
+        return not self._positive.excrete(findable, ctx)
 
-    def regurgitate(self) -> typing.Iterable[str]:
+    def regurgitate(self) -> typing.Iterator[str]:
         yield min(self.NEGATE)
         yield from self._positive.regurgitate()
 
@@ -297,10 +296,10 @@ class Disjoined(FilterMember):
         single, until = Single.eat(params, at + 1)
         return cls(single), until
 
-    def excrete(self, item: typing.Any, general: typing.Any) -> bool:
-        return self._single.excrete(item, general)
+    def excrete(self, findable: _ml.Findable, ctx: _ctx.FlamContext) -> bool:
+        return self._single.excrete(findable, ctx)
 
-    def regurgitate(self) -> typing.Iterable[str]:
+    def regurgitate(self) -> typing.Iterator[str]:
         yield min(self.DISJOIN)
         yield from self._single.regurgitate()
 
@@ -350,7 +349,7 @@ class Predicate(FilterMember):
         suggestions = f' (did you mean: {", ".join(close_matches)}?)' if len(close_matches) > 0 else '.'
         raise _EinGafrurError(f"Expected valid predicate name, but got: '{prefixed_name}'{suggestions}", tokens=params.tokens, error_indices=at)
 
-    def regurgitate(self) -> typing.Iterable[str]:
+    def regurgitate(self) -> typing.Iterator[str]:
         yield self.PREFIX + self.name
 
 # This should be the only concrete predicate that is in this file, because it's special.
@@ -370,12 +369,14 @@ class AttributePredicate(Predicate, name='attribute'):
         value = None # TODO: use attribute to parse value_str into the attribute's type. Possibly also check if attribute supports the comparator?
         return cls(attribute, cmp, value), at + 1
 
-    def excrete(self, item: typing.Any, general: typing.Any) -> bool:
-        # TODO: If array type, extract first element only. Or actually, if array type, do "contains"? It delivers a more similar result to something like "mgrep tarantino".
-        actual = self._attribute.extract(None) # TODO: not None of course.
-        return self._cmp.compare(actual, self._value)
+    def excrete(self, findable: _ml.Findable, ctx: _ctx.FlamContext) -> bool:
+        actual = findable.extract(self._attribute)
 
-    def regurgitate(self) -> typing.Iterable[str]:
+        # For array types we do "contains".
+        return (any(self._cmp.compare(elem, self._value) for elem in actual) if self._attribute.is_array
+            else self._cmp.compare(actual, self._value))
+
+    def regurgitate(self) -> typing.Iterator[str]:
         yield from super().regurgitate()
         yield self._cmp.sign + str(self._value)
 
@@ -387,7 +388,3 @@ def is_filter_token(token: str) -> bool:
             or token in Conjoined.CONJOIN
             or token in Positive.LPAREN
             or token in Positive.RPAREN)
-
-def split_at_filter(strs: list[str]) -> tuple[list[str], list[str]]:
-    filter_begin = next((i for i, s in enumerate(strs) if is_filter_token(s)), len(strs))
-    return strs[:filter_begin], strs[filter_begin:]

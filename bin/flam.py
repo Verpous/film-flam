@@ -20,6 +20,7 @@ import enum
 import os
 import sys
 import typing
+import itertools
 
 import filmflam as ff
 
@@ -37,6 +38,10 @@ class Choice(enum.StrEnum):
     @classmethod
     def yes_no_auto(cls) -> typing.Iterable[str]:
         return (cls.YES, cls.NO, cls.AUTO)
+
+def split_at_filter(strs: list[str]) -> tuple[list[str], list[str]]:
+    filter_begin = next((i for i, s in enumerate(strs) if ff.is_filter_token(s)), len(strs))
+    return strs[:filter_begin], strs[filter_begin:]
 
 def subcommand_config_list(ctx: ff.FlamContext, args: argparse.Namespace) -> None:
     if args.delete:
@@ -141,7 +146,7 @@ def config_composite_edit(ctx: ff.FlamContext, args: argparse.Namespace, composi
     if args.rename is not None:
         composite_list.name = args.rename
 
-    simple_list_names, filter_tokens = ff.split_at_filter(args.LIST + args.FILTER)
+    simple_list_names, filter_tokens = split_at_filter(args.LIST + args.FILTER)
 
     if len(simple_list_names) > 0:
         # The unset check should always be true, but the type checker wants it.
@@ -165,7 +170,7 @@ def config_composite_create(ctx: ff.FlamContext, args: argparse.Namespace) -> No
     if args.NAME is None:
         raise ff.InputError(f"Must specify a NAME to create or edit a composite list.")
 
-    simple_list_names, filter_tokens = ff.split_at_filter(args.LIST + args.FILTER)
+    simple_list_names, filter_tokens = split_at_filter(args.LIST + args.FILTER)
 
     composite_list = ff.CompositeList.create(
         name = args.NAME,
@@ -192,8 +197,12 @@ def subcommand_fetch(ctx: ff.FlamContext, args: argparse.Namespace) -> None:
 
 def subcommand_find(ctx: ff.FlamContext, args: argparse.Namespace) -> None:
     # Parse filter
-    listdefs, filter_tokens = ff.split_at_filter(args.LISTDEF + args.FILTER)
-    filtr = ctx.compile_filter(filter_tokens, args.findable)
+    listdefs, filter_tokens = split_at_filter(args.LISTDEF + args.FILTER)
+    filter = ctx.compile_filter(filter_tokens, args.findable)
+    movie_list = ctx.get_movie_list(listdefs, filter)
+
+    for findable in movie_list.find(args.FINDABLE, filter=filter):
+        pass
     
     # 1. Parse the listdefs for finding (generally means no composite list expansion, and maybe even no uniqueing).
     # 2. Load all the relevant data, which includes the list file and, if people (or roles?) also cached grouping files, or compute the grouping now if not cached
@@ -351,7 +360,7 @@ Valid column names: ...''')
 
     # TODO: future problem: REMAINDER doesn't work if there are no positional arguments before it. If we add the shorthand subcommands a la "flam WHAT",
     # the WHAT won't be a positional argument anymore and REMAINDER won't work.
-    find_parser.add_argument('FINDABLE', choices=ff.FindableType, action='store', help=
+    find_parser.add_argument('FINDABLE', choices=itertools.chain(ff.FindableType, ff.CrewType), action='store', help= # TODO: support comma-delimited crew types? If ROLES, use all crew types.
         '''Choose what to find: movies, people, or roles. Roles have all the attributes of the movie and the person, and then a few role-specific ones.''')
     find_parser.add_argument('LISTDEF', nargs='*', action='store', help=
         '''Like fetch but with different defaults, and if the LISTDEFs aren't already fetched, it fails with a nice error message.''')

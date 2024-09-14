@@ -17,7 +17,8 @@ import typing
 import enum
 import abc
 
-from . import _filter
+from . import _mlf
+from . import _ml
 
 class ComparisonOp(enum.Enum):
     # Important to use prefix-free signs.
@@ -50,23 +51,33 @@ class Attribute(abc.ABC):
     def default_cmp(self) -> ComparisonOp:
         raise NotImplementedError()
 
-    def make_predicate(self, cmp: ComparisonOp, value: str) -> _filter.Predicate:
+    # TODO: To force the right one of these to be implemented, either subclass Attribute with MovieAttribute, PersonAttribute, RoleAttribute,
+    #       or some compositional approach.
+    def _extract_from_movie(self, movie: _ml.Movie, mlf_movie: _mlf.MLFMovie):
         raise NotImplementedError()
 
-    def extract(self, obj) -> typing.Any:
-        if not isinstance(obj, self.findable_type.corresponding_type):
-            raise Exception(f'Invalid owner: {name} expects {self.findable_type}, but got {type(obj)}')
+    def _extract_from_role(self, role: _ml.Role, mlf_roles: list[_mlf.MLFRole]):
+        raise NotImplementedError()
 
-        self.ensure_owner_match(obj)
-        return self._extract_internal(obj)
+    def _extract_from_person(self, person: _ml.Person, mlf_person: _mlf.MLFPerson):
+        raise NotImplementedError()
 
-    @abc.abstractmethod
-    def _extract_internal(self, obj) -> typing.Any:
-        pass
 
-    def _extract_from_movie():
-        pass
-    def _extract_from_role():
-        pass
-    def _extract_from_person():
-        pass
+# TODO: attribute ideas:
+# Generic:
+# * for every array type predicate have a length attribute
+# * every field in list files should have a corresponding attribute
+# 
+# Person:
+# * nmovies appeared in
+# * n<crew-type>, like ndirector for num of movies directed
+# * average rating (per crew type?)
+# 
+# Movie:
+# * days until it leaves, this should be a personal extension of mine
+# * release/watch date in many formats? day of week, month of year, etc.
+# 
+# Crew:
+# * which crew type
+# * npeople in the group
+# * ncrewed (or some different name), adaptive version of n<crew-type>

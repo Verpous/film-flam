@@ -13,16 +13,13 @@
 # You should have received a copy of the GNU General Public License
 # along with this program. If not, see <https://www.gnu.org/licenses/>.
 
-# Not even worth bothering trying to type hint this file without this.
 from __future__ import annotations
 
 import typing
 import enum
-import shlex
 
 from . import _ctx
 from . import _xcept
-from . import _filter
 
 class SpecialListType(enum.StrEnum):
     ALL         = '*'           # *[=]
@@ -109,7 +106,7 @@ class CanonListdef(typing.NamedTuple):
             case SpecialListType.ANNONYMOUS:
                 # Fully supporting annonymous lists is both unneeded and will require complicating a lot of code with recursion.
                 # This list type is only meant for internal use and we'll assume that it's made up of already expanded parts.
-                raise _xcept.InputError(f"Annonymous lists do not support expansion.")
+                raise _xcept.InputError("Annonymous lists do not support expansion.")
             case SpecialListType.SIMPLE | _:
                 yield self
 
@@ -134,14 +131,10 @@ class CanonListdef(typing.NamedTuple):
     # Internally when canonicalizing listdefs it's convenient to convert list names to UIDs,
     # but it means that whenever we print the listdef we need to convert it back to have human-readable list names.
     def pretty(self, ctx: _ctx.FlamContext) -> str:
-        # Annonymous lists need to separate the filter from the listdefs, and then recursively pretty the listdefs.
+        # Printing the "annonymous=" part isn't pretty. Since annonymous lists are only ever stringified for pretty printing,
+        # the lists that make it up are already pretty.
         if self.list_type == SpecialListType.ANNONYMOUS:
-            listdefs_and_filter = shlex.split(self.address)
-            listdefs, filter = _filter.split_at_filter(listdefs_and_filter)
-
-            # Not shlex.joining them back together because it's ugly. Rather live with the "incorrectness".
-            listdefs_rejoined = ' '.join(self.parse(ldef, ctx).pretty(ctx) for ldef in listdefs)
-            return f"{listdefs_rejoined}{' ' if len(filter) > 0 else ''}{' '.join(filter)}"
+            return self.address
         
         if self.is_abstract:
             # Note that we're constructing a "CanonListdef" here which technically isn't "Canon". If you were to pretty() it, it will hit an error.
@@ -152,4 +145,3 @@ class CanonListdef(typing.NamedTuple):
 
     def __str__(self) -> str:
         return f'{self.list_type}={self.address}'
-    

@@ -13,7 +13,6 @@
 # You should have received a copy of the GNU General Public License
 # along with this program. If not, see <https://www.gnu.org/licenses/>.
 
-# Not even worth bothering trying to type hint this file without this.
 from __future__ import annotations
 
 import abc
