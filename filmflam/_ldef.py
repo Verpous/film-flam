@@ -19,7 +19,8 @@ import typing
 import enum
 
 from . import _ctx
-from . import _xcept
+from . import _exc
+from . import _dbg
 
 class SpecialListType(enum.StrEnum):
     ALL         = '*'           # *[=]
@@ -27,6 +28,9 @@ class SpecialListType(enum.StrEnum):
     SIMPLE      = 'list'        # list=<uid>
     COMPOSITE   = 'composite'   # composite=<uid>
     ANNONYMOUS  = 'annonymous'  # annonymous='<listdef1> <listdef2> ... <listdefN>' (for internal use only)
+    
+    def __repr__(self) -> str:
+        return str(self)
 
 class ExpandFlavor(enum.Enum):
     FIND        = enum.auto()
@@ -41,37 +45,44 @@ class CanonListdef(typing.NamedTuple):
     def parse(cls, listdef: str, ctx: _ctx.FlamContext) -> CanonListdef:
         eq_idx = listdef.find('=')
         before_eq, after_eq = (listdef[:eq_idx], listdef[eq_idx + 1:]) if eq_idx != -1 else (listdef, '')
+        result: None | CanonListdef = None
 
         # First case, DEFAULTS or ALL.
         if before_eq == SpecialListType.DEFAULTS or before_eq == SpecialListType.ALL:
             # We (reluctantly) support a trailing '=' for ALL and DEFAULTS so that this function and __str__ inverse each other. But it must be trailing.
             if after_eq != '':
-                raise _xcept.InputError(f"Invalid LISTDEF: '{listdef}' must have nothing after the equal sign.")
+                raise _exc.InputError(f"Invalid LISTDEF: '{listdef}' must have nothing after the equal sign.")
 
-            return cls(before_eq, after_eq)
-
+            result = cls(before_eq, after_eq)
         # For simple/composite lists we need to convert the name to a uid.
-        if eq_idx != -1 and (before_eq == SpecialListType.SIMPLE or before_eq == SpecialListType.COMPOSITE):
-            return ctx.lists_of_type(before_eq).get_by_name(after_eq).abstract_listdef
-
+        elif eq_idx != -1 and (before_eq == SpecialListType.SIMPLE or before_eq == SpecialListType.COMPOSITE):
+            result = ctx.lists_of_type(before_eq).get_by_name(after_eq).abstract_listdef
         # The generic case where it's whatever=whatever. This includes SpecialListType.ANNONYMOUS.
-        if eq_idx != -1:
-            return cls(before_eq, after_eq)
-        
+        elif eq_idx != -1:
+            result = cls(before_eq, after_eq)
         # If no '=' sign then we'll treat it as a simple list or composite list, and try to determine which.
-        for list_type in (SpecialListType.SIMPLE, SpecialListType.COMPOSITE):
-            try:
-                return ctx.lists_of_type(list_type).get_by_name(after_eq).abstract_listdef
-            except _xcept.InputError:
-                pass
+        else:
+            for list_type in (SpecialListType.SIMPLE, SpecialListType.COMPOSITE):
+                try:
+                    result = ctx.lists_of_type(list_type).get_by_name(before_eq).abstract_listdef
+                    break
+                except _exc.InputError:
+                    pass
 
-        raise _xcept.InputError(f"Invalid LISTDEF: '{listdef}'.")
+        if result is None:
+            raise _exc.InputError(f"Invalid LISTDEF: '{listdef}'.")
+
+        _dbg.logger.info(f"Parsed {listdef=}, split into: {before_eq=}, {after_eq=}. {result=}.")
+        return result
 
     @classmethod
     def parse_and_expand(cls, listdefs: typing.Iterable[str], ctx: _ctx.FlamContext, flavor: ExpandFlavor) -> typing.Iterator[CanonListdef]:
         for ldef in listdefs:
             cldef = cls.parse(ldef, ctx)
-            yield from cldef.expand(ctx, flavor)
+            
+            for expanded in cldef.expand(ctx, flavor):
+                _dbg.logger.info(f"Expansion of {cldef} includes {expanded}")
+                yield expanded
 
     def expand(self, ctx: _ctx.FlamContext, flavor: ExpandFlavor) -> typing.Iterator[CanonListdef]:
         match self.list_type:
@@ -106,7 +117,7 @@ class CanonListdef(typing.NamedTuple):
             case SpecialListType.ANNONYMOUS:
                 # Fully supporting annonymous lists is both unneeded and will require complicating a lot of code with recursion.
                 # This list type is only meant for internal use and we'll assume that it's made up of already expanded parts.
-                raise _xcept.InputError("Annonymous lists do not support expansion.")
+                raise _exc.InputError("Annonymous lists do not support expansion.")
             case SpecialListType.SIMPLE | _:
                 yield self
 

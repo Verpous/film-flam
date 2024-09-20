@@ -44,8 +44,11 @@ PYLINT_IGNORE += W0511 # fixme
 PYLINT_IGNORE += W0622 # redefined-builtin
 PYLINT_IGNORE += W0702 # bare-except
 PYLINT_IGNORE += W1514 # unspecified-encoding
+PYLINT_IGNORE += W1203 # logging-fstring-interpolation
 
-.PHONY: all install uinstall clean cfg mypy pylint
+view = tail -f
+
+.PHONY: all install uinstall clean cfg mypy pylint log
 
 all: install
 
@@ -65,8 +68,15 @@ cfg:
 mypy:
 	MYPY_FORCE_COLOR=1 mypy --disallow-untyped-defs --disallow-incomplete-defs $(CLI)
 
+# Need to find all python files which are not ignored. git ls-files helps find tracked files, but misses not-ignored-but-not-yet-tracked files.
+# It's ugly as shit because the dudes who made git check-ignore caught some sort of aneurysm and decided that "no one will ever need to output NOT ignored files".
 pylint:
-	find -name '*.py' -print0 | xargs -0 git ls-files -z | xargs -0 pylint --output-format=colorized --disable="$$(printf %s, $(PYLINT_IGNORE))" |  less -R
+	find -name '*.py' -print0 | grep -Fvxzf <(find -name '*.py' | git check-ignore --stdin) | \
+		xargs -0 pylint --output-format=colorized --disable="$$(printf %s, $(PYLINT_IGNORE))" |  less -R
+
+# Use LOGLEVEL=critical so that this very action doesn't create new logs.
+log:
+	$(view) "$$(echo "import filmflam; print(filmflam.get_log_file_path())" | FLAM_LOGLEVEL=critical python)"
 
 # Not really a target, but want to put this someplace for now.
 # profile:

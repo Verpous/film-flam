@@ -16,17 +16,23 @@
 import typing
 import colorama # type: ignore
 
+from . import _dbg
+
 class FlamError(Exception):
-    pass
+    def __init__(self, *args: object, log_trace: bool = True, stacklevel: int = 2) -> None:
+        super().__init__(*args)
+
+        # Use stacklevel=2 at least so that the file:function:lineno is from where the exception was raised and not here.
+        # If the child class implements its own __init__, it must pass a higher stacklevel.
+        _dbg.logger.error(f"Raised exception: {self}", stacklevel=stacklevel, stack_info=log_trace)
 
 class InputError(FlamError):
     pass
 
 class FilterSyntaxError(InputError):
-    def __init__(self, message: str, tokens: list[str], error_indices: int | typing.Iterable[int] = -1, is_terminal: bool = False) -> None:
-        self.message = message
-        self.tokens = tokens
-        self.error_indices = error_indices
+    def __init__(self, message: str, tokens: list[str], error_indices: int | typing.Iterable[int] = -1, is_terminal: bool = True) -> None:
+        super().__init__(f'FILTER syntax error{'' if is_terminal else ' (not terminal)'}: {message}\nIn: {self.join_tokens(tokens, error_indices)}',
+            log_trace=is_terminal, stacklevel=3)
 
         # This is for exceptions that only mean we guessed wrong on which type of expression the tokens are, and we should try different options.
         # For exceptions which are terminal, if they are raised then we know there is no reason to check if the tokens match a different expression,
@@ -35,15 +41,13 @@ class FilterSyntaxError(InputError):
         # Anyone who calls a function which raises nonterminal exceptions, should handle them directly.
         self.is_terminal = is_terminal
 
-    def __str__(self) -> str:
-        return f'FILTER syntax error: {self.message}\nIn: {self._join_tokens()}'
-
     # shlex.join wouldn't allow us to color the quotes around error tokens that need quoting, so we need a custom solution.
-    def _join_tokens(self) -> str:
-        error_indices_set = (set(self.error_indices) if not isinstance(self.error_indices, int)
-            else set() if self.error_indices == -1
-            else {self.error_indices})
-        return ' '.join(self.format_token(t, i in error_indices_set) for i, t in enumerate(self.tokens))
+    @classmethod
+    def join_tokens(cls, tokens: list[str], error_indices: int | typing.Iterable[int]) -> str:
+        error_indices_set = (set(error_indices) if not isinstance(error_indices, int)
+            else set() if error_indices == -1
+            else {error_indices})
+        return ' '.join(cls.format_token(t, i in error_indices_set) for i, t in enumerate(tokens))
 
     @classmethod
     def format_token(cls, token: str, is_error: bool = False) -> str:

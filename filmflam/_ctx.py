@@ -26,7 +26,7 @@ import weakref
 import itertools
 
 from . import _cfg
-from . import _xcept
+from . import _exc
 from . import _filter
 from . import _ldef
 from . import _file
@@ -36,14 +36,15 @@ from . import _reg
 from . import _utils
 from . import _fetch
 from . import _ml
+from . import _dbg
 
 # Data structure for using simple/composite lists generically.
 LT = typing.TypeVar('LT', _cfg.SimpleList, _cfg.CompositeList)
 
 class ConfigurationLists(typing.Generic[LT]):
-    def __init__(self, lists: list[LT], type_name: str) -> None:
+    def __init__(self, lists: list[LT], list_type: str) -> None:
         self._lists: list[LT] = lists
-        self._type_name = type_name
+        self._list_type = list_type
 
     def __iter__(self) -> typing.Iterator[LT]:
         return iter(self._lists)
@@ -52,26 +53,28 @@ class ConfigurationLists(typing.Generic[LT]):
         try:
             return next(l for l in self._lists if l.uid == uid)
         except StopIteration as e:
-            raise _xcept.InputError(f"Invalid {self._type_name} UID: '{uid}'.") from e
+            raise _exc.InputError(f"Invalid {self._list_type} UID: '{uid}'.") from e
 
     def get_by_name(self, name: str) -> LT:
         try:
             return next(l for l in self._lists if l.name == name)
         except StopIteration as e:
-            raise _xcept.InputError(f"Invalid {self._type_name} name: '{name}'.") from e
+            raise _exc.InputError(f"Invalid {self._list_type} name: '{name}'.") from e
 
 # This class is the user's entry point to basically everything that is "built in" to this API: accessing lists, filtering, configuring.
 class FlamContext:
-    DEFAULT_FLAM_DIR = os.environ.get('FLAM_DIR', os.path.join(os.path.expanduser('~'), '.film_flam'))
+    DEFAULT_FLAM_DIR = _dbg.FlamEnv.CTX_DIR.get(os.path.join(os.path.expanduser('~'), '.film_flam'))
     _LISTFILES_DIR = 'movie_lists'
     _CONFIGURATION_FILE = 'config.json'
     _METADATA_FILE = 'metadata.json'
 
     def __init__(self, flam_dir: None | str = DEFAULT_FLAM_DIR, import_extensions: bool = False) -> None:
+        _dbg.logger.info(f"Making a context, {flam_dir=}, {import_extensions=}")
+
         # Support None for users who just want to work with volatile memory and not load or save anything, we call it volatile mode.
         # Don't tell this to anyone but in "volatile" mode we actually just persist everything to a tempdir. It's so, so much easier.
         if flam_dir is None:
-            tempdir = tempfile.TemporaryDirectory(prefix='.film_flam', ignore_cleanup_errors=not _is_debug()) # pylint: disable=consider-using-with
+            tempdir = tempfile.TemporaryDirectory(prefix='.film_flam', ignore_cleanup_errors=not _dbg.is_debug()) # pylint: disable=consider-using-with
             self._flam_dir = tempdir.name
 
             # Deletes the tempdir when the object is garbage collected or program exits.
@@ -83,15 +86,19 @@ class FlamContext:
 
         self._make_flam_dir()
         self._cfg = _cfg.Configuration.load_or_create(self._get_cfg_path())
-        self._metadata = _md.FlamMetadata.load_or_create(self._get_metadata_path()) # TODO: Initialize/verify metadata?
+        self._metadata = _md.FlamMetadata.load_or_create(self._get_metadata_path()) # TODO: Clean metadata of old lists?
+
+        # TODO: Sort out pretty printing.
+        _dbg.logger.info(f'Loaded configuration: {self._cfg=}')
+        _dbg.logger.info(f'Loaded metadata: {self._metadata=}')
 
         self._movie_list_files_cache: dict[_ldef.CanonListdef, _mlf.MovieListFile] = {}
 
         # Since Configuration needs to be serializable, we can't store the lists in there in some funky data structure,
         # and we can't add fields to the object that aren't meant for serialization.
         # The solution I've got is to wrap those lists in this Context.
-        self._simple_lists = ConfigurationLists(self.cfg._simple_lists, 'list')
-        self._composite_lists = ConfigurationLists(self.cfg._composite_lists, 'composite list')
+        self._simple_lists = ConfigurationLists(self.cfg._simple_lists, _ldef.SpecialListType.SIMPLE)
+        self._composite_lists = ConfigurationLists(self.cfg._composite_lists, _ldef.SpecialListType.COMPOSITE)
 
         self._extensions = _reg.Registry()
 
@@ -104,11 +111,13 @@ class FlamContext:
                 # Try both ways.
                 try:
                     importlib.import_module(extension)
+                    _dbg.logger.info(f"Successful import using importlib: {extension=}")
                 except ModuleNotFoundError:
                     try:
                         _utils.import_file(extension)
+                        _dbg.logger.info(f"Successful import using utils: {extension=}")
                     except ModuleNotFoundError as e:
-                        raise _xcept.InputError(str(e)) from e
+                        raise _exc.InputError(str(e)) from e
 
     @property
     def flam_dir(self) -> str:
@@ -143,6 +152,9 @@ class FlamContext:
             except FileExistsError:
                 pass
 
+        # Log what the flam dir looked like at the beginning.
+        _dbg.logger.info(f"Made flam dir. Structure:\n{'\n'.join(_utils.tree(self._flam_dir, stats=lambda f: f" (size={os.path.getsize(f)}B, mtime={os.path.getmtime(f)})"))}")
+
     # List files.
     def get_movie_list(self, listdefs: str | typing.Iterable[str], filter: None | _filter.Filter = None) -> _ml.MovieList:
         listdefs_iterable = listdefs if not isinstance(listdefs, str) else (listdefs,)
@@ -157,6 +169,7 @@ class FlamContext:
         else:
             movie_list_file = self._generate_composite_movie_list_file(canon_listdefs, filter, None)
 
+        _dbg.logger.info(f"Returning movie list for: '{movie_list_file.abstract_listdef=}'")
         return _ml.MovieList(movie_list_file, self)
 
     def _get_movie_list_file(self, abstract_listdef: _ldef.CanonListdef) -> _mlf.MovieListFile:
@@ -184,26 +197,31 @@ class FlamContext:
 
             # Update cache and we can skiddadle.
             self._movie_list_files_cache[abstract_listdef] = movie_list_file
+
+            _dbg.logger.info(f"Regenerated and returning: '{abstract_listdef}'")
             return movie_list_file
 
         # Now we try to get it from memory.
         if abstract_listdef in self._movie_list_files_cache:
+            _dbg.logger.info(f"Returning from cache: '{abstract_listdef}'")
             return self._movie_list_files_cache[abstract_listdef]
             
         # Memory didn't work out, try to load it from disk.
         try:
             movie_list_file = _mlf.MovieListFile.load(self._get_movie_list_file_path(abstract_listdef))
         except FileNotFoundError as e:
-            raise _xcept.InputError(f"No fetched file for LISTDEF '{abstract_listdef.pretty(self)}'.") from e
-        except _xcept.FileValidationError as e:
-            raise _xcept.FileValidationError(f"{e} You may need to fetch '{abstract_listdef.pretty(self)}' again from scratch.") from e
+            raise _exc.InputError(f"No fetched file for LISTDEF '{abstract_listdef.pretty(self)}'.") from e
+        except _exc.FileValidationError as e:
+            raise _exc.FileValidationError(f"{e} You may need to fetch '{abstract_listdef.pretty(self)}' again from scratch.") from e
 
         assert not isinstance(movie_list_file.address, _file.UnsetType)
         self._movie_list_files_cache[abstract_listdef] = movie_list_file
+        _dbg.logger.info(f"Returning from disk: '{abstract_listdef}'")
         return movie_list_file
     
     def _is_composite_list_outdated(self, uid: str) -> bool:
         if uid not in self._metadata.composite_lists_by_uid:
+            _dbg.logger.info(f"Composite list {uid=} is not in the metadata.")
             return True
 
         cl_config = self._composite_lists.get_by_uid(uid)
@@ -211,17 +229,19 @@ class FlamContext:
 
         for sl_uid in cl_config.simple_list_uids:
             if sl_uid not in cl_meta.dependency_mtime:
+                _dbg.logger.info(f"Composite list {uid=} requires regeneration because of missing dependency: {sl_uid=}")
                 return True
 
             sl_path = self._get_movie_list_file_path(_ldef.CanonListdef(_ldef.SpecialListType.SIMPLE, sl_uid))
 
             try:
                 if sl_uid not in cl_meta.dependency_mtime or os.path.getmtime(sl_path) > cl_meta.dependency_mtime[sl_uid]:
+                    _dbg.logger.info(f"Composite list {uid=} requires regeneration because of outdated dependency: {sl_uid=}")
                     return True
             except FileNotFoundError as e:
                 cl_listdef = _ldef.CanonListdef(_ldef.SpecialListType.COMPOSITE, uid)
                 sl_listdef = _ldef.CanonListdef(_ldef.SpecialListType.SIMPLE, sl_uid)
-                raise _xcept.InputError(f"List '{cl_listdef.pretty(self)}' depends on {sl_listdef} which hasn't been fetched.") from e
+                raise _exc.InputError(f"List '{cl_listdef.pretty(self)}' depends on {sl_listdef} which hasn't been fetched.") from e
 
         return False
 
@@ -235,7 +255,7 @@ class FlamContext:
         # In case of duplicates we arbitrarily choose which to keep. We don't allow non-uniqueness.
         for mlf in dependency_mlfs:
             if mlf.uid_type != merged_mlf.uid_type:
-                raise _xcept.InputError(f"Cannot merge the lists '{' '.join(cldef.pretty(self) for cldef in abstract_listdefs)}' into a composite list "
+                raise _exc.InputError(f"Cannot merge the lists '{' '.join(cldef.pretty(self) for cldef in abstract_listdefs)}' into a composite list "
                     f"due to an ID type mismatch: {mlf.uid_type} != {merged_mlf.uid_type}.")
 
             # TODO: preserve information about which list each movie/person came from? Or in how many it appeared?
@@ -251,15 +271,18 @@ class FlamContext:
             merged_mlf.list_type = _ldef.SpecialListType.COMPOSITE
             merged_mlf.address = composite_uid
 
-        if not filter.is_empty:
-            merged_mlf = _ml.MovieList(merged_mlf, self).export(filter)
-        else:
+        if filter.is_empty:
             merged_mlf = copy.deepcopy(merged_mlf)
+        else:
+            merged_mlf = _ml.MovieList(merged_mlf, self).export(filter)
             
+        _dbg.logger.info(f"Generated '{merged_mlf.abstract_listdef}' with nmovies={len(merged_mlf.movies_by_uid)} npeople={len(merged_mlf.people_by_uid)}")
         return merged_mlf
 
     def _write_movie_list_file(self, movie_list_file: _mlf.MovieListFile) -> None:
-        movie_list_file.write(self._get_movie_list_file_path(movie_list_file.abstract_listdef))
+        path = self._get_movie_list_file_path(movie_list_file.abstract_listdef)
+        _dbg.logger.info(f"Writing movie list file with nmovies={len(movie_list_file.movies_by_uid)} npeople={len(movie_list_file.people_by_uid)} to {path=}")
+        movie_list_file.write(path)
 
     # After much deliberation, I decided that files for named lists should be named according to the list type and UID,
     # and unnamed lists' files should be named according to the list type and address.
@@ -277,7 +300,7 @@ class FlamContext:
             case _ldef.SpecialListType.COMPOSITE:
                 return self._composite_lists
             case _:
-                raise _xcept.InputError(f"Invalid list type '{list_type}': not any kind of stored list.")
+                raise _exc.InputError(f"Invalid list type '{list_type}': not any kind of stored list.")
 
     def get_list_by_abstract_listdef(self, abstract_listdef: _ldef.CanonListdef) -> _cfg.SimpleList | _cfg.CompositeList:
         return self.lists_of_type(abstract_listdef.list_type).get_by_uid(abstract_listdef.address)
@@ -302,7 +325,7 @@ class FlamContext:
         dependents = [cl.name for cl in self._composite_lists if uid in cl.simple_list_uids]
 
         if len(dependents) > 0:
-            raise _xcept.InputError(f"Failed to delete list '{simple_list.name}' because it is depended on by composite lists: {', '.join(dependents)}.")
+            raise _exc.InputError(f"Failed to delete list '{simple_list.name}' because it is depended on by composite lists: {', '.join(dependents)}.")
 
         # Deleting a list doesn't delete it from local storage, only gets it renamed to be anonymous.
         concrete_filename = self._get_movie_list_file_path(simple_list.concrete_listdef)
@@ -326,6 +349,7 @@ class FlamContext:
 
     def write_cfg(self) -> None:
         # TODO: In all the write() functions, actually write to a .partial and mov to the true dest once complete? In case the user exits in the middle.
+        _dbg.logger.info(f"Writing configuration: {self._cfg=}")
         self.cfg.write(self._get_cfg_path())
         
     def _get_cfg_path(self) -> str:
@@ -333,6 +357,7 @@ class FlamContext:
 
     # Metadata
     def _write_metadata(self) -> None:
+        _dbg.logger.info(f"Writing metadata: {self._cfg=}")
         self._metadata.write(self._get_metadata_path())
 
     def _get_metadata_path(self) -> str:
@@ -349,6 +374,8 @@ class FlamContext:
 
     # Fetching.
     def fetch(self, listdefs: typing.Iterable[str], refetch_pattern: None | str = None, quiet: bool = True) -> None:
+        _dbg.logger.info(f"Requested to fetch {listdefs=}, {refetch_pattern=}, {quiet=}")
+
         # Use a list not a generator so that if one of the listdefs doesn't parse good we will raise an error now and not before fetching a few.
         fetchers = [
             self._get_fetcher(cldef)
@@ -358,14 +385,16 @@ class FlamContext:
         try:
             refetch_re = re.compile(refetch_pattern, flags=re.IGNORECASE) if refetch_pattern is not None else None
         except re.error as e:
-            raise _xcept.InputError(f"Invalid PATTERN: '{refetch_pattern}': {e}") from e
+            raise _exc.InputError(f"Invalid PATTERN: '{refetch_pattern}': {e}") from e
 
         for fetcher in fetchers:
             try:
                 movie_list_file = self._get_movie_list_file(fetcher.abstract_listdef)
             # If the list were composite there'd be another case where this exception is raised, but it's not possible to reach here with a composite list.
-            except _xcept.InputError:
+            except _exc.InputError:
                 movie_list_file = _mlf.MovieListFile.create()
+
+            _dbg.logger.info(f"Fetching {fetcher.abstract_listdef} into file with nmovies={len(movie_list_file.movies_by_uid)} npeople={len(movie_list_file.people_by_uid)}")
                 
             # We need both the old and new versions to compare at the end. But it's important that the new one is the deepcopy,
             # so that anyone currently holding on to a list handle won't have the underlying list file changed.
@@ -374,7 +403,7 @@ class FlamContext:
             
             try:
                 fetcher.fetch(new_movie_list_file, self, refetch_re, quiet)
-            except _xcept.FetchInterrupt as e:
+            except _exc.FetchInterrupt as e:
                 interrupt_error = e
 
             # Must canonicalize before comparing for equality.
@@ -390,7 +419,10 @@ class FlamContext:
             self._movie_list_files_cache[new_movie_list_file.abstract_listdef] = new_movie_list_file
 
             if interrupt_error is not None:
+                _dbg.logger.info(f"Partially fetched {fetcher.abstract_listdef} due to interrupt: {interrupt_error}")
                 raise interrupt_error
+
+            _dbg.logger.info(f"Fetched {fetcher.abstract_listdef} with no interrupts")
 
     def _get_fetcher(self, canon_listdef: _ldef.CanonListdef) -> _fetch.ListFetcher:
         if canon_listdef.is_abstract:
@@ -409,15 +441,16 @@ class FlamContext:
                 pass
 
         if fetcher_cls is None:
-            raise _xcept.InputError(f"Invalid LISTDEF '{concrete_listdef}': type is unknown.")
+            raise _exc.InputError(f"Invalid LISTDEF '{concrete_listdef}': type is unknown.")
 
+        _dbg.logger.info(f"Created fetcher of type {fetcher_cls} for {concrete_listdef=}, {abstract_listdef=}")
         return fetcher_cls(concrete_listdef, abstract_listdef)
 
     # Filtering.
     def compile_filter(self, tokens: list[str], find: _ml.FindableType) -> _filter.Filter:
+        _dbg.logger.info(f"Compiling {tokens=}, {find=}")
         params = _filter.EatParams(tokens=tokens, find=find, ctx=self)
-        return _filter.Filter.eat(params)
+        filter = _filter.Filter.eat(params)
+        _dbg.logger.info(f"Compiled into: {filter}")
+        return filter
 
-# TODO: for now we put this here.
-def _is_debug() -> bool:
-    return 'FLAM_DEBUG' in os.environ

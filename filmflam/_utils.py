@@ -178,3 +178,30 @@ def import_file(file: str) -> types.ModuleType:
     module = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(module)
     return module
+
+# Courtesy of https://stackoverflow.com/a/59109706/12553917.
+_tree_space =  '    '
+_tree_branch = '│   '
+_tree_tee =    '├── '
+_tree_last =   '└── '
+
+def tree(dir_path: str, prefix: str = '', stats: None | typing.Callable[[str], str] = None) -> typing.Iterator[str]:
+    contents = os.listdir(dir_path)
+    
+    # contents each get pointers that are ├── with a final └──
+    pointers = [_tree_tee] * (len(contents) - 1) + [_tree_last]
+
+    for pointer, basename in zip(pointers, contents):
+        path = os.path.join(dir_path, basename)
+
+        if os.path.isfile(path) and stats is not None:
+            yield prefix + pointer + basename + stats(path)
+        else:
+            yield prefix + pointer + basename
+
+        # Extend the prefix and recurse.
+        if os.path.isdir(path):
+            extension = _tree_branch if pointer == _tree_tee else _tree_space
+
+            # i.e. space because last, └── , above so no more |
+            yield from tree(path, prefix=prefix + extension, stats=stats)

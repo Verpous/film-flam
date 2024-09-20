@@ -20,10 +20,11 @@ from ._reg import *
 
 # I don't want long lines and hate importing specific things with "from", so script names tend to be short.
 from ._ml import *
+from ._dbg import *
+from ._exc import *
 from ._ctx import *
 from ._cfg import *
 from ._file import *
 from ._attr import *
 from ._ldef import *
-from ._xcept import *
 from ._filter import *

@@ -39,6 +39,10 @@ class Choice(enum.StrEnum):
     def yes_no_auto(cls) -> typing.Iterable[str]:
         return (cls.YES, cls.NO, cls.AUTO)
 
+    # When you give argparse choices and they don't match it prints the error using repr so repr must be user readable.
+    def __repr__(self) -> str:
+        return str(self)
+
 def split_at_filter(strs: list[str]) -> tuple[list[str], list[str]]:
     filter_begin = next((i for i, s in enumerate(strs) if ff.is_filter_token(s)), len(strs))
     return strs[:filter_begin], strs[filter_begin:]
@@ -198,7 +202,7 @@ def subcommand_fetch(ctx: ff.FlamContext, args: argparse.Namespace) -> None:
 def subcommand_find(ctx: ff.FlamContext, args: argparse.Namespace) -> None:
     # Parse filter
     listdefs, filter_tokens = split_at_filter(args.LISTDEF + args.FILTER)
-    filter = ctx.compile_filter(filter_tokens, args.findable)
+    filter = ctx.compile_filter(filter_tokens, args.FINDABLE)
     movie_list = ctx.get_movie_list(listdefs, filter)
 
     for findable in movie_list.find(args.FINDABLE, filter=filter):
@@ -223,10 +227,9 @@ def main() -> None:
         formatter_class=argparse.RawTextHelpFormatter,
         description='I dunno lol.')
     parser.add_argument('-C', '--flam-dir', metavar='PATH', default=ff.FlamContext.DEFAULT_FLAM_DIR, action='store', help=
-        'Use %(metavar)s as the flam directory. Uses FLAM_DIR environment variable by default, or ~/.film_flam if it is not defined.')
+        f'Use %(metavar)s as the flam directory. Uses {ff.FlamEnv.CTX_DIR} environment variable by default, or ~/.film_flam if it is not defined.')
     parser.add_argument('-e', '--no-extensions', action='store_true', help=
         "Don't import configured extensions.")
-    parser.add_argument('--debug', action='store_true', help=argparse.SUPPRESS)
 
     subparsers = parser.add_subparsers(required=True)
 
@@ -360,7 +363,7 @@ Valid column names: ...''')
 
     # TODO: future problem: REMAINDER doesn't work if there are no positional arguments before it. If we add the shorthand subcommands a la "flam WHAT",
     # the WHAT won't be a positional argument anymore and REMAINDER won't work.
-    find_parser.add_argument('FINDABLE', choices=itertools.chain(ff.FindableType, ff.CrewType), action='store', help= # TODO: support comma-delimited crew types? If ROLES, use all crew types.
+    find_parser.add_argument('FINDABLE', choices=list(itertools.chain(ff.FindableType, ff.CrewType)), action='store', help= # TODO: support comma-delimited crew types? If ROLES, use all crew types.
         '''Choose what to find: movies, people, or roles. Roles have all the attributes of the movie and the person, and then a few role-specific ones.''')
     find_parser.add_argument('LISTDEF', nargs='*', action='store', help=
         '''Like fetch but with different defaults, and if the LISTDEFs aren't already fetched, it fails with a nice error message.''')
@@ -400,15 +403,12 @@ Valid column names: ...''')
     if hasattr(args, 'FILTER') and hasattr(args, 'REMAINDER'):
         args.FILTER += args.REMAINDER
 
-    if args.debug:
-        os.environ['FLAM_DEBUG'] = "1"
-
     ctx = ff.FlamContext(args.flam_dir, import_extensions=not args.no_extensions)
 
     try:
         args.function(ctx, args)
     except ff.FlamError as e:
-        if args.debug:
+        if ff.is_debug():
             raise
 
         # No ugly tracebacks for input errors. Only for internal errors.

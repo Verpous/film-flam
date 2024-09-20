@@ -19,7 +19,8 @@ import msgspec
 import typing
 import types
 
-from . import _xcept
+from . import _exc
+from . import _dbg
 
 # Users need to know about this type, mainly for type checking reasons, but I don't want them to have to know about msgspec.
 UnsetType = msgspec.UnsetType
@@ -34,7 +35,9 @@ class _FlamSerializable(msgspec.Struct, forbid_unknown_fields=True):
     def create(cls, **kwargs: typing.Any) -> typing.Self:
         field_values = dict(cls._defaults())
         field_values.update(kwargs)
-        return cls(**field_values)
+        obj = cls(**field_values)
+        _dbg.logger.info(f'Created serializable: {obj}')
+        return obj
 
     @classmethod
     def _defaults(cls) -> typing.Iterator[tuple[str, typing.Any]]:
@@ -64,6 +67,7 @@ class _FlamSerializable(msgspec.Struct, forbid_unknown_fields=True):
             raise cls._validation_error(f'{e}.') from e
 
         obj.sanity_checks()
+        _dbg.logger.info(f'Successfully loaded a {cls} of size {len(contents)}B')
         return obj
 
     @classmethod
@@ -71,7 +75,10 @@ class _FlamSerializable(msgspec.Struct, forbid_unknown_fields=True):
         try:
             return cls.load(file)
         except FileNotFoundError:
-            return cls.create(**kwargs)
+            _dbg.logger.info(f"File {file} doesn't exist, creating a new instance {cls}")
+            obj = cls.create(**kwargs)
+            obj.write(file)
+            return obj
     
     def write(self, file: str) -> None:
         self.sanity_checks()
@@ -82,7 +89,10 @@ class _FlamSerializable(msgspec.Struct, forbid_unknown_fields=True):
             raise self._validation_error(f'{e}.') from e
 
         with open(file, 'wb') as f:
-            f.write(msgspec.json.format(encoded))
+            formatted = msgspec.json.format(encoded)
+            f.write(formatted)
+
+        _dbg.logger.info(f'Successfully wrote a {type(self)} of size {len(formatted)}B')
 
     # Subclasses can override this to add file validity checks beyond what msgspec already does.
     def sanity_checks(self) -> None:
@@ -93,6 +103,8 @@ class _FlamSerializable(msgspec.Struct, forbid_unknown_fields=True):
 
     # Sorts all lists in the file recursively so that we can compare files for equality.
     def canonicalize(self) -> None:
+        _dbg.logger.info(f'Canonicalizing a {type(self)}')
+
         # Must be depth-first for this to work.
         for node in self.depth_first_iter():
             for field in msgspec.structs.fields(node):
@@ -129,5 +141,5 @@ class _FlamSerializable(msgspec.Struct, forbid_unknown_fields=True):
         yield self
 
     @classmethod
-    def _validation_error(cls, message: str) -> _xcept.FileValidationError:
-        return _xcept.FileValidationError(f'Invalid {cls.__name__}: {message}')
+    def _validation_error(cls, message: str) -> _exc.FileValidationError:
+        return _exc.FileValidationError(f'Invalid {cls.__name__}: {message}')

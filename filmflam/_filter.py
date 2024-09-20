@@ -22,7 +22,7 @@ import dataclasses
 
 from . import _ctx
 from . import _attr
-from . import _xcept
+from . import _exc
 from . import _ml
 
 # FILTER    := PIPELINE | <epsilon>
@@ -42,7 +42,7 @@ from . import _ml
 # )         := )  | ]    | -rparen
 
 # This one's for you, mayer.
-_EinGafrurError = _xcept.FilterSyntaxError
+_EinGafrurError = _exc.FilterSyntaxError
 
 @dataclasses.dataclass(frozen=True)
 class EatParams:
@@ -64,18 +64,18 @@ class FilterMember(abc.ABC):
 
     # Helper methods for parsing below.
     @classmethod
-    def eat_str(cls, params: EatParams, at: int, description: str, error_indices: int | typing.Iterable[int] = -1, is_terminal: bool = False) -> str:
+    def eat_str(cls, params: EatParams, at: int, description: str, error_indices: int | typing.Iterable[int] = -1, is_terminal: bool = True) -> str:
         if at >= len(params.tokens):
-            raise _EinGafrurError(f"Expected {description}, but reached the end of input.", tokens=params.tokens, is_terminal=is_terminal, error_indices=error_indices)
+            raise _EinGafrurError(f"Expected {description}, but reached the end of input.", tokens=params.tokens, error_indices=error_indices, is_terminal=is_terminal)
 
         return params.tokens[at]
 
     @classmethod
-    def eat_one_of(cls, params: EatParams, at: int, description: str, options: set[str], is_terminal: bool = False) -> str:
+    def eat_one_of(cls, params: EatParams, at: int, description: str, options: set[str], is_terminal: bool = True) -> str:
         s = cls.eat_str(params, at, description, is_terminal)
         
         if s not in options:
-            raise _EinGafrurError(f"Expected {description}, but got: '{s}'.", tokens=params.tokens, is_terminal=is_terminal, error_indices=at)
+            raise _EinGafrurError(f"Expected {description}, but got: '{s}'.", tokens=params.tokens, error_indices=at, is_terminal=is_terminal)
 
         return s
 
@@ -117,6 +117,7 @@ class Filter(FilterMember):
     def __init__(self, pipeline: None | Pipeline, find: _ml.FindableType) -> None:
         self._pipeline = pipeline
         self._find = find
+        self._regurgitation: None | list[str] = None
 
     @property
     def findable_type(self) -> _ml.FindableType:
@@ -142,11 +143,17 @@ class Filter(FilterMember):
         return self._pipeline is None or self._pipeline.excrete(findable, ctx)
 
     def regurgitate(self) -> typing.Iterator[str]:
-        if self._pipeline is not None:
+        # Cache it since due to logging it's pretty much guaranteed we will want this multiple times.
+        if self._regurgitation is None:
             # Parentheses around the whole filter are useless, and they make it so if you repeatedly compile(regurgitate(compile(regurgitate...))),
             # each iteration wraps the expression in an additional parentheses.
-            yield from self._pipeline.regurgitate(parenthesize=False)
+            self._regurgitation = [] if self._pipeline is None else list(self._pipeline.regurgitate(parenthesize=False))
 
+        return iter(self._regurgitation)
+
+    def __str__(self) -> str:
+        return ' '.join(self.regurgitate())
+        
 class Pipeline(FilterMember):
     # Yes the type annotations are a little ugly, but there's no way to alias them due to their recursive nature.
     def __init__(self, single: Predicate | Negative | Pipeline, joinables: list[Disjoined | Predicate | Negative | Pipeline]) -> None:

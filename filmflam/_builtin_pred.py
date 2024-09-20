@@ -17,7 +17,7 @@ import typing
 
 from . import _ctx
 from . import _filter
-from . import _xcept
+from . import _exc
 from . import _reg
 from . import _attr
 from . import _ml
@@ -105,7 +105,7 @@ class Size(_filter.Predicate, name='size'):
         try:
             value = int(value_str)
         except ValueError as e:
-            raise _xcept.FilterSyntaxError(f"Expected value to be an int, but got: '{value_str}'.", tokens=params.tokens, error_indices=at + 1) from e
+            raise _exc.FilterSyntaxError(f"Expected value to be an int, but got: '{value_str}'.", tokens=params.tokens, error_indices=at + 1) from e
 
         return cls(attribute, cmp, value), at + 2
 
@@ -154,9 +154,9 @@ def _test_compile(line: str, find: _ml.FindableType = _ml.FindableType.ROLES, ct
 
     try:
         filter = ctx.compile_filter(tokens, find)
-        regurg = ' '.join(_xcept.FilterSyntaxError.format_token(t) for t in filter.regurgitate())
+        regurg = ' '.join(_exc.FilterSyntaxError.format_token(t) for t in filter.regurgitate())
         print(line, '->', regurg)
-    except _xcept.FilterSyntaxError as e:
+    except _exc.FilterSyntaxError as e:
         print(e)
 
 # _test_compile('')

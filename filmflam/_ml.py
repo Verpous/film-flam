@@ -25,12 +25,16 @@ from . import _mlf
 from . import _ctx
 from . import _fetch
 from . import _attr
-from . import _xcept
+from . import _exc
+from . import _dbg
 
 class GroupMode(enum.StrEnum):
     DEFAULT             = 'default'
     GROUP               = 'group'
     SINGLE              = 'single'
+    
+    def __repr__(self) -> str:
+        return str(self)
 
 class CrewType(enum.StrEnum):
     #                      value                default_group_mode
@@ -55,6 +59,9 @@ class CrewType(enum.StrEnum):
     # This init only exists to convince mypy that this enum really has these fields.
     def __init__(self, value: str, default_group_mode: bool) -> None:
         self.default_group_mode = default_group_mode
+        
+    def __repr__(self) -> str:
+        return str(self)
 
 class FindableType(enum.StrEnum):
     MOVIES              = 'movies'
@@ -64,6 +71,9 @@ class FindableType(enum.StrEnum):
     def is_compatible(self, find: FindableType) -> bool:
         # Roles are compatible with everything because a role is associated with people and a movie.
         return find == self.ROLES or self == find
+        
+    def __repr__(self) -> str:
+        return str(self)
 
 class Findable(abc.ABC):
     def __init__(self, movie_list: MovieList) -> None:
@@ -138,6 +148,9 @@ class Person(Findable):
 
 class MovieList:
     def __init__(self, movie_list_file: _mlf.MovieListFile, ctx: _ctx.FlamContext):
+        _dbg.logger.info(f"Creating movie list for '{movie_list_file.abstract_listdef}', "
+            f"which has {len(movie_list_file.movies_by_uid)} movies, {len(movie_list_file.people_by_uid)} people")
+
         self._ctx = ctx
         self._movie_list_file = movie_list_file
 
@@ -148,12 +161,14 @@ class MovieList:
     def __iter__(self) -> typing.Iterator[Findable]:
         return iter(self.find(FindableType.MOVIES))
 
-    def find(self, what: FindableType, crew_type: None | CrewType = None, group_mode: GroupMode = GroupMode.DEFAULT, filter: None | _filter.Filter = None) -> typing.Iterable[Findable]:
+    def find(self, what: FindableType, crew_type: None | CrewType = None, group_mode: GroupMode = GroupMode.DEFAULT, filter: None | _filter.Filter = None) -> typing.Iterator[Findable]:
+        _dbg.logger.info(f"Going to find {what} in '{self._movie_list_file.abstract_listdef}' with {filter=!s}")
+
         if filter is None:
             filter = self._ctx.compile_filter([], what)
 
         if filter.findable_type != what:
-            raise _xcept.InputError(f"Requested to find {what} but filter is of type {filter.findable_type}.")
+            raise _exc.InputError(f"Requested to find {what} but filter is of type {filter.findable_type}.")
 
         findables: list[Movie] | list[Person] | list[Role]
         
@@ -164,7 +179,7 @@ class MovieList:
                 findables = self._generate_people()
             case FindableType.ROLES:
                 if crew_type is None:
-                    raise _xcept.InputError(f"Cannot find {what} without specifying the crew type.")
+                    raise _exc.InputError(f"Cannot find {what} without specifying the crew type.")
 
                 findables = self._generate_roles(crew_type, group_mode)
 
@@ -173,38 +188,22 @@ class MovieList:
         else:
             yield from (f for f in findables if filter.excrete(f, self._ctx))
 
-    def find_movies(self, filter: None | _filter.Filter = None) -> typing.Iterable[Movie]:
-        # TODO: keeping these functions has deep implications, including: {Movie,Person,Role}Attributes, {Movie,Person,Role}Filter,
-        # and as a consequence of that possibly splitting the registry by attribute type, and 3 compile_filter methods, and 3 of many things...
-        # So far it's all just to eliminate one cast. Maybe not worth it.
-        raise NotImplementedError()
+    def find_movies(self, filter: None | _filter.Filter = None) -> typing.Iterator[Movie]:
+        # Yes, casting, ugly... But the infrastracture we will need to build to eliminate this cast is, at this time, not worth it.
+        return typing.cast(typing.Iterator[Movie], self.find(FindableType.MOVIES, filter=filter))
 
-        if filter is None:
-            filter = self._ctx.compile_filter([], FindableType.MOVIES)
+    def find_people(self, filter: None | _filter.Filter = None) -> typing.Iterator[Person]:
+        return typing.cast(typing.Iterator[Person], self.find(FindableType.PEOPLE, filter=filter))
 
-        if filter.findable_type != FindableType.MOVIES:
-            raise _xcept.InputError(f"Requested to find {FindableType.MOVIES} but filter is of type {filter.findable_type}.")
-
-        movies = self._generate_movies()
-
-        if filter.is_empty:
-            yield from movies
-        else:
-            yield from (m for m in movies if filter.excrete(m, self._ctx))
-
-    def find_people(self, filter: None | _filter.Filter = None) -> typing.Iterable[Person]:
-        raise NotImplementedError()
-
-    def find_roles(self, crew_type: CrewType, group_mode: GroupMode = GroupMode.DEFAULT, filter: None | _filter.Filter = None) -> typing.Iterable[Role]:
-        raise NotImplementedError()
+    def find_roles(self, crew_type: None | CrewType = None, group_mode: GroupMode = GroupMode.DEFAULT, filter: None | _filter.Filter = None) -> typing.Iterator[Role]:
+        return typing.cast(typing.Iterator[Role], self.find(FindableType.ROLES, crew_type=crew_type, group_mode=group_mode, filter=filter))
 
     def export(self, filter: _filter.Filter) -> _mlf.MovieListFile:
+        _dbg.logger.info(f"Exporting '{self._movie_list_file.abstract_listdef}' with {filter=!s}")
         filtered_file = copy.deepcopy(self._movie_list_file)
-
-        # Yes, casting, ugly... But the infrastracture we will need to build to eliminate this cast is, at this time, not worth it.
-        movies = typing.cast(typing.Iterable[Movie], self.find(FindableType.MOVIES, filter=filter))
-        filtered_file.movies_by_uid = {movie._mlf_movie.uid: movie._mlf_movie for movie in movies}
+        filtered_file.movies_by_uid = {movie._mlf_movie.uid: movie._mlf_movie for movie in self.find_movies(filter)}
         _fetch._remove_unused_people(filtered_file)
+        _dbg.logger.info(f"Resulting file has {len(filtered_file.movies_by_uid)} movies, {len(filtered_file.people_by_uid)} people")
         return filtered_file
 
     # I permit access to this and entrust users to only read from it because some attributes need it,
@@ -218,12 +217,14 @@ class MovieList:
         if self._movies is None:
             self._movies = [Movie(self, mlf_movie) for mlf_movie in self._movie_list_file.movies_by_uid.values()]
 
+        _dbg.logger.info(f"Generated movie list, {len(self._movies)=}")
         return self._movies
 
     def _generate_people(self) -> list[Person]:
         if self._people is None:
             self._people = [Person(self, mlf_person) for mlf_person in self._movie_list_file.people_by_uid.values()]
 
+        _dbg.logger.info(f"Generated people list, {len(self._movies)=}")
         return self._people
 
     def _generate_roles(self, crew_type: CrewType, group_mode: GroupMode) -> list[Role]:
@@ -240,6 +241,7 @@ class MovieList:
                     for mlf_role in mlf_movie.crew[crew_type].roles_by_uid.values()
             ]
 
+        _dbg.logger.info(f"Generated roles list, {cg=}, {len(self._roles[cg])=}")
         return self._roles[cg]
 
 # Crew type, grouping, roles, people brainstorming:
