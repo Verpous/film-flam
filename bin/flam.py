@@ -200,24 +200,31 @@ def subcommand_fetch(ctx: ff.FlamContext, args: argparse.Namespace) -> None:
         ctx.fetch(listdefs, refetch_pattern=args.refetch, quiet=False)
 
 def subcommand_find(ctx: ff.FlamContext, args: argparse.Namespace) -> None:
-    # Parse filter
+    # Get attributes.
+    def get_attribute(ctx: ff.FlamContext, name: str) -> ff.Attribute:
+        for registry in ctx.registries_to_try():
+            if registry.has_attribute(name):
+                return registry.get_attribute(name)
+
+        raise ff.InputError(f"Invalid COLUMN: '{name}'")
+
+    attributes = [get_attribute(ctx, c) for c in [args.columns]]
+
+    # Get movie list.
     listdefs, filter_tokens = split_at_filter(args.LISTDEF + args.FILTER)
     filter = ctx.compile_filter(filter_tokens, args.FINDABLE)
     movie_list = ctx.get_movie_list(listdefs, filter)
 
-    for findable in movie_list.find(args.FINDABLE, filter=filter):
-        pass
-    
-    # 1. Parse the listdefs for finding (generally means no composite list expansion, and maybe even no uniqueing).
-    # 2. Load all the relevant data, which includes the list file and, if people (or roles?) also cached grouping files, or compute the grouping now if not cached
-    # 3. Put the data through filtering
-    # 4. Sort the data according to desired sorting
-    # 5. Extract list of stringified attributes from the data and add titles row (TODO: do this sooner in order to have a "row regex matches" filter?
-    #    Only do it sooner if that filter token exists?) On second thought, probably not because filtering shouldn't even know about columnating
-    # 6. Format in a table
-    # 7. Print
+    rows = [
+        [
+            attr.type_handler.stringify(findable.extract(attr))
+            for attr in attributes
+        ]
+        for findable in movie_list.find(args.FINDABLE, filter=filter)
+    ]
 
-    # I would say that steps 1,2 are a single operation, and every other step is a separate function
+    # TODO: tabulate.
+    print(rows)
 
 def subcommand_chart(ctx: ff.FlamContext, args: argparse.Namespace) -> None:
     print('chart')

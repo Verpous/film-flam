@@ -31,18 +31,18 @@ from . import _dbg
 class GroupMode(enum.StrEnum):
     DEFAULT             = 'default'
     GROUP               = 'group'
-    SINGLE              = 'single'
+    SEPARATE            = 'separate'
     
     def __repr__(self) -> str:
         return str(self)
 
 class CrewType(enum.StrEnum):
     #                      value                default_group_mode
-    CAST                = ('cast',              GroupMode.SINGLE)
-    STUNTCAST           = ('stuntcast',         GroupMode.SINGLE)
+    CAST                = ('cast',              GroupMode.SEPARATE)
+    STUNTCAST           = ('stuntcast',         GroupMode.SEPARATE)
     DIRECTOR            = ('director',          GroupMode.GROUP)
     WRITER              = ('writer',            GroupMode.GROUP)
-    PRODUCER            = ('producer',          GroupMode.SINGLE)
+    PRODUCER            = ('producer',          GroupMode.SEPARATE)
     COMPOSER            = ('composer',          GroupMode.GROUP)
     CINEMATOGRAPHER     = ('cinematographer',   GroupMode.GROUP)
     EDITOR              = ('editor',            GroupMode.GROUP)
@@ -57,7 +57,7 @@ class CrewType(enum.StrEnum):
         return obj
 
     # This init only exists to convince mypy that this enum really has these fields.
-    def __init__(self, value: str, default_group_mode: bool) -> None:
+    def __init__(self, _: str, default_group_mode: bool) -> None:
         self.default_group_mode = default_group_mode
         
     def __repr__(self) -> str:
@@ -224,7 +224,7 @@ class MovieList:
         if self._people is None:
             self._people = [Person(self, mlf_person) for mlf_person in self._movie_list_file.people_by_uid.values()]
 
-        _dbg.logger.info(f"Generated people list, {len(self._movies)=}")
+        _dbg.logger.info(f"Generated people list, {len(self._people)=}")
         return self._people
 
     def _generate_roles(self, crew_type: CrewType, group_mode: GroupMode) -> list[Role]:

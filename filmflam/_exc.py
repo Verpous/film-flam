@@ -14,7 +14,7 @@
 # along with this program. If not, see <https://www.gnu.org/licenses/>.
 
 import typing
-import colorama # type: ignore
+import colorama
 
 from . import _dbg
 

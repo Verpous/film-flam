@@ -46,7 +46,7 @@ class Registry:
             if obj.name in self._attributes:
                 raise _exc.InputError(f"Cannot register the attribute '{obj.name}' because an attribute by that name is already registered.")
 
-            _dbg.logger.info(f"Registered {obj} as a attribute with key='{obj.name}'")
+            _dbg.logger.info(f"Registered {obj} as an attribute with key='{obj.name}'")
             self._attributes[obj.name] = obj
         else:
             raise _exc.InputError(f"Invalid object for registration: {obj}.")

@@ -98,11 +98,11 @@ class ListFetcher(abc.ABC):
         pass
 
 def _remove_unused_people(movie_list_file: _mlf.MovieListFile) -> None:
-    used_person_uids = set(_get_all_used_person_uids(movie_list_file))
+    used_person_uids = set(
+        role.person_uid
+        for mlf_movie in movie_list_file.movies_by_uid.values()
+            for crew in mlf_movie.crew.values()
+                for role in crew.roles_by_uid.values()
+    )
+    
     movie_list_file.people_by_uid = {uid: person for uid, person in movie_list_file.people_by_uid.items() if uid in used_person_uids}
-
-def _get_all_used_person_uids(movie_list_file: _mlf.MovieListFile) -> typing.Iterator[str]:
-    for mlf_movie in movie_list_file.movies_by_uid.values():
-        for crew in mlf_movie.crew.values():
-            for role in crew.roles_by_uid.values():
-                yield role.person_uid

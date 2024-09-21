@@ -99,14 +99,17 @@ class FilterMember(abc.ABC):
         return attribute
 
     @classmethod
-    def eat_cmp_value(cls, params: EatParams, at: int, default_cmp: _attr.ComparisonOp) -> tuple[_attr.ComparisonOp, str]:
-        cmp_value = cls.eat_str(params, at, 'a value')
-        # TODO: Cast value into correct type?
-        return cls.split_cmp_value(cmp_value, default_cmp)
+    def eat_cmp_value(cls, params: EatParams, at: int, type_handler: _attr.TypeHandler) -> _attr.CmpValue:
+        cmp_value_str = cls.eat_str(params, at, 'a value')
+        cmp, value_str = cls.split_cmp_value_str(cmp_value_str, type_handler.default_cmp)
 
-    # TODO: if the type is regex compile it right here right now? Probably not since why would it be special when all other values are parsed later.
+        try:
+            return type_handler.make_cmp_value(cmp, value_str)
+        except _exc.InputError as e:
+            raise _EinGafrurError(str(e), tokens=params.tokens, error_indices=at) from e
+
     @classmethod
-    def split_cmp_value(cls, cmp_value: str, default_cmp: _attr.ComparisonOp) -> tuple[_attr.ComparisonOp, str]:
+    def split_cmp_value_str(cls, cmp_value: str, default_cmp: _attr.ComparisonOp) -> tuple[_attr.ComparisonOp, str]:
         for cmp in _attr.ComparisonOp:
             if cmp_value.startswith(cmp.sign):
                 return cmp, cmp_value.removeprefix(cmp.sign)
@@ -361,10 +364,9 @@ class Predicate(FilterMember):
 
 # This should be the only concrete predicate that is in this file, because it's special.
 class AttributePredicate(Predicate, name='attribute'):
-    def __init__(self, attribute: _attr.Attribute, cmp: _attr.ComparisonOp, value: typing.Any) -> None: # TODO: not "Any"?
+    def __init__(self, attribute: _attr.Attribute, cmp_value: _attr.CmpValue) -> None:
         self._attribute = attribute
-        self._cmp = cmp
-        self._value = value
+        self._cmp_value = cmp_value
 
         # Shadow the name with that of the attribute. Python lets you shadow class variables with instance variables like this.
         self.name = attribute.name
@@ -372,20 +374,17 @@ class AttributePredicate(Predicate, name='attribute'):
     # Part of being a special predicate means its "eat" has a different signature so we have to give it a different name.
     @classmethod
     def eat_shit(cls, params: EatParams, at: int, attribute: _attr.Attribute) -> tuple[Predicate, int]:
-        cmp, value_str = cls.eat_cmp_value(params, at, attribute.default_cmp)
-        value = None # TODO: use attribute to parse value_str into the attribute's type. Possibly also check if attribute supports the comparator?
-        return cls(attribute, cmp, value), at + 1
+        cmp_value = cls.eat_cmp_value(params, at, attribute.type_handler)
+        return cls(attribute, cmp_value), at + 1
 
     def excrete(self, findable: _ml.Findable, ctx: _ctx.FlamContext) -> bool:
         actual = findable.extract(self._attribute)
-
-        # For array types we do "contains".
-        return (any(self._cmp.compare(elem, self._value) for elem in actual) if self._attribute.is_array
-            else self._cmp.compare(actual, self._value))
+        return (any(self._cmp_value.compare(elem) for elem in actual) if self._attribute.is_array
+            else self._cmp_value.compare(actual))
 
     def regurgitate(self) -> typing.Iterator[str]:
         yield from super().regurgitate()
-        yield self._cmp.sign + str(self._value)
+        yield str(self._cmp_value)
 
 # Doesn't guarantee that token is valid, only indicates that it looks like it should be.
 def is_filter_token(token: str) -> bool:

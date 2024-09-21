@@ -31,6 +31,7 @@ class MLFCrew(_file._FlamSerializable):
 class MLFPerson(_file._FlamSerializable):
     uid:                    str
     name:                   _file.UnsetType | str
+    # TODO: Check if can support birthday?
     # Would love to add gender, nationality but cinemagoer doesn't have them.
 
 class MLFMovie(_file._FlamSerializable):

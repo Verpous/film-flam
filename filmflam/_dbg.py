@@ -21,7 +21,7 @@ import os
 import sys
 import types
 import enum
-import colorama # type: ignore
+import colorama
 import typing
 
 class FlamEnv(enum.StrEnum):
@@ -59,32 +59,13 @@ def get_log_file_path() -> str:
     # Use cwd for unknown platforms.
     return FILENAME
 
-# Add support for colored logging. I prefer this approach to a custom formatter.
-_old_factory = logging.getLogRecordFactory()
-_script = os.path.basename(sys.argv[0]) if len(sys.argv) > 0 else 'n/a'
-_levelcolors = {
-    logging.DEBUG:      '',
-    logging.INFO:       '',
-    logging.WARNING:    colorama.Fore.YELLOW,
-    logging.ERROR:      colorama.Style.BRIGHT + colorama.Fore.RED,
-    logging.CRITICAL:   colorama.Fore.RED,
-}
-
-def _levelcolor_record_factory(*args: typing.Any, **kwargs: typing.Any) -> logging.LogRecord:
-    record = _old_factory(*args, **kwargs)
-    record.resetcolor = colorama.Style.RESET_ALL
-    record.levelcolor = _levelcolors[record.levelno]
-    record.scriptName = _script
-    return record
-
-logging.setLogRecordFactory(_levelcolor_record_factory)
-
 def _make_logger() -> logging.Logger:
     # Ignore exceptions except in debug mode. I hate using logging because it's global but there's no nice way to enable this per-logger or per-handler.
     logging.raiseExceptions = is_debug()
 
-    loggr = logging.Logger('filmflam')
-    loggr.setLevel(getattr(logging, FlamEnv.LOGLEVEL.get('DEBUG').upper()))
+    # Underscore to not conflict with the global.
+    logger_ = logging.Logger('filmflam')
+    logger_.setLevel(getattr(logging, FlamEnv.LOGLEVEL.get('DEBUG').upper()))
 
     # Timestamp is first because when catenating log with backups it's easy to sort.
     formatter = logging.Formatter(
@@ -103,23 +84,45 @@ def _make_logger() -> logging.Logger:
     fh = logging.handlers.RotatingFileHandler(logs_path, maxBytes=1 << 24, backupCount=1, encoding='utf-8')
     fh.setLevel(logging.DEBUG)
     fh.setFormatter(formatter)
-    loggr.addHandler(fh)
+    logger_.addHandler(fh)
 
     if FlamEnv.LOG2CONSOLE.is_defined:
         ch = logging.StreamHandler()
         ch.setLevel(logging.DEBUG)
         ch.setFormatter(formatter)
-        loggr.addHandler(ch)
+        logger_.addHandler(ch)
 
-    return loggr
+    return logger_
 
+# Support for colored logging and logging the script name. I prefer this approach to a custom formatter.
+def _flam_record_factory(*args: typing.Any, **kwargs: typing.Any) -> logging.LogRecord:
+    record = _prev_record_factory(*args, **kwargs)
+    record.resetcolor = colorama.Style.RESET_ALL
+    record.levelcolor = _levelcolors[record.levelno]
+    record.scriptName = _script_name
+    return record
+
+# Handler for uncaught exceptions.
 def _log_exception(exc_type: type[BaseException], exc_value: BaseException, exc_traceback: None | types.TracebackType) -> None:
     logger.critical('Uncaught exception!', exc_info=(exc_type, exc_value, exc_traceback))
     _prev_excepthook(exc_type, exc_value, exc_traceback)
 
+_script_name = os.path.basename(sys.argv[0]) if len(sys.argv) > 0 else 'n/a'
+_levelcolors = {
+    logging.DEBUG:      '',
+    logging.INFO:       '',
+    logging.WARNING:    colorama.Fore.YELLOW,
+    logging.ERROR:      colorama.Style.BRIGHT + colorama.Fore.RED,
+    logging.CRITICAL:   colorama.Fore.RED,
+}
+
+_prev_record_factory = logging.getLogRecordFactory()
+logging.setLogRecordFactory(_flam_record_factory)
+
 logger = _make_logger()
-logger.info("Here we go again!")
-logger.info(f"Environment variables:\n{'\n    '.join(f'"{k}": \t"{v}"' for k, v in os.environ.items())}")
 
 _prev_excepthook = sys.excepthook
 sys.excepthook = _log_exception
+
+logger.info("Here we go again!")
+logger.info(f"Environment variables:\n{'\n    '.join(f'"{k}": \t"{v}"' for k, v in os.environ.items())}")

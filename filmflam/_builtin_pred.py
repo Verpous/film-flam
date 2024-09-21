@@ -21,6 +21,7 @@ from . import _exc
 from . import _reg
 from . import _attr
 from . import _ml
+from . import attrutils
 
 @_reg._register_builtin
 class TruePredicate(_filter.Predicate, name='true'):
@@ -42,82 +43,68 @@ class FalsePredicate(_filter.Predicate, name='false'):
 
 @_reg._register_builtin
 class All(_filter.Predicate, name='all'):
-    def __init__(self, attribute: _attr.Attribute, cmp: _attr.ComparisonOp, value: typing.Any) -> None: # TODO: better annotation for value, in many places.
+    def __init__(self, attribute: _attr.Attribute, cmp_value: _attr.CmpValue) -> None:
         self._attribute = attribute
-        self._cmp = cmp
-        self._value = value
+        self._cmp_value = cmp_value
     
     @classmethod
     def eat(cls, params: _filter.EatParams, at: int) -> tuple[_filter.Predicate, int]:
         attribute = cls.eat_attribute(params, at, is_array=True)
-        cmp, value_str = cls.eat_cmp_value(params, at + 1, attribute.default_cmp)
-        value = None # TODO: use attribute to parse value_str into the attribute's type. Possibly also check if attribute supports the comparator?
-        return cls(attribute, cmp, value), at + 2
+        cmp_value = cls.eat_cmp_value(params, at + 1, attribute.type_handler)
+        return cls(attribute, cmp_value), at + 2
 
     def excrete(self, findable: _ml.Findable, ctx: _ctx.FlamContext) -> bool:
-        # TODO: If array type, extract first element only.
         actual = findable.extract(self._attribute)
-        return all(self._cmp.compare(elem, self._value) for elem in actual)
+        return all(self._cmp_value.compare(elem) for elem in actual)
 
     def regurgitate(self) -> typing.Iterator[str]:
         yield from super().regurgitate()
         yield self._attribute.name
-        yield self._cmp.sign + str(self._value)
+        yield str(self._cmp_value)
 
 # TODO: actually delete this I think, we don't need it.
 @_reg._register_builtin
 class Contains(_filter.Predicate, name='contains'):
-    def __init__(self, attribute: _attr.Attribute, cmp: _attr.ComparisonOp, value: typing.Any) -> None:
+    def __init__(self, attribute: _attr.Attribute, cmp_value: _attr.CmpValue) -> None:
         self._attribute = attribute
-        self._cmp = cmp
-        self._value = value
+        self._cmp_value = cmp_value
     
     @classmethod
     def eat(cls, params: _filter.EatParams, at: int) -> tuple[_filter.Predicate, int]:
         attribute = cls.eat_attribute(params, at, is_array=True)
-        cmp, value_str = cls.eat_cmp_value(params, at + 1, attribute.default_cmp)
-        value = None # TODO: use attribute to parse value_str into the attribute's type. Possibly also check if attribute supports the comparator?
-        return cls(attribute, cmp, value), at + 2
+        cmp_value = cls.eat_cmp_value(params, at + 1, attribute.type_handler)
+        return cls(attribute, cmp_value), at + 2
 
     def excrete(self, findable: _ml.Findable, ctx: _ctx.FlamContext) -> bool:
-        # TODO: If array type, extract first element only.
         actual = findable.extract(self._attribute)
-        return any(self._cmp.compare(elem, self._value) for elem in actual)
+        return any(self._cmp_value.compare(elem) for elem in actual)
 
     def regurgitate(self) -> typing.Iterator[str]:
         yield from super().regurgitate()
         yield self._attribute.name
-        yield self._cmp.sign + str(self._value)
+        yield str(self._cmp_value)
 
 # TODO: actually we probably want to have a size attribute for every array type so this isn't needed either.
 @_reg._register_builtin
 class Size(_filter.Predicate, name='size'):
-    def __init__(self, attribute: _attr.Attribute, cmp: _attr.ComparisonOp, value: typing.Any) -> None:
+    def __init__(self, attribute: _attr.Attribute, cmp_value: _attr.CmpValue) -> None:
         self._attribute = attribute
-        self._cmp = cmp
-        self._value = value
+        self._cmp_value = cmp_value
     
     @classmethod
     def eat(cls, params: _filter.EatParams, at: int) -> tuple[_filter.Predicate, int]:
         attribute = cls.eat_attribute(params, at, is_array=True)
-        cmp, value_str = cls.eat_cmp_value(params, at + 1, attribute.default_cmp)
-        
-        try:
-            value = int(value_str)
-        except ValueError as e:
-            raise _exc.FilterSyntaxError(f"Expected value to be an int, but got: '{value_str}'.", tokens=params.tokens, error_indices=at + 1) from e
-
-        return cls(attribute, cmp, value), at + 2
+        cmp_value = cls.eat_cmp_value(params, at + 1, attrutils.int_handler)
+        return cls(attribute, cmp_value), at + 2
 
     def excrete(self, findable: _ml.Findable, ctx: _ctx.FlamContext) -> bool:
-        # TODO: If array type, extract first element only.
         actual = findable.extract(self._attribute)
-        return self._cmp.compare(len(actual), self._value)
+        return self._cmp_value.compare(len(actual))
 
     def regurgitate(self) -> typing.Iterator[str]:
         yield from super().regurgitate()
         yield self._attribute.name
-        yield self._cmp.sign + str(self._value)
+        yield str(self._cmp_value)
 
 # TODO: Predicate ideas:
 # Don't forget for string predicates we should support regex with "anywhere in the string" matching by default!
