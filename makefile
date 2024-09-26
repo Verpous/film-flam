@@ -23,6 +23,7 @@ PYLINT_IGNORE += C0104 # disallowed-name
 PYLINT_IGNORE += C0114 # missing-module-docstring
 PYLINT_IGNORE += C0115 # missing-class-docstring
 PYLINT_IGNORE += C0116 # missing-function-docstring
+PYLINT_IGNORE += C0200 # consider-using-enumerate
 PYLINT_IGNORE += C0301 # line-too-long
 PYLINT_IGNORE += C0302 # too-many-lines
 PYLINT_IGNORE += C0303 # trailing-whitespace
@@ -35,6 +36,7 @@ PYLINT_IGNORE += R0402 # consider-using-from-import
 PYLINT_IGNORE += R0902 # too-many-instance-attributes
 PYLINT_IGNORE += R0903 # too-few-public-methods
 PYLINT_IGNORE += R0913 # too-many-arguments
+PYLINT_IGNORE += R0917 # too-many-positional-arguments
 PYLINT_IGNORE += R1708 # stop-iteration-return
 PYLINT_IGNORE += R1714 # consider-using-in
 
@@ -68,10 +70,11 @@ cfg:
 	$(CLI) config composite testcomp testlist -true
 
 mypy:
-	MYPY_FORCE_COLOR=1 mypy --disallow-untyped-defs --disallow-incomplete-defs $(CLI)
+	MYPY_FORCE_COLOR=1 mypy --disallow-untyped-defs --disallow-incomplete-defs --enable-incomplete-feature=NewGenericSyntax $(CLI)
 
+# PEP 695 support seems to be a little shoddy at this time so we patch it with a grep.
 pylint:
-	pylint --output-format=colorized --disable="$$(printf %s, $(PYLINT_IGNORE))" -- $(FILES) | less -R
+	pylint --output-format=colorized --disable="$$(printf %s, $(PYLINT_IGNORE))" -- $(FILES) | grep -v "Undefined variable 'T'" | less -R
 
 wc:
 	@wc -l -- $(FILES)

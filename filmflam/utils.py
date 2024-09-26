@@ -22,13 +22,14 @@ import typing
 import shutil
 import unicodedata
 import importlib.util
+import colorama
 
-class ProgressBar:
+class ProgressBar[T]:
     MAX_DESC = 20
     MAX_SUFFIX = 40
     FRAC_FMT = '({} / {})'
 
-    def __init__(self, elements: list[typing.Any], desc: None | str = None, keyfunc: None | typing.Callable[[typing.Any], str] = None) -> None:
+    def __init__(self, elements: list[T], desc: None | str = None, keyfunc: None | typing.Callable[[T], str] = None) -> None:
         self._elements = elements
         self._num_of = len(self._elements)
 
@@ -36,7 +37,7 @@ class ProgressBar:
         self._keyfunc = keyfunc if keyfunc is not None else lambda elem: ''
 
         # Type checker needs this hint.
-        self._iterator: None | typing.Iterator[tuple[int, typing.Any]] = None
+        self._iterator: None | typing.Iterator[tuple[int, T]] = None
         self._is_done = True
 
         # The progress fraction's size is fixed to the maximal length it may reach, which is when it's num_of / num_of.
@@ -48,22 +49,22 @@ class ProgressBar:
         empty_bar = self._build_bar(0, None)
         self._bar_width = max(shutil.get_terminal_size().columns - len(empty_bar), 0) # os.get_terminal_size fails if output is not a tty.
 
-    def _build_bar(self, idx: int, elem: typing.Any) -> str:
+    def _build_bar(self, idx: int, elem: None | T) -> str:
         fill_amt = int((float(idx) / float(self._num_of)) * self._bar_width) if idx != self._num_of else self._bar_width
         fill_str = (fill_amt * '#').ljust(self._bar_width)
         frac_str = self.FRAC_FMT.format(idx, self._num_of).ljust(self._max_frac_len)
         suff_str = (truncate(self._keyfunc(elem), self.MAX_SUFFIX) if elem is not None else '').ljust(self.MAX_SUFFIX)
         return f'{self._desc} [{fill_str}] {frac_str} {suff_str}'
     
-    def _repaint(self, idx: int, elem: typing.Any) -> None:
+    def _repaint(self, idx: int, elem: None | T) -> None:
         print(self._build_bar(idx, elem), end='\r')
 
-    def __iter__(self) -> typing.Iterator[typing.Any]:
+    def __iter__(self) -> typing.Iterator[T]:
         self._iterator = iter(enumerate(self._elements))
         self._is_done = False
         return self
 
-    def __next__(self) -> typing.Any:
+    def __next__(self) -> T:
         assert self._iterator is not None
 
         try:
@@ -205,3 +206,46 @@ def tree(dir_path: str, prefix: str = '', stats: None | typing.Callable[[str], s
 
             # i.e. space because last, └── , above so no more |
             yield from tree(path, prefix=prefix + extension, stats=stats)
+
+def tabulate(
+        records: list[list[str]],
+        fillchar: str = ' ',
+        use_color: bool = True,
+        header_color: str = '', 
+        fill_color: str = colorama.Fore.BLACK + colorama.Style.BRIGHT,
+        column_colors: list[str] = [
+            colorama.Fore.WHITE,
+            colorama.Fore.GREEN + colorama.Style.BRIGHT,
+            colorama.Fore.YELLOW,
+            colorama.Fore.BLUE + colorama.Style.BRIGHT,
+            colorama.Fore.RED + colorama.Style.BRIGHT,
+            colorama.Fore.MAGENTA + colorama.Style.BRIGHT,
+            colorama.Fore.CYAN + colorama.Style.BRIGHT,
+            colorama.Fore.YELLOW + colorama.Style.BRIGHT,
+        ]) -> typing.Iterable[str]:
+
+    if len(fillchar) != 1:
+        raise ValueError(f"Invalid fillchar: '{fillchar}': must be a single character.")
+
+    # We need the max length of each column for alignment. +2 so that there's always enough spacing between columns.
+    ncolumns = len(records[0])
+    maxlens = [2 + max(len(record[col]) for record in records) for col in range(ncolumns)]
+
+    # Setting it up so that the code following can be the same regardless of color usage.
+    if use_color:
+        reset = colorama.Style.RESET_ALL
+    else:
+        column_colors = ['']
+        fill_color = ''
+        header_color = ''
+        reset = ''
+
+    # Yield all the rows, with alignment and color!
+    for record in records:
+        yield ''.join(
+            f'{column_colors[col % len(column_colors)]}{header_color}{entry}{reset}{fill_color}{(maxlens[col] - len(entry)) * fillchar}{reset}'
+            for col, entry in enumerate(record)
+        )
+
+        # Get rid of this after the first row.
+        header_color = ''

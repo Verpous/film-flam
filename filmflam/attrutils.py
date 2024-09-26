@@ -42,23 +42,23 @@ class EasyTypeHandler(_attr.TypeHandler):
     def parse(self, value_str: str) -> typing.Any:
         return self._parse(value_str)
 
-int_handler = EasyTypeHandler(
+INT_HANDLER = EasyTypeHandler(
     type_ = int,
     default_cmp = _attr.ComparisonOp.EQ,
     parse = lambda s: int(s, base=0), # 0 means deduce the base from the str.
 )
 
-str_handler = EasyTypeHandler(
+STR_HANDLER = EasyTypeHandler(
     type_ = str,
     default_cmp = _attr.ComparisonOp.RX,
     parse = lambda s: s,
 )
 
 # TODO: If an attribute is like "release year+month (without day)", you wouldn't want to compare by the whole date, would you?
-date_handler = EasyTypeHandler(
+DATE_HANDLER = EasyTypeHandler(
     type_ = datetime.date,
     default_cmp = _attr.ComparisonOp.EQ,
-    parse = lambda s: dateutil.parser.parse(s).date(),
+    parse = lambda s: dateutil.parser.parse(s, default=datetime.datetime.min).date(),
 )
 
 class EasyAttribute(_attr.Attribute):

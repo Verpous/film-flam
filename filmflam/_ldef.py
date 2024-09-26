@@ -91,8 +91,8 @@ class CanonListdef(typing.NamedTuple):
             case SpecialListType.DEFAULTS:
                 match flavor:
                     case ExpandFlavor.FIND:
-                        yield from (sl.abstract_listdef for sl in ctx.simple_lists if sl.is_default_fetch)
-                        yield from (cl.abstract_listdef for cl in ctx.composite_lists if cl.is_default_fetch)
+                        yield from (sl.abstract_listdef for sl in ctx.simple_lists if sl.is_default_find)
+                        yield from (cl.abstract_listdef for cl in ctx.composite_lists if cl.is_default_find)
                     case ExpandFlavor.FETCH:
                         yield from (sl.abstract_listdef for sl in ctx.simple_lists if sl.is_default_fetch)
 

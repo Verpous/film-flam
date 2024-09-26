@@ -37,31 +37,34 @@ class GroupMode(enum.StrEnum):
         return str(self)
 
 class CrewType(enum.StrEnum):
-    #                      value                default_group_mode
-    CAST                = ('cast',              GroupMode.SEPARATE)
-    STUNTCAST           = ('stuntcast',         GroupMode.SEPARATE)
-    DIRECTOR            = ('director',          GroupMode.GROUP)
-    WRITER              = ('writer',            GroupMode.GROUP)
-    PRODUCER            = ('producer',          GroupMode.SEPARATE)
-    COMPOSER            = ('composer',          GroupMode.GROUP)
-    CINEMATOGRAPHER     = ('cinematographer',   GroupMode.GROUP)
-    EDITOR              = ('editor',            GroupMode.GROUP)
+    CAST                = 'cast'
+    STUNTCAST           = 'stuntcast'
+    DIRECTOR            = 'director'
+    WRITER              = 'writer'
+    PRODUCER            = 'producer'
+    COMPOSER            = 'composer'
+    CINEMATOGRAPHER     = 'cinematographer'
+    EDITOR              = 'editor'
 
-    # This is how you add attributes to the enum without ruining it being primarily a StrEnum.
-    def __new__(cls, value: str, default_group_mode: bool) -> CrewType:
-        assert default_group_mode != GroupMode.DEFAULT
-
-        obj = str.__new__(cls, value)
-        obj._value_ = value
-        obj.default_group_mode = default_group_mode
-        return obj
-
-    # This init only exists to convince mypy that this enum really has these fields.
-    def __init__(self, _: str, default_group_mode: bool) -> None:
-        self.default_group_mode = default_group_mode
+    @property
+    def default_group_mode(self) -> GroupMode:
+        # There is a way to add this as an attribute of each enum but it has... problems.
+        # It's also tricky to define a ClassVar to an enum so we put it outside the class.
+        return _default_group_modes[self]
         
     def __repr__(self) -> str:
         return str(self)
+
+_default_group_modes = {
+    CrewType.CAST: GroupMode.SEPARATE,
+    CrewType.STUNTCAST: GroupMode.SEPARATE,
+    CrewType.DIRECTOR: GroupMode.GROUP,
+    CrewType.WRITER: GroupMode.GROUP,
+    CrewType.PRODUCER: GroupMode.SEPARATE,
+    CrewType.COMPOSER: GroupMode.GROUP,
+    CrewType.CINEMATOGRAPHER: GroupMode.GROUP,
+    CrewType.EDITOR: GroupMode.GROUP,
+}
 
 class FindableType(enum.StrEnum):
     MOVIES              = 'movies'

@@ -33,33 +33,61 @@ from . import _file
 from . import _mlf
 from . import _md
 from . import _reg
-from . import _utils
+from . import utils
 from . import _fetch
 from . import _ml
 from . import _dbg
+from . import _attr
 
 # Data structure for using simple/composite lists generically.
-LT = typing.TypeVar('LT', _cfg.SimpleList, _cfg.CompositeList)
-
-class ConfigurationLists(typing.Generic[LT]):
-    def __init__(self, lists: list[LT], list_type: str) -> None:
-        self._lists: list[LT] = lists
+class ConfigurationLists[T: (_cfg.SimpleList, _cfg.CompositeList)]:
+    def __init__(self, lists: list[T], list_type: str) -> None:
+        self._lists: list[T] = lists
         self._list_type = list_type
 
-    def __iter__(self) -> typing.Iterator[LT]:
+    def __iter__(self) -> typing.Iterator[T]:
         return iter(self._lists)
 
-    def get_by_uid(self, uid: str) -> LT:
+    def get_by_uid(self, uid: str) -> T:
         try:
             return next(l for l in self._lists if l.uid == uid)
         except StopIteration as e:
             raise _exc.InputError(f"Invalid {self._list_type} UID: '{uid}'.") from e
 
-    def get_by_name(self, name: str) -> LT:
+    def get_by_name(self, name: str) -> T:
         try:
             return next(l for l in self._lists if l.name == name)
         except StopIteration as e:
             raise _exc.InputError(f"Invalid {self._list_type} name: '{name}'.") from e
+
+# Utility for "inverting" registries: instead of first the registration level then the item type, it's first the item type then the levels.
+# Has to be implemented this way because some of the registries are contextual, some global.
+class RegistriesOf[T: (type[_fetch.ListFetcher], type[_filter.Predicate], _attr.Attribute)]:
+    def __init__(self, type_selector: typing.Callable[[_reg.Registry], _reg.RegistryOf[T]], ctx_registry: _reg.Registry, use_global_extensions: bool) -> None:
+        self._registries_to_try = [_reg._builtins, _reg._global_extensions, ctx_registry] if use_global_extensions else [_reg._builtins, ctx_registry]
+        self._type_selector: typing.Callable[[_reg.Registry], _reg.RegistryOf[T]] = type_selector
+
+    def __getitem__(self, name: str) -> T:
+        for reg in self._registries_to_try:
+            try:
+                return self._type_selector(reg)[name]
+            except KeyError:
+                pass
+
+        raise _exc.InputError(f"No registered item with the name: '{name}'.")
+
+    def __contains__(self, name: str) -> bool:
+        return any(name in self._type_selector(reg) for reg in self._registries_to_try)
+
+    def __iter__(self) -> typing.Iterator[T]:
+        for reg in self._registries_to_try:
+            yield from self._type_selector(reg)
+
+    def register(self, item: T) -> None:
+        _dbg.logger.info("Registering a context extension")
+
+        # Last registry is the context extensions.
+        self._type_selector(self._registries_to_try[-1]).register(item)
 
 # This class is the user's entry point to basically everything that is "built in" to this API: accessing lists, filtering, configuring.
 class FlamContext:
@@ -100,12 +128,13 @@ class FlamContext:
         self._simple_lists = ConfigurationLists(self.cfg._simple_lists, _ldef.SpecialListType.SIMPLE)
         self._composite_lists = ConfigurationLists(self.cfg._composite_lists, _ldef.SpecialListType.COMPOSITE)
 
-        self._extensions = _reg.Registry()
+        ctx_extensions = _reg.Registry()
+        self._fetchers = RegistriesOf(lambda reg: reg.fetchers, ctx_extensions, import_extensions)
+        self._predicates = RegistriesOf(lambda reg: reg.predicates, ctx_extensions, import_extensions)
+        self._attributes = RegistriesOf(lambda reg: reg.attributes, ctx_extensions, import_extensions)
 
         # import_extensions does 2 things: import all configured extensions, and subscribe to any globally registered extensions.
         # It's good to make this an option with default false for security, and I prefer to keep the two options as one for simplicity.
-        self._use_global_extensions = import_extensions
-
         if import_extensions:
             for extension in self.cfg.extensions:
                 # Try both ways.
@@ -114,7 +143,7 @@ class FlamContext:
                     _dbg.logger.info(f"Successful import using importlib: {extension=}")
                 except ModuleNotFoundError:
                     try:
-                        _utils.import_file(extension)
+                        utils.import_file(extension)
                         _dbg.logger.info(f"Successful import using utils: {extension=}")
                     except ModuleNotFoundError as e:
                         raise _exc.InputError(str(e)) from e
@@ -128,16 +157,24 @@ class FlamContext:
         return self._cfg
 
     @property
-    def extensions(self) -> _reg.Registry:
-        return self._extensions
-
-    @property
     def simple_lists(self) -> ConfigurationLists[_cfg.SimpleList]:
         return self._simple_lists
 
     @property
     def composite_lists(self) -> ConfigurationLists[_cfg.CompositeList]:
         return self._composite_lists
+
+    @property
+    def fetchers(self) -> RegistriesOf[type[_fetch.ListFetcher]]:
+        return self._fetchers
+
+    @property
+    def predicates(self) -> RegistriesOf[type[_filter.Predicate]]:
+        return self._predicates
+
+    @property
+    def attributes(self) -> RegistriesOf[_attr.Attribute]:
+        return self._attributes
 
     def _make_flam_dir(self) -> None:
         # Make sure to keep it topologically sorted.
@@ -153,12 +190,15 @@ class FlamContext:
                 pass
 
         # Log what the flam dir looked like at the beginning.
-        _dbg.logger.info(f"Made flam dir. Structure:\n{'\n'.join(_utils.tree(self._flam_dir, stats=lambda f: f" (size={os.path.getsize(f)}B, mtime={os.path.getmtime(f)})"))}")
+        _dbg.logger.info(f"Made flam dir. Structure:\n{'\n'.join(utils.tree(self._flam_dir, stats=lambda f: f" (size={os.path.getsize(f)}B, mtime={os.path.getmtime(f)})"))}")
 
     # List files.
     def get_movie_list(self, listdefs: str | typing.Iterable[str], filter: None | _filter.Filter = None) -> _ml.MovieList:
         listdefs_iterable = listdefs if not isinstance(listdefs, str) else (listdefs,)
         canon_listdefs = list(_ldef.CanonListdef.parse_and_expand(listdefs_iterable, self, _ldef.ExpandFlavor.FIND))
+
+        if len(canon_listdefs) == 0:
+            raise _exc.InputError(f"Can't create movie list of 0 LISTDEFs. Did you forget to set a default?")
 
         # Replace None with empty filter to make the rest of the code nicer.
         if filter is None:
@@ -289,7 +329,7 @@ class FlamContext:
     # This is mostly as opposed to storing all lists according to the concrete list_type and address.
     # The reason: this lets us change lists to a different list type with a compatible ID type.
     def _get_movie_list_file_path(self, abstract_listdef: _ldef.CanonListdef) -> str:
-        filename = _utils.slugify(f'{abstract_listdef.list_type}_{abstract_listdef.address}.json')
+        filename = utils.slugify(f'{abstract_listdef.list_type}_{abstract_listdef.address}.json')
         return os.path.join(self._flam_dir, self._LISTFILES_DIR, filename)
 
     # Configuration.
@@ -363,15 +403,6 @@ class FlamContext:
     def _get_metadata_path(self) -> str:
         return os.path.join(self._flam_dir, self._METADATA_FILE)
 
-    # Registration.
-    def registries_to_try(self) -> typing.Iterator[_reg.Registry]:
-        yield _reg._builtins
-
-        if self._use_global_extensions:
-            yield _reg._global_extensions
-
-        yield self._extensions
-
     # Fetching.
     def fetch(self, listdefs: typing.Iterable[str], refetch_pattern: None | str = None, quiet: bool = True) -> None:
         _dbg.logger.info(f"Requested to fetch {listdefs=}, {refetch_pattern=}, {quiet=}")
@@ -432,17 +463,7 @@ class FlamContext:
         else:
             abstract_listdef = concrete_listdef = canon_listdef
 
-        fetcher_cls = None
-
-        for registry in self.registries_to_try():
-            try:
-                fetcher_cls = registry.get_fetcher(concrete_listdef.list_type)
-            except KeyError:
-                pass
-
-        if fetcher_cls is None:
-            raise _exc.InputError(f"Invalid LISTDEF '{concrete_listdef}': type is unknown.")
-
+        fetcher_cls = self.fetchers[concrete_listdef.list_type]
         _dbg.logger.info(f"Created fetcher of type {fetcher_cls} for {concrete_listdef=}, {abstract_listdef=}")
         return fetcher_cls(concrete_listdef, abstract_listdef)
 

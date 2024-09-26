@@ -42,7 +42,7 @@ from selenium.webdriver.chromium.options import ChromiumOptions
 from . import _reg
 from . import _fetch
 from . import _exc
-from . import _utils
+from . import utils
 from . import _mlf
 from . import _file
 from . import _ml
@@ -98,7 +98,7 @@ class SeleniumListFetcher(_fetch.ListFetcher, list_type='imdb-id', uid_type=_UID
             self.spin_server_if_needed()
 
             try:
-                latest_csv = _utils.download_file_using_browser(
+                latest_csv = utils.download_file_using_browser(
                     download_cmd=lambda: SeleniumListFetcher.requests_queue.put_nowait(self.concrete_listdef.address),
                     file_extension='csv',
                     downloads_dir=downloads_dir,
@@ -208,7 +208,7 @@ def _fetch_movies_in_csv(movies_csv: list[_CsvRow], movie_list_file: _mlf.MovieL
     try:
         # Now we do a pass where we fetch fields using Cinemagoer.
         # Note that we not only skip movies that were previously fetched, but also duplicates in case the same movie appears in the CSV twice.
-        with _utils.ProgressBar([m for m in movies_csv if m.uid not in movie_list_file.movies_by_uid],
+        with utils.ProgressBar([m for m in movies_csv if m.uid not in movie_list_file.movies_by_uid],
                 desc='Downloading',
                 keyfunc=lambda m: m.title) as bar:
             for movie_csv in bar:
@@ -217,7 +217,7 @@ def _fetch_movies_in_csv(movies_csv: list[_CsvRow], movie_list_file: _mlf.MovieL
         _dbg.logger.info("Done fetching movies")
 
         # We have this "bad names" problem with cinemagoer, so here we refetch any people with bad names.
-        with _utils.ProgressBar([p for p in movie_list_file.people_by_uid.values() if _is_person_name_bad(p.name)],
+        with utils.ProgressBar([p for p in movie_list_file.people_by_uid.values() if _is_person_name_bad(p.name)],
                 desc='Cleansing data',
                 keyfunc=lambda p: p.uid) as bar:
             for mlf_person in bar:
@@ -240,7 +240,7 @@ def _fetch_movies_in_csv(movies_csv: list[_CsvRow], movie_list_file: _mlf.MovieL
         # If any of the conversions fail we simply propagate the error.
         mlf_movie.list_index        = int(movie_csv.list_index)
         mlf_movie.description       = movie_csv.description
-        mlf_movie.rating            = float(movie_csv.rating)
+        mlf_movie.rating            = float(movie_csv.rating) if movie_csv.rating != '' else None # I've actually found shorts which have no rating.
         mlf_movie.runtime_minutes   = int(movie_csv.runtime_minutes)
         mlf_movie.genres            = movie_csv.genres.split(', ')
         mlf_movie.votes             = int(movie_csv.votes)
@@ -466,7 +466,7 @@ class _FirefoxController(_BrowserController):
     def launch(self) -> WebDriver:
         return webdriver.Firefox(options=self.options)
 
-def _do_with_retries(action: typing.Callable[[], typing.Any], num_retries: int = 10, sleep_between_retries: float = 1.0) -> typing.Any: # pylint: disable=inconsistent-return-statements
+def _do_with_retries[T](action: typing.Callable[[], T], num_retries: int = 10, sleep_between_retries: float = 1.0) -> T:
     for i in range(num_retries):
         try:
             return action()
@@ -475,6 +475,8 @@ def _do_with_retries(action: typing.Callable[[], typing.Any], num_retries: int =
                 raise
 
             time.sleep(sleep_between_retries)
+
+    raise RuntimeError('This should never be reached!')
 
 def _is_browser_alive(driver: WebDriver) -> bool:
     try:

@@ -23,70 +23,63 @@ from . import _filter
 from . import _attr
 from . import _dbg
 
+class RegistryOf[T: (type[_fetch.ListFetcher], type[_filter.Predicate], _attr.Attribute)]:
+    def __init__(self) -> None:
+        self._registered_items: dict[str, T] = {}
+
+    def register(self, item: T) -> None:
+        if item.name in self:
+            raise _exc.InputError(f"Cannot register '{item}' because an item with that name is already registered.")
+
+        self._registered_items[item.name] = item
+        _dbg.logger.info(f"Registered a {type(item).__name__}: {item=}, {item.name=}")
+
+    def __getitem__(self, name: str) -> T:
+        return self._registered_items[name]
+
+    def __contains__(self, name: str) -> bool:
+        return name in self._registered_items
+
+    def __iter__(self) -> typing.Iterator[T]:
+        return iter(self._registered_items.values())
+
 class Registry:
     def __init__(self) -> None:
-        self._fetchers: dict[str, type[_fetch.ListFetcher]] = {}
-        self._predicates: dict[str, type[_filter.Predicate]] = {}
-        self._attributes: dict[str, _attr.Attribute] = {}
+        self._fetchers: RegistryOf[type[_fetch.ListFetcher]] = RegistryOf()
+        self._predicates: RegistryOf[type[_filter.Predicate]] = RegistryOf()
+        self._attributes: RegistryOf[_attr.Attribute] = RegistryOf()
+
+    @property
+    def fetchers(self) -> RegistryOf[type[_fetch.ListFetcher]]:
+        return self._fetchers
+
+    @property
+    def predicates(self) -> RegistryOf[type[_filter.Predicate]]:
+        return self._predicates
+
+    @property
+    def attributes(self) -> RegistryOf[_attr.Attribute]:
+        return self._attributes
 
     def register(self, obj: typing.Any) -> None:
         if isinstance(obj, type) and issubclass(obj, _fetch.ListFetcher):
-            if obj.list_type in self._fetchers:
-                raise _exc.InputError(f"Cannot register the fetcher '{obj.list_type}' because a fetcher for that list type is already registered.")
-
-            _dbg.logger.info(f"Registered {obj} as a fetcher with key='{obj.list_type}'")
-            self._fetchers[obj.list_type] = obj
+            self.fetchers.register(obj)
         elif isinstance(obj, type) and issubclass(obj, _filter.Predicate):
-            if obj.name in self._predicates:
-                raise _exc.InputError(f"Cannot register the predicate '{obj.name}' because a predicate by that name is already registered.")
-
-            _dbg.logger.info(f"Registered {obj} as a predicate with key='{obj.name}'")
-            self._predicates[obj.name] = obj
+            self.predicates.register(obj)
         elif isinstance(obj, _attr.Attribute):
-            if obj.name in self._attributes:
-                raise _exc.InputError(f"Cannot register the attribute '{obj.name}' because an attribute by that name is already registered.")
-
-            _dbg.logger.info(f"Registered {obj} as an attribute with key='{obj.name}'")
-            self._attributes[obj.name] = obj
+            self.attributes.register(obj)
         else:
             raise _exc.InputError(f"Invalid object for registration: {obj}.")
-
-    def get_fetcher(self, list_type: str) -> type[_fetch.ListFetcher]:
-        return self._fetchers[list_type]
-
-    def get_predicate(self, name: str) -> type[_filter.Predicate]:
-        return self._predicates[name]
-
-    def get_attribute(self, name: str) -> _attr.Attribute:
-        return self._attributes[name]
-
-    def has_fetcher(self, list_type: str) -> bool:
-        return list_type in self._fetchers
-
-    def has_predicate(self, name: str) -> bool:
-        return name in self._predicates
-
-    def has_attribute(self, name: str) -> bool:
-        return name in self._attributes
-
-    def fetcher_keyvals(self) -> typing.ItemsView[str, type[_fetch.ListFetcher]]:
-        return self._fetchers.items()
-
-    def predicate_keyvals(self) -> typing.ItemsView[str, type[_filter.Predicate]]:
-        return self._predicates.items()
-
-    def attribute_keyvals(self) -> typing.ItemsView[str, _attr.Attribute]:
-        return self._attributes.items()
 
 _builtins = Registry()
 _global_extensions = Registry()
 
-def _register_builtin(obj: typing.Any) -> typing.Any:
+def _register_builtin[T](obj: T) -> T:
     _dbg.logger.info("Registering a builtin")
     _builtins.register(obj)
     return obj
 
-def register(obj: typing.Any) -> typing.Any:
+def register[T](obj: T) -> T:
     _dbg.logger.info("Registering a global extension")
     _global_extensions.register(obj)
     return obj

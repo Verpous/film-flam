@@ -94,7 +94,7 @@ class Size(_filter.Predicate, name='size'):
     @classmethod
     def eat(cls, params: _filter.EatParams, at: int) -> tuple[_filter.Predicate, int]:
         attribute = cls.eat_attribute(params, at, is_array=True)
-        cmp_value = cls.eat_cmp_value(params, at + 1, attrutils.int_handler)
+        cmp_value = cls.eat_cmp_value(params, at + 1, attrutils.INT_HANDLER)
         return cls(attribute, cmp_value), at + 2
 
     def excrete(self, findable: _ml.Findable, ctx: _ctx.FlamContext) -> bool:

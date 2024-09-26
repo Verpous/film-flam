@@ -23,7 +23,7 @@ from . import attrutils
 _reg._register_builtin(attrutils.EasyAttribute(
     name = 'title',
     findable_type = _ml.FindableType.MOVIES,
-    type_handler = attrutils.str_handler,
+    type_handler = attrutils.STR_HANDLER,
     is_array = False,
     extract_from_movie = lambda movie, mlf_movie: mlf_movie.title, # TODO: Handle unset, figure out what we do about not having type checker for this...
 ))
@@ -31,7 +31,7 @@ _reg._register_builtin(attrutils.EasyAttribute(
 _reg._register_builtin(attrutils.EasyAttribute(
     name = 'name',
     findable_type = _ml.FindableType.PEOPLE,
-    type_handler = attrutils.str_handler,
+    type_handler = attrutils.STR_HANDLER,
     is_array = False,
     extract_from_person = lambda person, mlf_person: mlf_person.name,
 ))
@@ -39,7 +39,7 @@ _reg._register_builtin(attrutils.EasyAttribute(
 _reg._register_builtin(attrutils.EasyAttribute(
     name = 'characters',
     findable_type = _ml.FindableType.ROLES,
-    type_handler = attrutils.str_handler,
+    type_handler = attrutils.STR_HANDLER,
     is_array = True,
     extract_from_role = lambda role, mlf_roles: [c for mlf_role in mlf_roles for c in mlf_role.characters],
 ))

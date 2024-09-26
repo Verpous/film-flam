@@ -30,12 +30,14 @@ from . import _dbg
 
 class ListFetcher(abc.ABC):
     list_type: str
+    name: str
     uid_type: str
 
     # Subclasses must provide a list_type, and may optionally provide an uid_type if they have multiple fetchers that they want to be compatible.
     def __init_subclass__(cls, list_type: str, uid_type: None | str = None, **kwargs: typing.Any) -> None:
         super().__init_subclass__(**kwargs)
-        cls.list_type = list_type
+        # I like the name list_type better, but for registration it needs to be named "name".
+        cls.list_type = cls.name = list_type
         cls.uid_type = uid_type if uid_type is not None else list_type
 
     def __init__(self, concrete_listdef: _ldef.CanonListdef, abstract_listdef: _ldef.CanonListdef) -> None:

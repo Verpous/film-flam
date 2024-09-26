@@ -83,10 +83,11 @@ class FilterMember(abc.ABC):
     def eat_attribute(cls, params: EatParams, at: int, is_array: bool = False) -> _attr.Attribute:
         description = 'a valid attribute name'
         attribute_name = cls.eat_str(params, at, description)
-        attribute = next((registry.get_attribute(attribute_name) for registry in params.ctx.registries_to_try() if registry.has_attribute(attribute_name)), None)
 
-        if attribute is None:
-            raise _EinGafrurError(f"Expected {description}, but got: '{attribute_name}'.", tokens=params.tokens, error_indices=at)
+        try:
+            attribute = params.ctx.attributes[attribute_name]
+        except _exc.InputError as e:
+            raise _EinGafrurError(f"Expected {description}, but got: '{attribute_name}'.", tokens=params.tokens, error_indices=at) from e
 
         if not attribute.findable_type.is_compatible(params.find):
             raise _EinGafrurError(f"Expected attribute of {params.find}, but got: '{attribute_name}' which belongs to {attribute.findable_type}.",
@@ -330,32 +331,24 @@ class Predicate(FilterMember):
             # Instead of going predicate by predicate and checking for _EinGafrurError,
             # it's more optimal to pick the only possibly right predicate from a dictionary,
             # and eat the name token right here and let the predicate eat its arguments alone.
-            for registry in params.ctx.registries_to_try():
-                if registry.has_predicate(name):
-                    # Mypy wouldn't like this line if we annotated with typing.Self.
-                    return registry.get_predicate(name).eat(params, at + 1)
-                
-                # Special treatment for AttributePredicate because it's not wise to make a predicate for each attribute.
-                if registry.has_attribute(name):
-                    attribute = registry.get_attribute(name)
+            if name in params.ctx.predicates:
+                # Mypy wouldn't like this line if we annotated with typing.Self.
+                return params.ctx.predicates[name].eat(params, at + 1)
 
-                    if not attribute.findable_type.is_compatible(params.find):
-                        raise _EinGafrurError(f"Expected attribute of {params.find}, but got: '{attribute.name}' which belongs to {attribute.findable_type}.",
-                            tokens=params.tokens, error_indices=at)
+            # Special treatment for AttributePredicate because it's not wise to make a predicate for each attribute.
+            if name in params.ctx.attributes:
+                attribute = params.ctx.attributes[name]
 
-                    return AttributePredicate.eat_shit(params, at + 1, registry.get_attribute(name))
+                if not attribute.findable_type.is_compatible(params.find):
+                    raise _EinGafrurError(f"Expected attribute of {params.find}, but got: '{attribute.name}' which belongs to {attribute.findable_type}.",
+                        tokens=params.tokens, error_indices=at)
+
+                return AttributePredicate.eat_shit(params, at + 1, attribute)
 
         if prefixed_name in Positive.RPAREN:
             raise _EinGafrurError('Right parenthesis has no matching left parenthesis.', tokens=params.tokens, error_indices=at)
             
-        all_pred_names = (
-            Predicate.PREFIX + k
-            for registry in params.ctx.registries_to_try()
-                for keyvals in (registry.predicate_keyvals(), registry.attribute_keyvals())
-                    for k, _ in keyvals
-        )
-
-        close_matches = difflib.get_close_matches(prefixed_name, all_pred_names)
+        close_matches = difflib.get_close_matches(prefixed_name, (Predicate.PREFIX + pred.name for pred in params.ctx.predicates))
         suggestions = f' (did you mean: {", ".join(close_matches)}?)' if len(close_matches) > 0 else '.'
         raise _EinGafrurError(f"Expected valid predicate name, but got: '{prefixed_name}'{suggestions}", tokens=params.tokens, error_indices=at)
 
