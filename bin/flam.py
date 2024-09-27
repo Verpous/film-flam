@@ -67,7 +67,6 @@ class Choice(enum.StrEnum):
 class SubcommandConfig:
     @classmethod
     def add_parser(cls, subparsers: argparse._SubParsersAction) -> None:
-        # TODO: config things like downloads dir, default browser, etc? Or since they're specific to a fetcher they should just be env vars?
         parser = subparsers.add_parser('config', formatter_class=argparse.RawTextHelpFormatter)
         config_subparsers = parser.add_subparsers(required=True)
 
@@ -473,7 +472,7 @@ Valid column names: ...''')
 
         match args.paginate:
             case Choice.AUTO:
-                paginate = sys.stdout.isatty() and os.get_terminal_size().lines < len(table) and shutil.which('less')
+                paginate = sys.stdout.isatty() and os.get_terminal_size().lines < len(table) and shutil.which('less') is not None
                 args.spacious |= paginate
             case Choice.ALWAYS:
                 paginate = True

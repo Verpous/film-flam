@@ -118,15 +118,6 @@ class Attribute(abc.ABC):
     def type_handler(self) -> TypeHandler:
         pass
 
-    def _extract_from_movie(self, movie: _ml.Movie, mlf_movie: _mlf.MLFMovie) -> typing.Any:
-        raise NotImplementedError()
-
-    def _extract_from_role(self, role: _ml.Role, mlf_roles: list[_mlf.MLFRole]) -> typing.Any:
-        raise NotImplementedError()
-
-    def _extract_from_person(self, person: _ml.Person, mlf_person: _mlf.MLFPerson) -> typing.Any:
-        raise NotImplementedError()
-
 # TODO: attribute ideas:
 # Generic:
 # * for every array type predicate have a length attribute

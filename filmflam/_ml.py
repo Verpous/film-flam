@@ -108,7 +108,15 @@ class Movie(Findable):
         self._mlf_movie = mlf_movie
 
     def extract(self, attribute: _attr.Attribute) -> typing.Any:
-        return attribute._extract_from_movie(self, self._mlf_movie)
+        return attribute._extract_from_movie(self, self._mlf_movie) # type: ignore
+
+class Person(Findable):
+    def __init__(self, movie_list: MovieList, mlf_person: _mlf.MLFPerson):
+        super().__init__(movie_list)
+        self._mlf_person = mlf_person
+
+    def extract(self, attribute: _attr.Attribute) -> typing.Any:
+        return attribute._extract_from_person(self, self._mlf_person) # type: ignore
 
 class Role(Findable):
     def __init__(self, movie_list: MovieList, mlf_roles: list[_mlf.MLFRole], mlf_movie: _mlf.MLFMovie, crew_type: CrewType, group_mode: GroupMode):
@@ -127,27 +135,26 @@ class Role(Findable):
         return self._group_mode
 
     def extract(self, attribute: _attr.Attribute) -> typing.Any:
-        # TODO: For now this is the implementation. But 1: it could be largely optimized by caching the Movie/Person objects,
-        # even possibly pulling them from a cache in MovieList so that if someone iterates over movies/people later they will be there and include things already computed on them.
-        # Also there's a more cumbersome but more powerful path: movie/person attributes will implement _extract_from_role to specify custom behavior for how to extract them from a role.
-        # Maybe we should have this as a default behavior, but allow attributes to override it with their own for the few that need it.
+        # TODO: Optimize by caching Person/Movie objects, maybe even on the ML so that if someone iterates over movies/people later
+        # they will be there and include things already computed on them.
         match attribute.findable_type:
             case FindableType.ROLES:
-                return attribute._extract_from_role(self, self._mlf_roles)
+                return attribute._extract_from_role(self, self._mlf_roles) # type: ignore
             case FindableType.MOVIES:
+                # Role attributes can define custom extractors from movie/people if the default behavior doesn't suit them.
+                if hasattr(attribute, '_extract_from_movie'):
+                    return attribute._extract_from_movie(self, self._mlf_movie)
+
                 return Movie(self.movie_list, self._mlf_movie).extract(attribute)
             case FindableType.PEOPLE:
                 mlf = self.movie_list.underlying_file
+                mlf_people = (mlf.people_by_uid[mlf_role.person_uid] for mlf_role in self._mlf_roles)
+
+                if hasattr(attribute, '_extract_from_person'):
+                    return attribute._extract_from_person(self, list(mlf_people))
+
                 # TODO: if attribute is array type already, flatten it?
-                return [Person(self.movie_list, mlf.people_by_uid[mlf_role.person_uid]).extract(attribute) for mlf_role in self._mlf_roles]
-
-class Person(Findable):
-    def __init__(self, movie_list: MovieList, mlf_person: _mlf.MLFPerson):
-        super().__init__(movie_list)
-        self._mlf_person = mlf_person
-
-    def extract(self, attribute: _attr.Attribute) -> typing.Any:
-        return attribute._extract_from_person(self, self._mlf_person)
+                return [Person(self.movie_list, mlf_person).extract(attribute) for mlf_person in mlf_people]
 
 class MovieList:
     def __init__(self, movie_list_file: _mlf.MovieListFile, ctx: _ctx.FlamContext):
@@ -159,12 +166,13 @@ class MovieList:
 
         self._movies: None | list[Movie] = None
         self._people: None | list[Person] = None
-        self._roles: None | dict[tuple[CrewType, GroupMode], list[Role]] = None
+        self._roles: None | dict[tuple[GroupMode, CrewType], list[Role]] = None
 
     def __iter__(self) -> typing.Iterator[Findable]:
         return iter(self.find(FindableType.MOVIES))
 
-    def find(self, what: FindableType, crew_type: None | CrewType = None, group_mode: GroupMode = GroupMode.DEFAULT, filter: None | _filter.Filter = None) -> typing.Iterator[Findable]:
+    def find(self, what: FindableType, crew_type: None | CrewType = None, group_mode: GroupMode = GroupMode.DEFAULT,
+            filter: None | _filter.Filter = None) -> typing.Iterator[Findable]:
         _dbg.logger.info(f"Going to find {what} in '{self._movie_list_file.abstract_listdef}' with {filter=!s}")
 
         if filter is None:
@@ -234,18 +242,18 @@ class MovieList:
         if self._roles is None:
             self._roles = {}
 
-        cg = (crew_type, group_mode)
+        modal_crew_type = (group_mode, crew_type)
 
-        if cg not in self._roles:
+        if modal_crew_type not in self._roles:
             # TODO: implement grouping. For now assume not grouped.
-            self._roles[cg] = [
+            self._roles[modal_crew_type] = [
                 Role(self, [mlf_role], mlf_movie, crew_type, group_mode)
                 for mlf_movie in self._movie_list_file.movies_by_uid.values()
                     for mlf_role in mlf_movie.crew[crew_type].roles_by_uid.values()
             ]
 
-        _dbg.logger.info(f"Generated roles list, {cg=}, {len(self._roles[cg])=}")
-        return self._roles[cg]
+        _dbg.logger.info(f"Generated roles list, {modal_crew_type=}, {len(self._roles[modal_crew_type])=}")
+        return self._roles[modal_crew_type]
 
 # Crew type, grouping, roles, people brainstorming:
 # I think we pass on allowing to group across crew types. Grouping is for a specific crew type

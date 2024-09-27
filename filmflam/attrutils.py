@@ -18,12 +18,12 @@ from __future__ import annotations
 import typing
 import datetime
 import dateutil.parser
+import dataclasses
 
 from . import _attr
 from . import _mlf
 from . import _ml
 
-# TODO: Pull this same shtick for attributes?
 class EasyTypeHandler(_attr.TypeHandler):
     def __init__(self, type_: type, default_cmp: _attr.ComparisonOp, parse: typing.Callable[[str], typing.Any]) -> None:
         super().__init__()
@@ -48,6 +48,7 @@ INT_HANDLER = EasyTypeHandler(
     parse = lambda s: int(s, base=0), # 0 means deduce the base from the str.
 )
 
+# TODO: I think we want this to compare EQ case-insensitively.
 STR_HANDLER = EasyTypeHandler(
     type_ = str,
     default_cmp = _attr.ComparisonOp.RX,
@@ -61,59 +62,48 @@ DATE_HANDLER = EasyTypeHandler(
     parse = lambda s: dateutil.parser.parse(s, default=datetime.datetime.min).date(),
 )
 
+# If the way this EasyAttribute business is coded looks funny to you, here is why:
+# 1. I want the "_extract_from_x" functions to only be defined in the concrete classes that need them, as opposed to being inherited abstract methods.
+#    That way roles can optionally define "from_person/movie" extractors that we invoke if they "hasattr" it.
+# 2. Despite all these extractor methods basically returning "Any", I want mypy to still check each one for type correctness.
+# 3. We're gonna be implementing a 100 attributes so boilerplate must be kept to a minimum.
+@dataclasses.dataclass
+class EasyAttributeParams:
+    name: str
+    findable_type: _ml.FindableType
+    type_handler: _attr.TypeHandler
+    is_array: bool
+
 class EasyAttribute(_attr.Attribute):
     # TODO: many more fields. Fields related to sorting, distribution, etc..
-    def __init__(
-                self,
-                name: str,
-                findable_type: _ml.FindableType,
-                type_handler: _attr.TypeHandler,
-                is_array: bool,
-                extract_from_role: None | typing.Callable[[_ml.Role, list[_mlf.MLFRole]], typing.Any] = None,
-                extract_from_movie: None | typing.Callable[[_ml.Movie, _mlf.MLFMovie], typing.Any] = None,
-                extract_from_person: None | typing.Callable[[_ml.Person, _mlf.MLFPerson], typing.Any] = None,
-            ) -> None: 
-        self._name = name
-        self._findable_type = findable_type
-        self._type_handler = type_handler
-        self._is_array = is_array
-
-        assert findable_type != _ml.FindableType.ROLES or extract_from_role is not None
-        assert findable_type != _ml.FindableType.MOVIES or extract_from_movie is not None
-        assert findable_type != _ml.FindableType.PEOPLE or extract_from_person is not None
-
-        self._extract_from_role_lambda = extract_from_role
-        self._extract_from_movie_lambda = extract_from_movie
-        self._extract_from_person_lambda = extract_from_person
+    def __init__(self, params: EasyAttributeParams) -> None: 
+        self._params = params
 
     @property
     def name(self) -> str:
-        return self._name
+        return self._params.name
     
     @property
     def findable_type(self) -> _ml.FindableType:
-        return self._findable_type
+        return self._params.findable_type
 
     @property
     def type_handler(self) -> _attr.TypeHandler:
-        return self._type_handler
+        return self._params.type_handler
 
     @property
     def is_array(self) -> bool:
-        return self._is_array
+        return self._params.is_array
 
-    # TODO: Don't like the assert on every extract, don't like the inability to define these optionally so we can hasattr them...
-    def _extract_from_movie(self, movie: _ml.Movie, mlf_movie: _mlf.MLFMovie) -> typing.Any:
-        assert self._extract_from_movie_lambda is not None
-        return self._extract_from_movie_lambda(movie, mlf_movie)
+def easy_attribute[T](extractor:
+        typing.Callable[[EasyAttribute, _ml.Movie, _mlf.MLFMovie], T] |
+        typing.Callable[[EasyAttribute, _ml.Person, _mlf.MLFPerson], T] |
+        typing.Callable[[EasyAttribute, _ml.Role, list[_mlf.MLFRole]], T]) -> type[EasyAttribute]:
+    class SpecificAttribute(EasyAttribute):
+        pass
 
-    def _extract_from_role(self, role: _ml.Role, mlf_roles: list[_mlf.MLFRole]) -> typing.Any:
-        assert self._extract_from_role_lambda is not None
-        return self._extract_from_role_lambda(role, mlf_roles)
-
-    def _extract_from_person(self, person: _ml.Person, mlf_person: _mlf.MLFPerson) -> typing.Any:
-        assert self._extract_from_person_lambda is not None
-        return self._extract_from_person_lambda(person, mlf_person)
+    setattr(SpecificAttribute, extractor.__name__, extractor)
+    return SpecificAttribute
 
 # TODO: attribute ideas:
 # Generic:

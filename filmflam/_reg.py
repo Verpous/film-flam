@@ -32,7 +32,7 @@ class RegistryOf[T: (type[_fetch.ListFetcher], type[_filter.Predicate], _attr.At
             raise _exc.InputError(f"Cannot register '{item}' because an item with that name is already registered.")
 
         self._registered_items[item.name] = item
-        _dbg.logger.info(f"Registered a {type(item).__name__}: {item=}, {item.name=}")
+        _dbg.logger.info(f"Registered {item=}, {item.name=}")
 
     def __getitem__(self, name: str) -> T:
         return self._registered_items[name]
@@ -63,10 +63,13 @@ class Registry:
 
     def register(self, obj: typing.Any) -> None:
         if isinstance(obj, type) and issubclass(obj, _fetch.ListFetcher):
+            _dbg.logger.info(f"Registering as a fetcher")
             self.fetchers.register(obj)
         elif isinstance(obj, type) and issubclass(obj, _filter.Predicate):
+            _dbg.logger.info(f"Registering as a predicate")
             self.predicates.register(obj)
         elif isinstance(obj, _attr.Attribute):
+            _dbg.logger.info(f"Registering as an attribute")
             self.attributes.register(obj)
         else:
             raise _exc.InputError(f"Invalid object for registration: {obj}.")

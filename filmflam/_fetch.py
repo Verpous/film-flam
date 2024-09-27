@@ -29,7 +29,6 @@ from . import _file
 from . import _dbg
 
 class ListFetcher(abc.ABC):
-    list_type: str
     name: str
     uid_type: str
 
@@ -37,7 +36,7 @@ class ListFetcher(abc.ABC):
     def __init_subclass__(cls, list_type: str, uid_type: None | str = None, **kwargs: typing.Any) -> None:
         super().__init_subclass__(**kwargs)
         # I like the name list_type better, but for registration it needs to be named "name".
-        cls.list_type = cls.name = list_type
+        cls.name = list_type
         cls.uid_type = uid_type if uid_type is not None else list_type
 
     def __init__(self, concrete_listdef: _ldef.CanonListdef, abstract_listdef: _ldef.CanonListdef) -> None:
