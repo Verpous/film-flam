@@ -29,11 +29,11 @@ import subprocess
 import re
 import shutil
 
-import filmflam as ff
+import filmflam as flam
 from filmflam import utils
 
 def split_at_filter(strs: list[str]) -> tuple[list[str], list[str]]:
-    filter_begin = next((i for i, s in enumerate(strs) if ff.is_filter_token(s)), len(strs))
+    filter_begin = next((i for i, s in enumerate(strs) if flam.is_filter_token(s)), len(strs))
     return strs[:filter_begin], strs[filter_begin:]
 
 # TODO: need reverse? In mbrowse we only use it for the "source" column (i.e. the abstract address the movie came from)
@@ -91,7 +91,7 @@ class SubcommandConfigList:
         parser.add_argument('LISTDEF', action='store', nargs='?', default=None, help='set the list type and address to %(dest)s')
 
     @classmethod
-    def execute(cls, ctx: ff.FlamContext, args: argparse.Namespace) -> None:
+    def execute(cls, ctx: flam.FlamContext, args: argparse.Namespace) -> None:
         if args.delete:
             cls.delete(ctx, args)
         elif args.print:
@@ -100,23 +100,23 @@ class SubcommandConfigList:
         else:
             try:
                 simple_list = ctx.simple_lists.get_by_name(args.NAME)
-            except ff.InputError:
+            except flam.InputError:
                 cls.create(ctx, args)
             else:
                 cls.edit(ctx, args, simple_list)
 
     @classmethod
-    def delete(cls, ctx: ff.FlamContext, args: argparse.Namespace) -> None:
+    def delete(cls, ctx: flam.FlamContext, args: argparse.Namespace) -> None:
         if args.NAME is None:
-            raise ff.InputError(f"Must specify a NAME to delete a list.")
+            raise flam.InputError(f"Must specify a NAME to delete a list.")
 
         simple_list = ctx.simple_lists.get_by_name(args.NAME)
-        assert not isinstance(simple_list.uid, ff.UnsetType)
+        assert not isinstance(simple_list.uid, flam.UnsetType)
         ctx.delete_simple_list(simple_list.uid)
         ctx.write_cfg()
 
     @classmethod
-    def print(cls, ctx: ff.FlamContext, args: argparse.Namespace) -> None:
+    def print(cls, ctx: flam.FlamContext, args: argparse.Namespace) -> None:
         # TODO: improve this in the future
         if args.NAME is None:
             for sl in ctx.simple_lists:
@@ -125,12 +125,12 @@ class SubcommandConfigList:
             print(ctx.simple_lists.get_by_name(args.NAME))
 
     @classmethod
-    def edit(cls, ctx: ff.FlamContext, args: argparse.Namespace, simple_list: ff.SimpleList) -> None:
+    def edit(cls, ctx: flam.FlamContext, args: argparse.Namespace, simple_list: flam.SimpleList) -> None:
         if args.rename is not None and args.rename != simple_list.name:
             simple_list.name = args.rename
 
         if args.LISTDEF is not None:
-            cldef = ff.CanonListdef.parse(args.LISTDEF, ctx)
+            cldef = flam.CanonListdef.parse(args.LISTDEF, ctx)
             simple_list.list_type = cldef.list_type
             simple_list.address = cldef.address
 
@@ -143,16 +143,16 @@ class SubcommandConfigList:
         ctx.write_cfg()
 
     @classmethod
-    def create(cls, ctx: ff.FlamContext, args: argparse.Namespace) -> None:
+    def create(cls, ctx: flam.FlamContext, args: argparse.Namespace) -> None:
         if args.NAME is None:
-            raise ff.InputError(f"Must specify a NAME to create or edit a list.")
+            raise flam.InputError(f"Must specify a NAME to create or edit a list.")
 
         if args.LISTDEF is None:
-            raise ff.InputError(f"List '{args.NAME}' doesn't exist, so LISTDEF is required.")
+            raise flam.InputError(f"List '{args.NAME}' doesn't exist, so LISTDEF is required.")
 
-        cldef = ff.CanonListdef.parse(args.LISTDEF, ctx)
+        cldef = flam.CanonListdef.parse(args.LISTDEF, ctx)
 
-        simple_list = ff.SimpleList.create(
+        simple_list = flam.SimpleList.create(
             name = args.NAME,
             list_type = cldef.list_type,
             address = cldef.address,
@@ -186,7 +186,7 @@ class SubcommandConfigComposite:
         parser.add_argument('REMAINDER', nargs=argparse.REMAINDER, action='store') # TODO: somehow don't show this in the help
 
     @classmethod
-    def execute(cls, ctx: ff.FlamContext, args: argparse.Namespace) -> None:
+    def execute(cls, ctx: flam.FlamContext, args: argparse.Namespace) -> None:
         if args.delete:
             cls.delete(ctx, args)
         elif args.print:
@@ -195,23 +195,23 @@ class SubcommandConfigComposite:
         else:
             try:
                 composite_list = ctx.composite_lists.get_by_name(args.NAME)
-            except ff.InputError:
+            except flam.InputError:
                 cls.create(ctx, args)
             else:
                 cls.edit(ctx, args, composite_list)
 
     @classmethod
-    def delete(cls, ctx: ff.FlamContext, args: argparse.Namespace) -> None:
+    def delete(cls, ctx: flam.FlamContext, args: argparse.Namespace) -> None:
         if args.NAME is None:
-            raise ff.InputError(f"Must specify a NAME to delete a composite list.")
+            raise flam.InputError(f"Must specify a NAME to delete a composite list.")
 
         composite_list = ctx.composite_lists.get_by_name(args.NAME)
-        assert not isinstance(composite_list.uid, ff.UnsetType)
+        assert not isinstance(composite_list.uid, flam.UnsetType)
         ctx.delete_composite_list(composite_list.uid)
         ctx.write_cfg()
 
     @classmethod
-    def print(cls, ctx: ff.FlamContext, args: argparse.Namespace) -> None:
+    def print(cls, ctx: flam.FlamContext, args: argparse.Namespace) -> None:
         # TODO: improve this in the future
         if args.NAME is None:
             for cl in ctx.composite_lists:
@@ -220,7 +220,7 @@ class SubcommandConfigComposite:
             print(ctx.composite_lists.get_by_name(args.NAME))
 
     @classmethod
-    def edit(cls, ctx: ff.FlamContext, args: argparse.Namespace, composite_list: ff.CompositeList) -> None:
+    def edit(cls, ctx: flam.FlamContext, args: argparse.Namespace, composite_list: flam.CompositeList) -> None:
         if args.rename is not None:
             composite_list.name = args.rename
 
@@ -228,11 +228,11 @@ class SubcommandConfigComposite:
 
         if len(simple_list_names) > 0:
             # The unset check should always be true, but the type checker wants it.
-            composite_list.simple_list_uids = [sl_uid for sl_name in simple_list_names if not isinstance(sl_uid := ctx.simple_lists.get_by_name(sl_name).uid, ff.UnsetType)]
+            composite_list.simple_list_uids = [sl_uid for sl_name in simple_list_names if not isinstance(sl_uid := ctx.simple_lists.get_by_name(sl_name).uid, flam.UnsetType)]
 
         if len(filter_tokens) > 0:
             # Don't have anything to do with this for now, but we can raise an exception if it doesn't compile.
-            ctx.compile_filter(filter_tokens, ff.FindableType.MOVIES)
+            ctx.compile_filter(filter_tokens, flam.FindableType.MOVIES)
             composite_list.filter_tokens = filter_tokens
 
         if args.default_fetch != Choice.AUTO:
@@ -245,13 +245,13 @@ class SubcommandConfigComposite:
         ctx.write_cfg()
 
     @classmethod
-    def create(cls, ctx: ff.FlamContext, args: argparse.Namespace) -> None:
+    def create(cls, ctx: flam.FlamContext, args: argparse.Namespace) -> None:
         if args.NAME is None:
-            raise ff.InputError(f"Must specify a NAME to create or edit a composite list.")
+            raise flam.InputError(f"Must specify a NAME to create or edit a composite list.")
 
         simple_list_names, filter_tokens = split_at_filter(args.LIST + args.FILTER)
 
-        composite_list = ff.CompositeList.create(
+        composite_list = flam.CompositeList.create(
             name = args.NAME,
             simple_list_uids = [ctx.simple_lists.get_by_name(sl_name).uid for sl_name in simple_list_names],
             filter_tokens = filter_tokens,
@@ -294,13 +294,13 @@ To avoid ambiguity and for downloading addresses directly, you can specify the %
 If no %(dest)s provided, fetches all lists configured as defaults.''')
 
     @classmethod
-    def execute(cls, ctx: ff.FlamContext, args: argparse.Namespace) -> None:
+    def execute(cls, ctx: flam.FlamContext, args: argparse.Namespace) -> None:
         # TODO: Hate this feature. It should either be scratched or changed to be a CLI feature that we backup the entire folder
         if args.undo:
             pass
         else:
             # TODO: maybe defaults shouldn't be configured on the API side, maybe it's more of a CLI thing and we should have our own separate configuration for it.
-            listdefs = args.LISTDEF if len(args.LISTDEF) != 0 else [ff.SpecialListType.DEFAULTS]
+            listdefs = args.LISTDEF if len(args.LISTDEF) != 0 else [flam.SpecialListType.DEFAULTS]
             ctx.fetch(listdefs, refetch_pattern=args.refetch, quiet=False)
 
 class SubcommandClean:
@@ -317,7 +317,7 @@ class SubcommandClean:
             '''Like find. Will delete ''')
 
     @classmethod
-    def execute(cls, ctx: ff.FlamContext, args: argparse.Namespace) -> None:
+    def execute(cls, ctx: flam.FlamContext, args: argparse.Namespace) -> None:
         print('clean')
 
 class SubcommandFind:
@@ -365,31 +365,31 @@ Valid column names: ...''')
         parser.add_argument('REMAINDER', nargs=argparse.REMAINDER, action='store')
 
     @classmethod
-    def parse_findable(cls, findable: str) -> tuple[ff.FindableType, list[tuple[ff.GroupMode, None | ff.CrewType]]]:
-        if findable == ff.FindableType.ROLES:
-            return ff.FindableType.ROLES, list(zip([ff.GroupMode.DEFAULT] * len(ff.CrewType), ff.CrewType))
+    def parse_findable(cls, findable: str) -> tuple[flam.FindableType, list[tuple[flam.GroupMode, None | flam.CrewType]]]:
+        if findable == flam.FindableType.ROLES:
+            return flam.FindableType.ROLES, list(zip([flam.GroupMode.DEFAULT] * len(flam.CrewType), flam.CrewType))
 
-        if findable in ff.FindableType:
-            return ff.FindableType(findable), [(ff.GroupMode.DEFAULT, None)]
+        if findable in flam.FindableType:
+            return flam.FindableType(findable), [(flam.GroupMode.DEFAULT, None)]
 
         modal_crew_types = []
 
         for modal_crew_type in findable.split(','):
             colon_idx = modal_crew_type.find('=')
-            group_mode, crew_type = (modal_crew_type[:colon_idx], modal_crew_type[colon_idx + 1:]) if colon_idx != -1 else (ff.GroupMode.DEFAULT, modal_crew_type)
-            modal_crew_types.append((ff.GroupMode(group_mode), ff.CrewType(crew_type)))
+            group_mode, crew_type = (modal_crew_type[:colon_idx], modal_crew_type[colon_idx + 1:]) if colon_idx != -1 else (flam.GroupMode.DEFAULT, modal_crew_type)
+            modal_crew_types.append((flam.GroupMode(group_mode), flam.CrewType(crew_type)))
 
-        return ff.FindableType.ROLES, modal_crew_types # type: ignore
+        return flam.FindableType.ROLES, modal_crew_types # type: ignore
 
     @classmethod
-    def execute(cls, ctx: ff.FlamContext, args: argparse.Namespace) -> None:
+    def execute(cls, ctx: flam.FlamContext, args: argparse.Namespace) -> None:
         findable_type, modal_crew_types = args.FINDABLE
         is_additive, attributes = cls.parse_columns(args, findable_type, ctx)
 
         listdefs, filter_tokens = split_at_filter(args.LISTDEF + args.FILTER)
         filter = ctx.compile_filter(filter_tokens, findable_type)
 
-        movie_list = ctx.get_movie_list(listdefs if len(listdefs) > 0 else ff.SpecialListType.DEFAULTS)
+        movie_list = ctx.get_movie_list(listdefs if len(listdefs) > 0 else flam.SpecialListType.DEFAULTS)
 
         values = list(cls.extract_values(attributes, movie_list, filter, modal_crew_types, args))
         cls.sort_values(attributes, values, args)
@@ -398,19 +398,19 @@ Valid column names: ...''')
 
     # Can't do this at argparse time because it depends on the context.
     @classmethod
-    def parse_columns(cls, args: argparse.Namespace, findable_type: ff.FindableType, ctx: ff.FlamContext) -> tuple[bool, list[ff.Attribute]]:
+    def parse_columns(cls, args: argparse.Namespace, findable_type: flam.FindableType, ctx: flam.FlamContext) -> tuple[bool, list[flam.Attribute]]:
         is_additive = args.columns is None or args.columns.startswith('+')
         columns = [] if args.columns is None else args.columns.removeprefix('+').split(',')
 
         if is_additive:
             # TODO: Decide on default columns for PEOPLE, ROLES, and also what do we do about the 'leaving' column? Also uniq_append!
             match findable_type:
-                case ff.FindableType.MOVIES:
-                    columns = ['title', 'leaving', 'runtime', 'released', 'rating', 'metascore', 'director'] + columns
-                case ff.FindableType.PEOPLE:
-                    pass
-                case ff.FindableType.ROLES:
-                    pass
+                case flam.FindableType.MOVIES:
+                    columns = ['title', 'runtime', 'released', 'rating', 'metascore', 'director'] + columns
+                case flam.FindableType.PEOPLE:
+                    columns = ['name', 'nmovies', 'avg-rating', 'avg-metascore'] + columns
+                case flam.FindableType.ROLES:
+                    columns = ['name', 'title', 'ncrewed', 'avg-rating-crewed?', 'avg-metascore-crewed?'] + columns
                 case _:
                     raise RuntimeError(f"Unexpected {findable_type=}")
 
@@ -434,19 +434,19 @@ Valid column names: ...''')
         return is_additive, attributes
 
     @classmethod
-    def extract_values(cls, attributes: list[ff.Attribute], movie_list: ff.MovieList, filter: ff.Filter,
-            modal_crew_types: list[tuple[ff.GroupMode, None | ff.CrewType]], args: argparse.Namespace) -> typing.Iterable[list[typing.Any]]:
+    def extract_values(cls, attributes: list[flam.Attribute], movie_list: flam.MovieList, filter: flam.Filter,
+            modal_crew_types: list[tuple[flam.GroupMode, None | flam.CrewType]], args: argparse.Namespace) -> typing.Iterable[list[typing.Any]]:
         for group_mode, crew_type in modal_crew_types:
             for findable in movie_list.find(filter.findable_type, crew_type=crew_type, group_mode=group_mode, filter=filter):
                 yield [findable.extract(attr) for attr in attributes]
 
     @classmethod
-    def sort_values(cls, attributes: list[ff.Attribute], values: list[list[typing.Any]], args: argparse.Namespace) -> None:
+    def sort_values(cls, attributes: list[flam.Attribute], values: list[list[typing.Any]], args: argparse.Namespace) -> None:
         # TODO: this.
         pass
 
     @classmethod
-    def build_table(cls, attributes: list[ff.Attribute], values: list[list[typing.Any]], args: argparse.Namespace) -> typing.Iterable[list[str]]:
+    def build_table(cls, attributes: list[flam.Attribute], values: list[list[typing.Any]], args: argparse.Namespace) -> typing.Iterable[list[str]]:
         if not args.no_titles:
             yield [attr.name for attr in attributes]
 
@@ -505,7 +505,7 @@ Valid column names: ...''')
                 try:
                     subprocess.call(['less', '-RS', out.name])
                 except Exception as e:
-                    raise ff.InputError(f"Pagination failed with error: {e}. You probably don't have less installed.") from e
+                    raise flam.InputError(f"Pagination failed with error: {e}. You probably don't have less installed.") from e
 
 class SubcommandChart:
     @classmethod
@@ -536,7 +536,7 @@ class SubcommandChart:
             '''find-like expression featuring predicates like -crew, -cast, -release...''')
 
     @classmethod
-    def execute(cls, ctx: ff.FlamContext, args: argparse.Namespace) -> None:
+    def execute(cls, ctx: flam.FlamContext, args: argparse.Namespace) -> None:
         print('chart')
 
 def main() -> None:
@@ -546,13 +546,13 @@ def main() -> None:
     try:
         sys.stdout.reconfigure(encoding='utf-8', newline='\n') # type: ignore
     except:
-        ff.logger.error(f"Failed to reconfigure stdout", exc_info=True)
+        flam.logger.error(f"Failed to reconfigure stdout", exc_info=True)
 
     parser = argparse.ArgumentParser(
         formatter_class=argparse.RawTextHelpFormatter,
         description='I dunno lol.')
-    parser.add_argument('-C', '--flam-dir', metavar='PATH', default=ff.FlamContext.DEFAULT_FLAM_DIR, action='store', help=
-        f'Use %(metavar)s as the flam directory. Uses {ff.FlamEnv.CTX_DIR} environment variable by default, or ~/.film_flam if it is not defined.')
+    parser.add_argument('-C', '--flam-dir', metavar='PATH', default=flam.FlamContext.DEFAULT_FLAM_DIR, action='store', help=
+        f'Use %(metavar)s as the flam directory. Uses {flam.FlamEnv.CTX_DIR} environment variable by default, or ~/.film_flam if it is not defined.')
     parser.add_argument('-e', '--no-extensions', action='store_true', help=
         "Don't import configured extensions.")
 
@@ -570,12 +570,12 @@ def main() -> None:
     if hasattr(args, 'FILTER') and hasattr(args, 'REMAINDER'):
         args.FILTER += args.REMAINDER
 
-    ctx = ff.FlamContext(args.flam_dir, import_extensions=not args.no_extensions)
+    ctx = flam.FlamContext(args.flam_dir, import_extensions=not args.no_extensions)
 
     try:
         args.function(ctx, args)
-    except ff.FlamError as e:
-        if ff.is_debug():
+    except flam.FlamError as e:
+        if flam.is_debug():
             raise
 
         # No ugly tracebacks for input errors. Only for internal errors.

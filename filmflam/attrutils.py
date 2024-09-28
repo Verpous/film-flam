@@ -48,6 +48,12 @@ INT_HANDLER = EasyTypeHandler(
     parse = lambda s: int(s, base=0), # 0 means deduce the base from the str.
 )
 
+FLOAT_HANDLER = EasyTypeHandler(
+    type_ = float,
+    default_cmp = _attr.ComparisonOp.EQ,
+    parse = lambda s: float(s),
+)
+
 # TODO: I think we want this to compare EQ case-insensitively.
 STR_HANDLER = EasyTypeHandler(
     type_ = str,
@@ -67,11 +73,13 @@ DATE_HANDLER = EasyTypeHandler(
 #    That way roles can optionally define "from_person/movie" extractors that we invoke if they "hasattr" it.
 # 2. Despite all these extractor methods basically returning "Any", I want mypy to still check each one for type correctness.
 # 3. We're gonna be implementing a 100 attributes so boilerplate must be kept to a minimum.
+# 4. Lots of little constraints to please mypy and pylint about what we're doing.
 @dataclasses.dataclass
 class EasyAttributeParams:
     name: str
     findable_type: _ml.FindableType
     type_handler: _attr.TypeHandler
+    is_little_endian: bool
     is_array: bool
 
 class EasyAttribute(_attr.Attribute):
@@ -92,18 +100,35 @@ class EasyAttribute(_attr.Attribute):
         return self._params.type_handler
 
     @property
+    def is_little_endian(self) -> bool:
+        return self._params.is_little_endian
+
+    @property
     def is_array(self) -> bool:
         return self._params.is_array
 
-def easy_attribute[T](extractor:
-        typing.Callable[[EasyAttribute, _ml.Movie, _mlf.MLFMovie], T] |
-        typing.Callable[[EasyAttribute, _ml.Person, _mlf.MLFPerson], T] |
-        typing.Callable[[EasyAttribute, _ml.Role, list[_mlf.MLFRole]], T]) -> type[EasyAttribute]:
-    class SpecificAttribute(EasyAttribute):
-        pass
+type MovieExtractor[T] = typing.Callable[[EasyAttribute, _ml.Movie, _mlf.MLFMovie], T]
+type PersonExtractor[T] = typing.Callable[[EasyAttribute, _ml.Person, _mlf.MLFPerson], T]
+type RoleExtractor[T] = typing.Callable[[EasyAttribute, _ml.Role, list[_mlf.MLFRole]], T]
+type Extractor[T] = MovieExtractor | PersonExtractor[T] | RoleExtractor[T]
 
-    setattr(SpecificAttribute, extractor.__name__, extractor)
-    return SpecificAttribute
+def easy_attribute[T](params: EasyAttributeParams) -> typing.Callable[[Extractor[T]], EasyAttribute]:
+    def inner(extractor: Extractor[T]) -> EasyAttribute:
+        class SpecificAttribute(EasyAttribute):
+            pass
+
+        match params.findable_type:
+            case _ml.FindableType.MOVIES:
+                setattr(SpecificAttribute, '_extract_from_movie', extractor)
+            case _ml.FindableType.PEOPLE:
+                setattr(SpecificAttribute, '_extract_from_role', extractor)
+            case _ml.FindableType.ROLES:
+                setattr(SpecificAttribute, '_extract_from_person', extractor)
+            case _:
+                raise RuntimeError(f"Unexpected {params.findable_type=}")
+
+        return SpecificAttribute(params)
+    return inner
 
 # TODO: attribute ideas:
 # Generic:

@@ -14,54 +14,114 @@
 # along with this program. If not, see <https://www.gnu.org/licenses/>.
 
 import typing
+import datetime
 
 from . import _dbg
 from . import _exc
 from . import _reg
 from . import _ml
 from . import _mlf
+from . import _file
 from . import _attr
 from . import attrutils
 
-    # def _extract_from_role(self, role: _ml.Role, mlf_roles: list[_mlf.MLFRole]) -> typing.Any:
-    #     assert self._extract_from_role_lambda is not None
-    #     return self._extract_from_role_lambda(role, mlf_roles)
+# Combine common decorator chain into a single decorator.
+# MUST be defined this way and not via lambda for mypy to work.
+def _register_easy_attribute[T](params: attrutils.EasyAttributeParams) -> typing.Callable[[attrutils.Extractor[T]], None]:
+    def inner(extractor: attrutils.Extractor[T]) -> None:
+        _reg._register_builtin(attrutils.easy_attribute(params)(extractor))
+    return inner
 
-    # def _extract_from_person(self, person: _ml.Person, mlf_person: _mlf.MLFPerson) -> typing.Any:
-    #     assert self._extract_from_person_lambda is not None
-    #     return self._extract_from_person_lambda(person, mlf_person)
+#region movie attributes
 
-def _instantiate_and_register(params: attrutils.EasyAttributeParams) -> typing.Callable[[type[attrutils.EasyAttribute]], None]:
-    def internal(cls: type[attrutils.EasyAttribute]) -> None:
-        _reg._register_builtin(cls(params))
-    return internal
-
-@_instantiate_and_register(attrutils.EasyAttributeParams(
+@_register_easy_attribute(attrutils.EasyAttributeParams(
     name = 'title',
     findable_type = _ml.FindableType.MOVIES,
     type_handler = attrutils.STR_HANDLER,
     is_array = False,
 ))
-@attrutils.easy_attribute
-def _extract_from_movie(self: attrutils.EasyAttribute, movie: _ml.Movie, mlf_movie: _mlf.MLFMovie) -> str:
+def _movie_title_extractor(self: attrutils.EasyAttribute, movie: _ml.Movie, mlf_movie: _mlf.MLFMovie) -> None | str:
+    assert not isinstance(mlf_movie.title, _file.UnsetType)
     return mlf_movie.title
 
-@_instantiate_and_register(attrutils.EasyAttributeParams(
+# TODO: Format output hrs:minutes
+@_register_easy_attribute(attrutils.EasyAttributeParams(
+    name = 'runtime',
+    findable_type = _ml.FindableType.MOVIES,
+    type_handler = attrutils.INT_HANDLER,
+    is_array = False,
+))
+def _movie_runtime_extractor(self: attrutils.EasyAttribute, movie: _ml.Movie, mlf_movie: _mlf.MLFMovie) -> None | int:
+    assert not isinstance(mlf_movie.runtime_minutes, _file.UnsetType)
+    return mlf_movie.runtime_minutes
+
+@_register_easy_attribute(attrutils.EasyAttributeParams(
+    name = 'released',
+    findable_type = _ml.FindableType.MOVIES,
+    type_handler = attrutils.DATE_HANDLER,
+    is_array = False,
+))
+def _movie_released_extractor(self: attrutils.EasyAttribute, movie: _ml.Movie, mlf_movie: _mlf.MLFMovie) -> None | datetime.date:
+    assert not isinstance(mlf_movie.release_date, _file.UnsetType)
+    return mlf_movie.release_date
+
+@_register_easy_attribute(attrutils.EasyAttributeParams(
+    name = 'rating',
+    findable_type = _ml.FindableType.MOVIES,
+    type_handler = attrutils.FLOAT_HANDLER,
+    is_array = False,
+))
+def _movie_rating_extractor(self: attrutils.EasyAttribute, movie: _ml.Movie, mlf_movie: _mlf.MLFMovie) -> None | float:
+    assert not isinstance(mlf_movie.rating, _file.UnsetType)
+    return mlf_movie.rating
+
+@_register_easy_attribute(attrutils.EasyAttributeParams(
+    name = 'metascore',
+    findable_type = _ml.FindableType.MOVIES,
+    type_handler = attrutils.INT_HANDLER,
+    is_array = False,
+))
+def _movie_metascore_extractor(self: attrutils.EasyAttribute, movie: _ml.Movie, mlf_movie: _mlf.MLFMovie) -> None | int:
+    assert not isinstance(mlf_movie.metascore, _file.UnsetType)
+    return mlf_movie.metascore
+
+# TODO: Do we want this to just be the name or should we extract a list of roles?
+@_register_easy_attribute(attrutils.EasyAttributeParams(
+    name = 'director',
+    findable_type = _ml.FindableType.MOVIES,
+    type_handler = attrutils.STR_HANDLER,
+    is_array = True,
+))
+def _movie_director_extractor(self: attrutils.EasyAttribute, movie: _ml.Movie, mlf_movie: _mlf.MLFMovie) -> list[str]:
+    mlf = movie.movie_list.underlying_file
+    return [mlf.people_by_uid[uid].name for uid in mlf_movie.crew[_ml.CrewType.DIRECTOR].roles_by_uid]
+
+#endregion movie attributes
+
+#region person attributes
+
+@_reg._register_builtin
+@attrutils.easy_attribute(attrutils.EasyAttributeParams(
     name = 'name',
     findable_type = _ml.FindableType.PEOPLE,
     type_handler = attrutils.STR_HANDLER,
     is_array = False,
 ))
-@attrutils.easy_attribute
-def _extract_from_person(self: attrutils.EasyAttribute, person: _ml.Person, mlf_person: _mlf.MLFPerson) -> str:
+def _person_name_extractor(self: attrutils.EasyAttribute, person: _ml.Person, mlf_person: _mlf.MLFPerson) -> None | str:
+    assert not isinstance(mlf_person.name, _file.UnsetType)
     return mlf_person.name
 
-@_instantiate_and_register(attrutils.EasyAttributeParams(
+#endregion person attributes
+
+#region role attributes
+
+@_register_easy_attribute(attrutils.EasyAttributeParams(
     name = 'characters',
     findable_type = _ml.FindableType.ROLES,
     type_handler = attrutils.STR_HANDLER,
     is_array = True,
 ))
-@attrutils.easy_attribute
-def _extract_from_role(self: attrutils.EasyAttribute, role: _ml.Role, mlf_roles: list[_mlf.MLFRole]) -> list[str]:
+def _role_characters_extractor(self: attrutils.EasyAttribute, role: _ml.Role, mlf_roles: list[_mlf.MLFRole]) -> list[str]:
     return [c for mlf_role in mlf_roles for c in mlf_role.characters]
+
+#endregion role attributes

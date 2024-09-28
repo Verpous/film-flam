@@ -245,8 +245,8 @@ def _fetch_movies_in_csv(movies_csv: list[_CsvRow], movie_list_file: _mlf.MovieL
         mlf_movie.genres            = movie_csv.genres.split(', ')
         mlf_movie.votes             = int(movie_csv.votes)
         mlf_movie.myrating          = float(movie_csv.myrating) if (movie_csv.myrating is not None and movie_csv.myrating != '') else None
-        mlf_movie.watch_date        = _format_date_from_csv(movie_csv.watch_date)
-        mlf_movie.release_date      = _format_date_from_csv(movie_csv.release_date)
+        mlf_movie.watch_date        = _date_from_csv(movie_csv.watch_date)
+        mlf_movie.release_date      = _date_from_csv(movie_csv.release_date)
 
     if interrupting_error is not None:
         raise _exc.FetchInterrupt(f"{type(interrupting_error).__name__}: {interrupting_error}")
@@ -343,8 +343,8 @@ def _update_people_by_uid(dst_people: dict[str, _mlf.MLFPerson], src_people: typ
 # We fix this by trying to find people with a name like that and replacing it with the correct name.
 # By doing this after everything is downloaded and not when the name was added to the dictionary,
 # we are able to optimize by using the same person's appearance in something else instead of doing the big download when possible.
-def _is_person_name_bad(name: _file.UnsetType | str) -> bool:
-    assert not isinstance(name, _file.UnsetType)
+def _is_person_name_bad(name: _file.UnsetType | None | str) -> bool:
+    assert isinstance(name, str)
     return '\n' in name or ' episode' in name.lower()
 
 def _safe_get(obj: typing.Any, key: str, default: typing.Any = None) -> typing.Any:
@@ -357,11 +357,11 @@ def _safe_get(obj: typing.Any, key: str, default: typing.Any = None) -> typing.A
 
     return val
 
-def _format_date_from_csv(date: str) -> str:
+def _date_from_csv(date: str) -> datetime.date:
     # IMDb used to only serve %Y-%m-%d, but now it sometimes serves a partial date.
     for fmt in ('%Y-%m-%d', '%Y-%m', '%Y'):
         try:
-            return datetime.datetime.strptime(date, fmt).strftime('%Y-%m-%d')
+            return datetime.datetime.strptime(date, fmt)
         except ValueError:
             pass
 

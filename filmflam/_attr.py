@@ -112,6 +112,13 @@ class Attribute(abc.ABC):
     def is_array(self) -> bool:
         pass
 
+    # Of course we aren't talking about actual byte order here.
+    # We're talking about generally, when stringified, does the string go from most to least significant or vice versa?
+    @property
+    @abc.abstractmethod
+    def is_little_endian(self) -> bool:
+        pass
+
     # TODO: Not sure if all type_handler functions should actually be in attribute, and type_handler should only be an implementation detail used by EasyAttribute.
     @property
     @abc.abstractmethod

@@ -15,6 +15,8 @@
 
 from __future__ import annotations
 
+import datetime
+
 from . import _file
 from . import _ldef
 from . import _ml
@@ -30,15 +32,15 @@ class MLFCrew(_file._FlamSerializable):
 
 class MLFPerson(_file._FlamSerializable):
     uid:                    str
-    name:                   _file.UnsetType | str
+    name:                   _file.UnsetType | None | str
     # TODO: Check if can support birthday?
     # Would love to add gender, nationality but cinemagoer doesn't have them.
 
 class MLFMovie(_file._FlamSerializable):
     uid:                    str
-    title:                  _file.UnsetType | str
-    watch_date:             _file.UnsetType | None | str
-    release_date:           _file.UnsetType | None | str
+    title:                  _file.UnsetType | None | str
+    watch_date:             _file.UnsetType | None | datetime.date
+    release_date:           _file.UnsetType | None | datetime.date
     description:            _file.UnsetType | None | str
     list_index:             _file.UnsetType | None | int
     runtime_minutes:        _file.UnsetType | None | int
