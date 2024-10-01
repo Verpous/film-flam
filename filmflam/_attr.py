@@ -19,11 +19,16 @@ import typing
 import enum
 import abc
 import re
+import functools
 
 from . import _mlf
 from . import _ml
 from . import _exc
 from . import _dbg
+
+# For now typing.Any, but what we really want is an "intersection" of protocols value must support, which for now is sorting and stringification?
+# Unfortunately python has neither an intersection type, nor a "sortable" type.
+type AttributeValue = None | typing.Any
 
 class ComparisonOp(enum.Enum):
     # Important to use prefix-free signs.
@@ -34,65 +39,29 @@ class ComparisonOp(enum.Enum):
     GT = ('@+', lambda v1, v2: v1 > v2)
     RX = ('@=', lambda v, regex: bool(regex.search(v)))
 
-    def __init__(self, sign: str, compare: typing.Callable[[typing.Any, typing.Any], bool]) -> None:
+    def __init__(self, sign: str, compare: typing.Callable[[AttributeValue, AttributeValue], bool]) -> None:
         self.sign = sign
         self.compare = compare
 
-# TODO: Everything about this class is ugly, but I don't know how to do it better at this time.
-class CmpValue:
-    def __init__(self, compare_func: typing.Callable[[typing.Any], bool], str_func: typing.Callable[[], str]) -> None:
-        self._compare_func = compare_func
-        self._str_func = str_func
+    def __call__(self, value1: AttributeValue, value2: AttributeValue) -> bool:
+        return self.compare(value1, value2)
 
-    def compare(self, value: typing.Any) -> bool:
-        return self._compare_func(value)
+class CmpTo:
+    def __init__(self, op: ComparisonOp, value: AttributeValue, attribute: Attribute) -> None:
+        self._attribute = attribute
+        self._op = op
+        self._value = value
+
+    def __call__(self, value: AttributeValue) -> bool:
+        # Order is important.
+        return self._op(value, self._value)
 
     def __str__(self) -> str:
-        return self._str_func()
-
-# There are some facilities that we need out of every possible value attributes may extract.
-# I don't want to wrap every such value in a "Value" class to provide those facitilites because that would mean making lots of small objects.
-# Solution: Flyweight pattern. Subclasses of TypeHandler provide all the facilities we need, with the underlying value externalized.
-# Downside: Casting/type assertion everywhere.
-class TypeHandler(abc.ABC):
-    @property
-    @abc.abstractmethod
-    def type_(self) -> type:
-        pass
-
-    @property
-    @abc.abstractmethod
-    def default_cmp(self) -> ComparisonOp:
-        pass
-
-    @abc.abstractmethod
-    def parse(self, value_str: str) -> typing.Any:
-        pass
-
-    def assert_type(self, value: typing.Any) -> typing.Any:
-        assert isinstance(value, self.type_)
-        return value
-
-    def stringify(self, value: typing.Any) -> str:
-        return str(self.assert_type(value))
-
-    def make_cmp_value(self, cmp: ComparisonOp, value_str: str) -> CmpValue:
-        match cmp:
+        match self._op:
             case ComparisonOp.RX:
-                try:
-                    # TODO: Support case sensitivity on the cmpvalue level, or globally with an env var, or not at all?
-                    compiled = re.compile(value_str, flags=re.IGNORECASE)
-                except re.error as e:
-                    raise _exc.InputError(f"Failed to parse value '{value_str}' as a regular expression: {e}") from e
-
-                return CmpValue(
-                    compare_func=lambda value: cmp.compare(self.stringify(value), compiled),
-                    str_func=lambda: compiled.pattern)
+                return f"{self._op.sign}{self._value.pattern}"
             case _:
-                parsed = self.parse(value_str)
-                return CmpValue(
-                    compare_func=lambda value: cmp.compare(self.assert_type(value), parsed),
-                    str_func=lambda: f"{cmp.sign}{self.stringify(parsed)}")
+                return f"{self._op.sign}{self._attribute.str_of(self._value)}"
 
 # TODO: Thoughts on supporting aliases: will need to register the attribute with each alias name, separate the registry by findable type,
 # prevent collisions (but allow them across types), and support '<findable-type>-<attr name>' (e.g. movies-name, person-age) to prevent ambiguity when there is any
@@ -116,14 +85,90 @@ class Attribute(abc.ABC):
     # We're talking about generally, when stringified, does the string go from most to least significant or vice versa?
     @property
     @abc.abstractmethod
-    def is_little_endian(self) -> bool:
+    def is_big_endian(self) -> bool:
         pass
 
-    # TODO: Not sure if all type_handler functions should actually be in attribute, and type_handler should only be an implementation detail used by EasyAttribute.
     @property
     @abc.abstractmethod
-    def type_handler(self) -> TypeHandler:
+    def is_ascending(self) -> bool:
         pass
+
+    @property
+    @abc.abstractmethod
+    def type_(self) -> type:
+        pass
+
+    @property
+    @abc.abstractmethod
+    def default_op(self) -> ComparisonOp:
+        pass
+
+    @abc.abstractmethod
+    def parse(self, value_str: str) -> AttributeValue:
+        pass
+
+    def compare(self, op: ComparisonOp, value1: AttributeValue, value2: AttributeValue) -> bool:
+        if value1 is not None and value2 is not None:
+            return op(value1, value2)
+
+        assert self.is_noneable
+        return value1 is None and value2 is None
+
+    def compare_all(self, op: ComparisonOp, value1: AttributeValue, value2: AttributeValue) -> bool:
+        if not self.is_array:
+            return self.compare(op, value1, value2)
+
+        assert isinstance(value1, list) and isinstance(value2, list)
+        len1, len2 = len(value1), len(value2)
+        
+        match op:
+            case ComparisonOp.LE:
+                return self.compare_all(ComparisonOp.EQ, value1, value2) or self.compare_all(ComparisonOp.LT, value1, value2)
+            case ComparisonOp.GE:
+                return self.compare_all(ComparisonOp.EQ, value1, value2) or self.compare_all(ComparisonOp.GT, value1, value2)
+            case ComparisonOp.EQ:
+                return len1 == len2 and all(self.compare(op, elem1, elem2) for elem1, elem2 in zip(value1, value2))
+            case ComparisonOp.LT | ComparisonOp.GT:
+                # Lexicographic compare.
+                for elem1, elem2 in zip(value1, value2):
+                    if self.compare(op, elem1, elem2):
+                        return True
+                    
+                    if not self.compare(ComparisonOp.EQ, value1, value2):
+                        return False
+
+                return op(len1, len2)
+            case ComparisonOp.RX:
+                raise _exc.InputError("Regex comparison is not supported for compare_all.")
+            case _:
+                raise RuntimeError(f"Unexpected {op=}")
+
+    # The need for this function is to handle the fact that values may be None.
+    # Use typing.Any because there's no typehint for sortable.
+    def sort_key(self, value: AttributeValue) -> typing.Callable[[AttributeValue], typing.Any]:
+        return ((value is None) ^ self.is_ascending, value)
+
+    def verify_type(self, value: AttributeValue, allow_none: bool = True) -> AttributeValue:
+        assert isinstance(value, self.type_) or (allow_none and value is None)
+        return value
+
+    def str_of(self, value: AttributeValue) -> str:
+        if value is None or (isinstance(value, list) and len(value) == 0):
+            return '-'
+
+        return str(value)
+
+    def make_cmpto(self, op: ComparisonOp, value_str: str) -> CmpTo:
+        match op:
+            case ComparisonOp.RX:
+                try:
+                    parsed = re.compile(value_str, flags=re.IGNORECASE)
+                except re.error as e:
+                    raise _exc.InputError(f"Failed to parse value '{value_str}' as a regular expression: {e}") from e
+            case _:
+                parsed = self.parse(value_str)
+
+        return CmpTo(op, parsed, self)
 
 # TODO: attribute ideas:
 # Generic:

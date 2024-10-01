@@ -45,6 +45,10 @@ def clampstr(s: str, maxlen: int = 30, ellipsis: str = '...', keep_lhs: bool = T
         else s[:maxlen - len(ellipsis)] + ellipsis if keep_lhs
         else ellipsis + s[-(maxlen - len(ellipsis)):])
 
+def uniq_append(l: list, x: typing.Any) -> None:
+    if x not in l:
+        l.append(x)
+
 class Choice(enum.StrEnum):
     YES     = 'yes'
     NO      = 'no'
@@ -327,14 +331,14 @@ class SubcommandFind:
         parser.set_defaults(function=cls.execute)
 
         # TODO: "--split" option to expand array attributes into a row for each one?
-        parser.add_argument('-s', '--sort', metavar='KEYS', type=str, default=['leaving', 'runtime', 'alpha', 'dunnolol'], action='store', help= # TODO: type=sort_aliases
+        parser.add_argument('-s', '--sort', metavar='ATTRIBUTES', default=None, action='store', help=
             f'''Sort movies according to %(metavar)s, which is a comma-delimited list of keys to sort by, in decreasing priority. Defaults to 'leaving,runtime,alphabetical'.
             Valid sort keys: ...''')
         parser.add_argument('-c', '--color', choices=Choice.always_auto_never(), default=Choice.AUTO, action='store', help=
             'Set whether columns should be colored. Defaults to %(default)s')
         parser.add_argument('-d', '--dsv', metavar='DELIM', default=None, action='store', help=
             "Output in delimiter-separated values format (DSV).")
-        parser.add_argument('-C', '--columns', metavar='COLUMNS', action='store', default=None, help=
+        parser.add_argument('-C', '--columns', metavar='ATTRIBUTES', default=None, action='store', help=
             'List of columns to print, delimited by commas. Defaults to \'title,leaving,runtime,released,rating,metascore,director\','
             f''' with a few other "smart" columns which activate when a condition is met.
 This option overrides the defaults and smart columns. Only the columns you specify will be printed.
@@ -384,81 +388,109 @@ Valid column names: ...''')
     @classmethod
     def execute(cls, ctx: flam.FlamContext, args: argparse.Namespace) -> None:
         findable_type, modal_crew_types = args.FINDABLE
-        is_additive, attributes = cls.parse_columns(args, findable_type, ctx)
 
         listdefs, filter_tokens = split_at_filter(args.LISTDEF + args.FILTER)
         filter = ctx.compile_filter(filter_tokens, findable_type)
-
         movie_list = ctx.get_movie_list(listdefs if len(listdefs) > 0 else flam.SpecialListType.DEFAULTS)
 
-        values = list(cls.extract_values(attributes, movie_list, filter, modal_crew_types, args))
-        cls.sort_values(attributes, values, args)
-        table = list(cls.build_table(attributes, values, args))
-        cls.print_table(table, args)
+        sort_attrs = cls.parse_sortkeys(args, findable_type, ctx)
+        column_attrs = cls.parse_columns(args, findable_type, sort_attrs, movie_list, ctx)
+
+        findables = [
+            findable
+            for group_mode, crew_type in modal_crew_types
+                for findable in movie_list.find(findable_type, crew_type=crew_type, group_mode=group_mode, filter=filter)
+        ]
+
+        cls.sort_findables(sort_attrs, findables, args)
+
+        values_table = [[findable.extract(attr) for attr in column_attrs] for findable in findables]
+        strs_table = list(cls.build_strs_table(column_attrs, values_table, args))
+        cls.print_table(strs_table, column_attrs, args)
 
     # Can't do this at argparse time because it depends on the context.
     @classmethod
-    def parse_columns(cls, args: argparse.Namespace, findable_type: flam.FindableType, ctx: flam.FlamContext) -> tuple[bool, list[flam.Attribute]]:
+    def parse_sortkeys(cls, args: argparse.Namespace, findable_type: flam.FindableType, ctx: flam.FlamContext) -> list[flam.Attribute]:
+        if args.sort is None:
+            default_attribute_names = {
+                flam.FindableType.MOVIES: ['runtime', 'title'], # TODO: Used to have 'leaving' as top priority.
+                flam.FindableType.PEOPLE: ['nmovies', 'name'],
+                flam.FindableType.ROLES: ['nmovies', 'name', 'release', 'title'],
+            }
+
+            attribute_names = default_attribute_names[findable_type]
+        else:
+            attribute_names = args.sort.split(',')
+
+        attributes = [ctx.attributes[a] for a in attribute_names]
+
+        for attr in attributes:
+            if not attr.findable_type.is_compatible(findable_type):
+                raise flam.InputError(f"ATTRIBUTE '{attr.name}' is a {attr.findable_type} attribute, so it is not found on {findable_type}.")
+        
+        return attributes
+
+    # Can't do this at argparse time because it depends on the context and sortkeys.
+    @classmethod
+    def parse_columns(cls, args: argparse.Namespace, findable_type: flam.FindableType, sort_attrs: list[flam.Attribute],
+            movie_list: flam.MovieList, ctx: flam.FlamContext) -> list[flam.Attribute]:
         is_additive = args.columns is None or args.columns.startswith('+')
         columns = [] if args.columns is None else args.columns.removeprefix('+').split(',')
 
         if is_additive:
-            # TODO: Decide on default columns for PEOPLE, ROLES, and also what do we do about the 'leaving' column? Also uniq_append!
-            match findable_type:
-                case flam.FindableType.MOVIES:
-                    columns = ['title', 'runtime', 'released', 'rating', 'metascore', 'director'] + columns
-                case flam.FindableType.PEOPLE:
-                    columns = ['name', 'nmovies', 'avg-rating', 'avg-metascore'] + columns
-                case flam.FindableType.ROLES:
-                    columns = ['name', 'title', 'ncrewed', 'avg-rating-crewed?', 'avg-metascore-crewed?'] + columns
-                case _:
-                    raise RuntimeError(f"Unexpected {findable_type=}")
+            # TODO: Decide on default columns for PEOPLE, ROLES, and also what do we do about the 'leaving' column?
+            default_columns = {
+                flam.FindableType.MOVIES: ['title', 'runtime', 'released', 'rating', 'metascore', 'director'],
+                flam.FindableType.PEOPLE: ['name', 'nmovies', 'avg-rating', 'avg-metascore'],
+                flam.FindableType.ROLES: ['name', 'title', 'ncrewed', 'avg-rating-crewed?', 'avg-metascore-crewed?'],
+            }
 
-        # TODO: "smart" columns
-        # if sk_watched in sort_keys:
-        #     uniq_append(column_keys, ck_watched)
+            columns = default_columns[findable_type] + columns
 
-        # if sk_votes in sort_keys:
-        #     uniq_append(column_keys, ck_votes)
+        # "Smart" columns that aren't default unless conditions are met.
+        if any(attr.name == 'watched' for attr in sort_attrs):
+            uniq_append(columns, 'watched')
 
-        # if sk_myrating in sort_keys:
-        #     uniq_append(column_keys, ck_myrating)
+        if any(attr.name == 'votes' for attr in sort_attrs):
+            uniq_append(columns, 'votes')
 
-        # if sk_description in sort_keys:
-        #     uniq_append(column_keys, ck_description)
-            
-        # if len(jsonfiles) > 1:
-        #     uniq_append(column_keys, ck_source)
+        if any(attr.name == 'myrating' for attr in sort_attrs):
+            uniq_append(columns, 'myrating')
+
+        if any(attr.name == 'description' for attr in sort_attrs):
+            uniq_append(columns, 'description')
+        
+        # If we combined multiple lists, tag each element with the list(s) it came from.
+        if movie_list.underlying_file.abstract_listdef.list_type == flam.SpecialListType.ANNONYMOUS:
+            uniq_append(columns, 'origin')
         
         attributes = [ctx.attributes[c] for c in columns]
-        return is_additive, attributes
+
+        for attr in attributes:
+            if not attr.findable_type.is_compatible(findable_type):
+                raise flam.InputError(f"ATTRIBUTE '{attr.name}' is a {attr.findable_type} attribute, so it is not found on {findable_type}.")
+
+        return attributes
 
     @classmethod
-    def extract_values(cls, attributes: list[flam.Attribute], movie_list: flam.MovieList, filter: flam.Filter,
-            modal_crew_types: list[tuple[flam.GroupMode, None | flam.CrewType]], args: argparse.Namespace) -> typing.Iterable[list[typing.Any]]:
-        for group_mode, crew_type in modal_crew_types:
-            for findable in movie_list.find(filter.findable_type, crew_type=crew_type, group_mode=group_mode, filter=filter):
-                yield [findable.extract(attr) for attr in attributes]
+    def sort_findables(cls, sort_attrs: list[flam.Attribute], findables: list[flam.Findable], args: argparse.Namespace) -> None:
+        for attr in sort_attrs[::-1]:
+            findables.sort(key=attr.sort_key, reverse=attr.is_ascending ^ args.reverse)
 
     @classmethod
-    def sort_values(cls, attributes: list[flam.Attribute], values: list[list[typing.Any]], args: argparse.Namespace) -> None:
-        # TODO: this.
-        pass
-
-    @classmethod
-    def build_table(cls, attributes: list[flam.Attribute], values: list[list[typing.Any]], args: argparse.Namespace) -> typing.Iterable[list[str]]:
+    def build_strs_table(cls, attributes: list[flam.Attribute], values_table: list[list[_attr.AttributeValue]], args: argparse.Namespace) -> typing.Iterable[list[str]]:
         if not args.no_titles:
             yield [attr.name for attr in attributes]
 
-        for record in values:
-            yield [attributes[i].type_handler.stringify(record[i]) for i in range(len(attributes))]
+        for record in values_table:
+            yield [attributes[i].str_of(record[i]) for i in range(len(attributes))]
 
     @classmethod
-    def print_table(cls, table: list[list[str]], args: argparse.Namespace) -> None:
+    def print_table(cls, table: list[list[str]], attributes: list[flam.Attribute], args: argparse.Namespace) -> None:
         if not args.verbose:
             for row in table:
                 for i in range(len(row)):
-                    row[i] = clampstr(row[i])
+                    row[i] = clampstr(row[i], keep_lhs=attributes[i].is_big_endian)
 
         match args.color:
             case Choice.AUTO:

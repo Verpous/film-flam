@@ -88,7 +88,7 @@ class Findable(abc.ABC):
         return self._movie_list
 
     @abc.abstractmethod
-    def extract(self, attribute: _attr.Attribute) -> typing.Any:
+    def extract(self, attribute: _attr.Attribute) -> _attr.AttributeValue:
         pass
 
     # TODO: some attributes may want to cache partial results, but we could have a special case for attributes that want to cache the entire result of extract(),
@@ -107,7 +107,7 @@ class Movie(Findable):
         super().__init__(movie_list)
         self._mlf_movie = mlf_movie
 
-    def extract(self, attribute: _attr.Attribute) -> typing.Any:
+    def extract(self, attribute: _attr.Attribute) -> _attr.AttributeValue:
         return attribute._extract_from_movie(self, self._mlf_movie) # type: ignore
 
 class Person(Findable):
@@ -115,7 +115,7 @@ class Person(Findable):
         super().__init__(movie_list)
         self._mlf_person = mlf_person
 
-    def extract(self, attribute: _attr.Attribute) -> typing.Any:
+    def extract(self, attribute: _attr.Attribute) -> _attr.AttributeValue:
         return attribute._extract_from_person(self, self._mlf_person) # type: ignore
 
 class Role(Findable):
@@ -134,7 +134,7 @@ class Role(Findable):
     def group_mode(self) -> GroupMode:
         return self._group_mode
 
-    def extract(self, attribute: _attr.Attribute) -> typing.Any:
+    def extract(self, attribute: _attr.Attribute) -> _attr.AttributeValue:
         # TODO: Optimize by caching Person/Movie objects, maybe even on the ML so that if someone iterates over movies/people later
         # they will be there and include things already computed on them.
         match attribute.findable_type:

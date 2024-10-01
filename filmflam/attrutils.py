@@ -19,53 +19,89 @@ import typing
 import datetime
 import dateutil.parser
 import dataclasses
+import abc
 
 from . import _attr
 from . import _mlf
 from . import _ml
 
-class EasyTypeHandler(_attr.TypeHandler):
-    def __init__(self, type_: type, default_cmp: _attr.ComparisonOp, parse: typing.Callable[[str], typing.Any]) -> None:
+# There are some facilities that we need out of every possible value attributes may extract (e.g.: ability to compare, stringify, etc.).
+# I don't want to wrap every such value in a "Value" class to provide those facitilites because that would mean making lots of small objects.
+# Solution: Flyweight pattern. Subclasses of TypeHandler provide all the facilities we need, with the underlying value externalized.
+# Downside: Casting/type assertion everywhere.
+class TypeHandler(abc.ABC):
+    @property
+    @abc.abstractmethod
+    def type_(self) -> type:
+        pass
+
+    @property
+    @abc.abstractmethod
+    def default_op(self) -> _attr.ComparisonOp:
+        pass
+
+    @abc.abstractmethod
+    def parse(self, value_str: str) -> _attr.AttributeValue:
+        pass
+
+    def str_of(self, value: _attr.AttributeValue) -> str:
+        return str(value)
+
+class EasyTypeHandler(TypeHandler):
+    def __init__(
+            self,
+            type_: type,
+            default_op: _attr.ComparisonOp,
+            parse: typing.Callable[[str], _attr.AttributeValue],
+            str_of: typing.Callable[[_attr.AttributeValue], str]) -> None:
         super().__init__()
         self._type = type_
-        self._default_cmp = default_cmp
+        self._default_op = default_op
         self._parse = parse
+        self._str_of = str_of
 
     @property
     def type_(self) -> type:
         return self._type
 
     @property
-    def default_cmp(self) -> _attr.ComparisonOp:
-        return self._default_cmp
+    def default_op(self) -> _attr.ComparisonOp:
+        return self._default_op
 
-    def parse(self, value_str: str) -> typing.Any:
+    def parse(self, value_str: str) -> _attr.AttributeValue:
         return self._parse(value_str)
+
+    def str_of(self, value: _attr.AttributeValue) -> str:
+        return self._str_of(value)
 
 INT_HANDLER = EasyTypeHandler(
     type_ = int,
-    default_cmp = _attr.ComparisonOp.EQ,
+    default_op = _attr.ComparisonOp.EQ,
     parse = lambda s: int(s, base=0), # 0 means deduce the base from the str.
+    str_of = str,
 )
 
 FLOAT_HANDLER = EasyTypeHandler(
     type_ = float,
-    default_cmp = _attr.ComparisonOp.EQ,
-    parse = lambda s: float(s),
+    default_op = _attr.ComparisonOp.EQ,
+    parse = float,
+    str_of = str,
 )
 
 # TODO: I think we want this to compare EQ case-insensitively.
 STR_HANDLER = EasyTypeHandler(
     type_ = str,
-    default_cmp = _attr.ComparisonOp.RX,
+    default_op = _attr.ComparisonOp.RX,
     parse = lambda s: s,
+    str_of = lambda s: s,
 )
 
 # TODO: If an attribute is like "release year+month (without day)", you wouldn't want to compare by the whole date, would you?
 DATE_HANDLER = EasyTypeHandler(
     type_ = datetime.date,
-    default_cmp = _attr.ComparisonOp.EQ,
+    default_op = _attr.ComparisonOp.EQ,
     parse = lambda s: dateutil.parser.parse(s, default=datetime.datetime.min).date(),
+    str_of = lambda d: d.strftime("%Y-%m-%d"),
 )
 
 # If the way this EasyAttribute business is coded looks funny to you, here is why:
@@ -76,14 +112,15 @@ DATE_HANDLER = EasyTypeHandler(
 # 4. Lots of little constraints to please mypy and pylint about what we're doing.
 @dataclasses.dataclass
 class EasyAttributeParams:
+    # TODO: many more fields. Fields related to sorting, distribution, etc..
     name: str
     findable_type: _ml.FindableType
-    type_handler: _attr.TypeHandler
-    is_little_endian: bool
+    type_handler: TypeHandler
     is_array: bool
+    is_big_endian: bool
+    is_ascending: bool
 
 class EasyAttribute(_attr.Attribute):
-    # TODO: many more fields. Fields related to sorting, distribution, etc..
     def __init__(self, params: EasyAttributeParams) -> None: 
         self._params = params
 
@@ -96,37 +133,49 @@ class EasyAttribute(_attr.Attribute):
         return self._params.findable_type
 
     @property
-    def type_handler(self) -> _attr.TypeHandler:
-        return self._params.type_handler
+    def is_big_endian(self) -> bool:
+        return self._params.is_big_endian
 
     @property
-    def is_little_endian(self) -> bool:
-        return self._params.is_little_endian
+    def is_ascending(self) -> bool:
+        return self._params.is_big_endian
 
     @property
     def is_array(self) -> bool:
         return self._params.is_array
+
+    @property
+    def is_noneable(self) -> bool:
+        return not self.is_array and self.name != 'uid'
+
+    @property
+    def type_(self) -> type:
+        return self._params.type_handler.type_
+
+    @property
+    def default_op(self) -> _attr.ComparisonOp:
+        return self._params.type_handler.default_op
+
+    def parse(self, value_str: str) -> _attr.AttributeValue:
+        return self._params.type_handler.parse(value_str)
 
 type MovieExtractor[T] = typing.Callable[[EasyAttribute, _ml.Movie, _mlf.MLFMovie], T]
 type PersonExtractor[T] = typing.Callable[[EasyAttribute, _ml.Person, _mlf.MLFPerson], T]
 type RoleExtractor[T] = typing.Callable[[EasyAttribute, _ml.Role, list[_mlf.MLFRole]], T]
 type Extractor[T] = MovieExtractor | PersonExtractor[T] | RoleExtractor[T]
 
+_extractor_names = {
+    _ml.FindableType.MOVIES: '_extract_from_movie',
+    _ml.FindableType.PEOPLE: '_extract_from_role',
+    _ml.FindableType.ROLES: '_extract_from_person',
+}
+
 def easy_attribute[T](params: EasyAttributeParams) -> typing.Callable[[Extractor[T]], EasyAttribute]:
     def inner(extractor: Extractor[T]) -> EasyAttribute:
         class SpecificAttribute(EasyAttribute):
             pass
 
-        match params.findable_type:
-            case _ml.FindableType.MOVIES:
-                setattr(SpecificAttribute, '_extract_from_movie', extractor)
-            case _ml.FindableType.PEOPLE:
-                setattr(SpecificAttribute, '_extract_from_role', extractor)
-            case _ml.FindableType.ROLES:
-                setattr(SpecificAttribute, '_extract_from_person', extractor)
-            case _:
-                raise RuntimeError(f"Unexpected {params.findable_type=}")
-
+        setattr(SpecificAttribute, _extractor_names[params.findable_type], extractor)
         return SpecificAttribute(params)
     return inner
 

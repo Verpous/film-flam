@@ -122,6 +122,6 @@ def _person_name_extractor(self: attrutils.EasyAttribute, person: _ml.Person, ml
     is_array = True,
 ))
 def _role_characters_extractor(self: attrutils.EasyAttribute, role: _ml.Role, mlf_roles: list[_mlf.MLFRole]) -> list[str]:
-    return [c for mlf_role in mlf_roles for c in mlf_role.characters]
+    return sorted(c for mlf_role in mlf_roles for c in mlf_role.characters)
 
 #endregion role attributes

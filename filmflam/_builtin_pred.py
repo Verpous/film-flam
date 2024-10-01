@@ -43,68 +43,68 @@ class FalsePredicate(_filter.Predicate, name='false'):
 
 @_reg._register_builtin
 class All(_filter.Predicate, name='all'):
-    def __init__(self, attribute: _attr.Attribute, cmp_value: _attr.CmpValue) -> None:
+    def __init__(self, attribute: _attr.Attribute, cmpto: _attr.CmpTo) -> None:
         self._attribute = attribute
-        self._cmp_value = cmp_value
+        self._cmpto = cmpto
     
     @classmethod
     def eat(cls, params: _filter.EatParams, at: int) -> tuple[_filter.Predicate, int]:
         attribute = cls.eat_attribute(params, at, is_array=True)
-        cmp_value = cls.eat_cmp_value(params, at + 1, attribute.type_handler)
-        return cls(attribute, cmp_value), at + 2
+        cmpto = cls.eat_cmpto(params, at + 1, attribute)
+        return cls(attribute, cmpto), at + 2
 
     def excrete(self, findable: _ml.Findable, ctx: _ctx.FlamContext) -> bool:
         actual = findable.extract(self._attribute)
-        return all(self._cmp_value.compare(elem) for elem in actual)
+        return all(self._cmpto(elem) for elem in actual)
 
     def regurgitate(self) -> typing.Iterator[str]:
         yield from super().regurgitate()
         yield self._attribute.name
-        yield str(self._cmp_value)
+        yield str(self._cmpto)
 
 # TODO: actually delete this I think, we don't need it.
 @_reg._register_builtin
 class Contains(_filter.Predicate, name='contains'):
-    def __init__(self, attribute: _attr.Attribute, cmp_value: _attr.CmpValue) -> None:
+    def __init__(self, attribute: _attr.Attribute, cmpto: _attr.CmpTo) -> None:
         self._attribute = attribute
-        self._cmp_value = cmp_value
+        self._cmpto = cmpto
     
     @classmethod
     def eat(cls, params: _filter.EatParams, at: int) -> tuple[_filter.Predicate, int]:
         attribute = cls.eat_attribute(params, at, is_array=True)
-        cmp_value = cls.eat_cmp_value(params, at + 1, attribute.type_handler)
-        return cls(attribute, cmp_value), at + 2
+        cmpto = cls.eat_cmpto(params, at + 1, attribute)
+        return cls(attribute, cmpto), at + 2
 
     def excrete(self, findable: _ml.Findable, ctx: _ctx.FlamContext) -> bool:
         actual = findable.extract(self._attribute)
-        return any(self._cmp_value.compare(elem) for elem in actual)
+        return any(self._cmpto(elem) for elem in actual)
 
     def regurgitate(self) -> typing.Iterator[str]:
         yield from super().regurgitate()
         yield self._attribute.name
-        yield str(self._cmp_value)
+        yield str(self._cmpto)
 
 # TODO: actually we probably want to have a size attribute for every array type so this isn't needed either.
 @_reg._register_builtin
 class Size(_filter.Predicate, name='size'):
-    def __init__(self, attribute: _attr.Attribute, cmp_value: _attr.CmpValue) -> None:
+    def __init__(self, attribute: _attr.Attribute, cmpto: _attr.CmpTo) -> None:
         self._attribute = attribute
-        self._cmp_value = cmp_value
+        self._cmpto = cmpto
     
     @classmethod
     def eat(cls, params: _filter.EatParams, at: int) -> tuple[_filter.Predicate, int]:
         attribute = cls.eat_attribute(params, at, is_array=True)
-        cmp_value = cls.eat_cmp_value(params, at + 1, attrutils.INT_HANDLER)
-        return cls(attribute, cmp_value), at + 2
+        cmpto = cls.eat_cmpto(params, at + 1, attrutils.INT_HANDLER)
+        return cls(attribute, cmpto), at + 2
 
     def excrete(self, findable: _ml.Findable, ctx: _ctx.FlamContext) -> bool:
         actual = findable.extract(self._attribute)
-        return self._cmp_value.compare(len(actual))
+        return self._cmpto(len(actual))
 
     def regurgitate(self) -> typing.Iterator[str]:
         yield from super().regurgitate()
         yield self._attribute.name
-        yield str(self._cmp_value)
+        yield str(self._cmpto)
 
 # TODO: Predicate ideas:
 # Don't forget for string predicates we should support regex with "anywhere in the string" matching by default!
@@ -119,6 +119,7 @@ class Size(_filter.Predicate, name='size'):
 # * -also-in <listdef> (searches for the same uid in another list by the same pivot/crew-type. I think this is only a person/movie predicate, not a role predicate)
 # * -has <attribute name> (check if the value is None, or generally missing)
 # * -line <comma-delimited column names which are just attribute names?> <regex> (like grepping in the tabulated result)
+# * -index <num (or slice)?> <array attribute name> [=|+|-|++|--]<value> (compare value to specific array element or slice. Useful mostly because arrays are sorted)
 # * In <value>s support %<attribute> expressions which expand to the value of this attribute on this findable?
 # 
 # Person predicates:

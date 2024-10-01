@@ -95,27 +95,28 @@ class FilterMember(abc.ABC):
 
         if is_array and not attribute.is_array:
             # TODO: "which is of type X"? Or nah?
-            raise _EinGafrurError(f"Expected attribute to be an array type, but got: '{attribute_name}'.", tokens=params.tokens, error_indices=at)
+            raise _EinGafrurError(f"Expected attribute to be an array type, but got: '{attribute_name}' of type: {attribute.type_.__name__}.",
+                tokens=params.tokens, error_indices=at)
 
         return attribute
 
     @classmethod
-    def eat_cmp_value(cls, params: EatParams, at: int, type_handler: _attr.TypeHandler) -> _attr.CmpValue:
-        cmp_value_str = cls.eat_str(params, at, 'a value')
-        cmp, value_str = cls.split_cmp_value_str(cmp_value_str, type_handler.default_cmp)
+    def eat_cmpto(cls, params: EatParams, at: int, attribute: _attr.Attribute) -> _attr.CmpTo:
+        cmpto_str = cls.eat_str(params, at, 'a value')
+        op, value_str = cls.split_cmpto_str(cmpto_str, attribute.default_op)
 
         try:
-            return type_handler.make_cmp_value(cmp, value_str)
+            return attribute.make_cmpto(op, value_str)
         except _exc.InputError as e:
             raise _EinGafrurError(str(e), tokens=params.tokens, error_indices=at) from e
 
     @classmethod
-    def split_cmp_value_str(cls, cmp_value: str, default_cmp: _attr.ComparisonOp) -> tuple[_attr.ComparisonOp, str]:
-        for cmp in _attr.ComparisonOp:
-            if cmp_value.startswith(cmp.sign):
-                return cmp, cmp_value.removeprefix(cmp.sign)
+    def split_cmpto_str(cls, cmpto: str, default_op: _attr.ComparisonOp) -> tuple[_attr.ComparisonOp, str]:
+        for op in _attr.ComparisonOp:
+            if cmpto.startswith(op.sign):
+                return op, cmpto.removeprefix(op.sign)
 
-        return default_cmp, cmp_value
+        return default_op, cmpto
 
 class Filter(FilterMember):
     def __init__(self, pipeline: None | Pipeline, find: _ml.FindableType) -> None:
@@ -336,6 +337,7 @@ class Predicate(FilterMember):
                 return params.ctx.predicates[name].eat(params, at + 1)
 
             # Special treatment for AttributePredicate because it's not wise to make a predicate for each attribute.
+            # TODO: Don't like that we go first-pred, then-attribute when we should go level by level pred-then-attribute.
             if name in params.ctx.attributes:
                 attribute = params.ctx.attributes[name]
 
@@ -357,9 +359,9 @@ class Predicate(FilterMember):
 
 # This should be the only concrete predicate that is in this file, because it's special.
 class AttributePredicate(Predicate, name='attribute'):
-    def __init__(self, attribute: _attr.Attribute, cmp_value: _attr.CmpValue) -> None:
+    def __init__(self, attribute: _attr.Attribute, cmpto: _attr.CmpTo) -> None:
         self._attribute = attribute
-        self._cmp_value = cmp_value
+        self._cmpto = cmpto
 
         # Shadow the name with that of the attribute. Python lets you shadow class variables with instance variables like this.
         self.name = attribute.name
@@ -367,17 +369,22 @@ class AttributePredicate(Predicate, name='attribute'):
     # Part of being a special predicate means its "eat" has a different signature so we have to give it a different name.
     @classmethod
     def eat_shit(cls, params: EatParams, at: int, attribute: _attr.Attribute) -> tuple[Predicate, int]:
-        cmp_value = cls.eat_cmp_value(params, at, attribute.type_handler)
-        return cls(attribute, cmp_value), at + 1
+        cmpto = cls.eat_cmpto(params, at, attribute)
+        return cls(attribute, cmpto), at + 1
 
     def excrete(self, findable: _ml.Findable, ctx: _ctx.FlamContext) -> bool:
         actual = findable.extract(self._attribute)
-        return (any(self._cmp_value.compare(elem) for elem in actual) if self._attribute.is_array
-            else self._cmp_value.compare(actual))
+
+        # For array attributes we do "contains". There is an "-all" predicate for those who want that behavior.
+        if self._attribute.is_array:
+            assert isinstance(actual, list)
+            return any(self._cmpto(elem) for elem in actual)
+
+        return self._cmpto(actual)
 
     def regurgitate(self) -> typing.Iterator[str]:
         yield from super().regurgitate()
-        yield str(self._cmp_value)
+        yield str(self._cmpto)
 
 # Doesn't guarantee that token is valid, only indicates that it looks like it should be.
 def is_filter_token(token: str) -> bool:
