@@ -55,51 +55,8 @@ class All(_filter.Predicate, name='all'):
 
     def excrete(self, findable: _ml.Findable, ctx: _ctx.FlamContext) -> bool:
         actual = findable.extract(self._attribute)
+        assert isinstance(actual, list)
         return all(self._cmpto(elem) for elem in actual)
-
-    def regurgitate(self) -> typing.Iterator[str]:
-        yield from super().regurgitate()
-        yield self._attribute.name
-        yield str(self._cmpto)
-
-# TODO: actually delete this I think, we don't need it.
-@_reg._register_builtin
-class Contains(_filter.Predicate, name='contains'):
-    def __init__(self, attribute: _attr.Attribute, cmpto: _attr.CmpTo) -> None:
-        self._attribute = attribute
-        self._cmpto = cmpto
-    
-    @classmethod
-    def eat(cls, params: _filter.EatParams, at: int) -> tuple[_filter.Predicate, int]:
-        attribute = cls.eat_attribute(params, at, is_array=True)
-        cmpto = cls.eat_cmpto(params, at + 1, attribute)
-        return cls(attribute, cmpto), at + 2
-
-    def excrete(self, findable: _ml.Findable, ctx: _ctx.FlamContext) -> bool:
-        actual = findable.extract(self._attribute)
-        return any(self._cmpto(elem) for elem in actual)
-
-    def regurgitate(self) -> typing.Iterator[str]:
-        yield from super().regurgitate()
-        yield self._attribute.name
-        yield str(self._cmpto)
-
-# TODO: actually we probably want to have a size attribute for every array type so this isn't needed either.
-@_reg._register_builtin
-class Size(_filter.Predicate, name='size'):
-    def __init__(self, attribute: _attr.Attribute, cmpto: _attr.CmpTo) -> None:
-        self._attribute = attribute
-        self._cmpto = cmpto
-    
-    @classmethod
-    def eat(cls, params: _filter.EatParams, at: int) -> tuple[_filter.Predicate, int]:
-        attribute = cls.eat_attribute(params, at, is_array=True)
-        cmpto = cls.eat_cmpto(params, at + 1, attrutils.INT_HANDLER)
-        return cls(attribute, cmpto), at + 2
-
-    def excrete(self, findable: _ml.Findable, ctx: _ctx.FlamContext) -> bool:
-        actual = findable.extract(self._attribute)
-        return self._cmpto(len(actual))
 
     def regurgitate(self) -> typing.Iterator[str]:
         yield from super().regurgitate()

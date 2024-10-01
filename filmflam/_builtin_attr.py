@@ -39,6 +39,8 @@ def _register_easy_attribute[T](params: attrutils.EasyAttributeParams) -> typing
     findable_type = _ml.FindableType.MOVIES,
     type_handler = attrutils.STR_HANDLER,
     is_array = False,
+    is_big_endian = True,
+    is_ascending = True,
 ))
 def _movie_title_extractor(self: attrutils.EasyAttribute, movie: _ml.Movie, mlf_movie: _mlf.MLFMovie) -> None | str:
     assert not isinstance(mlf_movie.title, _file.UnsetType)
@@ -50,6 +52,8 @@ def _movie_title_extractor(self: attrutils.EasyAttribute, movie: _ml.Movie, mlf_
     findable_type = _ml.FindableType.MOVIES,
     type_handler = attrutils.INT_HANDLER,
     is_array = False,
+    is_big_endian = True,
+    is_ascending = True,
 ))
 def _movie_runtime_extractor(self: attrutils.EasyAttribute, movie: _ml.Movie, mlf_movie: _mlf.MLFMovie) -> None | int:
     assert not isinstance(mlf_movie.runtime_minutes, _file.UnsetType)
@@ -60,6 +64,8 @@ def _movie_runtime_extractor(self: attrutils.EasyAttribute, movie: _ml.Movie, ml
     findable_type = _ml.FindableType.MOVIES,
     type_handler = attrutils.DATE_HANDLER,
     is_array = False,
+    is_big_endian = True,
+    is_ascending = False,
 ))
 def _movie_released_extractor(self: attrutils.EasyAttribute, movie: _ml.Movie, mlf_movie: _mlf.MLFMovie) -> None | datetime.date:
     assert not isinstance(mlf_movie.release_date, _file.UnsetType)
@@ -70,6 +76,8 @@ def _movie_released_extractor(self: attrutils.EasyAttribute, movie: _ml.Movie, m
     findable_type = _ml.FindableType.MOVIES,
     type_handler = attrutils.FLOAT_HANDLER,
     is_array = False,
+    is_big_endian = True,
+    is_ascending = False,
 ))
 def _movie_rating_extractor(self: attrutils.EasyAttribute, movie: _ml.Movie, mlf_movie: _mlf.MLFMovie) -> None | float:
     assert not isinstance(mlf_movie.rating, _file.UnsetType)
@@ -80,6 +88,8 @@ def _movie_rating_extractor(self: attrutils.EasyAttribute, movie: _ml.Movie, mlf
     findable_type = _ml.FindableType.MOVIES,
     type_handler = attrutils.INT_HANDLER,
     is_array = False,
+    is_big_endian = True,
+    is_ascending = False,
 ))
 def _movie_metascore_extractor(self: attrutils.EasyAttribute, movie: _ml.Movie, mlf_movie: _mlf.MLFMovie) -> None | int:
     assert not isinstance(mlf_movie.metascore, _file.UnsetType)
@@ -91,10 +101,12 @@ def _movie_metascore_extractor(self: attrutils.EasyAttribute, movie: _ml.Movie, 
     findable_type = _ml.FindableType.MOVIES,
     type_handler = attrutils.STR_HANDLER,
     is_array = True,
+    is_big_endian = True,
+    is_ascending = True,
 ))
 def _movie_director_extractor(self: attrutils.EasyAttribute, movie: _ml.Movie, mlf_movie: _mlf.MLFMovie) -> list[str]:
     mlf = movie.movie_list.underlying_file
-    return [mlf.people_by_uid[uid].name for uid in mlf_movie.crew[_ml.CrewType.DIRECTOR].roles_by_uid]
+    return sorted(mlf.people_by_uid[uid].name for uid in mlf_movie.crew[_ml.CrewType.DIRECTOR].roles_by_uid)
 
 #endregion movie attributes
 
@@ -106,6 +118,8 @@ def _movie_director_extractor(self: attrutils.EasyAttribute, movie: _ml.Movie, m
     findable_type = _ml.FindableType.PEOPLE,
     type_handler = attrutils.STR_HANDLER,
     is_array = False,
+    is_big_endian = True,
+    is_ascending = True,
 ))
 def _person_name_extractor(self: attrutils.EasyAttribute, person: _ml.Person, mlf_person: _mlf.MLFPerson) -> None | str:
     assert not isinstance(mlf_person.name, _file.UnsetType)
@@ -120,6 +134,8 @@ def _person_name_extractor(self: attrutils.EasyAttribute, person: _ml.Person, ml
     findable_type = _ml.FindableType.ROLES,
     type_handler = attrutils.STR_HANDLER,
     is_array = True,
+    is_big_endian = True,
+    is_ascending = True,
 ))
 def _role_characters_extractor(self: attrutils.EasyAttribute, role: _ml.Role, mlf_roles: list[_mlf.MLFRole]) -> list[str]:
     return sorted(c for mlf_role in mlf_roles for c in mlf_role.characters)

@@ -36,13 +36,12 @@ def split_at_filter(strs: list[str]) -> tuple[list[str], list[str]]:
     filter_begin = next((i for i, s in enumerate(strs) if flam.is_filter_token(s)), len(strs))
     return strs[:filter_begin], strs[filter_begin:]
 
-# TODO: need reverse? In mbrowse we only use it for the "source" column (i.e. the abstract address the movie came from)
-def clampstr(s: str, maxlen: int = 30, ellipsis: str = '...', keep_lhs: bool = True) -> str:
+def truncstr(s: str, maxlen: int = 45, ellipsis: str = '...', is_big_endian: bool = True) -> str:
     if maxlen < len(ellipsis):
         raise ValueError(f'Ellipsis must not be longer than maxlen. {ellipsis=}, {maxlen=}.')
 
     return (s if len(s) <= maxlen
-        else s[:maxlen - len(ellipsis)] + ellipsis if keep_lhs
+        else s[:maxlen - len(ellipsis)] + ellipsis if is_big_endian
         else ellipsis + s[-(maxlen - len(ellipsis)):])
 
 def uniq_append(l: list, x: typing.Any) -> None:
@@ -303,9 +302,9 @@ If no %(dest)s provided, fetches all lists configured as defaults.''')
         if args.undo:
             pass
         else:
-            # TODO: maybe defaults shouldn't be configured on the API side, maybe it's more of a CLI thing and we should have our own separate configuration for it.
             listdefs = args.LISTDEF if len(args.LISTDEF) != 0 else [flam.SpecialListType.DEFAULTS]
             ctx.fetch(listdefs, refetch_pattern=args.refetch, quiet=False)
+            # TODO: regenerate affected composites and grouping cache files.
 
 class SubcommandClean:
     @classmethod
@@ -420,7 +419,7 @@ Valid column names: ...''')
 
             attribute_names = default_attribute_names[findable_type]
         else:
-            attribute_names = args.sort.split(',')
+            attribute_names = args.sort.split(',') if args.sort != '' else []
 
         attributes = [ctx.attributes[a] for a in attribute_names]
 
@@ -475,10 +474,10 @@ Valid column names: ...''')
     @classmethod
     def sort_findables(cls, sort_attrs: list[flam.Attribute], findables: list[flam.Findable], args: argparse.Namespace) -> None:
         for attr in sort_attrs[::-1]:
-            findables.sort(key=attr.sort_key, reverse=attr.is_ascending ^ args.reverse)
+            findables.sort(key=lambda f: attr.sort_key(f.extract(attr)), reverse=(not attr.is_ascending) ^ args.reverse)
 
     @classmethod
-    def build_strs_table(cls, attributes: list[flam.Attribute], values_table: list[list[_attr.AttributeValue]], args: argparse.Namespace) -> typing.Iterable[list[str]]:
+    def build_strs_table(cls, attributes: list[flam.Attribute], values_table: list[list[flam.AttributeValue]], args: argparse.Namespace) -> typing.Iterable[list[str]]:
         if not args.no_titles:
             yield [attr.name for attr in attributes]
 
@@ -490,7 +489,7 @@ Valid column names: ...''')
         if not args.verbose:
             for row in table:
                 for i in range(len(row)):
-                    row[i] = clampstr(row[i], keep_lhs=attributes[i].is_big_endian)
+                    row[i] = truncstr(row[i], is_big_endian=attributes[i].is_big_endian)
 
         match args.color:
             case Choice.AUTO:

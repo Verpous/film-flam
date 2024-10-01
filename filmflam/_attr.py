@@ -19,7 +19,6 @@ import typing
 import enum
 import abc
 import re
-import functools
 
 from . import _mlf
 from . import _ml
@@ -31,34 +30,35 @@ from . import _dbg
 type AttributeValue = None | typing.Any
 
 class ComparisonOp(enum.Enum):
-    # Important to use prefix-free signs.
+    # IMPORTANT: use prefix-free signs.
     LE = ('-', lambda v1, v2: v1 <= v2)
     GE = ('+', lambda v1, v2: v1 >= v2)
-    EQ = ('=', lambda v1, v2: v1 == v2)
-    LT = ('@-', lambda v1, v2: v1 < v2)
-    GT = ('@+', lambda v1, v2: v1 > v2)
-    RX = ('@=', lambda v, regex: bool(regex.search(v)))
+    EQ = ('==', lambda v1, v2: v1 == v2)
+    LT = ('.-', lambda v1, v2: v1 < v2)
+    GT = ('.+', lambda v1, v2: v1 > v2)
+    RX = ('=~', lambda v, regex: bool(regex.search(v)))
 
-    def __init__(self, sign: str, compare: typing.Callable[[AttributeValue, AttributeValue], bool]) -> None:
+    def __init__(self, sign: str, compare: typing.Callable[[AttributeValue, AttributeValue | re.Pattern], bool]) -> None:
         self.sign = sign
         self.compare = compare
 
-    def __call__(self, value1: AttributeValue, value2: AttributeValue) -> bool:
+    def __call__(self, value1: AttributeValue, value2: AttributeValue | re.Pattern) -> bool:
         return self.compare(value1, value2)
 
 class CmpTo:
-    def __init__(self, op: ComparisonOp, value: AttributeValue, attribute: Attribute) -> None:
+    def __init__(self, op: ComparisonOp, value: AttributeValue | re.Pattern, attribute: Attribute) -> None:
         self._attribute = attribute
         self._op = op
         self._value = value
 
     def __call__(self, value: AttributeValue) -> bool:
         # Order is important.
-        return self._op(value, self._value)
+        return value is not None and self._op(value, self._value)
 
     def __str__(self) -> str:
         match self._op:
             case ComparisonOp.RX:
+                assert isinstance(self._value, re.Pattern)
                 return f"{self._op.sign}{self._value.pattern}"
             case _:
                 return f"{self._op.sign}{self._attribute.str_of(self._value)}"
@@ -107,45 +107,13 @@ class Attribute(abc.ABC):
     def parse(self, value_str: str) -> AttributeValue:
         pass
 
-    def compare(self, op: ComparisonOp, value1: AttributeValue, value2: AttributeValue) -> bool:
-        if value1 is not None and value2 is not None:
-            return op(value1, value2)
-
-        assert self.is_noneable
-        return value1 is None and value2 is None
-
-    def compare_all(self, op: ComparisonOp, value1: AttributeValue, value2: AttributeValue) -> bool:
-        if not self.is_array:
-            return self.compare(op, value1, value2)
-
-        assert isinstance(value1, list) and isinstance(value2, list)
-        len1, len2 = len(value1), len(value2)
-        
-        match op:
-            case ComparisonOp.LE:
-                return self.compare_all(ComparisonOp.EQ, value1, value2) or self.compare_all(ComparisonOp.LT, value1, value2)
-            case ComparisonOp.GE:
-                return self.compare_all(ComparisonOp.EQ, value1, value2) or self.compare_all(ComparisonOp.GT, value1, value2)
-            case ComparisonOp.EQ:
-                return len1 == len2 and all(self.compare(op, elem1, elem2) for elem1, elem2 in zip(value1, value2))
-            case ComparisonOp.LT | ComparisonOp.GT:
-                # Lexicographic compare.
-                for elem1, elem2 in zip(value1, value2):
-                    if self.compare(op, elem1, elem2):
-                        return True
-                    
-                    if not self.compare(ComparisonOp.EQ, value1, value2):
-                        return False
-
-                return op(len1, len2)
-            case ComparisonOp.RX:
-                raise _exc.InputError("Regex comparison is not supported for compare_all.")
-            case _:
-                raise RuntimeError(f"Unexpected {op=}")
+    @abc.abstractmethod
+    def _str_of_single(self, value: AttributeValue) -> str:
+        pass
 
     # The need for this function is to handle the fact that values may be None.
     # Use typing.Any because there's no typehint for sortable.
-    def sort_key(self, value: AttributeValue) -> typing.Callable[[AttributeValue], typing.Any]:
+    def sort_key(self, value: AttributeValue) -> tuple[bool, AttributeValue]:
         return ((value is None) ^ self.is_ascending, value)
 
     def verify_type(self, value: AttributeValue, allow_none: bool = True) -> AttributeValue:
@@ -156,9 +124,17 @@ class Attribute(abc.ABC):
         if value is None or (isinstance(value, list) and len(value) == 0):
             return '-'
 
-        return str(value)
+        if isinstance(value, list):
+            if len(value) == 0:
+                return '-'
+            
+            return ', '.join(self._str_of_single(elem) for elem in value)
+            
+        return self._str_of_single(value)
 
     def make_cmpto(self, op: ComparisonOp, value_str: str) -> CmpTo:
+        parsed: AttributeValue | re.Pattern
+
         match op:
             case ComparisonOp.RX:
                 try:

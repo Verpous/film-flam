@@ -135,27 +135,23 @@ class Role(Findable):
         return self._group_mode
 
     def extract(self, attribute: _attr.Attribute) -> _attr.AttributeValue:
+        # Support optionally implementing _extract_from_role on any type of attribute, for custom behavior on how to extract them from roles.
+        if attribute.findable_type == FindableType.ROLES or hasattr(attribute, '_extract_from_role'):
+            return attribute._extract_from_role(self, self._mlf_roles) # type: ignore
+        
         # TODO: Optimize by caching Person/Movie objects, maybe even on the ML so that if someone iterates over movies/people later
         # they will be there and include things already computed on them.
-        match attribute.findable_type:
-            case FindableType.ROLES:
-                return attribute._extract_from_role(self, self._mlf_roles) # type: ignore
-            case FindableType.MOVIES:
-                # Role attributes can define custom extractors from movie/people if the default behavior doesn't suit them.
-                if hasattr(attribute, '_extract_from_movie'):
-                    return attribute._extract_from_movie(self, self._mlf_movie)
-
-                return Movie(self.movie_list, self._mlf_movie).extract(attribute)
-            case FindableType.PEOPLE:
-                mlf = self.movie_list.underlying_file
-                mlf_people = (mlf.people_by_uid[mlf_role.person_uid] for mlf_role in self._mlf_roles)
-
-                if hasattr(attribute, '_extract_from_person'):
-                    return attribute._extract_from_person(self, list(mlf_people))
-
-                # TODO: if attribute is array type already, flatten it?
-                return [Person(self.movie_list, mlf_person).extract(attribute) for mlf_person in mlf_people]
-
+        if attribute.findable_type == FindableType.MOVIES:
+            return Movie(self.movie_list, self._mlf_movie).extract(attribute)
+        
+        if attribute.findable_type == FindableType.PEOPLE:
+            # TODO: if attribute is array type already, flatten it?
+            mlf = self.movie_list.underlying_file
+            mlf_people = (mlf.people_by_uid[mlf_role.person_uid] for mlf_role in self._mlf_roles)
+            return [Person(self.movie_list, mlf_person).extract(attribute) for mlf_person in mlf_people]
+        
+        raise RuntimeError(f"Unexpected {attribute.findable_type=}")
+        
 class MovieList:
     def __init__(self, movie_list_file: _mlf.MovieListFile, ctx: _ctx.FlamContext):
         _dbg.logger.info(f"Creating movie list for '{movie_list_file.abstract_listdef}', "

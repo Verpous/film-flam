@@ -25,10 +25,10 @@ from . import _attr
 from . import _mlf
 from . import _ml
 
-# There are some facilities that we need out of every possible value attributes may extract (e.g.: ability to compare, stringify, etc.).
+# There are some facilities that we need out of every possible value attributes may extract (e.g.: ability stringify, etc.).
 # I don't want to wrap every such value in a "Value" class to provide those facitilites because that would mean making lots of small objects.
 # Solution: Flyweight pattern. Subclasses of TypeHandler provide all the facilities we need, with the underlying value externalized.
-# Downside: Casting/type assertion everywhere.
+# Downside: Casting/type assertion everywhere, or in many places just assuming the types are fine and not checking.
 class TypeHandler(abc.ABC):
     @property
     @abc.abstractmethod
@@ -44,6 +44,7 @@ class TypeHandler(abc.ABC):
     def parse(self, value_str: str) -> _attr.AttributeValue:
         pass
 
+    # Assumes value is not None.
     def str_of(self, value: _attr.AttributeValue) -> str:
         return str(value)
 
@@ -145,10 +146,6 @@ class EasyAttribute(_attr.Attribute):
         return self._params.is_array
 
     @property
-    def is_noneable(self) -> bool:
-        return not self.is_array and self.name != 'uid'
-
-    @property
     def type_(self) -> type:
         return self._params.type_handler.type_
 
@@ -159,6 +156,9 @@ class EasyAttribute(_attr.Attribute):
     def parse(self, value_str: str) -> _attr.AttributeValue:
         return self._params.type_handler.parse(value_str)
 
+    def _str_of_single(self, value: AttributeValue) -> str:
+        return self._params.type_handler.str_of(value)
+
 type MovieExtractor[T] = typing.Callable[[EasyAttribute, _ml.Movie, _mlf.MLFMovie], T]
 type PersonExtractor[T] = typing.Callable[[EasyAttribute, _ml.Person, _mlf.MLFPerson], T]
 type RoleExtractor[T] = typing.Callable[[EasyAttribute, _ml.Role, list[_mlf.MLFRole]], T]
@@ -166,8 +166,8 @@ type Extractor[T] = MovieExtractor | PersonExtractor[T] | RoleExtractor[T]
 
 _extractor_names = {
     _ml.FindableType.MOVIES: '_extract_from_movie',
-    _ml.FindableType.PEOPLE: '_extract_from_role',
-    _ml.FindableType.ROLES: '_extract_from_person',
+    _ml.FindableType.PEOPLE: '_extract_from_person',
+    _ml.FindableType.ROLES: '_extract_from_role',
 }
 
 def easy_attribute[T](params: EasyAttributeParams) -> typing.Callable[[Extractor[T]], EasyAttribute]:
