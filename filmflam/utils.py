@@ -213,7 +213,11 @@ def tabulate(
         use_color: bool = True,
         header_color: str = '', 
         fill_color: str = colorama.Fore.BLACK + colorama.Style.BRIGHT,
-        column_colors: list[str] = [
+        column_colors: None | list[str] = None) -> typing.Iterable[str]:
+
+    # Do default value like this to avoid "dangerous default" warning by pylint.
+    if column_colors is None:
+        column_colors = [
             colorama.Fore.WHITE,
             colorama.Fore.GREEN + colorama.Style.BRIGHT,
             colorama.Fore.YELLOW,
@@ -222,7 +226,7 @@ def tabulate(
             colorama.Fore.MAGENTA + colorama.Style.BRIGHT,
             colorama.Fore.CYAN + colorama.Style.BRIGHT,
             colorama.Fore.YELLOW + colorama.Style.BRIGHT,
-        ]) -> typing.Iterable[str]:
+        ]
 
     if len(fillchar) != 1:
         raise ValueError(f"Invalid fillchar: '{fillchar}': must be a single character.")

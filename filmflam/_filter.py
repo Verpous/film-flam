@@ -62,6 +62,9 @@ class FilterMember(abc.ABC):
     def regurgitate(self) -> typing.Iterator[str]:
         pass
 
+    def __str__(self) -> str:
+        return ' '.join(self.regurgitate())
+
     # Helper methods for parsing below.
     @classmethod
     def eat_str(cls, params: EatParams, at: int, description: str, error_indices: int | typing.Iterable[int] = -1, is_terminal: bool = True) -> str:
@@ -70,9 +73,25 @@ class FilterMember(abc.ABC):
 
         return params.tokens[at]
 
+    # eatfunc is assumed to only consume 1.
+    @classmethod
+    def eat_listof[T](cls, eatfunc: typing.Callable[[EatParams, int], T], params: EatParams, at: int, at_least_one: bool) -> tuple[list[T], int]:
+        if at < len(params.tokens) and params.tokens[at] in Pipeline.LPAREN:
+            try:
+                rparen_idx = next(i for i in range(at + 1, len(params.tokens)) if params.tokens[i] in Pipeline.RPAREN)
+            except StopIteration:
+                raise _EinGafrurError(f"Expected {Positive._RPAREN_DESC}, but reached the end of input.", tokens=params.tokens, error_indices=at)
+
+            if at_least_one and rparen_idx == at + 1:
+                raise _EinGafrurError(f"Expected non empty list.", tokens=params.tokens, error_indices=[at, rparen_idx])
+
+            return [eatfunc(params, i) for i in range(at + 1, rparen_idx)], rparen_idx + 1
+
+        return [eatfunc(params, at)], at + 1
+
     @classmethod
     def eat_one_of(cls, params: EatParams, at: int, description: str, options: set[str], is_terminal: bool = True) -> str:
-        s = cls.eat_str(params, at, description, is_terminal)
+        s = cls.eat_str(params, at, description, is_terminal=is_terminal)
         
         if s not in options:
             raise _EinGafrurError(f"Expected {description}, but got: '{s}'.", tokens=params.tokens, error_indices=at, is_terminal=is_terminal)
@@ -94,7 +113,6 @@ class FilterMember(abc.ABC):
                 tokens=params.tokens, error_indices=at)
 
         if is_array and not attribute.is_array:
-            # TODO: "which is of type X"? Or nah?
             raise _EinGafrurError(f"Expected attribute to be an array type, but got: '{attribute_name}' of type: {attribute.type_.__name__}.",
                 tokens=params.tokens, error_indices=at)
 
@@ -118,19 +136,54 @@ class FilterMember(abc.ABC):
 
         return default_op, cmpto
 
+    @classmethod
+    def eat_movie_list(cls, params: EatParams, at: int) -> tuple[_ml.MovieList, int]:
+        listdefs, until = cls.eat_listof(lambda p, a: cls.eat_str(p, a, 'a LISTDEF'), params, at, True)
+
+        try:
+            return params.ctx.get_movie_list(listdefs), until
+        except _exc.InputError as e:
+            raise _exc.FilterSyntaxError(f"Expected valid LISTDEFs, but got error: {e}", tokens=params.tokens, error_indices=at) from e
+
+    @classmethod
+    def eat_ct_gm(cls, params: EatParams, at: int) -> tuple[_ml.CrewType, _ml.GroupMode]:
+        ct_gm_str = cls.eat_str(params, at, 'crew type[:group mode]')
+
+        colon_idx = ct_gm_str.find(':')
+        crew_type_str, group_mode_str = (ct_gm_str[:colon_idx], ct_gm_str[colon_idx + 1:]) if colon_idx != -1 else (ct_gm_str, _ml.GroupMode.DEFAULT)
+
+        try:
+            crew_type = _ml.CrewType(crew_type_str)
+        except ValueError as e:
+            raise _EinGafrurError(f"Expected a valid crew type, but got: '{crew_type_str}'", tokens=params.tokens, error_indices=at) from e
+
+        try:
+            group_mode = _ml.GroupMode(group_mode_str)
+        except ValueError as e:
+            raise _EinGafrurError(f"Expected a valid group mode, but got: '{crew_type_str}'", tokens=params.tokens, error_indices=at) from e
+
+        return crew_type, group_mode
+
 class Filter(FilterMember):
-    def __init__(self, pipeline: None | Pipeline, find: _ml.FindableType) -> None:
-        self._pipeline = pipeline
+    def __init__(self, filter: None | Predicate | Negative | Pipeline, find: _ml.FindableType, ctx: _ctx.FlamContext) -> None:
+        self._filter = filter
         self._find = find
+        self._ctx = ctx
+
         self._regurgitation: None | list[str] = None
 
     @property
     def findable_type(self) -> _ml.FindableType:
         return self._find
 
+    # Yes, the context is part of the filter's state. The reason is the filter may contain predicates like -in-other which bind it to the context.
+    @property
+    def ctx(self) -> _ctx.FlamContext:
+        return self._ctx
+
     @property
     def is_empty(self) -> bool:
-        return self._pipeline is None
+        return self._filter is None
 
     # We compile by defining "eat" classmethods for all the FilterMembers (and some classes which aren't FilterMembers).
     # Generally, eat receives the *full* tokenized expression, the index where "uneaten" tokens begin, and some extras.
@@ -139,51 +192,70 @@ class Filter(FilterMember):
     @classmethod
     def eat(cls, params: EatParams) -> Filter:
         if len(params.tokens) == 0:
-            return cls(None, params.find)
+            return cls(None, params.find, params.ctx)
+        
+        pipeline, _ = Pipeline.eat(params, 0, True)
+        return cls(pipeline, params.find, params.ctx)
 
-        pipeline, _ = Pipeline.eat(params, 0, expect_eat_everything=True)
-        return cls(pipeline, params.find)
+    # Some predicates take a Single as an argument. But this Single should be wrapped in a Filter so that we can treat it as a complete expression of its own.
+    @classmethod
+    def eat_single(cls, params: EatParams, at: int) -> tuple[Filter, int]:
+        # Allow a way to indicate "empty" because we require tokens to have something in it to eat.
+        if at < len(params.tokens) and params.tokens[at] in ('', '-'):
+            return cls(None, params.find, params.ctx), at + 1
+        
+        single, until = Single.eat(params, at)
+        return cls(single, params.find, params.ctx), until
 
     def excrete(self, findable: _ml.Findable, ctx: _ctx.FlamContext) -> bool:
-        return self._pipeline is None or self._pipeline.excrete(findable, ctx)
+        return self._filter is None or self._filter.excrete(findable, ctx)
 
     def regurgitate(self) -> typing.Iterator[str]:
         # Cache it since due to logging it's pretty much guaranteed we will want this multiple times.
         if self._regurgitation is None:
-            # Parentheses around the whole filter are useless, and they make it so if you repeatedly compile(regurgitate(compile(regurgitate...))),
-            # each iteration wraps the expression in an additional parentheses.
-            self._regurgitation = [] if self._pipeline is None else list(self._pipeline.regurgitate(parenthesize=False))
+            self._regurgitation = [] if self._filter is None else list(self._filter.regurgitate())
 
         return iter(self._regurgitation)
 
-    def __str__(self) -> str:
-        return ' '.join(self.regurgitate())
-        
 class Pipeline(FilterMember):
+    LPAREN = {'(', '[', '-lparen'}
+    RPAREN = {')', ']', '-rparen'}
+    _LPAREN_DESC = 'left parenthesis'
+    _RPAREN_DESC = 'matching right parenthesis'
+
     # Yes the type annotations are a little ugly, but there's no way to alias them due to their recursive nature.
-    def __init__(self, single: Predicate | Negative | Pipeline, joinables: list[Disjoined | Predicate | Negative | Pipeline]) -> None:
+    def __init__(self, single: Predicate | Negative | Pipeline, joinables: list[Disjoined | Predicate | Negative | Pipeline], is_entire_filter: bool) -> None:
         self._single = single
         self._joinables = joinables
+        self._is_entire_filter = is_entire_filter
         
     @classmethod
-    def eat(cls, params: EatParams, at: int, expect_eat_everything: bool = False) -> tuple[Pipeline, int]:
-        single, until = Single.eat(params, at)
+    def eat(cls, params: EatParams, at: int, is_entire_filter: bool) -> tuple[Pipeline, int]:
+        # If we don't expect to eat the entire filter what we do eat must be parenthesized.
+        if is_entire_filter:
+            single_idx = at
+        else:
+            cls.eat_one_of(params, at, cls._LPAREN_DESC, cls.LPAREN, is_terminal=False)
+            single_idx = at + 1
+
+        closed_parentheses = False
+        single, until = Single.eat(params, single_idx)
         joinables = []
 
         while until < len(params.tokens):
-            try:
-                jable, until = Joinable.eat(params, until)
-            except _EinGafrurError:
-                # Doing it this way "breaks" the model (by giving Pipeline a unique eat signature),
-                # but it lets us raise a meaningful error instead of some cryptic "some tokens weren't eaten".
-                if expect_eat_everything:
-                    raise
-                    
+            # Don't use eat_one_of because we know we aren't at end of input and we don't want to spam exceptions.
+            if not is_entire_filter and params.tokens[until] in cls.RPAREN:
+                closed_parentheses = True
+                until += 1
                 break
 
+            jable, until = Joinable.eat(params, until)
             joinables.append(jable)
 
-        return cls(single, joinables), until
+        if not is_entire_filter and not closed_parentheses:
+            raise _EinGafrurError(f"Expected {cls._RPAREN_DESC}, but reached the end of input.", tokens=params.tokens, error_indices=[at])
+
+        return cls(single, joinables, is_entire_filter), until
 
     def excrete(self, findable: _ml.Findable, ctx: _ctx.FlamContext) -> bool:
         accept = self._single.excrete(findable, ctx)
@@ -199,16 +271,18 @@ class Pipeline(FilterMember):
 
         return accept
 
-    def regurgitate(self, parenthesize: bool = True) -> typing.Iterator[str]:
-        if parenthesize:
+    def regurgitate(self) -> typing.Iterator[str]:
+        # Parentheses around entire filters are useless, and they make it so if you repeatedly compile(regurgitate(compile(regurgitate...))),
+        # each iteration wraps the expression in an additional parentheses.
+        if not self._is_entire_filter:
             # We use min because these are sets so next(iter(...)) returns different things every time.
-            yield min(Positive.LPAREN)
+            yield min(Pipeline.LPAREN)
 
         yield from self._single.regurgitate()
         yield from (tok for jable in self._joinables for tok in jable.regurgitate())
 
-        if parenthesize:
-            yield min(Positive.RPAREN)
+        if not self._is_entire_filter:
+            yield min(Pipeline.RPAREN)
 
 # Some "FilterMembers" (as defined in the BNF) don't need to be instantiated. Eating a "Single" directly returns what its "child" would be.
 class Single:
@@ -226,23 +300,13 @@ class Single:
         return Positive.eat(params, at)
 
 class Positive:
-    LPAREN = {'(', '[', '-lparen'}
-    RPAREN = {')', ']', '-rparen'}
-    _RPAREN_DESC = 'matching right parenthesis'
-
     @classmethod
     def eat(cls, params: EatParams, at: int) -> tuple[Predicate | Pipeline, int]:
-        # Only raise parenthesis errors if we have reason to believe this was meant to be a parenthesis expression.
-        if at < len(params.tokens) and params.tokens[at] in cls.LPAREN:
-            pipeline, until = Pipeline.eat(params, at + 1)
-            
-            # Doesn't use eat_one_of because different error_indices.
-            rparen = FilterMember.eat_str(params, until, cls._RPAREN_DESC, error_indices=at)
-
-            if rparen not in cls.RPAREN:
-                raise _EinGafrurError(f"Expected {cls._RPAREN_DESC}, but got: '{rparen}'.", tokens=params.tokens, error_indices=[at, until])
-
-            return pipeline, until + 1
+        try:
+            return Pipeline.eat(params, at, False)
+        except _EinGafrurError as e:
+            if e.is_terminal:
+                raise
 
         return Predicate.eat(params, at)
 
@@ -318,10 +382,12 @@ class Disjoined(FilterMember):
 class Predicate(FilterMember):
     PREFIX = '-'
     name: str
+    findable_type: None | _ml.FindableType
     
-    def __init_subclass__(cls, name: str, **kwargs: typing.Any) -> None:
+    def __init_subclass__(cls, name: str, findable_type: None | _ml.FindableType = None, **kwargs: typing.Any) -> None:
         super().__init_subclass__(**kwargs)
         cls.name = name
+        cls.findable_type = findable_type
 
     @classmethod
     def eat(cls, params: EatParams, at: int) -> tuple[Predicate, int]:
@@ -334,7 +400,13 @@ class Predicate(FilterMember):
             # and eat the name token right here and let the predicate eat its arguments alone.
             if name in params.ctx.predicates:
                 # Mypy wouldn't like this line if we annotated with typing.Self.
-                return params.ctx.predicates[name].eat(params, at + 1)
+                predicate = params.ctx.predicates[name]
+
+                if predicate.findable_type is not None and not predicate.findable_type.is_compatible(params.find):
+                    raise _EinGafrurError(f"Expected predicate of {params.find}, but got: '{prefixed_name}' which belongs to {predicate.findable_type}.",
+                        tokens=params.tokens, error_indices=at)
+
+                return predicate.eat(params, at + 1)
 
             # Special treatment for AttributePredicate because it's not wise to make a predicate for each attribute.
             # TODO: Don't like that we go first-pred, then-attribute when we should go level by level pred-then-attribute.
@@ -347,8 +419,9 @@ class Predicate(FilterMember):
 
                 return AttributePredicate.eat_shit(params, at + 1, attribute)
 
-        if prefixed_name in Positive.RPAREN:
-            raise _EinGafrurError('Right parenthesis has no matching left parenthesis.', tokens=params.tokens, error_indices=at)
+        if prefixed_name in Pipeline.RPAREN:
+            raise _EinGafrurError('Unexpected right parenthesis. It either has no matching left parenthesis or a predicate was expected.',
+                tokens=params.tokens, error_indices=at)
             
         close_matches = difflib.get_close_matches(prefixed_name, (Predicate.PREFIX + pred.name for pred in params.ctx.predicates))
         suggestions = f' (did you mean: {", ".join(close_matches)}?)' if len(close_matches) > 0 else '.'
@@ -375,9 +448,8 @@ class AttributePredicate(Predicate, name='attribute'):
     def excrete(self, findable: _ml.Findable, ctx: _ctx.FlamContext) -> bool:
         actual = findable.extract(self._attribute)
 
-        # For array attributes we do "contains". There is an "-all" predicate for those who want that behavior.
-        if self._attribute.is_array:
-            assert isinstance(actual, list)
+        # For lists we do "contains". There is an "-all" predicate for those who want that behavior.
+        if isinstance(actual, list):
             return any(self._cmpto(elem) for elem in actual)
 
         return self._cmpto(actual)
@@ -392,5 +464,5 @@ def is_filter_token(token: str) -> bool:
             or token in Negative.NEGATE
             or token in Disjoined.DISJOIN
             or token in Conjoined.CONJOIN
-            or token in Positive.LPAREN
-            or token in Positive.RPAREN)
+            or token in Pipeline.LPAREN
+            or token in Pipeline.RPAREN)

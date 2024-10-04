@@ -82,6 +82,14 @@ INT_HANDLER = EasyTypeHandler(
     str_of = str,
 )
 
+# TODO: Maybe not wise to have the str format different than the parse format, how will people know what format to input comparisons in?
+MINUTES_HANDLER = EasyTypeHandler(
+    type_ = datetime.timedelta,
+    default_op = _attr.ComparisonOp.EQ,
+    parse = lambda s: int(s, base=0), # 0 means deduce the base from the str.
+    str_of = lambda mins: f'{str(mins // 60)}:{str(mins % 60).zfill(2)}',
+)
+
 FLOAT_HANDLER = EasyTypeHandler(
     type_ = float,
     default_op = _attr.ComparisonOp.EQ,
@@ -89,12 +97,11 @@ FLOAT_HANDLER = EasyTypeHandler(
     str_of = str,
 )
 
-# TODO: I think we want this to compare EQ case-insensitively.
 STR_HANDLER = EasyTypeHandler(
     type_ = str,
     default_op = _attr.ComparisonOp.RX,
     parse = lambda s: s,
-    str_of = lambda s: s,
+    str_of = lambda s: typing.cast(str, s),
 )
 
 # TODO: If an attribute is like "release year+month (without day)", you wouldn't want to compare by the whole date, would you?
@@ -102,7 +109,7 @@ DATE_HANDLER = EasyTypeHandler(
     type_ = datetime.date,
     default_op = _attr.ComparisonOp.EQ,
     parse = lambda s: dateutil.parser.parse(s, default=datetime.datetime.min).date(),
-    str_of = lambda d: d.strftime("%Y-%m-%d"),
+    str_of = lambda d: typing.cast(datetime.date, d).strftime("%Y-%m-%d"),
 )
 
 # If the way this EasyAttribute business is coded looks funny to you, here is why:
@@ -113,7 +120,6 @@ DATE_HANDLER = EasyTypeHandler(
 # 4. Lots of little constraints to please mypy and pylint about what we're doing.
 @dataclasses.dataclass
 class EasyAttributeParams:
-    # TODO: many more fields. Fields related to sorting, distribution, etc..
     name: str
     findable_type: _ml.FindableType
     type_handler: TypeHandler
@@ -141,6 +147,7 @@ class EasyAttribute(_attr.Attribute):
     def is_ascending(self) -> bool:
         return self._params.is_big_endian
 
+    # TODO: this is actually more complicated, because person attributes which are not array can become array when extracted from a role.
     @property
     def is_array(self) -> bool:
         return self._params.is_array
@@ -156,7 +163,7 @@ class EasyAttribute(_attr.Attribute):
     def parse(self, value_str: str) -> _attr.AttributeValue:
         return self._params.type_handler.parse(value_str)
 
-    def _str_of_single(self, value: AttributeValue) -> str:
+    def _str_of_single(self, value: _attr.AttributeValue) -> str:
         return self._params.type_handler.str_of(value)
 
 type MovieExtractor[T] = typing.Callable[[EasyAttribute, _ml.Movie, _mlf.MLFMovie], T]
@@ -170,8 +177,8 @@ _extractor_names = {
     _ml.FindableType.ROLES: '_extract_from_role',
 }
 
-def easy_attribute[T](params: EasyAttributeParams) -> typing.Callable[[Extractor[T]], EasyAttribute]:
-    def inner(extractor: Extractor[T]) -> EasyAttribute:
+def easy_attribute[ET](params: EasyAttributeParams) -> typing.Callable[[Extractor[ET]], EasyAttribute]:
+    def inner(extractor: Extractor[ET]) -> EasyAttribute:
         class SpecificAttribute(EasyAttribute):
             pass
 

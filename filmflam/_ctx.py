@@ -148,6 +148,9 @@ class FlamContext:
                     except ModuleNotFoundError as e:
                         raise _exc.InputError(str(e)) from e
 
+        # Cache empty filters for optimization.
+        self._empty_filters = {find: _filter.Filter.eat(_filter.EatParams(tokens=[], find=find, ctx=self)) for find in _ml.FindableType}
+
     @property
     def flam_dir(self) -> str:
         return self._flam_dir
@@ -198,11 +201,11 @@ class FlamContext:
         canon_listdefs = list(_ldef.CanonListdef.parse_and_expand(listdefs_iterable, self, _ldef.ExpandFlavor.FIND))
 
         if len(canon_listdefs) == 0:
-            raise _exc.InputError(f"Can't create movie list of 0 LISTDEFs. Did you forget to set a default?")
+            raise _exc.InputError("Can't create movie list of 0 LISTDEFs. Did you forget to set a default?")
 
         # Replace None with empty filter to make the rest of the code nicer.
         if filter is None:
-            filter = self.compile_filter([], _ml.FindableType.MOVIES)
+            filter = self.compile_filter(None, _ml.FindableType.MOVIES)
 
         if len(canon_listdefs) == 1 and filter.is_empty:
             movie_list_file = self._get_movie_list_file(canon_listdefs[0])
@@ -468,10 +471,11 @@ class FlamContext:
         return fetcher_cls(concrete_listdef, abstract_listdef)
 
     # Filtering.
-    def compile_filter(self, tokens: list[str], find: _ml.FindableType) -> _filter.Filter:
-        _dbg.logger.info(f"Compiling {tokens=}, {find=}")
+    def compile_filter(self, tokens: None | list[str], find: _ml.FindableType) -> _filter.Filter:
+        if tokens is None or len(tokens) == 0:
+            return self._empty_filters[find]
+
         params = _filter.EatParams(tokens=tokens, find=find, ctx=self)
         filter = _filter.Filter.eat(params)
-        _dbg.logger.info(f"Compiled into: {filter}")
+        _dbg.logger.info(f"Compiled {tokens=}, {find=} into: {filter}")
         return filter
-

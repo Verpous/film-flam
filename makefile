@@ -48,7 +48,7 @@ PYLINT_IGNORE += W0702 # bare-except
 PYLINT_IGNORE += W1514 # unspecified-encoding
 PYLINT_IGNORE += W1203 # logging-fstring-interpolation
 
-FILES:=$(wildcard $(PKG)/*.py $(BIN)/*.py)
+SRCFILES:=$(wildcard $(PKG)/*.py $(BIN)/*.py)
 
 view = tail -f
 
@@ -66,18 +66,22 @@ clean:
 	rm -rf $(FLAM_DIR)
 
 cfg:
-	$(CLI) config list testlist imdb-id=540302193
+	$(CLI) config list --default-fetch=yes testlist imdb-id=540302193
+	$(CLI) config list --default-fetch=yes netflix imdb-id=560256455
+	$(CLI) config list --default-fetch=yes mubi imdb-id=571616524
+	$(CLI) config composite --default-find=yes testcomp testlist -true
 	$(CLI) config composite testcomp testlist -true
+	$(CLI) config composite streaming mubi netflix
 
 mypy:
 	MYPY_FORCE_COLOR=1 mypy --disallow-untyped-defs --disallow-incomplete-defs --enable-incomplete-feature=NewGenericSyntax $(CLI)
 
-# PEP 695 support seems to be a little shoddy at this time so we patch it with a grep.
+# PEP 695 support seems to be a little shoddy at this time so we patch it --additional-builtins.
 pylint:
-	pylint --output-format=colorized --disable="$$(printf %s, $(PYLINT_IGNORE))" -- $(FILES) | grep -v "Undefined variable 'T'" | less -R
+	pylint --output-format=colorized --disable="$$(printf %s, $(PYLINT_IGNORE))" --additional-builtins="T" -- $(SRCFILES) | less -R
 
 wc:
-	@wc -l -- $(FILES)
+	@wc -l -- $(SRCFILES)
 
 # Use LOGLEVEL=critical so that this very action doesn't create new logs.
 log:

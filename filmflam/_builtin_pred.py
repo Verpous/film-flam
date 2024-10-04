@@ -14,6 +14,7 @@
 # along with this program. If not, see <https://www.gnu.org/licenses/>.
 
 import typing
+import dataclasses
 
 from . import _ctx
 from . import _filter
@@ -63,28 +64,111 @@ class All(_filter.Predicate, name='all'):
         yield self._attribute.name
         yield str(self._cmpto)
 
+@_reg._register_builtin
+class Has(_filter.Predicate, name='has'):
+    def __init__(self, attribute: _attr.Attribute) -> None:
+        self._attribute = attribute
+    
+    @classmethod
+    def eat(cls, params: _filter.EatParams, at: int) -> tuple[_filter.Predicate, int]:
+        attribute = cls.eat_attribute(params, at)
+        return cls(attribute), at + 1
+
+    def excrete(self, findable: _ml.Findable, ctx: _ctx.FlamContext) -> bool:
+        actual = findable.extract(self._attribute)
+        return actual is not None and (not isinstance(actual, list) or len(actual) > 0)
+
+    def regurgitate(self) -> typing.Iterator[str]:
+        yield from super().regurgitate()
+        yield self._attribute.name
+
+@_reg._register_builtin
+class InList(_filter.Predicate, name='in-list'):
+    def __init__(self, movie_list: _ml.MovieList, filter: _filter.Filter) -> None:
+        self._movie_list = movie_list
+        self._filter = filter
+
+        self._found_uids: None | set[str]
+        self._found_uids_ct_gm: None | tuple[_ml.CrewType, _ml.GroupMode]
+
+        # For optimization we cache the set of found uids. 
+        # But because a role filter can be reused with different modal_crew_types, we can't precompute that here, have to do it when the filter is used.
+        match filter.findable_type:
+            case _ml.FindableType.MOVIES | _ml.FindableType.PEOPLE:
+                self._found_uids = {f.uid for f in movie_list.find(filter.findable_type, filter=self._filter)}
+                self._found_uids_ct_gm = None
+            case _:
+                self._found_uids = None
+                self._found_uids_ct_gm = None
+    
+    @classmethod
+    def eat(cls, params: _filter.EatParams, at: int) -> tuple[_filter.Predicate, int]:
+        movie_list, filter_idx = cls.eat_movie_list(params, at)
+        filter, until = _filter.Filter.eat_single(params, filter_idx)
+        return cls(movie_list, filter), until
+
+    def excrete(self, findable: _ml.Findable, ctx: _ctx.FlamContext) -> bool:
+        if self._filter.findable_type == _ml.FindableType.ROLES:
+            assert isinstance(findable, _ml.Role)
+
+            ct_gm = (findable.crew_type, findable.group_mode)
+
+            if self._found_uids_ct_gm != ct_gm:
+                self._found_uids = {f.uid for f in self._movie_list.find_roles(*ct_gm, self._filter)}
+                self._found_uids_ct_gm = ct_gm
+
+        assert self._found_uids is not None
+        return findable.uid in self._found_uids
+
+    def regurgitate(self) -> typing.Iterator[str]:
+        yield from super().regurgitate()
+        yield min(_filter.Pipeline.LPAREN)
+
+        # We handle multiple listdefs as best we can but it's not great.
+        yield from self._movie_list.underlying_file.abstract_listdef.pretty(self._movie_list.ctx).split(' ')
+
+        yield min(_filter.Pipeline.RPAREN)
+        yield from self._filter.regurgitate()
+
+@_reg._register_builtin
+class CrewContains(_filter.Predicate, name='crew-contains', findable_type=_ml.FindableType.MOVIES):
+    def __init__(self, ct_gms: list[tuple[_ml.CrewType, _ml.GroupMode]], filter: _filter.Filter) -> None:
+        self._ct_gms = ct_gms
+        self._filter = filter
+        self._muid_attr = _reg._builtins.attributes['muid']
+    
+    @classmethod
+    def eat(cls, params: _filter.EatParams, at: int) -> tuple[_filter.Predicate, int]:
+        ct_gms, filter_idx = cls.eat_listof(cls.eat_ct_gm, params, at, True)
+        sub_params = dataclasses.replace(params, find=_ml.FindableType.ROLES)
+        filter, until = _filter.Filter.eat_single(sub_params, filter_idx)
+        return cls(ct_gms, filter), until
+
+    def excrete(self, findable: _ml.Findable, ctx: _ctx.FlamContext) -> bool:
+        return any(
+            role.extract(self._muid_attr) == findable.uid
+            for ct_gm in self._ct_gms
+                for role in findable.movie_list.find_roles(*ct_gm, filter=self._filter)
+        )
+
+    def regurgitate(self) -> typing.Iterator[str]:
+        yield from super().regurgitate()
+        yield min(_filter.Pipeline.LPAREN)
+        yield from (f"{ct_gm[0]}:{ct_gm[1]}" for ct_gm in self._ct_gms)
+        yield min(_filter.Pipeline.RPAREN)
+        yield from self._filter.regurgitate()
+
 # TODO: Predicate ideas:
 # Don't forget for string predicates we should support regex with "anywhere in the string" matching by default!
 # Generic predicates:
-# * -<attribute-name> [=|+|-|++|--]<value> (obviously. = for eq and is default, +/- for ge/le, ++/-- for strictly gt/lt. Not all attributes support anything other than =.
-#                                           Worth noting that if you want to compare equality to a negative number, you can avoid ambiguity by specifying the "=".
-#                                           If attribute is array type, compare against first element I think, and false if no first element.
-#                                           The names in a group are an array attribute that we don't have to treat special.)
-# * -contains <array attribute name> [=|+|-|++|--]<value>
-# * -all <array attribute name> [=|+|-|++|--]<value>
-# * -size <array attribute name> [=|+|-|++|--]<value> (array len check)
-# * -also-in <listdef> (searches for the same uid in another list by the same pivot/crew-type. I think this is only a person/movie predicate, not a role predicate)
-# * -has <attribute name> (check if the value is None, or generally missing)
-# * -line <comma-delimited column names which are just attribute names?> <regex> (like grepping in the tabulated result)
-# * -index <num (or slice)?> <array attribute name> [=|+|-|++|--]<value> (compare value to specific array element or slice. Useful mostly because arrays are sorted)
 # * In <value>s support %<attribute> expressions which expand to the value of this attribute on this findable?
+# * In <value>s support prefixing with [idx] (e.g. [0]==thing) to actual compare to the first value? If not then at least have an -index predicate?
 # 
 # Person predicates:
 # * -appeared-in <single with movie predicates> (searches all crew types)
 # * -<crew-type>-in <single with movie predicates> (ex: cast-in, director-in, etc. IDEA: "-cast-in -true" as a way to check if a person is an actor at all)
 #
 # Movie predicates:
-# * -crew-contains <crew-type> <single with role predicates>
 # * -crews-contain <single with role predicates> (searches all crew types, beware of people who appear in multiple crew types!)
 #
 # Role predicates:

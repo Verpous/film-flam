@@ -361,7 +361,7 @@ def _date_from_csv(date: str) -> datetime.date:
     # IMDb used to only serve %Y-%m-%d, but now it sometimes serves a partial date.
     for fmt in ('%Y-%m-%d', '%Y-%m', '%Y'):
         try:
-            return datetime.datetime.strptime(date, fmt)
+            return datetime.datetime.strptime(date, fmt).date()
         except ValueError:
             pass
 

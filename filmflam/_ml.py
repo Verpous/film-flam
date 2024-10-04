@@ -56,14 +56,14 @@ class CrewType(enum.StrEnum):
         return str(self)
 
 _default_group_modes = {
-    CrewType.CAST: GroupMode.SEPARATE,
-    CrewType.STUNTCAST: GroupMode.SEPARATE,
-    CrewType.DIRECTOR: GroupMode.GROUP,
-    CrewType.WRITER: GroupMode.GROUP,
-    CrewType.PRODUCER: GroupMode.SEPARATE,
-    CrewType.COMPOSER: GroupMode.GROUP,
-    CrewType.CINEMATOGRAPHER: GroupMode.GROUP,
-    CrewType.EDITOR: GroupMode.GROUP,
+    CrewType.CAST:              GroupMode.SEPARATE,
+    CrewType.STUNTCAST:         GroupMode.SEPARATE,
+    CrewType.DIRECTOR:          GroupMode.GROUP,
+    CrewType.WRITER:            GroupMode.GROUP,
+    CrewType.PRODUCER:          GroupMode.SEPARATE,
+    CrewType.COMPOSER:          GroupMode.GROUP,
+    CrewType.CINEMATOGRAPHER:   GroupMode.GROUP,
+    CrewType.EDITOR:            GroupMode.GROUP,
 }
 
 class FindableType(enum.StrEnum):
@@ -87,6 +87,16 @@ class Findable(abc.ABC):
     def movie_list(self) -> MovieList:
         return self._movie_list
 
+    @property
+    @abc.abstractmethod
+    def type_(self) -> FindableType:
+        pass
+
+    @property
+    @abc.abstractmethod
+    def uid(self) -> str:
+        pass
+
     @abc.abstractmethod
     def extract(self, attribute: _attr.Attribute) -> _attr.AttributeValue:
         pass
@@ -107,6 +117,14 @@ class Movie(Findable):
         super().__init__(movie_list)
         self._mlf_movie = mlf_movie
 
+    @property
+    def type_(self) -> FindableType:
+        return FindableType.MOVIES
+
+    @property
+    def uid(self) -> str:
+        return self._mlf_movie.uid
+
     def extract(self, attribute: _attr.Attribute) -> _attr.AttributeValue:
         return attribute._extract_from_movie(self, self._mlf_movie) # type: ignore
 
@@ -114,6 +132,14 @@ class Person(Findable):
     def __init__(self, movie_list: MovieList, mlf_person: _mlf.MLFPerson):
         super().__init__(movie_list)
         self._mlf_person = mlf_person
+
+    @property
+    def type_(self) -> FindableType:
+        return FindableType.PEOPLE
+
+    @property
+    def uid(self) -> str:
+        return self._mlf_person.uid
 
     def extract(self, attribute: _attr.Attribute) -> _attr.AttributeValue:
         return attribute._extract_from_person(self, self._mlf_person) # type: ignore
@@ -125,6 +151,16 @@ class Role(Findable):
         self._mlf_movie = mlf_movie
         self._crew_type = crew_type
         self._group_mode = group_mode
+
+        self._uid = ','.join(mlf_role.person_uid for mlf_role in mlf_roles)
+
+    @property
+    def type_(self) -> FindableType:
+        return FindableType.ROLES
+
+    @property
+    def uid(self) -> str:
+        return self._uid
 
     @property
     def crew_type(self) -> CrewType:
@@ -145,10 +181,14 @@ class Role(Findable):
             return Movie(self.movie_list, self._mlf_movie).extract(attribute)
         
         if attribute.findable_type == FindableType.PEOPLE:
-            # TODO: if attribute is array type already, flatten it?
             mlf = self.movie_list.underlying_file
             mlf_people = (mlf.people_by_uid[mlf_role.person_uid] for mlf_role in self._mlf_roles)
-            return [Person(self.movie_list, mlf_person).extract(attribute) for mlf_person in mlf_people]
+
+            if attribute.is_array:
+                return [elem for mlf_person in mlf_people for elem in typing.cast(list, Person(self.movie_list, mlf_person).extract(attribute))]
+
+            # We should not re-sort this. It should be ordered the same self._mlf_roles, which should be sorted by the person names.
+            return [value for mlf_person in mlf_people if (value := Person(self.movie_list, mlf_person).extract(attribute)) is not None]
         
         raise RuntimeError(f"Unexpected {attribute.findable_type=}")
         
@@ -162,17 +202,28 @@ class MovieList:
 
         self._movies: None | list[Movie] = None
         self._people: None | list[Person] = None
-        self._roles: None | dict[tuple[GroupMode, CrewType], list[Role]] = None
+        self._roles: None | dict[tuple[CrewType, GroupMode], list[Role]] = None
 
-    def __iter__(self) -> typing.Iterator[Findable]:
-        return iter(self.find(FindableType.MOVIES))
+    # I permit access to this and entrust users to only read from it because some attributes need it,
+    # and I don't believe in going so crazy about the API being "clean" and bulletproof that I sacrifice its efficiency.
+    # If you're implementing an attribute you should be allowed to peek "under the hood" more than a typical user anyway.
+    @property
+    def underlying_file(self) -> _mlf.MovieListFile:
+        return self._movie_list_file
+
+    @property
+    def ctx(self) -> _ctx.FlamContext:
+        return self._ctx
+
+    def __iter__(self) -> typing.Iterator[Movie]:
+        return iter(self.find_movies())
 
     def find(self, what: FindableType, crew_type: None | CrewType = None, group_mode: GroupMode = GroupMode.DEFAULT,
             filter: None | _filter.Filter = None) -> typing.Iterator[Findable]:
-        _dbg.logger.info(f"Going to find {what} in '{self._movie_list_file.abstract_listdef}' with {filter=!s}")
+        _dbg.logger.info(f"Going to find {what} with {crew_type=}, {group_mode=} in '{self._movie_list_file.abstract_listdef}' with {filter=!s}")
 
         if filter is None:
-            filter = self._ctx.compile_filter([], what)
+            filter = self._ctx.compile_filter(None, what)
 
         if filter.findable_type != what:
             raise _exc.InputError(f"Requested to find {what} but filter is of type {filter.findable_type}.")
@@ -213,43 +264,104 @@ class MovieList:
         _dbg.logger.info(f"Resulting file has {len(filtered_file.movies_by_uid)} movies, {len(filtered_file.people_by_uid)} people")
         return filtered_file
 
-    # I permit access to this and entrust users to only read from it because some attributes need it,
-    # and I don't believe in going so crazy about the API being "clean" and bulletproof that I sacrifice its efficiency.
-    # If you're implementing an attribute you should be allowed to peek "under the hood" more than a typical user anyway.
-    @property
-    def underlying_file(self) -> _mlf.MovieListFile:
-        return self._movie_list_file
 
     def _generate_movies(self) -> list[Movie]:
         if self._movies is None:
             self._movies = [Movie(self, mlf_movie) for mlf_movie in self._movie_list_file.movies_by_uid.values()]
+            _dbg.logger.info(f"Generated movie list, {len(self._movies)=}")
 
-        _dbg.logger.info(f"Generated movie list, {len(self._movies)=}")
         return self._movies
 
     def _generate_people(self) -> list[Person]:
         if self._people is None:
             self._people = [Person(self, mlf_person) for mlf_person in self._movie_list_file.people_by_uid.values()]
+            _dbg.logger.info(f"Generated people list, {len(self._people)=}")
 
-        _dbg.logger.info(f"Generated people list, {len(self._people)=}")
         return self._people
 
     def _generate_roles(self, crew_type: CrewType, group_mode: GroupMode) -> list[Role]:
         if self._roles is None:
             self._roles = {}
 
-        modal_crew_type = (group_mode, crew_type)
+        if group_mode == GroupMode.DEFAULT:
+            group_mode = crew_type.default_group_mode
 
-        if modal_crew_type not in self._roles:
-            # TODO: implement grouping. For now assume not grouped.
-            self._roles[modal_crew_type] = [
-                Role(self, [mlf_role], mlf_movie, crew_type, group_mode)
-                for mlf_movie in self._movie_list_file.movies_by_uid.values()
-                    for mlf_role in mlf_movie.crew[crew_type].roles_by_uid.values()
-            ]
+        ct_gm = (crew_type, group_mode)
 
-        _dbg.logger.info(f"Generated roles list, {modal_crew_type=}, {len(self._roles[modal_crew_type])=}")
-        return self._roles[modal_crew_type]
+        if ct_gm not in self._roles:
+            match group_mode:
+                case GroupMode.SEPARATE:
+                    self._roles[ct_gm] = [
+                        Role(self, [mlf_role], mlf_movie, crew_type, group_mode)
+                        for mlf_movie in self._movie_list_file.movies_by_uid.values()
+                            for mlf_role in mlf_movie.crew[crew_type].roles_by_uid.values()
+                    ]
+                case GroupMode.GROUP:
+                    # High level, the algorithm is as follows:
+                    #
+                    # foreach movie:
+                    #     intersect movie's crew set with every other movie's
+                    #     if the intersection with a movie (including self) is not empty, add that intersection to a set of sets
+                    #
+                    # foreach crew set in the set of sets we built:
+                    #     find all movies whose crew is a superset of this set
+                    #
+                    # In the end you have for every relevant person set, all movies that are accredited to it.
+                    # In reality the algorithm barely resembles this because of various optimizations.
+
+                    # groups will in the end include all relevant crew sets. We know that at minimum, it should have every crew that any movie has.
+                    # This set also allows us to only iterate over every unique movie crew pair, instead of every movie pair.
+                    mlf = self._movie_list_file
+
+                    groups = {
+                        crew_uids
+                        for mlf_movie in mlf.movies_by_uid.values()
+                        if len(crew_uids := frozenset(mlf_movie.crew[crew_type].roles_by_uid)) > 0
+                    }
+
+                    # Optimization: we only need to only iterate over each *unordered* crew pair once. For that we need groups to be ordered.
+                    ordered_base_groups = list(groups)
+
+                    # Optimization: 1-man crews are not interesting. Any intersection they have is either empty or equal to themselves.
+                    # So we will sort by crew length, and get the first index where crews have a greater length than 1.
+                    ordered_base_groups.sort(key=len)
+                    start_multiple = next((i for i, group in enumerate(ordered_base_groups) if len(group) > 1), len(ordered_base_groups))
+
+                    # Now we iterate over every unordered pair of crews that both have len > 1.
+                    for i, g1 in enumerate(ordered_base_groups[start_multiple:]):
+
+                        # We skip the pair of any crew with itself because we started off groups with all of those.
+                        for g2 in ordered_base_groups[i + 1:]:
+                            intersection = g1 & g2
+                            len_intersection = len(intersection)
+
+                            # Empty intersections are skipped.
+                            # If the intersection is equal to g1 or g2, it's already in groups so we will not re-add it.
+                            # If we did re-add it the set will block it anyway but it doing it this way is more optimal.
+                            # For extra optimization juice, we don't even compare the sets, comparing lengths is enough.
+                            if len_intersection != 0 and len_intersection != len(g1) and len_intersection != len(g2):
+                                groups.add(intersection)
+
+                    # This is step 2 of the algorithm: finding each group's credits.
+                    self._roles[ct_gm] = [
+                        Role(
+                            self,
+                            sorted(
+                                (mlf_movie.crew[crew_type].roles_by_uid[uid] for uid in group),
+                                key=lambda role: ((name := mlf.people_by_uid[role.person_uid].name) is not None, name)
+                            ),
+                            mlf_movie, crew_type, group_mode
+                        )
+                        for mlf_movie in mlf.movies_by_uid.values()
+                            for group in groups if group.issubset(mlf_movie.crew[crew_type].roles_by_uid)
+                    ]
+
+                case _:
+                    raise RuntimeError(f"Unexpected {group_mode=}")
+
+            _dbg.logger.info(f"Generated roles list, {ct_gm=}, {len(self._roles[ct_gm])=}")
+
+        return self._roles[ct_gm]
 
 # Crew type, grouping, roles, people brainstorming:
 # I think we pass on allowing to group across crew types. Grouping is for a specific crew type

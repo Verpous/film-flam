@@ -20,33 +20,16 @@ import enum
 import os
 import sys
 import typing
-import itertools
 import colorama
 import contextlib
 import csv
 import tempfile
 import subprocess
-import re
 import shutil
+import functools
 
 import filmflam as flam
 from filmflam import utils
-
-def split_at_filter(strs: list[str]) -> tuple[list[str], list[str]]:
-    filter_begin = next((i for i, s in enumerate(strs) if flam.is_filter_token(s)), len(strs))
-    return strs[:filter_begin], strs[filter_begin:]
-
-def truncstr(s: str, maxlen: int = 45, ellipsis: str = '...', is_big_endian: bool = True) -> str:
-    if maxlen < len(ellipsis):
-        raise ValueError(f'Ellipsis must not be longer than maxlen. {ellipsis=}, {maxlen=}.')
-
-    return (s if len(s) <= maxlen
-        else s[:maxlen - len(ellipsis)] + ellipsis if is_big_endian
-        else ellipsis + s[-(maxlen - len(ellipsis)):])
-
-def uniq_append(l: list, x: typing.Any) -> None:
-    if x not in l:
-        l.append(x)
 
 class Choice(enum.StrEnum):
     YES     = 'yes'
@@ -66,6 +49,77 @@ class Choice(enum.StrEnum):
     # When you give argparse choices and they don't match it prints the error using repr so repr must be user readable.
     def __repr__(self) -> str:
         return str(self)
+
+def split_at_filter(strs: list[str]) -> tuple[list[str], list[str]]:
+    filter_begin = next((i for i, s in enumerate(strs) if flam.is_filter_token(s)), len(strs))
+    return strs[:filter_begin], strs[filter_begin:]
+
+def uniq_append(l: list, x: typing.Any) -> None:
+    if x not in l:
+        l.append(x)
+
+# TODO: Titles want it 45, other attributes would prefer 30, and some don't need to be truncated at all. Support all kinds or just settle on 45?
+def truncstr(s: str, maxlen: int = 45, ellipsis: str = '...', is_big_endian: bool = True) -> str:
+    if maxlen < len(ellipsis):
+        raise ValueError(f'Ellipsis must not be longer than maxlen. {ellipsis=}, {maxlen=}.')
+
+    return (s if len(s) <= maxlen
+        else s[:maxlen - len(ellipsis)] + ellipsis if is_big_endian
+        else ellipsis + s[-(maxlen - len(ellipsis)):])
+
+def print_table(table: list[list[str]],
+        color_choice: Choice = Choice.AUTO,
+        paginate_choice: Choice = Choice.AUTO,
+        spacious: bool = False,
+        no_titles: bool = False,
+        dsv: None | str = None) -> None:
+    match color_choice:
+        case Choice.AUTO:
+            use_color = sys.stdout.isatty()
+        case Choice.ALWAYS:
+            use_color = True
+        case Choice.NEVER:
+            use_color = False
+        case _:
+            raise RuntimeError(f"Unexpected {color_choice=}")
+
+    match paginate_choice:
+        case Choice.AUTO:
+            # Slightly nudge up the length of the table to encourage pagination.
+            paginate = sys.stdout.isatty() and os.get_terminal_size().lines <= len(table) + 2 and shutil.which('less') is not None
+            spacious |= paginate
+        case Choice.ALWAYS:
+            paginate = True
+        case Choice.NEVER:
+            paginate = False
+        case _:
+            raise RuntimeError(f"Unexpected {paginate_choice=}")
+
+    # Pipe to less if requested. I tried a lot of variations including of course Popen(stdin=PIPE), this is the only one that works.
+    # Note: This program hits a harmless 'OSError [Errno 22]' when piping to less.
+    # This fixes it: https://stackoverflow.com/a/66874837/12553917, but I'm worried about the consequences of using this and it's not worth the hassle.
+    with tempfile.NamedTemporaryFile('w', encoding='utf-8') if paginate else contextlib.nullcontext(sys.stdout) as out: # type: ignore
+        # Output as CSV.
+        if dsv is not None:
+            writer = csv.writer(out, delimiter=dsv)
+            writer.writerows(table)
+        else:
+            # Output in a pretty table.
+            line_spacing = '\n\n' if spacious else '\n'
+            out.write(line_spacing.join(utils.tabulate(
+                table,
+                fillchar = '.' if use_color else ' ', 
+                use_color = use_color,
+                header_color = '' if no_titles else '\033[4m\033[K' # Underline, not supported by colorama.
+            )))
+        
+        out.flush()
+
+        if paginate:
+            try:
+                subprocess.call(['less', '-RS', out.name])
+            except Exception as e:
+                raise flam.InputError(f"Pagination failed with error: {e}. You probably don't have less installed.") from e
 
 class SubcommandConfig:
     @classmethod
@@ -120,12 +174,22 @@ class SubcommandConfigList:
 
     @classmethod
     def print(cls, ctx: flam.FlamContext, args: argparse.Namespace) -> None:
-        # TODO: improve this in the future
-        if args.NAME is None:
-            for sl in ctx.simple_lists:
-                print(sl)
-        else:
-            print(ctx.simple_lists.get_by_name(args.NAME))
+        simple_lists = list(ctx.simple_lists) if args.NAME is None else [ctx.simple_lists.get_by_name(args.NAME)]
+
+        table = [['uid', 'name', 'type', 'address', 'default-fetch?', 'default-find?']]
+        table.extend(
+            [
+                typing.cast(str, sl.uid).split('-')[0],
+                sl.name,
+                sl.list_type,
+                sl.address,
+                str(sl.is_default_fetch),
+                str(sl.is_default_find),
+            ]
+            for sl in simple_lists
+        )
+
+        print_table(table)
 
     @classmethod
     def edit(cls, ctx: flam.FlamContext, args: argparse.Namespace, simple_list: flam.SimpleList) -> None:
@@ -215,12 +279,22 @@ class SubcommandConfigComposite:
 
     @classmethod
     def print(cls, ctx: flam.FlamContext, args: argparse.Namespace) -> None:
-        # TODO: improve this in the future
-        if args.NAME is None:
-            for cl in ctx.composite_lists:
-                print(cl)
-        else:
-            print(ctx.composite_lists.get_by_name(args.NAME))
+        composite_lists = list(ctx.composite_lists) if args.NAME is None else [ctx.composite_lists.get_by_name(args.NAME)]
+
+        table = [['uid', 'name', 'lists', 'filter', 'default-fetch?', 'default-find?']]
+        table.extend(
+            [
+                typing.cast(str, cl.uid).split('-')[0],
+                cl.name,
+                ', '.join(ctx.simple_lists.get_by_uid(sl_uid).name for sl_uid in cl.simple_list_uids),
+                ' '.join(cl.filter_tokens) if len(cl.filter_tokens) > 0 else '-',
+                str(cl.is_default_fetch),
+                str(cl.is_default_find),
+            ]
+            for cl in composite_lists
+        )
+
+        print_table(table)
 
     @classmethod
     def edit(cls, ctx: flam.FlamContext, args: argparse.Namespace, composite_list: flam.CompositeList) -> None:
@@ -368,36 +442,37 @@ Valid column names: ...''')
         parser.add_argument('REMAINDER', nargs=argparse.REMAINDER, action='store')
 
     @classmethod
-    def parse_findable(cls, findable: str) -> tuple[flam.FindableType, list[tuple[flam.GroupMode, None | flam.CrewType]]]:
+    def parse_findable(cls, findable: str) -> tuple[flam.FindableType, list[tuple[None | flam.CrewType, flam.GroupMode]]]:
         if findable == flam.FindableType.ROLES:
-            return flam.FindableType.ROLES, list(zip([flam.GroupMode.DEFAULT] * len(flam.CrewType), flam.CrewType))
+            return flam.FindableType.ROLES, list(zip(flam.CrewType, [flam.GroupMode.DEFAULT] * len(flam.CrewType)))
 
         if findable in flam.FindableType:
-            return flam.FindableType(findable), [(flam.GroupMode.DEFAULT, None)]
+            return flam.FindableType(findable), [(None, flam.GroupMode.DEFAULT)]
 
-        modal_crew_types = []
+        ct_gms = []
 
-        for modal_crew_type in findable.split(','):
-            colon_idx = modal_crew_type.find('=')
-            group_mode, crew_type = (modal_crew_type[:colon_idx], modal_crew_type[colon_idx + 1:]) if colon_idx != -1 else (flam.GroupMode.DEFAULT, modal_crew_type)
-            modal_crew_types.append((flam.GroupMode(group_mode), flam.CrewType(crew_type)))
+        for ct_gm in findable.split(','):
+            colon_idx = ct_gm.find(':')
+            crew_type, group_mode = (ct_gm[:colon_idx], ct_gm[colon_idx + 1:]) if colon_idx != -1 else (ct_gm, flam.GroupMode.DEFAULT)
+            ct_gms.append((flam.CrewType(crew_type), flam.GroupMode(group_mode)))
 
-        return flam.FindableType.ROLES, modal_crew_types # type: ignore
+        return flam.FindableType.ROLES, ct_gms # type: ignore
 
     @classmethod
     def execute(cls, ctx: flam.FlamContext, args: argparse.Namespace) -> None:
-        findable_type, modal_crew_types = args.FINDABLE
+        findable_type, ct_gms = args.FINDABLE
 
         listdefs, filter_tokens = split_at_filter(args.LISTDEF + args.FILTER)
         filter = ctx.compile_filter(filter_tokens, findable_type)
         movie_list = ctx.get_movie_list(listdefs if len(listdefs) > 0 else flam.SpecialListType.DEFAULTS)
 
         sort_attrs = cls.parse_sortkeys(args, findable_type, ctx)
-        column_attrs = cls.parse_columns(args, findable_type, sort_attrs, movie_list, ctx)
+        column_attrs = cls.parse_columns(args, findable_type, ct_gms, sort_attrs, movie_list, ctx)
 
+        # TODO: if searching role attributes, optimization: extract and stringify person/movie attributes only once and not once per role.
         findables = [
             findable
-            for group_mode, crew_type in modal_crew_types
+            for crew_type, group_mode in ct_gms
                 for findable in movie_list.find(findable_type, crew_type=crew_type, group_mode=group_mode, filter=filter)
         ]
 
@@ -412,9 +487,9 @@ Valid column names: ...''')
     def parse_sortkeys(cls, args: argparse.Namespace, findable_type: flam.FindableType, ctx: flam.FlamContext) -> list[flam.Attribute]:
         if args.sort is None:
             default_attribute_names = {
-                flam.FindableType.MOVIES: ['runtime', 'title'], # TODO: Used to have 'leaving' as top priority.
+                flam.FindableType.MOVIES: ['runtime', 'title'],
                 flam.FindableType.PEOPLE: ['nmovies', 'name'],
-                flam.FindableType.ROLES: ['nmovies', 'name', 'release', 'title'],
+                flam.FindableType.ROLES: ['nmovies', 'name', 'released', 'title'],
             }
 
             attribute_names = default_attribute_names[findable_type]
@@ -431,8 +506,8 @@ Valid column names: ...''')
 
     # Can't do this at argparse time because it depends on the context and sortkeys.
     @classmethod
-    def parse_columns(cls, args: argparse.Namespace, findable_type: flam.FindableType, sort_attrs: list[flam.Attribute],
-            movie_list: flam.MovieList, ctx: flam.FlamContext) -> list[flam.Attribute]:
+    def parse_columns(cls, args: argparse.Namespace, findable_type: flam.FindableType, ct_gms: list[tuple[None | flam.CrewType, flam.GroupMode]],
+            sort_attrs: list[flam.Attribute], movie_list: flam.MovieList, ctx: flam.FlamContext) -> list[flam.Attribute]:
         is_additive = args.columns is None or args.columns.startswith('+')
         columns = [] if args.columns is None else args.columns.removeprefix('+').split(',')
 
@@ -446,23 +521,31 @@ Valid column names: ...''')
 
             columns = default_columns[findable_type] + columns
 
-        # "Smart" columns that aren't default unless conditions are met.
-        if any(attr.name == 'watched' for attr in sort_attrs):
-            uniq_append(columns, 'watched')
+            # "Smart" columns that aren't default unless conditions are met.
+            # TODO: maybe we should generalize and just say that any sort key also becomes a column key,
+            # and maybe we should consider not just sort keys but also attributes referenced in the filter?
+            if any(attr.name == 'watched' for attr in sort_attrs):
+                uniq_append(columns, 'watched')
 
-        if any(attr.name == 'votes' for attr in sort_attrs):
-            uniq_append(columns, 'votes')
+            if any(attr.name == 'votes' for attr in sort_attrs):
+                uniq_append(columns, 'votes')
 
-        if any(attr.name == 'myrating' for attr in sort_attrs):
-            uniq_append(columns, 'myrating')
+            if any(attr.name == 'myrating' for attr in sort_attrs):
+                uniq_append(columns, 'myrating')
 
-        if any(attr.name == 'description' for attr in sort_attrs):
-            uniq_append(columns, 'description')
-        
-        # If we combined multiple lists, tag each element with the list(s) it came from.
-        if movie_list.underlying_file.abstract_listdef.list_type == flam.SpecialListType.ANNONYMOUS:
-            uniq_append(columns, 'origin')
-        
+            if any(attr.name == 'description' for attr in sort_attrs):
+                uniq_append(columns, 'description')
+            
+            if len(ct_gms) > 1:
+                uniq_append(columns, 'crew-type')
+
+            if any(crew_type == flam.CrewType.CAST for crew_type, _ in ct_gms):
+                uniq_append(columns, 'characters')
+
+            # If we combined multiple lists, tag each element with the list(s) it came from.
+            if movie_list.underlying_file.abstract_listdef.list_type == flam.SpecialListType.ANNONYMOUS:
+                uniq_append(columns, 'origin')
+
         attributes = [ctx.attributes[c] for c in columns]
 
         for attr in attributes:
@@ -474,7 +557,9 @@ Valid column names: ...''')
     @classmethod
     def sort_findables(cls, sort_attrs: list[flam.Attribute], findables: list[flam.Findable], args: argparse.Namespace) -> None:
         for attr in sort_attrs[::-1]:
-            findables.sort(key=lambda f: attr.sort_key(f.extract(attr)), reverse=(not attr.is_ascending) ^ args.reverse)
+            # Use functools.partial to silence "cell-var-from-loop" warning by pylint.
+            key = functools.partial(lambda a, f: a.sort_key(f.extract(a)), attr)
+            findables.sort(key=key, reverse=(not attr.is_ascending) ^ args.reverse)
 
     @classmethod
     def build_strs_table(cls, attributes: list[flam.Attribute], values_table: list[list[flam.AttributeValue]], args: argparse.Namespace) -> typing.Iterable[list[str]]:
@@ -491,52 +576,7 @@ Valid column names: ...''')
                 for i in range(len(row)):
                     row[i] = truncstr(row[i], is_big_endian=attributes[i].is_big_endian)
 
-        match args.color:
-            case Choice.AUTO:
-                use_color = sys.stdout.isatty()
-            case Choice.ALWAYS:
-                use_color = True
-            case Choice.NEVER:
-                use_color = False
-            case _:
-                raise RuntimeError(f"Unexpected {args.color=}")
-
-        match args.paginate:
-            case Choice.AUTO:
-                paginate = sys.stdout.isatty() and os.get_terminal_size().lines < len(table) and shutil.which('less') is not None
-                args.spacious |= paginate
-            case Choice.ALWAYS:
-                paginate = True
-            case Choice.NEVER:
-                paginate = False
-            case _:
-                raise RuntimeError(f"Unexpected {args.paginate=}")
-
-        # Pipe to less if requested. I tried a lot of variations including of course Popen(stdin=PIPE), this is the only one that works.
-        # Note: This program hits a harmless 'OSError [Errno 22]' when piping to less.
-        # This fixes it: https://stackoverflow.com/a/66874837/12553917, but I'm worried about the consequences of using this and it's not worth the hassle.
-        with tempfile.NamedTemporaryFile('w', encoding='utf-8') if paginate else contextlib.nullcontext(sys.stdout) as out: # type: ignore
-            # Output as CSV.
-            if args.dsv is not None:
-                writer = csv.writer(out, delimiter=args.dsv)
-                writer.writerows(table)
-            else:
-                # Output in a pretty table.
-                line_spacing = '\n\n' if args.spacious else '\n'
-                out.write(line_spacing.join(utils.tabulate(
-                    table,
-                    fillchar = '.' if use_color else ' ', 
-                    use_color = use_color,
-                    header_color = '' if args.no_titles else '\033[4m\033[K' # Underline, not supported by colorama.
-                )))
-            
-            out.flush()
-
-            if paginate:
-                try:
-                    subprocess.call(['less', '-RS', out.name])
-                except Exception as e:
-                    raise flam.InputError(f"Pagination failed with error: {e}. You probably don't have less installed.") from e
+        print_table(table, args.color, args.paginate, args.spacious, args.no_titles, args.dsv)
 
 class SubcommandChart:
     @classmethod

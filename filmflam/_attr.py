@@ -36,7 +36,7 @@ class ComparisonOp(enum.Enum):
     EQ = ('==', lambda v1, v2: v1 == v2)
     LT = ('.-', lambda v1, v2: v1 < v2)
     GT = ('.+', lambda v1, v2: v1 > v2)
-    RX = ('=~', lambda v, regex: bool(regex.search(v)))
+    RX = ('=~', lambda v, pattern: bool(pattern.search(v)))
 
     def __init__(self, sign: str, compare: typing.Callable[[AttributeValue, AttributeValue | re.Pattern], bool]) -> None:
         self.sign = sign
@@ -52,8 +52,15 @@ class CmpTo:
         self._value = value
 
     def __call__(self, value: AttributeValue) -> bool:
-        # Order is important.
-        return value is not None and self._op(value, self._value)
+        # This is really bizarre but if you just use self._op directly mypy complains it isn't callable.
+        op = self._op
+
+        match self._op:
+            case ComparisonOp.RX:
+                # Order is important.
+                return op(self._attribute.str_of(value), self._value)
+            case _:
+                return value is not None and op(value, self._value)
 
     def __str__(self) -> str:
         match self._op:
@@ -129,7 +136,7 @@ class Attribute(abc.ABC):
                 return '-'
             
             return ', '.join(self._str_of_single(elem) for elem in value)
-            
+
         return self._str_of_single(value)
 
     def make_cmpto(self, op: ComparisonOp, value_str: str) -> CmpTo:
