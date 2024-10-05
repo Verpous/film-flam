@@ -79,11 +79,11 @@ class FilterMember(abc.ABC):
         if at < len(params.tokens) and params.tokens[at] in Pipeline.LPAREN:
             try:
                 rparen_idx = next(i for i in range(at + 1, len(params.tokens)) if params.tokens[i] in Pipeline.RPAREN)
-            except StopIteration:
-                raise _EinGafrurError(f"Expected {Positive._RPAREN_DESC}, but reached the end of input.", tokens=params.tokens, error_indices=at)
+            except StopIteration as e:
+                raise _EinGafrurError(f"Expected {Pipeline._RPAREN_DESC}, but reached the end of input.", tokens=params.tokens, error_indices=at) from e
 
             if at_least_one and rparen_idx == at + 1:
-                raise _EinGafrurError(f"Expected non empty list.", tokens=params.tokens, error_indices=[at, rparen_idx])
+                raise _EinGafrurError("Expected non empty list.", tokens=params.tokens, error_indices=[at, rparen_idx])
 
             return [eatfunc(params, i) for i in range(at + 1, rparen_idx)], rparen_idx + 1
 
@@ -99,7 +99,7 @@ class FilterMember(abc.ABC):
         return s
 
     @classmethod
-    def eat_attribute(cls, params: EatParams, at: int, is_array: bool = False) -> _attr.Attribute:
+    def eat_attribute(cls, params: EatParams, at: int) -> _attr.Attribute:
         description = 'a valid attribute name'
         attribute_name = cls.eat_str(params, at, description)
 
@@ -110,10 +110,6 @@ class FilterMember(abc.ABC):
 
         if not attribute.findable_type.is_compatible(params.find):
             raise _EinGafrurError(f"Expected attribute of {params.find}, but got: '{attribute_name}' which belongs to {attribute.findable_type}.",
-                tokens=params.tokens, error_indices=at)
-
-        if is_array and not attribute.is_array:
-            raise _EinGafrurError(f"Expected attribute to be an array type, but got: '{attribute_name}' of type: {attribute.type_.__name__}.",
                 tokens=params.tokens, error_indices=at)
 
         return attribute

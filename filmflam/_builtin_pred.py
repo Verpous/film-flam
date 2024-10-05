@@ -50,14 +50,17 @@ class All(_filter.Predicate, name='all'):
     
     @classmethod
     def eat(cls, params: _filter.EatParams, at: int) -> tuple[_filter.Predicate, int]:
-        attribute = cls.eat_attribute(params, at, is_array=True)
+        attribute = cls.eat_attribute(params, at)
         cmpto = cls.eat_cmpto(params, at + 1, attribute)
         return cls(attribute, cmpto), at + 2
 
     def excrete(self, findable: _ml.Findable, ctx: _ctx.FlamContext) -> bool:
         actual = findable.extract(self._attribute)
-        assert isinstance(actual, list)
-        return all(self._cmpto(elem) for elem in actual)
+
+        if isinstance(actual, list):
+            return all(self._cmpto(elem) for elem in actual)
+
+        return self._cmpto(actual)
 
     def regurgitate(self) -> typing.Iterator[str]:
         yield from super().regurgitate()

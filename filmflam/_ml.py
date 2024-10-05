@@ -184,13 +184,17 @@ class Role(Findable):
             mlf = self.movie_list.underlying_file
             mlf_people = (mlf.people_by_uid[mlf_role.person_uid] for mlf_role in self._mlf_roles)
 
-            if attribute.is_array:
-                return [elem for mlf_person in mlf_people for elem in typing.cast(list, Person(self.movie_list, mlf_person).extract(attribute))]
-
             # We should not re-sort this. It should be ordered the same self._mlf_roles, which should be sorted by the person names.
-            return [value for mlf_person in mlf_people if (value := Person(self.movie_list, mlf_person).extract(attribute)) is not None]
+            return list(self._flatten(value for mlf_person in mlf_people if (value := Person(self.movie_list, mlf_person).extract(attribute)) is not None))
         
         raise RuntimeError(f"Unexpected {attribute.findable_type=}")
+
+    def _flatten(self, iterable: typing.Iterable[_attr.AttributeValue]) -> typing.Iterable[_attr.AttributeValue]:
+        for elem in iterable:
+            if isinstance(elem, list):
+                yield from elem
+            else:
+                yield elem
         
 class MovieList:
     def __init__(self, movie_list_file: _mlf.MovieListFile, ctx: _ctx.FlamContext):

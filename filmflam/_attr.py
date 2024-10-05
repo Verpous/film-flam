@@ -83,11 +83,6 @@ class Attribute(abc.ABC):
     def findable_type(self) -> _ml.FindableType:
         pass
 
-    @property
-    @abc.abstractmethod
-    def is_array(self) -> bool:
-        pass
-
     # Of course we aren't talking about actual byte order here.
     # We're talking about generally, when stringified, does the string go from most to least significant or vice versa?
     @property

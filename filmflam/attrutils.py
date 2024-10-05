@@ -24,6 +24,7 @@ import abc
 from . import _attr
 from . import _mlf
 from . import _ml
+from . import _exc
 
 # There are some facilities that we need out of every possible value attributes may extract (e.g.: ability stringify, etc.).
 # I don't want to wrap every such value in a "Value" class to provide those facitilites because that would mean making lots of small objects.
@@ -75,19 +76,67 @@ class EasyTypeHandler(TypeHandler):
     def str_of(self, value: _attr.AttributeValue) -> str:
         return self._str_of(value)
 
+class DateHandler(TypeHandler):
+    def __init__(self, name: str, datefmt: str, is_ascending: bool, strmap: None | dict[str, str] = None) -> None:
+        super().__init__()
+        self._name = name
+        self._datefmt = datefmt
+        self._is_ascending = is_ascending
+        self._strmap = strmap
+
+    @property
+    def type_(self) -> type:
+        return datetime.date
+
+    @property
+    def default_op(self) -> _attr.ComparisonOp:
+        return _attr.ComparisonOp.EQ
+
+    @property
+    def name(self) -> str:
+        return self._name
+
+    @property
+    def datefmt(self) -> str:
+        return self._datefmt
+
+    @property
+    def is_ascending(self) -> bool:
+        return self._is_ascending
+
+    def parse(self, value_str: str) -> _attr.AttributeValue:
+        # First try to parse it with its datefmt. Otherwise use freeform parsing, and then drop the parts that aren't part of the format.
+        try:
+            return self._strptime(value_str)
+        except ValueError:
+            return self.strip(dateutil.parser.parse(value_str, default=datetime.datetime.min))
+
+    def strip(self, date: datetime.date) -> datetime.date:
+        # As an optimization, don't do anything for complete dates.
+        return self._strptime(date.strftime(self._datefmt)) if date != "%Y-%m-%d" else date
+
+    def str_of(self, value: _attr.AttributeValue) -> str:
+        assert isinstance(value, datetime.date)
+        datestr = value.strftime(self._datefmt)
+        return datestr if self._strmap is None else self._strmap[datestr]
+
+    # This function is a hack because strptime won't work correctly with certain formats unless additional information is supplied.
+    def _strptime(self, date_str: str) -> datetime.date:
+        match self._datefmt:
+            # Week of year requires specifying the day of week and the year.
+            case "%U" | "%W":
+                return datetime.datetime.strptime(date_str + " 0 1900", self._datefmt + " %w %Y").date()
+            # Day of week requires specifying the week of year.
+            case "%u" | "%w":
+                return datetime.datetime.strptime(date_str + " 0", self._datefmt + " %W").date()
+            case _:
+                return datetime.datetime.strptime(date_str, self._datefmt).date()
+
 INT_HANDLER = EasyTypeHandler(
     type_ = int,
     default_op = _attr.ComparisonOp.EQ,
     parse = lambda s: int(s, base=0), # 0 means deduce the base from the str.
     str_of = str,
-)
-
-# TODO: Maybe not wise to have the str format different than the parse format, how will people know what format to input comparisons in?
-MINUTES_HANDLER = EasyTypeHandler(
-    type_ = datetime.timedelta,
-    default_op = _attr.ComparisonOp.EQ,
-    parse = lambda s: int(s, base=0), # 0 means deduce the base from the str.
-    str_of = lambda mins: f'{str(mins // 60)}:{str(mins % 60).zfill(2)}',
 )
 
 FLOAT_HANDLER = EasyTypeHandler(
@@ -104,13 +153,64 @@ STR_HANDLER = EasyTypeHandler(
     str_of = lambda s: typing.cast(str, s),
 )
 
-# TODO: If an attribute is like "release year+month (without day)", you wouldn't want to compare by the whole date, would you?
-DATE_HANDLER = EasyTypeHandler(
-    type_ = datetime.date,
+def _parse_minutes(value_str: str) -> int:
+    # We don't check for things like negative numbers, minutes exceeding 60, what base the numbers are in, etc. Because what the hell for.
+    colon_idx = value_str.find(':')
+    hrs_str, mins_str = (value_str[:colon_idx], value_str[colon_idx + 1:]) if colon_idx != -1 else ('0', value_str)
+    hrs, mins = int(hrs_str, base=0), int(mins_str, base=0)
+    return hrs * 60 + mins
+
+MINUTES_HANDLER = EasyTypeHandler(
+    type_ = int,
     default_op = _attr.ComparisonOp.EQ,
-    parse = lambda s: dateutil.parser.parse(s, default=datetime.datetime.min).date(),
-    str_of = lambda d: typing.cast(datetime.date, d).strftime("%Y-%m-%d"),
+    parse = _parse_minutes,
+    str_of = lambda mins: f'{str(mins // 60)}:{str(mins % 60).zfill(2)}', # type: ignore
 )
+
+DATE_HANDLERS = [
+    DateHandler('',                     "%Y-%m-%d", False),
+    DateHandler('-year',                "%Y",       False),
+    DateHandler('-month',               "%Y-%m",    False),
+    DateHandler('-week-of-year',        "%U",       True),
+    DateHandler('-week-of-year-monday', "%W",       True),
+    DateHandler('-day-of-year',         "%j",       True),
+    DateHandler('-day-of-month',        "%d",       True),
+    DateHandler('-month-of-year',       "%m",       True,
+        strmap={
+            '01': 'January',
+            '02': 'February',
+            '03': 'March',
+            '04': 'April',
+            '05': 'May',
+            '06': 'June',
+            '07': 'July',
+            '08': 'August',
+            '09': 'September',
+            '10': 'October',
+            '11': 'November',
+            '12': 'December',
+        }),
+    DateHandler('-day-of-week',         "%w",       True,
+        strmap={
+            '0': 'Sunday',
+            '1': 'Monday',
+            '2': 'Tuesday',
+            '3': 'Wednesday',
+            '4': 'Thursday',
+            '5': 'Friday',
+            '6': 'Saturday',
+        }),
+    DateHandler('-day-of-week-monday',  "%u",       True,
+        strmap={
+            '1': 'Monday',
+            '2': 'Tuesday',
+            '3': 'Wednesday',
+            '4': 'Thursday',
+            '5': 'Friday',
+            '6': 'Saturday',
+            '7': 'Sunday',
+        }),
+]
 
 # If the way this EasyAttribute business is coded looks funny to you, here is why:
 # 1. I want the "_extract_from_x" functions to only be defined in the concrete classes that need them, as opposed to being inherited abstract methods.
@@ -123,7 +223,6 @@ class EasyAttributeParams:
     name: str
     findable_type: _ml.FindableType
     type_handler: TypeHandler
-    is_array: bool
     is_big_endian: bool
     is_ascending: bool
 
@@ -147,11 +246,6 @@ class EasyAttribute(_attr.Attribute):
     def is_ascending(self) -> bool:
         return self._params.is_big_endian
 
-    # TODO: this is actually more complicated, because person attributes which are not array can become array when extracted from a role.
-    @property
-    def is_array(self) -> bool:
-        return self._params.is_array
-
     @property
     def type_(self) -> type:
         return self._params.type_handler.type_
@@ -161,10 +255,40 @@ class EasyAttribute(_attr.Attribute):
         return self._params.type_handler.default_op
 
     def parse(self, value_str: str) -> _attr.AttributeValue:
-        return self._params.type_handler.parse(value_str)
+        try:
+            return self._params.type_handler.parse(value_str)
+        except ValueError:
+            raise _exc.InputError(f"Invalid {self.name}: '{value_str}'.")
 
     def _str_of_single(self, value: _attr.AttributeValue) -> str:
         return self._params.type_handler.str_of(value)
+
+class LenAttribute(EasyAttribute):
+    def __init__(self, len_of: _attr.Attribute) -> None: 
+        super().__init__(EasyAttributeParams(
+            name = 'n' + len_of.name,
+            findable_type = len_of.findable_type,
+            type_handler = INT_HANDLER,
+            is_big_endian = True,
+            is_ascending = False,
+        ))
+
+        self._len_of = len_of
+
+    # Have to support all 3 extractors because if it's a person/movie attribute, it could be an array only when extracted from roles.
+    def _extract_from_movie(self, movie: _ml.Movie, mlf_movie: _mlf.MLFMovie) -> int:
+        return self._len(movie)
+    
+    def _extract_from_person(self, person: _ml.Person, mlf_person: _mlf.MLFPerson) -> int:
+        return self._len(person)
+    
+    def _extract_from_role(self, role: _ml.Role, mlf_roles: list[_mlf.MLFRole]) -> int:
+        return self._len(role)
+
+    def _len(self, findable: _ml.Findable) -> int:
+        # TODO: Actually support len of strs too?
+        actual = findable.extract(self._len_of)
+        return len(actual) if isinstance(actual, list) else 1
 
 type MovieExtractor[T] = typing.Callable[[EasyAttribute, _ml.Movie, _mlf.MLFMovie], T]
 type PersonExtractor[T] = typing.Callable[[EasyAttribute, _ml.Person, _mlf.MLFPerson], T]

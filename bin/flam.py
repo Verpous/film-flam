@@ -462,12 +462,15 @@ Valid column names: ...''')
     def execute(cls, ctx: flam.FlamContext, args: argparse.Namespace) -> None:
         findable_type, ct_gms = args.FINDABLE
 
+        # TODO: add logs between steps, mainly to help us measure how long things take.
         listdefs, filter_tokens = split_at_filter(args.LISTDEF + args.FILTER)
         filter = ctx.compile_filter(filter_tokens, findable_type)
         movie_list = ctx.get_movie_list(listdefs if len(listdefs) > 0 else flam.SpecialListType.DEFAULTS)
 
         sort_attrs = cls.parse_sortkeys(args, findable_type, ctx)
         column_attrs = cls.parse_columns(args, findable_type, ct_gms, sort_attrs, movie_list, ctx)
+
+        flam.logger.info(f"Building findables list")
 
         # TODO: if searching role attributes, optimization: extract and stringify person/movie attributes only once and not once per role.
         findables = [
@@ -476,10 +479,16 @@ Valid column names: ...''')
                 for findable in movie_list.find(findable_type, crew_type=crew_type, group_mode=group_mode, filter=filter)
         ]
 
+        flam.logger.info(f"Sorting findables list of {len(findables)} items")
         cls.sort_findables(sort_attrs, findables, args)
 
+        flam.logger.info(f"Extracting columns from findables")
         values_table = [[findable.extract(attr) for attr in column_attrs] for findable in findables]
+
+        flam.logger.info(f"Stringifying the table")
         strs_table = list(cls.build_strs_table(column_attrs, values_table, args))
+
+        flam.logger.info(f"Printing the table")
         cls.print_table(strs_table, column_attrs, args)
 
     # Can't do this at argparse time because it depends on the context.
@@ -489,7 +498,7 @@ Valid column names: ...''')
             default_attribute_names = {
                 flam.FindableType.MOVIES: ['runtime', 'title'],
                 flam.FindableType.PEOPLE: ['nmovies', 'name'],
-                flam.FindableType.ROLES: ['nmovies', 'name', 'released', 'title'],
+                flam.FindableType.ROLES: ['nmovies', 'name', 'release-year', 'title'],
             }
 
             attribute_names = default_attribute_names[findable_type]
@@ -502,6 +511,7 @@ Valid column names: ...''')
             if not attr.findable_type.is_compatible(findable_type):
                 raise flam.InputError(f"ATTRIBUTE '{attr.name}' is a {attr.findable_type} attribute, so it is not found on {findable_type}.")
         
+        flam.logger.info(f"Got sort keys: {', '.join(attr.name for attr in attributes)}")
         return attributes
 
     # Can't do this at argparse time because it depends on the context and sortkeys.
@@ -513,10 +523,13 @@ Valid column names: ...''')
 
         if is_additive:
             # TODO: Decide on default columns for PEOPLE, ROLES, and also what do we do about the 'leaving' column?
+            # TODO: we could make more attributes compatible: movie attributes on a person are the array of the attribute for each movie the person is in,
+            #       person attributes for movies are the array of the attributes for every person in the movie.
+            #       Part of the benefit is that attributes like 'nmovies' can become 'ntitle' when extracted from a person.
             default_columns = {
-                flam.FindableType.MOVIES: ['title', 'runtime', 'released', 'rating', 'metascore', 'director'],
+                flam.FindableType.MOVIES: ['title', 'runtime', 'release-year', 'rating', 'metascore', 'director'],
                 flam.FindableType.PEOPLE: ['name', 'nmovies', 'avg-rating', 'avg-metascore'],
-                flam.FindableType.ROLES: ['name', 'title', 'ncrewed', 'avg-rating-crewed?', 'avg-metascore-crewed?'],
+                flam.FindableType.ROLES: ['name', 'title', 'avg-rating', 'avg-metascore'],
             }
 
             columns = default_columns[findable_type] + columns
@@ -552,6 +565,7 @@ Valid column names: ...''')
             if not attr.findable_type.is_compatible(findable_type):
                 raise flam.InputError(f"ATTRIBUTE '{attr.name}' is a {attr.findable_type} attribute, so it is not found on {findable_type}.")
 
+        flam.logger.info(f"Got columns: {', '.join(attr.name for attr in attributes)}")
         return attributes
 
     @classmethod
@@ -636,6 +650,8 @@ def main() -> None:
     SubcommandChart.add_parser(subparsers)
 
     args = parser.parse_args()
+
+    flam.logger.info(f"Got {args=}")
 
     # We use the FILTER, REMAINDER trick a lot so we take care of it generically.
     if hasattr(args, 'FILTER') and hasattr(args, 'REMAINDER'):
