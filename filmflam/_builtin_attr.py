@@ -77,22 +77,22 @@ def _movie_title_extractor(self: attrutils.EasyAttribute, movie: _ml.Movie, mlf_
 
 for handler in attrutils.DATE_HANDLERS:
     @_register_easy_attribute(attrutils.EasyAttributeParams(
-        name = 'watch' + handler.name,
+        name = 'watch' + handler.name, # pylint: disable=cell-var-from-loop
         findable_type = _ml.FindableType.MOVIES,
-        type_handler = handler,
+        type_handler = handler, # pylint: disable=cell-var-from-loop
         is_big_endian = True,
-        is_ascending = handler.is_ascending,
+        is_ascending = handler.is_ascending, # pylint: disable=cell-var-from-loop
     ))
     def _movie_watched_extractor(self: attrutils.EasyAttribute, movie: _ml.Movie, mlf_movie: _mlf.MLFMovie) -> None | datetime.date:
         assert not isinstance(mlf_movie.watch_date, _file.UnsetType)
         return None if mlf_movie.watch_date is None else typing.cast(attrutils.DateHandler, self._params.type_handler).strip(mlf_movie.watch_date)
 
     @_register_easy_attribute(attrutils.EasyAttributeParams(
-        name = 'release' + handler.name,
+        name = 'release' + handler.name, # pylint: disable=cell-var-from-loop
         findable_type = _ml.FindableType.MOVIES,
-        type_handler = handler,
+        type_handler = handler, # pylint: disable=cell-var-from-loop
         is_big_endian = True,
-        is_ascending = handler.is_ascending,
+        is_ascending = handler.is_ascending, # pylint: disable=cell-var-from-loop
     ))
     def _movie_released_extractor(self: attrutils.EasyAttribute, movie: _ml.Movie, mlf_movie: _mlf.MLFMovie) -> None | datetime.date:
         assert not isinstance(mlf_movie.release_date, _file.UnsetType)

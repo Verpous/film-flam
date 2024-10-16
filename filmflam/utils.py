@@ -105,11 +105,13 @@ class Timeout:
     def __exit__(self, exc_type: type[BaseException], exc_value: None | BaseException, traceback: None | types.TracebackType) -> None:
         self._enter_time = float('nan')
 
-def truncate(s: str, max_len: int, ellipsis: str = '...') -> str:
+def truncate(s: str, max_len: int, ellipsis: str = '...', is_big_endian: bool = True) -> str:
     if max_len < len(ellipsis):
-        raise ValueError(f'max_len {max_len} is too small, must be at least {len(ellipsis)}.')
+        raise ValueError(f'Ellipsis must not be longer than max_len. {ellipsis=}, {max_len=}.')
 
-    return s if len(s) <= max_len else s[:max_len - len(ellipsis)] + ellipsis
+    return (s if len(s) <= max_len
+        else s[:max_len - len(ellipsis)] + ellipsis if is_big_endian
+        else ellipsis + s[-(max_len - len(ellipsis)):])
 
 def subclasses_recursive(cls: type) -> set[type]:
     classes = set(cls.__subclasses__())

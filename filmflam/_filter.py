@@ -108,7 +108,7 @@ class FilterMember(abc.ABC):
         except _exc.InputError as e:
             raise _EinGafrurError(f"Expected {description}, but got: '{attribute_name}'.", tokens=params.tokens, error_indices=at) from e
 
-        if not attribute.findable_type.is_compatible(params.find):
+        if not attribute.findable_type.is_applicable_to(params.find):
             raise _EinGafrurError(f"Expected attribute of {params.find}, but got: '{attribute_name}' which belongs to {attribute.findable_type}.",
                 tokens=params.tokens, error_indices=at)
 
@@ -145,20 +145,10 @@ class FilterMember(abc.ABC):
     def eat_ct_gm(cls, params: EatParams, at: int) -> tuple[_ml.CrewType, _ml.GroupMode]:
         ct_gm_str = cls.eat_str(params, at, 'crew type[:group mode]')
 
-        colon_idx = ct_gm_str.find(':')
-        crew_type_str, group_mode_str = (ct_gm_str[:colon_idx], ct_gm_str[colon_idx + 1:]) if colon_idx != -1 else (ct_gm_str, _ml.GroupMode.DEFAULT)
-
         try:
-            crew_type = _ml.CrewType(crew_type_str)
-        except ValueError as e:
-            raise _EinGafrurError(f"Expected a valid crew type, but got: '{crew_type_str}'", tokens=params.tokens, error_indices=at) from e
-
-        try:
-            group_mode = _ml.GroupMode(group_mode_str)
-        except ValueError as e:
-            raise _EinGafrurError(f"Expected a valid group mode, but got: '{crew_type_str}'", tokens=params.tokens, error_indices=at) from e
-
-        return crew_type, group_mode
+            return _ml.parse_ct_gm(ct_gm_str)
+        except _exc.InputError as e:
+            raise _EinGafrurError(f"Expected a valid crew type[:group mode], but got error: {e}", tokens=params.tokens, error_indices=at) from e
 
 class Filter(FilterMember):
     def __init__(self, filter: None | Predicate | Negative | Pipeline, find: _ml.FindableType, ctx: _ctx.FlamContext) -> None:
@@ -398,7 +388,7 @@ class Predicate(FilterMember):
                 # Mypy wouldn't like this line if we annotated with typing.Self.
                 predicate = params.ctx.predicates[name]
 
-                if predicate.findable_type is not None and not predicate.findable_type.is_compatible(params.find):
+                if predicate.findable_type is not None and not predicate.findable_type.is_applicable_to(params.find):
                     raise _EinGafrurError(f"Expected predicate of {params.find}, but got: '{prefixed_name}' which belongs to {predicate.findable_type}.",
                         tokens=params.tokens, error_indices=at)
 
@@ -409,7 +399,7 @@ class Predicate(FilterMember):
             if name in params.ctx.attributes:
                 attribute = params.ctx.attributes[name]
 
-                if not attribute.findable_type.is_compatible(params.find):
+                if not attribute.findable_type.is_applicable_to(params.find):
                     raise _EinGafrurError(f"Expected attribute of {params.find}, but got: '{attribute.name}' which belongs to {attribute.findable_type}.",
                         tokens=params.tokens, error_indices=at)
 

@@ -128,7 +128,7 @@ class InList(_filter.Predicate, name='in-list'):
         yield min(_filter.Pipeline.LPAREN)
 
         # We handle multiple listdefs as best we can but it's not great.
-        yield from self._movie_list.underlying_file.abstract_listdef.pretty(self._movie_list.ctx).split(' ')
+        yield from self._movie_list.abstract_listdef.pretty(self._movie_list.ctx).split(' ')
 
         yield min(_filter.Pipeline.RPAREN)
         yield from self._filter.regurgitate()

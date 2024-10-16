@@ -26,7 +26,7 @@ from . import _mlf
 from . import _ml
 from . import _exc
 
-# There are some facilities that we need out of every possible value attributes may extract (e.g.: ability stringify, etc.).
+# There are some facilities that we need out of every possible value attributes may extract (e.g.: parse, str_of, etc.).
 # I don't want to wrap every such value in a "Value" class to provide those facitilites because that would mean making lots of small objects.
 # Solution: Flyweight pattern. Subclasses of TypeHandler provide all the facilities we need, with the underlying value externalized.
 # Downside: Casting/type assertion everywhere, or in many places just assuming the types are fine and not checking.
@@ -257,8 +257,8 @@ class EasyAttribute(_attr.Attribute):
     def parse(self, value_str: str) -> _attr.AttributeValue:
         try:
             return self._params.type_handler.parse(value_str)
-        except ValueError:
-            raise _exc.InputError(f"Invalid {self.name}: '{value_str}'.")
+        except ValueError as e:
+            raise _exc.InputError(f"Invalid {self.name}: '{value_str}'.") from e
 
     def _str_of_single(self, value: _attr.AttributeValue) -> str:
         return self._params.type_handler.str_of(value)
@@ -276,13 +276,13 @@ class LenAttribute(EasyAttribute):
         self._len_of = len_of
 
     # Have to support all 3 extractors because if it's a person/movie attribute, it could be an array only when extracted from roles.
-    def _extract_from_movie(self, movie: _ml.Movie, mlf_movie: _mlf.MLFMovie) -> int:
+    def _extract_from_movie(self, movie: _ml.Movie, mlf_movie: _mlf.MLFMovie) -> int: # pylint: disable=unused-argument
         return self._len(movie)
     
-    def _extract_from_person(self, person: _ml.Person, mlf_person: _mlf.MLFPerson) -> int:
+    def _extract_from_person(self, person: _ml.Person, mlf_person: _mlf.MLFPerson) -> int: # pylint: disable=unused-argument
         return self._len(person)
     
-    def _extract_from_role(self, role: _ml.Role, mlf_roles: list[_mlf.MLFRole]) -> int:
+    def _extract_from_role(self, role: _ml.Role, mlf_roles: list[_mlf.MLFRole]) -> int: # pylint: disable=unused-argument
         return self._len(role)
 
     def _len(self, findable: _ml.Findable) -> int:
@@ -309,6 +309,12 @@ def easy_attribute[ET](params: EasyAttributeParams) -> typing.Callable[[Extracto
         setattr(SpecificAttribute, _extractor_names[params.findable_type], extractor)
         return SpecificAttribute(params)
     return inner
+
+def iter_value(value: _attr.AttributeValue) -> typing.Iterable[_attr.AttributeValue]:
+    if isinstance(value, list):
+        yield from value
+    else:
+        yield value
 
 # TODO: attribute ideas:
 # Generic:

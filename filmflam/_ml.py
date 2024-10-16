@@ -27,6 +27,9 @@ from . import _fetch
 from . import _attr
 from . import _exc
 from . import _dbg
+from . import attrutils
+from . import _file
+from . import _ldef
 
 class GroupMode(enum.StrEnum):
     DEFAULT             = 'default'
@@ -51,9 +54,25 @@ class CrewType(enum.StrEnum):
         # There is a way to add this as an attribute of each enum but it has... problems.
         # It's also tricky to define a ClassVar to an enum so we put it outside the class.
         return _default_group_modes[self]
-        
+
     def __repr__(self) -> str:
         return str(self)
+
+def parse_ct_gm(ct_gm_str: str) -> tuple[CrewType, GroupMode]:
+    colon_idx = ct_gm_str.find(':')
+    crew_type_str, group_mode_str = (ct_gm_str[:colon_idx], ct_gm_str[colon_idx + 1:]) if colon_idx != -1 else (ct_gm_str, GroupMode.DEFAULT)
+
+    try:
+        crew_type = CrewType(crew_type_str)
+    except ValueError as e:
+        raise _exc.InputError(f"Invalid crew type: '{crew_type_str}'")
+
+    try:
+        group_mode = GroupMode(group_mode_str)
+    except ValueError as e:
+        raise _exc.InputError(f"Invalid group mode: '{group_mode_str}'")
+
+    return crew_type, group_mode
 
 _default_group_modes = {
     CrewType.CAST:              GroupMode.SEPARATE,
@@ -71,7 +90,7 @@ class FindableType(enum.StrEnum):
     PEOPLE              = 'people'
     ROLES               = 'roles'
 
-    def is_compatible(self, find: FindableType) -> bool:
+    def is_applicable_to(self, find: FindableType) -> bool:
         # Roles are compatible with everything because a role is associated with people and a movie.
         return find == self.ROLES or self == find
         
@@ -81,7 +100,6 @@ class FindableType(enum.StrEnum):
 class Findable(abc.ABC):
     def __init__(self, movie_list: MovieList) -> None:
         self._movie_list = movie_list
-        self._cache: dict[typing.Hashable, typing.Any] = {}
 
     @property
     def movie_list(self) -> MovieList:
@@ -101,16 +119,15 @@ class Findable(abc.ABC):
     def extract(self, attribute: _attr.Attribute) -> _attr.AttributeValue:
         pass
 
-    # TODO: some attributes may want to cache partial results, but we could have a special case for attributes that want to cache the entire result of extract(),
-    # where extract simply returns the cached value without asking 
-    def cache(self, key: typing.Hashable, value: typing.Any) -> None:
-        self._cache[key] = value
+    # TODO: So much awful about how these are implemented from an optimization perspective. Maybe they should return the MLF objects, maybe they should cache things,
+    # maybe they should share the Movie/Person objects with the entire list.
+    @abc.abstractmethod
+    def associated_movies(self) -> typing.Iterable[Movie]:
+        pass
 
-    def get(self, key: typing.Hashable) -> typing.Any:
-        return self._cache[key]
-
-    def is_cached(self, key: typing.Hashable) -> bool:
-        return key in self._cache
+    @abc.abstractmethod
+    def associated_people(self) -> typing.Iterable[Person]:
+        pass
 
 class Movie(Findable):
     def __init__(self, movie_list: MovieList, mlf_movie: _mlf.MLFMovie) -> None:
@@ -128,6 +145,13 @@ class Movie(Findable):
     def extract(self, attribute: _attr.Attribute) -> _attr.AttributeValue:
         return attribute._extract_from_movie(self, self._mlf_movie) # type: ignore
 
+    def associated_movies(self) -> typing.Iterable[Movie]:
+        yield self
+
+    def associated_people(self) -> typing.Iterable[Person]:
+        for mlf_person in self.movie_list.underlying_file.people_by_uid.values():
+            yield Person(self.movie_list, mlf_person)
+
 class Person(Findable):
     def __init__(self, movie_list: MovieList, mlf_person: _mlf.MLFPerson):
         super().__init__(movie_list)
@@ -144,6 +168,14 @@ class Person(Findable):
     def extract(self, attribute: _attr.Attribute) -> _attr.AttributeValue:
         return attribute._extract_from_person(self, self._mlf_person) # type: ignore
 
+    def associated_movies(self) -> typing.Iterable[Movie]:
+        for mlf_movie in self.movie_list.underlying_file.movies_by_uid.values():
+            if any(self._mlf_person.uid in mlf_movie.crew[crew_type].roles_by_uid for crew_type in CrewType):
+                yield Movie(self.movie_list, mlf_movie)
+
+    def associated_people(self) -> typing.Iterable[Person]:
+        yield self
+
 class Role(Findable):
     def __init__(self, movie_list: MovieList, mlf_roles: list[_mlf.MLFRole], mlf_movie: _mlf.MLFMovie, crew_type: CrewType, group_mode: GroupMode):
         super().__init__(movie_list)
@@ -152,6 +184,7 @@ class Role(Findable):
         self._crew_type = crew_type
         self._group_mode = group_mode
 
+        # TODO: A bit misleading to call it a UID if it isn't based on the movie and the ct:gm.
         self._uid = ','.join(mlf_role.person_uid for mlf_role in mlf_roles)
 
     @property
@@ -191,11 +224,15 @@ class Role(Findable):
 
     def _flatten(self, iterable: typing.Iterable[_attr.AttributeValue]) -> typing.Iterable[_attr.AttributeValue]:
         for elem in iterable:
-            if isinstance(elem, list):
-                yield from elem
-            else:
-                yield elem
-        
+            yield from attrutils.iter_value(elem)
+
+    def associated_movies(self) -> typing.Iterable[Movie]:
+        yield Movie(self.movie_list, self._mlf_movie)
+
+    def associated_people(self) -> typing.Iterable[Person]:
+        people_by_uid = self.movie_list.underlying_file.people_by_uid
+        yield from (Person(self.movie_list, people_by_uid[mlf_role.person_uid]) for mlf_role in self._mlf_roles)
+
 class MovieList:
     def __init__(self, movie_list_file: _mlf.MovieListFile, ctx: _ctx.FlamContext):
         _dbg.logger.info(f"Creating movie list for '{movie_list_file.abstract_listdef}', "
@@ -219,11 +256,30 @@ class MovieList:
     def ctx(self) -> _ctx.FlamContext:
         return self._ctx
 
+    @property
+    def abstract_listdef(self) -> _ldef.CanonListdef:
+        return self._movie_list_file.abstract_listdef
+
+    @property
+    def list_type(self) -> str:
+        assert not isinstance(self._movie_list_file.list_type, _file.UnsetType)
+        return self._movie_list_file.list_type
+
+    @property
+    def address(self) -> str:
+        assert not isinstance(self._movie_list_file.address, _file.UnsetType)
+        return self._movie_list_file.address
+
+    @property
+    def uid_type(self) -> str:
+        assert not isinstance(self._movie_list_file.uid_type, _file.UnsetType)
+        return self._movie_list_file.uid_type
+
     def __iter__(self) -> typing.Iterator[Movie]:
         return iter(self.find_movies())
 
     def find(self, what: FindableType, crew_type: None | CrewType = None, group_mode: GroupMode = GroupMode.DEFAULT,
-            filter: None | _filter.Filter = None) -> typing.Iterator[Findable]:
+            filter: None | _filter.Filter = None) -> typing.Iterable[Findable]:
         _dbg.logger.info(f"Going to find {what} with {crew_type=}, {group_mode=} in '{self._movie_list_file.abstract_listdef}' with {filter=!s}")
 
         if filter is None:
@@ -250,15 +306,15 @@ class MovieList:
         else:
             yield from (f for f in findables if filter.excrete(f, self._ctx))
 
-    def find_movies(self, filter: None | _filter.Filter = None) -> typing.Iterator[Movie]:
-        # Yes, casting, ugly... But the infrastracture we will need to build to eliminate this cast is, at this time, not worth it.
-        return typing.cast(typing.Iterator[Movie], self.find(FindableType.MOVIES, filter=filter))
+    def find_movies(self, filter: None | _filter.Filter = None) -> typing.Iterable[Movie]:
+        # The infrastructure we will need to write these functions without ignoring types is too much to bother.
+        return typing.cast(typing.Iterable[Movie], self.find(FindableType.MOVIES, filter=filter))
 
-    def find_people(self, filter: None | _filter.Filter = None) -> typing.Iterator[Person]:
-        return typing.cast(typing.Iterator[Person], self.find(FindableType.PEOPLE, filter=filter))
+    def find_people(self, filter: None | _filter.Filter = None) -> typing.Iterable[Person]:
+        return typing.cast(typing.Iterable[Person], self.find(FindableType.PEOPLE, filter=filter))
 
-    def find_roles(self, crew_type: None | CrewType = None, group_mode: GroupMode = GroupMode.DEFAULT, filter: None | _filter.Filter = None) -> typing.Iterator[Role]:
-        return typing.cast(typing.Iterator[Role], self.find(FindableType.ROLES, crew_type=crew_type, group_mode=group_mode, filter=filter))
+    def find_roles(self, crew_type: None | CrewType = None, group_mode: GroupMode = GroupMode.DEFAULT, filter: None | _filter.Filter = None) -> typing.Iterable[Role]:
+        return typing.cast(typing.Iterable[Role], self.find(FindableType.ROLES, crew_type=crew_type, group_mode=group_mode, filter=filter))
 
     def export(self, filter: _filter.Filter) -> _mlf.MovieListFile:
         _dbg.logger.info(f"Exporting '{self._movie_list_file.abstract_listdef}' with {filter=!s}")
@@ -267,7 +323,6 @@ class MovieList:
         _fetch._remove_unused_people(filtered_file)
         _dbg.logger.info(f"Resulting file has {len(filtered_file.movies_by_uid)} movies, {len(filtered_file.people_by_uid)} people")
         return filtered_file
-
 
     def _generate_movies(self) -> list[Movie]:
         if self._movies is None:
@@ -313,14 +368,14 @@ class MovieList:
                     # In the end you have for every relevant person set, all movies that are accredited to it.
                     # In reality the algorithm barely resembles this because of various optimizations.
 
-                    # groups will in the end include all relevant crew sets. We know that at minimum, it should have every crew that any movie has.
-                    # This set also allows us to only iterate over every unique movie crew pair, instead of every movie pair.
                     mlf = self._movie_list_file
 
+                    # groups will in the end include all relevant crew sets. We know that at minimum, it should have every crew that any movie has.
+                    # This set also allows us to only iterate over every unique movie crew pair, instead of every movie pair.
                     groups = {
-                        crew_uids
+                        frozenset(mlf_movie.crew[crew_type].roles_by_uid)
                         for mlf_movie in mlf.movies_by_uid.values()
-                        if len(crew_uids := frozenset(mlf_movie.crew[crew_type].roles_by_uid)) > 0
+                        if len(mlf_movie.crew[crew_type].roles_by_uid) > 0
                     }
 
                     # Optimization: we only need to only iterate over each *unordered* crew pair once. For that we need groups to be ordered.
@@ -341,7 +396,7 @@ class MovieList:
 
                             # Empty intersections are skipped.
                             # If the intersection is equal to g1 or g2, it's already in groups so we will not re-add it.
-                            # If we did re-add it the set will block it anyway but it doing it this way is more optimal.
+                            # If we did re-add it the set will block it anyway but doing it this way is more optimal.
                             # For extra optimization juice, we don't even compare the sets, comparing lengths is enough.
                             if len_intersection != 0 and len_intersection != len(g1) and len_intersection != len(g2):
                                 groups.add(intersection)

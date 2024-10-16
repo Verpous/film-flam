@@ -36,6 +36,8 @@ class MLFPerson(_file._FlamSerializable):
     # TODO: Check if can support birthday?
     # Would love to add gender, nationality but cinemagoer doesn't have them.
 
+# TODO: Separate properties of the movie from properties of its prescence in a list?
+# I.e., 'watch_date', 'description', 'list_index' are not the same as the rest, and when merging lists, we should keep them all.
 class MLFMovie(_file._FlamSerializable):
     uid:                    str
     title:                  _file.UnsetType | None | str

@@ -58,15 +58,6 @@ def uniq_append(l: list, x: typing.Any) -> None:
     if x not in l:
         l.append(x)
 
-# TODO: Titles want it 45, other attributes would prefer 30, and some don't need to be truncated at all. Support all kinds or just settle on 45?
-def truncstr(s: str, maxlen: int = 45, ellipsis: str = '...', is_big_endian: bool = True) -> str:
-    if maxlen < len(ellipsis):
-        raise ValueError(f'Ellipsis must not be longer than maxlen. {ellipsis=}, {maxlen=}.')
-
-    return (s if len(s) <= maxlen
-        else s[:maxlen - len(ellipsis)] + ellipsis if is_big_endian
-        else ellipsis + s[-(maxlen - len(ellipsis)):])
-
 def print_table(table: list[list[str]],
         color_choice: Choice = Choice.AUTO,
         paginate_choice: Choice = Choice.AUTO,
@@ -449,20 +440,13 @@ Valid column names: ...''')
         if findable in flam.FindableType:
             return flam.FindableType(findable), [(None, flam.GroupMode.DEFAULT)]
 
-        ct_gms = []
-
-        for ct_gm in findable.split(','):
-            colon_idx = ct_gm.find(':')
-            crew_type, group_mode = (ct_gm[:colon_idx], ct_gm[colon_idx + 1:]) if colon_idx != -1 else (ct_gm, flam.GroupMode.DEFAULT)
-            ct_gms.append((flam.CrewType(crew_type), flam.GroupMode(group_mode)))
-
+        ct_gms = [flam.parse_ct_gm(ct_gm_str) for ct_gm_str in findable.split(',')]
         return flam.FindableType.ROLES, ct_gms # type: ignore
 
     @classmethod
     def execute(cls, ctx: flam.FlamContext, args: argparse.Namespace) -> None:
         findable_type, ct_gms = args.FINDABLE
 
-        # TODO: add logs between steps, mainly to help us measure how long things take.
         listdefs, filter_tokens = split_at_filter(args.LISTDEF + args.FILTER)
         filter = ctx.compile_filter(filter_tokens, findable_type)
         movie_list = ctx.get_movie_list(listdefs if len(listdefs) > 0 else flam.SpecialListType.DEFAULTS)
@@ -508,7 +492,7 @@ Valid column names: ...''')
         attributes = [ctx.attributes[a] for a in attribute_names]
 
         for attr in attributes:
-            if not attr.findable_type.is_compatible(findable_type):
+            if not attr.findable_type.is_applicable_to(findable_type):
                 raise flam.InputError(f"ATTRIBUTE '{attr.name}' is a {attr.findable_type} attribute, so it is not found on {findable_type}.")
         
         flam.logger.info(f"Got sort keys: {', '.join(attr.name for attr in attributes)}")
@@ -556,13 +540,13 @@ Valid column names: ...''')
                 uniq_append(columns, 'characters')
 
             # If we combined multiple lists, tag each element with the list(s) it came from.
-            if movie_list.underlying_file.abstract_listdef.list_type == flam.SpecialListType.ANNONYMOUS:
+            if movie_list.list_type == flam.SpecialListType.ANNONYMOUS:
                 uniq_append(columns, 'origin')
 
         attributes = [ctx.attributes[c] for c in columns]
 
         for attr in attributes:
-            if not attr.findable_type.is_compatible(findable_type):
+            if not attr.findable_type.is_applicable_to(findable_type):
                 raise flam.InputError(f"ATTRIBUTE '{attr.name}' is a {attr.findable_type} attribute, so it is not found on {findable_type}.")
 
         flam.logger.info(f"Got columns: {', '.join(attr.name for attr in attributes)}")
@@ -588,7 +572,8 @@ Valid column names: ...''')
         if not args.verbose:
             for row in table:
                 for i in range(len(row)):
-                    row[i] = truncstr(row[i], is_big_endian=attributes[i].is_big_endian)
+                    # TODO: Titles want it 45, other attributes would prefer 30, and some don't need to be truncated at all. Support all kinds or just settle on 45?
+                    row[i] = utils.truncate(row[i], 45, is_big_endian=attributes[i].is_big_endian)
 
         print_table(table, args.color, args.paginate, args.spacious, args.no_titles, args.dsv)
 
