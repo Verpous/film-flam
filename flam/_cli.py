@@ -15,6 +15,8 @@
 # You should have received a copy of the GNU General Public License
 # along with this program. If not, see <https://www.gnu.org/licenses/>.
 
+from __future__ import annotations
+
 import argparse
 import enum
 import os
@@ -28,8 +30,10 @@ import subprocess
 import shutil
 import functools
 
-import filmflam as flam
-from filmflam import utils
+# This script is meant to be a CLI tool which uses the API. I wish I could place it outside the dir of package modules,
+# But there's poor support for that in pyproject.toml so we place it here but pretend like it's outside by doing things like "import flam".
+import flam
+from flam import utils
 
 class Choice(enum.StrEnum):
     YES     = 'yes'
@@ -39,12 +43,20 @@ class Choice(enum.StrEnum):
     AUTO    = 'auto'
 
     @classmethod
-    def always_auto_never(cls) -> typing.Iterable[str]:
+    def always_auto_never(cls) -> typing.Iterable[Choice]:
         return (cls.ALWAYS, cls.AUTO, cls.NEVER)
 
     @classmethod
-    def yes_no_auto(cls) -> typing.Iterable[str]:
+    def yes_no_auto(cls) -> typing.Iterable[Choice]:
         return (cls.YES, cls.NO, cls.AUTO)
+
+    @classmethod
+    def bool2yesno(cls, value: bool) -> Choice:
+        return cls.YES if value else cls.NO
+
+    @classmethod
+    def bool2alwaysnever(cls, value: bool) -> Choice:
+        return cls.ALWAYS if value else cls.NEVER
 
     # When you give argparse choices and they don't match it prints the error using repr so repr must be user readable.
     def __repr__(self) -> str:
@@ -103,6 +115,7 @@ def print_table(table: list[list[str]],
                 use_color = use_color,
                 header_color = '' if no_titles else '\033[4m\033[K' # Underline, not supported by colorama.
             )))
+            out.write('\n')
         
         out.flush()
 
@@ -174,8 +187,8 @@ class SubcommandConfigList:
                 sl.name,
                 sl.list_type,
                 sl.address,
-                str(sl.is_default_fetch),
-                str(sl.is_default_find),
+                Choice.bool2yesno(sl.is_default_fetch),
+                Choice.bool2yesno(sl.is_default_find),
             ]
             for sl in simple_lists
         )
@@ -279,8 +292,8 @@ class SubcommandConfigComposite:
                 cl.name,
                 ', '.join(ctx.simple_lists.get_by_uid(sl_uid).name for sl_uid in cl.simple_list_uids),
                 ' '.join(cl.filter_tokens) if len(cl.filter_tokens) > 0 else '-',
-                str(cl.is_default_fetch),
-                str(cl.is_default_find),
+                Choice.bool2yesno(cl.is_default_fetch),
+                Choice.bool2yesno(cl.is_default_find),
             ]
             for cl in composite_lists
         )
@@ -609,6 +622,12 @@ class SubcommandChart:
     def execute(cls, ctx: flam.FlamContext, args: argparse.Namespace) -> None:
         print('chart')
 
+# Implement --version option with a custom action so that it works even if no subparser is chosen.
+class PrintVersion(argparse.Action):
+    def __call__(self, parser: argparse.ArgumentParser, namespace: argparse.Namespace, values: str | typing.Sequence | None, option_string: None | str = None) -> None:
+        print(f'{os.path.basename(sys.argv[0])} version {flam.__version__}')
+        exit()
+
 def main() -> None:
     colorama.just_fix_windows_console()
 
@@ -616,7 +635,7 @@ def main() -> None:
     try:
         sys.stdout.reconfigure(encoding='utf-8', newline='\n') # type: ignore
     except:
-        flam.logger.error(f"Failed to reconfigure stdout", exc_info=True)
+        flam.logger.error(f"Failed to reconfigure stdout. Proceeding anyway.", exc_info=True)
 
     parser = argparse.ArgumentParser(
         formatter_class=argparse.RawTextHelpFormatter,
@@ -625,6 +644,8 @@ def main() -> None:
         f'Use %(metavar)s as the flam directory. Uses {flam.FlamEnv.CTX_DIR} environment variable by default, or ~/.film_flam if it is not defined.')
     parser.add_argument('-e', '--no-extensions', action='store_true', help=
         "Don't import configured extensions.")
+    parser.add_argument('-v', '--version', action=PrintVersion, nargs=0, help=
+        "Display version information and exit.")
 
     # Subparsers are organized into "static" classes. This is only for code organization reasons, not OOP reasons.
     # The classes are designed to enforce as little "model" as possible so we can be flexible with how we use them.
@@ -635,7 +656,6 @@ def main() -> None:
     SubcommandChart.add_parser(subparsers)
 
     args = parser.parse_args()
-
     flam.logger.info(f"Got {args=}")
 
     # We use the FILTER, REMAINDER trick a lot so we take care of it generically.
@@ -651,7 +671,7 @@ def main() -> None:
             raise
 
         # No ugly tracebacks for input errors. Only for internal errors.
-        sys.exit(f'{os.path.basename(__file__)}: error: {e}')
+        sys.exit(f'{os.path.basename(sys.argv[0])}: error: {e}')
 
 if __name__ == '__main__':
     main()

@@ -148,6 +148,12 @@ class Attribute(abc.ABC):
 
         return CmpTo(op, parsed, self)
 
+def iter_value(value: AttributeValue) -> typing.Iterable[AttributeValue]:
+    if isinstance(value, list):
+        yield from value
+    else:
+        yield value
+
 # TODO: attribute ideas:
 # Generic:
 # * for every array type predicate have a length attribute

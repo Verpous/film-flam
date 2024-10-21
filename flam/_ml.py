@@ -27,7 +27,6 @@ from . import _fetch
 from . import _attr
 from . import _exc
 from . import _dbg
-from . import attrutils
 from . import _file
 from . import _ldef
 
@@ -65,12 +64,12 @@ def parse_ct_gm(ct_gm_str: str) -> tuple[CrewType, GroupMode]:
     try:
         crew_type = CrewType(crew_type_str)
     except ValueError as e:
-        raise _exc.InputError(f"Invalid crew type: '{crew_type_str}'")
+        raise _exc.InputError(f"Invalid crew type: '{crew_type_str}'") from e
 
     try:
         group_mode = GroupMode(group_mode_str)
     except ValueError as e:
-        raise _exc.InputError(f"Invalid group mode: '{group_mode_str}'")
+        raise _exc.InputError(f"Invalid group mode: '{group_mode_str}'") from e
 
     return crew_type, group_mode
 
@@ -224,7 +223,7 @@ class Role(Findable):
 
     def _flatten(self, iterable: typing.Iterable[_attr.AttributeValue]) -> typing.Iterable[_attr.AttributeValue]:
         for elem in iterable:
-            yield from attrutils.iter_value(elem)
+            yield from _attr.iter_value(elem)
 
     def associated_movies(self) -> typing.Iterable[Movie]:
         yield Movie(self.movie_list, self._mlf_movie)

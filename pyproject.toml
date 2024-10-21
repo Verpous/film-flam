@@ -1,0 +1,27 @@
+[build-system]
+requires = ["setuptools>=75.2"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "film-flam"
+description = "Tools for extracting insights out of your movie lists"
+readme = "README.md"
+requires-python = ">=3.12.3"
+authors = [ { name="Aviv Edery", email="ederyaviv2@gmail.com" } ]
+classifiers = [
+    "Programming Language :: Python :: 3",
+    "License :: OSI Approved :: GNU General Public License v3 (GPLv3)",
+    "Operating System :: OS Independent",
+]
+
+dynamic = ["dependencies", "version"]
+
+[project.urls]
+Repository = "https://github.com/Verpous/film-flam"
+
+[project.scripts]
+flam = "flam._cli:main"
+
+[tool.setuptools.dynamic]
+dependencies = { file = ["_gen_requirements.txt"] }
+version = { attr = "flam._gen_version.__version__" }

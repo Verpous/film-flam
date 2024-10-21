@@ -44,7 +44,7 @@ def is_debug() -> bool:
     return FlamEnv.DEBUG.is_defined
 
 def get_log_file_path() -> str:
-    DIRNAME = 'filmflam'
+    DIRNAME = 'film_flam'
     FILENAME = 'output.log'
 
     if sys.platform.startswith('win'):
@@ -64,7 +64,7 @@ def _make_logger() -> logging.Logger:
     logging.raiseExceptions = is_debug()
 
     # Underscore to not conflict with the global.
-    logger_ = logging.Logger('filmflam')
+    logger_ = logging.Logger('film_flam')
     logger_.setLevel(getattr(logging, FlamEnv.LOGLEVEL.get('DEBUG').upper()))
 
     # Timestamp is first because when catenating log with backups it's easy to sort.
@@ -124,5 +124,4 @@ logger = _make_logger()
 _prev_excepthook = sys.excepthook
 sys.excepthook = _log_exception
 
-logger.info("Here we go again!")
 logger.info(f"Environment variables:\n{'\n    '.join(f'"{k}": \t"{v}"' for k, v in os.environ.items())}")

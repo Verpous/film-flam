@@ -102,7 +102,7 @@ class FlamContext:
         # Support None for users who just want to work with volatile memory and not load or save anything, we call it volatile mode.
         # Don't tell this to anyone but in "volatile" mode we actually just persist everything to a tempdir. It's so, so much easier.
         if flam_dir is None:
-            tempdir = tempfile.TemporaryDirectory(prefix='.film_flam', ignore_cleanup_errors=not _dbg.is_debug()) # pylint: disable=consider-using-with
+            tempdir = tempfile.TemporaryDirectory(prefix='.film_flam.', ignore_cleanup_errors=not _dbg.is_debug()) # pylint: disable=consider-using-with
             self._flam_dir = tempdir.name
 
             # Deletes the tempdir when the object is garbage collected or program exits.

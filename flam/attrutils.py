@@ -310,12 +310,6 @@ def easy_attribute[ET](params: EasyAttributeParams) -> typing.Callable[[Extracto
         return SpecificAttribute(params)
     return inner
 
-def iter_value(value: _attr.AttributeValue) -> typing.Iterable[_attr.AttributeValue]:
-    if isinstance(value, list):
-        yield from value
-    else:
-        yield value
-
 # TODO: attribute ideas:
 # Generic:
 # * for every array type predicate have a length attribute
