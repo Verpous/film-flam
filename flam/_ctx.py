@@ -64,7 +64,16 @@ class ConfigurationLists[T: (_cfg.SimpleList, _cfg.CompositeList)]:
 # Has to be implemented this way because some of the registries are contextual, some global.
 class RegistriesOf[T: (type[_fetch.ListFetcher], type[_filter.Predicate], _attr.Attribute)]:
     def __init__(self, type_selector: typing.Callable[[_reg.Registry], _reg.RegistryOf[T]], ctx_registry: _reg.Registry, use_global_extensions: bool) -> None:
-        self._registries_to_try = [_reg._builtins, _reg._global_extensions, ctx_registry] if use_global_extensions else [_reg._builtins, ctx_registry]
+        # Ordering lets you shadow builtins with extensions.
+        self._registries_to_try = [
+            ctx_registry,
+            _reg._global_extensions,
+            _reg._builtins
+        ] if use_global_extensions else [
+            ctx_registry,
+            _reg._builtins
+        ]
+
         self._type_selector: typing.Callable[[_reg.Registry], _reg.RegistryOf[T]] = type_selector
 
     def __getitem__(self, name: str) -> T:
@@ -116,7 +125,7 @@ class FlamContext:
         self._cfg = _cfg.Configuration.load_or_create(self._get_cfg_path())
         self._metadata = _md.FlamMetadata.load_or_create(self._get_metadata_path()) # TODO: Clean metadata of old lists?
 
-        # TODO: Sort out pretty printing.
+        # I wish I could print these prettier but it's not worth the hassle.
         _dbg.logger.info(f'Loaded configuration: {self._cfg=}')
         _dbg.logger.info(f'Loaded metadata: {self._metadata=}')
 

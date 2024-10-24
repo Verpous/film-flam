@@ -254,7 +254,7 @@ class SubcommandConfigComposite:
 
         # argparse.REMAINDER is an undocumented but very important feature.
         # Basically it's the only way to make positional arguments that start with dashes not be treated as bad options.
-        parser.add_argument('REMAINDER', nargs=argparse.REMAINDER, action='store') # TODO: somehow don't show this in the help
+        parser.add_argument('REMAINDER', nargs=argparse.REMAINDER, action='store', help=argparse.SUPPRESS)
 
     @classmethod
     def execute(cls, ctx: flam.FlamContext, args: argparse.Namespace) -> None:
@@ -437,13 +437,13 @@ Valid column names: ...''')
 
         # TODO: future problem: REMAINDER doesn't work if there are no positional arguments before it. If we add the shorthand subcommands a la "flam WHAT",
         # the WHAT won't be a positional argument anymore and REMAINDER won't work.
-        parser.add_argument('FINDABLE', type=cls.parse_findable, action='store', help= # TODO: support comma-delimited crew types? If ROLES, use all crew types.
+        parser.add_argument('FINDABLE', type=cls.parse_findable, action='store', help=
             '''Choose what to find: movies, people, or roles. Roles have all the attributes of the movie and the person, and then a few role-specific ones.''')
         parser.add_argument('LISTDEF', nargs='*', action='store', help=
             '''Like fetch but with different defaults, and if the LISTDEFs aren't already fetched, it fails with a nice error message.''')
         parser.add_argument('FILTER', nargs='*', action='store', help=
             '''find-like expression featuring predicates like -crew, -cast, -release...''')
-        parser.add_argument('REMAINDER', nargs=argparse.REMAINDER, action='store')
+        parser.add_argument('REMAINDER', nargs=argparse.REMAINDER, action='store', help=argparse.SUPPRESS)
 
     @classmethod
     def parse_findable(cls, findable: str) -> tuple[flam.FindableType, list[tuple[None | flam.CrewType, flam.GroupMode]]]:
@@ -626,7 +626,7 @@ class SubcommandChart:
 class PrintVersion(argparse.Action):
     def __call__(self, parser: argparse.ArgumentParser, namespace: argparse.Namespace, values: str | typing.Sequence | None, option_string: None | str = None) -> None:
         print(f'{os.path.basename(sys.argv[0])} version {flam.__version__}')
-        exit()
+        sys.exit()
 
 def main() -> None:
     colorama.just_fix_windows_console()

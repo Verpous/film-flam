@@ -19,6 +19,7 @@ import abc
 import typing
 import difflib
 import dataclasses
+import itertools
 
 from . import _ctx
 from . import _attr
@@ -381,35 +382,41 @@ class Predicate(FilterMember):
         name = prefixed_name.removeprefix(Predicate.PREFIX)
 
         if name != prefixed_name:
-            # Instead of going predicate by predicate and checking for _EinGafrurError,
-            # it's more optimal to pick the only possibly right predicate from a dictionary,
-            # and eat the name token right here and let the predicate eat its arguments alone.
-            if name in params.ctx.predicates:
-                # Mypy wouldn't like this line if we annotated with typing.Self.
-                predicate = params.ctx.predicates[name]
+            # Hacky use of registry because we want to lookup both predicates and attributes but prefer going level-by-level,
+            # so that a low-priority predicate won't shadow a high-priority attribute.
+            for reg in params.ctx.predicates._registries_to_try:
+                # Instead of going predicate by predicate and checking for _EinGafrurError,
+                # it's more optimal to pick the only possibly right predicate from a dictionary,
+                # and eat the name token right here and let the predicate eat its arguments alone.
+                if name in reg.predicates:
+                    # Mypy wouldn't like this line if we annotated with typing.Self.
+                    predicate = reg.predicates[name]
 
-                if predicate.findable_type is not None and not predicate.findable_type.is_applicable_to(params.find):
-                    raise _EinGafrurError(f"Expected predicate of {params.find}, but got: '{prefixed_name}' which belongs to {predicate.findable_type}.",
-                        tokens=params.tokens, error_indices=at)
+                    if predicate.findable_type is not None and not predicate.findable_type.is_applicable_to(params.find):
+                        raise _EinGafrurError(f"Expected predicate of {params.find}, but got: '{prefixed_name}' which belongs to {predicate.findable_type}.",
+                            tokens=params.tokens, error_indices=at)
 
-                return predicate.eat(params, at + 1)
+                    return predicate.eat(params, at + 1)
 
-            # Special treatment for AttributePredicate because it's not wise to make a predicate for each attribute.
-            # TODO: Don't like that we go first-pred, then-attribute when we should go level by level pred-then-attribute.
-            if name in params.ctx.attributes:
-                attribute = params.ctx.attributes[name]
+                # Special treatment for AttributePredicate because it's not wise to make a predicate for each attribute.
+                if name in reg.attributes:
+                    attribute = reg.attributes[name]
 
-                if not attribute.findable_type.is_applicable_to(params.find):
-                    raise _EinGafrurError(f"Expected attribute of {params.find}, but got: '{attribute.name}' which belongs to {attribute.findable_type}.",
-                        tokens=params.tokens, error_indices=at)
+                    if not attribute.findable_type.is_applicable_to(params.find):
+                        raise _EinGafrurError(f"Expected attribute of {params.find}, but got: '{attribute.name}' which belongs to {attribute.findable_type}.",
+                            tokens=params.tokens, error_indices=at)
 
-                return AttributePredicate.eat_shit(params, at + 1, attribute)
+                    return AttributePredicate.eat_shit(params, at + 1, attribute)                
 
         if prefixed_name in Pipeline.RPAREN:
             raise _EinGafrurError('Unexpected right parenthesis. It either has no matching left parenthesis or a predicate was expected.',
                 tokens=params.tokens, error_indices=at)
             
-        close_matches = difflib.get_close_matches(prefixed_name, (Predicate.PREFIX + pred.name for pred in params.ctx.predicates))
+        # TODO: difflib in more places where you get attr names wrong?
+        close_matches = difflib.get_close_matches(prefixed_name, itertools.chain(
+            (Predicate.PREFIX + pred.name for pred in params.ctx.predicates),
+            (Predicate.PREFIX + attr.name for attr in params.ctx.attributes)))
+            
         suggestions = f' (did you mean: {", ".join(close_matches)}?)' if len(close_matches) > 0 else '.'
         raise _EinGafrurError(f"Expected valid predicate name, but got: '{prefixed_name}'{suggestions}", tokens=params.tokens, error_indices=at)
 

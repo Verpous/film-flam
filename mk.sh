@@ -41,6 +41,7 @@ pylint_ignore+=C0415, # import-outside-toplevel
 
 pylint_ignore+=R0401, # cyclic-import
 pylint_ignore+=R0402, # consider-using-from-import
+pylint_ignore+=R0801, # duplicate-code
 pylint_ignore+=R0902, # too-many-instance-attributes
 pylint_ignore+=R0903, # too-few-public-methods
 pylint_ignore+=R0913, # too-many-arguments
@@ -100,6 +101,10 @@ release() {
     # Pipreqs gets confused if we don't clean for some reason.
     _gen_requirements
     _gen_version $flavor
+
+    # For actual releases, require mypy and pylint to report no problems.
+    [[ "$flavor" != actual ]] || { mypy && pylint } > /dev/null
+
     python -m build
     twine upload $twineargs dist/*
     sanity $flavor
