@@ -29,6 +29,7 @@ import tempfile
 import subprocess
 import shutil
 import functools
+import re
 
 # This script is meant to be a CLI tool which uses the API. I wish I could place it outside the dir of package modules,
 # But there's poor support for that in pyproject.toml so we place it here but pretend like it's outside by doing things like "import flam".
@@ -127,23 +128,20 @@ def print_table(table: list[list[str]],
 
 class SubcommandConfig:
     @classmethod
-    def add_parser(cls, subparsers: argparse._SubParsersAction) -> None:
-        parser = subparsers.add_parser('config', formatter_class=argparse.RawTextHelpFormatter)
+    def configure_parser(cls, parser: argparse.ArgumentParser) -> None:
         config_subparsers = parser.add_subparsers(required=True)
-
-        SubcommandConfigList.add_parser(config_subparsers)
-        SubcommandConfigComposite.add_parser(config_subparsers)
+        SubcommandConfigList.configure_parser(config_subparsers.add_parser('list', formatter_class=argparse.RawTextHelpFormatter))
+        SubcommandConfigComposite.configure_parser(config_subparsers.add_parser('composite', formatter_class=argparse.RawTextHelpFormatter))
 
 class SubcommandConfigList:
     @classmethod
-    def add_parser(cls, subparsers: argparse._SubParsersAction) -> None:
-        parser = subparsers.add_parser('list', formatter_class=argparse.RawTextHelpFormatter)
+    def configure_parser(cls, parser: argparse.ArgumentParser) -> None:
         parser.set_defaults(function=cls.execute)
 
         action_group = parser.add_mutually_exclusive_group(required=False)
-        action_group.add_argument('-E', '--edit', action='store_true', help='edit or create a list. This is the default behavior.')
-        action_group.add_argument('-D', '--delete', action='store_true', help='delete the list.')
-        action_group.add_argument('-P', '--print', action='store_true', help='print the list, or if NAME not provided, print all lists.')
+        action_group.add_argument('-E', '--edit', action='store_true', help='edit or create a list. This is the default behavior')
+        action_group.add_argument('-D', '--delete', action='store_true', help='delete the list')
+        action_group.add_argument('-P', '--print', action='store_true', help='print the list, or if NAME not provided, print all lists')
 
         parser.add_argument('-n', '--rename', metavar='NAME', default=None, action='store', help='in edit mode, rename the list to %(metavar)s')
         parser.add_argument('-i', '--default-find', choices=Choice.yes_no_auto(), default=Choice.AUTO, action='store', help='decide if this list should be default for flam find')
@@ -236,14 +234,13 @@ class SubcommandConfigList:
 
 class SubcommandConfigComposite:
     @classmethod
-    def add_parser(cls, subparsers: argparse._SubParsersAction) -> None:
-        parser = subparsers.add_parser('composite', formatter_class=argparse.RawTextHelpFormatter)
+    def configure_parser(cls, parser: argparse.ArgumentParser) -> None:
         parser.set_defaults(function=cls.execute)
 
         action_group = parser.add_mutually_exclusive_group(required=False)
-        action_group.add_argument('-E', '--edit', action='store_true', help='edit or create a composite list. This is the default behavior.')
-        action_group.add_argument('-D', '--delete', action='store_true', help='delete the list.')
-        action_group.add_argument('-P', '--print', action='store_true', help='print the list, or if NAME not provided, print all lists.')
+        action_group.add_argument('-E', '--edit', action='store_true', help='edit or create a composite list. This is the default behavior')
+        action_group.add_argument('-D', '--delete', action='store_true', help='delete the list')
+        action_group.add_argument('-P', '--print', action='store_true', help='print the list, or if NAME not provided, print all lists')
 
         parser.add_argument('-n', '--rename', metavar='NAME', default=None, action='store', help='in edit mode, rename the list to %(metavar)s')
         parser.add_argument('-i', '--default-find', choices=Choice.yes_no_auto(), default=Choice.AUTO, action='store', help='decide if this list should be default for flam find %(metavar)s')
@@ -345,8 +342,7 @@ class SubcommandConfigComposite:
 
 class SubcommandFetch:
     @classmethod
-    def add_parser(cls, subparsers: argparse._SubParsersAction) -> None:
-        parser = subparsers.add_parser('fetch', formatter_class=argparse.RawTextHelpFormatter)
+    def configure_parser(cls, parser: argparse.ArgumentParser) -> None:
         parser.set_defaults(function=cls.execute)
         
         parser.add_argument('-u', '--undo', action='store_true', help="Restore LISTDEFs to their previous versions."
@@ -356,7 +352,7 @@ class SubcommandFetch:
             '''Forces titles that match %(metavar)s (case-insensitive) to be redownloaded even if they are already locally stored.
 It's enough for %(metavar)s to match any part of the title, not necessarily the whole title.
 %(metavar)s uses regex syntax from python's re library, which is identical to egrep unless you use very advanced features.
-This feature is intended for redownloading shows after a new season has come out.''')
+This feature is intended for redownloading shows after a new season has come out''')
 
         parser.add_argument('LISTDEF', nargs='*', action='store', help=
             '''Each %(dest)s describes a list to fetch. Supports, in order of priority:
@@ -372,7 +368,7 @@ To avoid ambiguity and for downloading addresses directly, you can specify the %
 * 'imdb-csv'
 * Any custom types you define...
 
-If no %(dest)s provided, fetches all lists configured as defaults.''')
+If no %(dest)s provided, fetches all lists configured as defaults''')
 
     @classmethod
     def execute(cls, ctx: flam.FlamContext, args: argparse.Namespace) -> None:
@@ -382,13 +378,18 @@ If no %(dest)s provided, fetches all lists configured as defaults.''')
         else:
             listdefs = args.LISTDEF if len(args.LISTDEF) != 0 else [flam.SpecialListType.DEFAULTS]
             ctx.fetch(listdefs, refetch_pattern=args.refetch, quiet=False)
-            # TODO: regenerate affected composites and grouping cache files.
+
+            with utils.ProgressBar(list(ctx.composite_lists),
+                    desc='Regenerating composite lists',
+                    keyfunc=lambda cl: cl.name) as bar:
+                for cl in bar:
+                    # Easiest way to regenerate dependencies is to just get every composite list and do nothing with it.
+                    ctx.get_movie_list(f'{flam.SpecialListType.COMPOSITE}={cl.name}')
 
 class SubcommandClean:
     @classmethod
-    def add_parser(cls, subparsers: argparse._SubParsersAction) -> None:
+    def configure_parser(cls, parser: argparse.ArgumentParser) -> None:
         # TODO: still gotta figure this one out. Maybe it should just be flags in the other commands? I don't want to complicate this program with "not user friendly" subcommands.
-        parser = subparsers.add_parser('clean', formatter_class=argparse.RawTextHelpFormatter)
         parser.set_defaults(function=cls.execute)
         parser.add_argument('-t', '--tempfiles', action='store_true', help='Deletes tempfiles related to the %(dest)s as well')
         parser.add_argument('-f', '--fetched', action='store_true', help='Deletes tempfiles related to the %(dest)s as well')
@@ -403,19 +404,18 @@ class SubcommandClean:
 
 class SubcommandFind:
     @classmethod
-    def add_parser(cls, subparsers: argparse._SubParsersAction) -> None:
-        parser = subparsers.add_parser('find', formatter_class=argparse.RawTextHelpFormatter)
+    def configure_parser(cls, parser: argparse.ArgumentParser) -> None:
         parser.set_defaults(function=cls.execute)
 
         # TODO: "--split" option to expand array attributes into a row for each one?
         parser.add_argument('-s', '--sort', metavar='ATTRIBUTES', default=None, action='store', help=
             f'''Sort movies according to %(metavar)s, which is a comma-delimited list of keys to sort by, in decreasing priority. Defaults to 'leaving,runtime,alphabetical'.
             Valid sort keys: ...''')
-        parser.add_argument('-c', '--color', choices=Choice.always_auto_never(), default=Choice.AUTO, action='store', help=
+        parser.add_argument('-C', '--color', choices=Choice.always_auto_never(), default=Choice.AUTO, action='store', help=
             'Set whether columns should be colored. Defaults to %(default)s')
         parser.add_argument('-d', '--dsv', metavar='DELIM', default=None, action='store', help=
             "Output in delimiter-separated values format (DSV).")
-        parser.add_argument('-C', '--columns', metavar='ATTRIBUTES', default=None, action='store', help=
+        parser.add_argument('-c', '--columns', metavar='ATTRIBUTES', default=None, action='store', help=
             'List of columns to print, delimited by commas. Defaults to \'title,leaving,runtime,released,rating,metascore,director\','
             f''' with a few other "smart" columns which activate when a condition is met.
 This option overrides the defaults and smart columns. Only the columns you specify will be printed.
@@ -435,12 +435,10 @@ Valid column names: ...''')
         parser.add_argument('-t', '--no-titles', default=False, action='store_true', help=
             'Don\'t print a row with the column titles')
 
-        # TODO: future problem: REMAINDER doesn't work if there are no positional arguments before it. If we add the shorthand subcommands a la "flam WHAT",
-        # the WHAT won't be a positional argument anymore and REMAINDER won't work.
         parser.add_argument('FINDABLE', type=cls.parse_findable, action='store', help=
-            '''Choose what to find: movies, people, or roles. Roles have all the attributes of the movie and the person, and then a few role-specific ones.''')
+            '''Choose what to find: movies, people, or roles. Roles have all the attributes of the movie and the person, and then a few role-specific ones''')
         parser.add_argument('LISTDEF', nargs='*', action='store', help=
-            '''Like fetch but with different defaults, and if the LISTDEFs aren't already fetched, it fails with a nice error message.''')
+            '''Like fetch but with different defaults, and if the LISTDEFs aren't already fetched, it fails with a nice error message''')
         parser.add_argument('FILTER', nargs='*', action='store', help=
             '''find-like expression featuring predicates like -crew, -cast, -release...''')
         parser.add_argument('REMAINDER', nargs=argparse.REMAINDER, action='store', help=argparse.SUPPRESS)
@@ -450,11 +448,12 @@ Valid column names: ...''')
         if findable == flam.FindableType.ROLES:
             return flam.FindableType.ROLES, list(zip(flam.CrewType, [flam.GroupMode.DEFAULT] * len(flam.CrewType)))
 
-        if findable in flam.FindableType:
+        try:
             return flam.FindableType(findable), [(None, flam.GroupMode.DEFAULT)]
+        except ValueError:
+            pass
 
-        ct_gms = [flam.parse_ct_gm(ct_gm_str) for ct_gm_str in findable.split(',')]
-        return flam.FindableType.ROLES, ct_gms # type: ignore
+        return flam.FindableType.ROLES, [flam.parse_ct_gm(ct_gm_str) for ct_gm_str in findable.split(',')]
 
     @classmethod
     def execute(cls, ctx: flam.FlamContext, args: argparse.Namespace) -> None:
@@ -585,25 +584,25 @@ Valid column names: ...''')
         if not args.verbose:
             for row in table:
                 for i in range(len(row)):
-                    # TODO: Titles want it 45, other attributes would prefer 30, and some don't need to be truncated at all. Support all kinds or just settle on 45?
-                    row[i] = utils.truncate(row[i], 45, is_big_endian=attributes[i].is_big_endian)
+                    # For now I'm ok with this being tacked on instead of max_len as a property of each attribute.
+                    max_len = 45 if attributes[i].name == 'title' else 30
+                    row[i] = utils.truncate(row[i], max_len, is_big_endian=attributes[i].is_big_endian)
 
         print_table(table, args.color, args.paginate, args.spacious, args.no_titles, args.dsv)
 
 class SubcommandChart:
     @classmethod
-    def add_parser(cls, subparsers: argparse._SubParsersAction) -> None:
-        parser = subparsers.add_parser('chart', formatter_class=argparse.RawTextHelpFormatter)
+    def configure_parser(cls, parser: argparse.ArgumentParser) -> None:
         parser.set_defaults(function=cls.execute)
 
         parser.add_argument('-o', '--omit-zeroes', choices=Choice.always_auto_never(), default=Choice.AUTO, action='store', help=
-            'Choose whether to omit buckets with 0 movies. Defaults to %(default)s, which uses a mode that depends on DISTRIBUTION.')
-        parser.add_argument('-v', '--value-sort', default=False, action='store_true', help='Sort based on the table values, not the keys.')
+            'Choose whether to omit buckets with 0 movies. Defaults to %(default)s, which uses a mode that depends on DISTRIBUTION')
+        parser.add_argument('-v', '--value-sort', default=False, action='store_true', help='Sort based on the table values, not the keys')
         parser.add_argument('-n', '--no-number', default=False, action='store_true', help="Don't append the numerical value to each bar.")
-        parser.add_argument('-S', '--spacious', default=False, action='store_true', help='Space out the table.')
+        parser.add_argument('-S', '--spacious', default=False, action='store_true', help='Space out the table')
         parser.add_argument('-t', '--no-title', default=False, action='store_true', help="Don't print a title.")
         parser.add_argument('-k', '--no-prefix-key', default=False, action='store_true', help="Don't write the key at the start of each bar.")
-        parser.add_argument('-K', '--suffix-key', default=False, action='store_true', help='Append the key to the end of each bar.')
+        parser.add_argument('-K', '--suffix-key', default=False, action='store_true', help='Append the key to the end of each bar')
         
         # TODO: Not sure about these options yet:
         # '-c', '--crew-types',  CREWS      Comma-delimited list of crew types to count in crew-size distribution. Defaults to '*', which means all crew types.
@@ -622,11 +621,33 @@ class SubcommandChart:
     def execute(cls, ctx: flam.FlamContext, args: argparse.Namespace) -> None:
         print('chart')
 
-# Implement --version option with a custom action so that it works even if no subparser is chosen.
-class PrintVersion(argparse.Action):
-    def __call__(self, parser: argparse.ArgumentParser, namespace: argparse.Namespace, values: str | typing.Sequence | None, option_string: None | str = None) -> None:
-        print(f'{os.path.basename(sys.argv[0])} version {flam.__version__}')
-        sys.exit()
+def make_main_parser(add_subparsers: bool) -> tuple[argparse.ArgumentParser, argparse.ArgumentParser]:
+    parser = argparse.ArgumentParser(
+        formatter_class=argparse.RawTextHelpFormatter,
+        description='I dunno lol',
+        exit_on_error=False,
+        add_help=add_subparsers) # Don't conflict helps.
+
+    # Main parser option letters mustn't conflict with find's option letters (or: I wish -F could be -C).
+    parser.add_argument('-F', '--flam-dir', metavar='PATH', default=flam.FlamContext.DEFAULT_FLAM_DIR, action='store', help=
+        f'Use %(metavar)s as the flam directory. Uses {flam.FlamEnv.CTX_DIR} environment variable by default, or ~/.film_flam if it is not defined')
+    parser.add_argument('-E', '--no-extensions', action='store_true', help=
+        "Don't import configured extensions")
+    parser.add_argument('-V', '--version', action='version', version=f'%(prog)s version {flam.__version__}')
+
+    if add_subparsers:
+        # Subparsers are organized into "static" classes. This is only for code organization reasons, not OOP reasons.
+        # The classes are designed to enforce as little "model" as possible so we can be flexible with how we use them.
+        subparsers = parser.add_subparsers(required=True)
+        SubcommandConfig.configure_parser(subparsers.add_parser('config', formatter_class=argparse.RawTextHelpFormatter))
+        SubcommandFetch.configure_parser(subparsers.add_parser('fetch', formatter_class=argparse.RawTextHelpFormatter))
+        SubcommandFind.configure_parser(find_subparser := subparsers.add_parser('find', formatter_class=argparse.RawTextHelpFormatter))
+        SubcommandChart.configure_parser(subparsers.add_parser('chart', formatter_class=argparse.RawTextHelpFormatter))
+    else:
+        find_subparser = parser
+        SubcommandFind.configure_parser(parser)
+
+    return parser, find_subparser
 
 def main() -> None:
     colorama.just_fix_windows_console()
@@ -637,41 +658,53 @@ def main() -> None:
     except:
         flam.logger.error(f"Failed to reconfigure stdout. Proceeding anyway.", exc_info=True)
 
-    parser = argparse.ArgumentParser(
-        formatter_class=argparse.RawTextHelpFormatter,
-        description='I dunno lol.')
-    parser.add_argument('-C', '--flam-dir', metavar='PATH', default=flam.FlamContext.DEFAULT_FLAM_DIR, action='store', help=
-        f'Use %(metavar)s as the flam directory. Uses {flam.FlamEnv.CTX_DIR} environment variable by default, or ~/.film_flam if it is not defined.')
-    parser.add_argument('-e', '--no-extensions', action='store_true', help=
-        "Don't import configured extensions.")
-    parser.add_argument('-v', '--version', action=PrintVersion, nargs=0, help=
-        "Display version information and exit.")
+    flam.logger.info(f"Executed with: {sys.argv=}")
 
-    # Subparsers are organized into "static" classes. This is only for code organization reasons, not OOP reasons.
-    # The classes are designed to enforce as little "model" as possible so we can be flexible with how we use them.
-    subparsers = parser.add_subparsers(required=True)
-    SubcommandConfig.add_parser(subparsers)
-    SubcommandFetch.add_parser(subparsers)
-    SubcommandFind.add_parser(subparsers) # TODO: flam movies/roles/people as a subcommand shorthand for flam find movies/roles/people
-    SubcommandChart.add_parser(subparsers)
-
-    args = parser.parse_args()
-    flam.logger.info(f"Got {args=}")
-
-    # We use the FILTER, REMAINDER trick a lot so we take care of it generically.
-    if hasattr(args, 'FILTER') and hasattr(args, 'REMAINDER'):
-        args.FILTER += args.REMAINDER
-
-    ctx = flam.FlamContext(args.flam_dir, import_extensions=not args.no_extensions)
+    # We want to support 'find' as the default subparser. This has a few limitations:
+    # * argparse sucks at supporting it.
+    # * If we transform flam <main-opts> <WHAT> <find-opts> <LISTDEFS> <FILTER> -> flam <main-opts> <find-opts> <WHAT> <LISTDEFS> <FILTER>,
+    #   there is ambiguity because LISTDEFS can be empty and then you can have: flam movies -true, is -true a FILTER or the opts -t, -r, -u, -e?
+    # * Similar to the point above, argparse.REMAINDER only works if it is preceded by a positional argument.
+    # * A few error messages and --help can become confusing.
+    # 
+    # Our solution is the following:
+    # * We first try to build a parser where all subparsers are nested. If it fails to parse due to invalid subcommand choice,
+    #   we fallback to a parser where the main parser is configured with both main and find parser configs.
+    #   This works because we preserve the trait that <WHAT> isn't followed by optional arguments.
+    # * If the fallback parser fails we print the error as if it came from find as a subparser, not find as embedded in the main parser.
+    parser, find_subparser = make_main_parser(True)
 
     try:
+        try:
+            args = parser.parse_args()
+        except argparse.ArgumentError as e:
+            # If error was not an invalid subcommand, just forward it.
+            if not re.search('invalid choice.*config.*find', str(e)):
+                parser.error(str(e))
+            
+            flam.logger.info(f"Will default to parsing as find due to error: {e}")
+            find_mainparser, _ = make_main_parser(False)
+
+            try:
+                args = find_mainparser.parse_args()
+            except argparse.ArgumentError as e:
+                # Print errors as if they came from "flam find".
+                find_subparser.error(str(e))
+            
+        flam.logger.info(f"Parsed args into: {args=}")
+
+        # We use the FILTER, REMAINDER trick a lot so we take care of it generically.
+        if hasattr(args, 'FILTER') and hasattr(args, 'REMAINDER'):
+            args.FILTER += args.REMAINDER
+
+        ctx = flam.FlamContext(args.flam_dir, import_extensions=not args.no_extensions)
         args.function(ctx, args)
     except flam.FlamError as e:
         if flam.is_debug():
             raise
 
         # No ugly tracebacks for input errors. Only for internal errors.
-        sys.exit(f'{os.path.basename(sys.argv[0])}: error: {e}')
+        sys.exit(f'{parser.prog}: error: {e}')
 
 if __name__ == '__main__':
     main()

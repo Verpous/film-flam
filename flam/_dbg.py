@@ -74,7 +74,9 @@ def _make_logger() -> logging.Logger:
     logs_path = get_log_file_path()
     os.makedirs(os.path.dirname(logs_path), exist_ok=True)
 
-    # TODO: This isn't good for multiple processes. But storing the logs in the flam dir ain't good neither,
+    # TODO: This isn't good for multiple processes. Not just because logs may get garbled,
+    # but also because we hit an error if file rotation takes place while two processes are using it.
+    # Storing logs in the flam dir ain't good neither though,
     # because logger initialization must precede context creation and because of volatile mode.
     # There's an easy solution and a hard solution:
     # Easy: name the file something unique each time. Avoid conflicts but logs will be a bitch to open and read.

@@ -22,6 +22,7 @@ shopt -s extglob
 mdl=flam
 cli=flam
 pkg=film-flam
+build=dist
 
 flam_dir=~/.film_flam_dev
 srcfiles=($mdl/*.py)
@@ -103,10 +104,11 @@ release() {
     _gen_version $flavor
 
     # For actual releases, require mypy and pylint to report no problems.
-    [[ "$flavor" != actual ]] || { mypy && pylint } > /dev/null
+    [[ "$flavor" != actual ]] || { mypy && pylint; } > /dev/null
 
-    python -m build
-    twine upload $twineargs dist/*
+    rm -rf $build
+    python -m build --outdir $build
+    twine upload $twineargs $build/*
     sanity $flavor
     echo "Successfully created a release with flavor: $flavor."
 }
@@ -162,7 +164,8 @@ sanity() {
 }
 
 clean() {
-    # Need this buffer so we don't delete a file 
+    # Need this buffer so we don't delete a folder while find is iterating its contents.
+    # It'd be a lot nicer if we could just not descend into ignored folders, but that's much slower.
     _mktemp ignored_files
     find . -print0 | git check-ignore -z --stdin > "$ignored_files"
     xargs -0 rm -rf < "$ignored_files"
@@ -191,12 +194,12 @@ pylint() {
 }
 
 wc() {
-    command wc -l -- "${srcfiles[@]}"
+    command wc -l -- "${srcfiles[@]}" | sort -n
 }
 
 log() {
     # Use LOGLEVEL=critical so that this very action doesn't create new logs.
-    ${1:-tail -f} "$(echo "import $mdl; print($mdl.get_log_file_path())" | FLAM_LOGLEVEL=critical python)"
+    ${@:-tail -f} "$(echo "import $mdl; print($mdl.get_log_file_path())" | FLAM_LOGLEVEL=critical python)"
 }
 
 flam() {

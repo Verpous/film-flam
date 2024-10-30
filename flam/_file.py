@@ -88,8 +88,9 @@ class _FlamSerializable(msgspec.Struct, forbid_unknown_fields=True):
         except msgspec.ValidationError as e:
             raise self._validation_error(f'{e}.') from e
 
+        formatted = msgspec.json.format(encoded)
+        
         with open(file, 'wb') as f:
-            formatted = msgspec.json.format(encoded)
             f.write(formatted)
 
         _dbg.logger.info(f'Successfully wrote a {type(self)} of size {len(formatted)}B')

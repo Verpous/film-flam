@@ -412,7 +412,6 @@ class Predicate(FilterMember):
             raise _EinGafrurError('Unexpected right parenthesis. It either has no matching left parenthesis or a predicate was expected.',
                 tokens=params.tokens, error_indices=at)
             
-        # TODO: difflib in more places where you get attr names wrong?
         close_matches = difflib.get_close_matches(prefixed_name, itertools.chain(
             (Predicate.PREFIX + pred.name for pred in params.ctx.predicates),
             (Predicate.PREFIX + attr.name for attr in params.ctx.attributes)))

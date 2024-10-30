@@ -24,6 +24,7 @@ import importlib
 import tempfile
 import weakref
 import itertools
+import difflib
 
 from . import _cfg
 from . import _exc
@@ -83,7 +84,9 @@ class RegistriesOf[T: (type[_fetch.ListFetcher], type[_filter.Predicate], _attr.
             except KeyError:
                 pass
 
-        raise _exc.InputError(f"No registered item with the name: '{name}'.")
+        close_matches = difflib.get_close_matches(name, (item.name for item in self))
+        suggestions = f' (did you mean: {", ".join(close_matches)}?)' if len(close_matches) > 0 else '.'
+        raise _exc.InputError(f"No registered item with the name: '{name}'{suggestions}")
 
     def __contains__(self, name: str) -> bool:
         return any(name in self._type_selector(reg) for reg in self._registries_to_try)
@@ -102,6 +105,7 @@ class RegistriesOf[T: (type[_fetch.ListFetcher], type[_filter.Predicate], _attr.
 class FlamContext:
     DEFAULT_FLAM_DIR = _dbg.FlamEnv.CTX_DIR.get(os.path.join(os.path.expanduser('~'), '.film_flam'))
     _LISTFILES_DIR = 'movie_lists'
+    _CACHE_DIR = 'cache'
     _CONFIGURATION_FILE = 'config.json'
     _METADATA_FILE = 'metadata.json'
 
@@ -193,6 +197,8 @@ class FlamContext:
         directories = [
             self._flam_dir,
             os.path.join(self._flam_dir, self._LISTFILES_DIR),
+            os.path.join(self._flam_dir, self._CACHE_DIR),
+            os.path.join(self._flam_dir, self._CACHE_DIR, self._LISTFILES_DIR),
         ]
 
         for d in directories:
@@ -336,13 +342,21 @@ class FlamContext:
         _dbg.logger.info(f"Writing movie list file with nmovies={len(movie_list_file.movies_by_uid)} npeople={len(movie_list_file.people_by_uid)} to {path=}")
         movie_list_file.write(path)
 
-    # After much deliberation, I decided that files for named lists should be named according to the list type and UID,
-    # and unnamed lists' files should be named according to the list type and address.
-    # This is mostly as opposed to storing all lists according to the concrete list_type and address.
-    # The reason: this lets us change lists to a different list type with a compatible ID type.
     def _get_movie_list_file_path(self, abstract_listdef: _ldef.CanonListdef) -> str:
+        # After much deliberation, I decided that files for named lists should be named according to the list type and UID,
+        # and unnamed lists' files should be named according to the list type and address.
+        # This is mostly as opposed to storing all lists according to the concrete list_type and address.
+        # The reason: this lets us change lists to a different list type with a compatible ID type.
         filename = utils.slugify(f'{abstract_listdef.list_type}_{abstract_listdef.address}.json')
-        return os.path.join(self._flam_dir, self._LISTFILES_DIR, filename)
+
+        match abstract_listdef.list_type:
+            case _ldef.SpecialListType.ANNONYMOUS:
+                raise RuntimeError(f"Unexpected {abstract_listdef.list_type=}")
+            case _ldef.SpecialListType.COMPOSITE:
+                # Everything that can be easily regenerated should go under cache so it's easy to delete them all at once.
+                return os.path.join(self._flam_dir, self._CACHE_DIR, self._LISTFILES_DIR, filename)
+            case _:
+                return os.path.join(self._flam_dir, self._LISTFILES_DIR, filename)
 
     # Configuration.
     def lists_of_type(self, list_type: str) -> ConfigurationLists[_cfg.SimpleList] | ConfigurationLists[_cfg.CompositeList]:

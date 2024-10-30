@@ -103,7 +103,7 @@ class CanonListdef(typing.NamedTuple):
                                 for dbl_expanded in cl.abstract_listdef.expand(ctx, flavor)
                         )
                     case _:
-                        raise RuntimeError(f"Unsupported ExpandFlavor: {flavor}")
+                        raise RuntimeError(f"Unexpected {flavor=}")
             case SpecialListType.COMPOSITE:
                 match flavor:
                     case ExpandFlavor.FIND:
@@ -113,7 +113,7 @@ class CanonListdef(typing.NamedTuple):
                         composite_list = ctx.composite_lists.get_by_uid(self.address)
                         yield from (CanonListdef(SpecialListType.SIMPLE, sl_uid) for sl_uid in composite_list.simple_list_uids)
                     case _:
-                        raise RuntimeError(f"Unsupported ExpandFlavor: {flavor}")
+                        raise RuntimeError(f"Unexpected {flavor=}")
             case SpecialListType.ANNONYMOUS:
                 # Fully supporting annonymous lists is both unneeded and will require complicating a lot of code with recursion.
                 # This list type is only meant for internal use and we'll assume that it's made up of already expanded parts.
