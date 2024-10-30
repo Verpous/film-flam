@@ -30,14 +30,14 @@ from . import _dbg
 
 class ListFetcher(abc.ABC):
     name: str
-    uid_type: str
+    uid_family: str
 
-    # Subclasses must provide a list_type, and may optionally provide an uid_type if they have multiple fetchers that they want to be compatible.
-    def __init_subclass__(cls, list_type: str, uid_type: None | str = None, **kwargs: typing.Any) -> None:
+    # Subclasses must provide a list_type, and may optionally provide an uid_family if they have multiple fetchers that they want to be compatible.
+    def __init_subclass__(cls, list_type: str, uid_family: None | str = None, **kwargs: typing.Any) -> None:
         super().__init_subclass__(**kwargs)
         # I like the name list_type better, but for registration it needs to be named "name".
         cls.name = list_type
-        cls.uid_type = uid_type if uid_type is not None else list_type
+        cls.uid_family = uid_family if uid_family is not None else list_type
 
     def __init__(self, concrete_listdef: _ldef.CanonListdef, abstract_listdef: _ldef.CanonListdef) -> None:
         self._concrete_listdef = concrete_listdef
@@ -52,10 +52,11 @@ class ListFetcher(abc.ABC):
         return self._abstract_listdef
 
     def fetch(self, movie_list_file: _mlf.MovieListFile, ctx: _ctx.FlamContext, refetch_re: None | re.Pattern, quiet: bool) -> None:
-        if not isinstance(movie_list_file.uid_type, _file.UnsetType) and movie_list_file.uid_type != self.uid_type:
-            raise _exc.InputError(f"Cannot fetch '{self.abstract_listdef.pretty(ctx)}' because it's already fetched with a different ID type "
-                f"(old: '{movie_list_file.uid_type}', new: '{self.uid_type}'). "
-                "This can happen if you changed a list's LISTDEF to a nonmatching type. You can resolve it by fetching the list from scratch, or reverting the list to its old type.")
+        if not isinstance(movie_list_file.uid_family, _file.UnsetType) and movie_list_file.uid_family != self.uid_family:
+            raise _exc.InputError(f"Cannot fetch '{self.abstract_listdef.pretty(ctx)}' because it's already fetched with a different ID family "
+                f"(old: '{movie_list_file.uid_family}', new: '{self.uid_family}'). "
+                "This can happen if you changed a list's LISTDEF to one from a different family. "
+                "You can resolve it by fetching the list from scratch, or reverting it to its old type.")
 
         _dbg.logger.info(f"Running fetcher {type(self)=}, abstract={self.abstract_listdef}, concrete={self.concrete_listdef}")
         interrupt_error = None
@@ -84,7 +85,7 @@ class ListFetcher(abc.ABC):
         # Fetcher may have removed some movies from the list. Over here we remove people who are orphaned because of that.
         _remove_unused_people(movie_list_file)
 
-        movie_list_file.uid_type = self.uid_type
+        movie_list_file.uid_family = self.uid_family
         movie_list_file.list_type = self.abstract_listdef.list_type
         movie_list_file.address = self.abstract_listdef.address
 

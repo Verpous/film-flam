@@ -307,14 +307,14 @@ class FlamContext:
         dependency_mlfs = [self._get_movie_list_file(cldef) for cldef in abstract_listdefs]
 
         merged_mlf = _mlf.MovieListFile.create()
-        merged_mlf.uid_type = dependency_mlfs[0].uid_type
+        merged_mlf.uid_family = dependency_mlfs[0].uid_family
 
         # When building the list, we use the same objects from the dependency lists. At the end we deepcopy the result.
         # In case of duplicates we arbitrarily choose which to keep. We don't allow non-uniqueness.
         for mlf in dependency_mlfs:
-            if mlf.uid_type != merged_mlf.uid_type:
+            if mlf.uid_family != merged_mlf.uid_family:
                 raise _exc.InputError(f"Cannot merge the lists '{' '.join(cldef.pretty(self) for cldef in abstract_listdefs)}' into a composite list "
-                    f"due to an ID type mismatch: {mlf.uid_type} != {merged_mlf.uid_type}.")
+                    f"due to an ID family mismatch: {mlf.uid_family} != {merged_mlf.uid_family}.")
 
             # TODO: preserve information about which list each movie/person came from? Or in how many it appeared?
             merged_mlf.movies_by_uid.update(mlf.movies_by_uid)
@@ -346,7 +346,7 @@ class FlamContext:
         # After much deliberation, I decided that files for named lists should be named according to the list type and UID,
         # and unnamed lists' files should be named according to the list type and address.
         # This is mostly as opposed to storing all lists according to the concrete list_type and address.
-        # The reason: this lets us change lists to a different list type with a compatible ID type.
+        # The reason: this lets us change lists to a different list type with the same ID family.
         filename = utils.slugify(f'{abstract_listdef.list_type}_{abstract_listdef.address}.json')
 
         match abstract_listdef.list_type:

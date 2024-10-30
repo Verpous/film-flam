@@ -48,7 +48,7 @@ from . import _file
 from . import _ml
 from . import _dbg
 
-_UID_TYPE = 'imdb'
+_UID_FAMILY = 'imdb'
 _REQUEST_QUIT = 'quit'
 
 #region Fetching
@@ -78,7 +78,7 @@ class _CsvRow:
     myrating_date:      None | str = None
 
 @_reg._register_builtin
-class SeleniumListFetcher(_fetch.ListFetcher, list_type='imdb-id', uid_type=_UID_TYPE):
+class SeleniumListFetcher(_fetch.ListFetcher, list_type='imdb-id', uid_family=_UID_FAMILY):
     exports_server: None | multiprocessing.Process = None
     requests_queue: multiprocessing.Queue = multiprocessing.Queue()
 
@@ -165,7 +165,7 @@ def _exports_server_cleanup() -> None:
         _dbg.logger.info("No need to do server cleanup")
 
 @_reg._register_builtin
-class CsvListFetcher(_fetch.ListFetcher, list_type='imdb-csv', uid_type=_UID_TYPE):
+class CsvListFetcher(_fetch.ListFetcher, list_type='imdb-csv', uid_family=_UID_FAMILY):
     def fetch_into_file(self, movie_list_file: _mlf.MovieListFile) -> None:
         _dbg.logger.info(f"Fetching IMDb list by CSV: '{self.concrete_listdef.address}'")
 

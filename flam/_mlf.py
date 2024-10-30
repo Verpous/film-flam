@@ -63,9 +63,9 @@ class MovieListFile(_file._FlamSerializable):
     list_type:              _file.UnsetType | str
     address:                _file.UnsetType | str
 
-    # Files are "compatible" if they have a matching uid_type. This is because I have no good way of identifying matching items between, say, IMDb and Letterboxd.
+    # Files are "compatible" if they have a matching uid_family. This is because I have no good way of identifying matching items between, say, IMDb and Letterboxd.
     # If a list originates from IMDb, all the uids in the file will be from IMDb, and so it will only be compatible with other IMDb-based lists.
-    uid_type:               _file.UnsetType | str
+    uid_family:               _file.UnsetType | str
 
     movies_by_uid:          dict[str, MLFMovie]
     people_by_uid:          dict[str, MLFPerson]

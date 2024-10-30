@@ -270,9 +270,9 @@ class MovieList:
         return self._movie_list_file.address
 
     @property
-    def uid_type(self) -> str:
-        assert not isinstance(self._movie_list_file.uid_type, _file.UnsetType)
-        return self._movie_list_file.uid_type
+    def uid_family(self) -> str:
+        assert not isinstance(self._movie_list_file.uid_family, _file.UnsetType)
+        return self._movie_list_file.uid_family
 
     def __iter__(self) -> typing.Iterator[Movie]:
         return iter(self.find_movies())
