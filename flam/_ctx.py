@@ -34,11 +34,11 @@ from . import _file
 from . import _mlf
 from . import _md
 from . import _reg
-from . import utils
 from . import _fetch
 from . import _ml
 from . import _dbg
 from . import _attr
+from . import utils
 
 # Data structure for using simple/composite lists generically.
 class ConfigurationLists[T: (_cfg.SimpleList, _cfg.CompositeList)]:
@@ -150,16 +150,7 @@ class FlamContext:
         # It's good to make this an option with default false for security, and I prefer to keep the two options as one for simplicity.
         if import_extensions:
             for extension in self.cfg.extensions:
-                # Try both ways.
-                try:
-                    importlib.import_module(extension)
-                    _dbg.logger.info(f"Successful import using importlib: {extension=}")
-                except ModuleNotFoundError:
-                    try:
-                        utils.import_file(extension)
-                        _dbg.logger.info(f"Successful import using utils: {extension=}")
-                    except ModuleNotFoundError as e:
-                        raise _exc.InputError(str(e)) from e
+                self._import_extension(extension)
 
         # Cache empty filters for optimization.
         self._empty_filters = {find: _filter.Filter.eat(_filter.EatParams(tokens=[], find=find, ctx=self)) for find in _ml.FindableType}
@@ -412,6 +403,24 @@ class FlamContext:
         composite_list = self._composite_lists.get_by_uid(uid)
         # TODO: delete files
         self.cfg._composite_lists.remove(composite_list)
+
+    def add_extension(self, extension: str):
+        pass
+    
+    def delete_extension(self, extension: str):
+        pass
+
+    def _import_extension(self, extension: str) -> None:
+        # Try both ways.
+        try:
+            importlib.import_module(extension)
+            _dbg.logger.info(f"Successful import using importlib: {extension=}")
+        except ModuleNotFoundError:
+            try:
+                utils.import_file(extension)
+                _dbg.logger.info(f"Successful import using utils: {extension=}")
+            except ModuleNotFoundError as e:
+                raise _exc.InputError(str(e)) from e
 
     def write_cfg(self) -> None:
         # TODO: In all the write() functions, actually write to a .partial and mov to the true dest once complete? In case the user exits in the middle.

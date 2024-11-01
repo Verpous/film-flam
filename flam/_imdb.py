@@ -15,7 +15,6 @@
 
 from __future__ import annotations
 
-# TODO: If any of this stuff takes time to import, actually we can skip it all unless a fetcher gets used.
 import os
 import csv
 import imdb # type: ignore
@@ -42,11 +41,11 @@ from selenium.webdriver.chromium.options import ChromiumOptions
 from . import _reg
 from . import _fetch
 from . import _exc
-from . import utils
 from . import _mlf
 from . import _file
 from . import _ml
 from . import _dbg
+from . import utils
 
 _UID_FAMILY = 'imdb'
 _REQUEST_QUIT = 'quit'

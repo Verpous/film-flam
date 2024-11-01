@@ -74,8 +74,5 @@ class Configuration(_file._FlamSerializable):
                 raise self._validation_error(f"Composite list '{cl.name}' is made up of 0 lists.")
                 
             for uid in cl.simple_list_uids:
-                try:
-                    # get_by_uid is not accessible from here.
-                    next(sl for sl in self._simple_lists if sl.uid == uid)
-                except StopIteration as e:
-                    raise self._validation_error(f"Composite list '{cl.name}' references unknown simple list: '{uid}'.") from e
+                if not any(sl.uid == uid for sl in self._simple_lists):
+                    raise self._validation_error(f"Composite list '{cl.name}' references unknown list: '{uid}'.")

@@ -179,7 +179,7 @@ class SubcommandConfigList:
         simple_lists = list(ctx.simple_lists) if args.NAME is None else [ctx.simple_lists.get_by_name(args.NAME)]
 
         table = [['uid', 'name', 'type', 'address', 'default-fetch?', 'default-find?']]
-        table.extend(
+        table.extend(sorted(
             [
                 typing.cast(str, sl.uid).split('-')[0],
                 sl.name,
@@ -189,7 +189,7 @@ class SubcommandConfigList:
                 Choice.bool2yesno(sl.is_default_find),
             ]
             for sl in simple_lists
-        )
+        ))
 
         print_table(table)
 
@@ -283,7 +283,7 @@ class SubcommandConfigComposite:
         composite_lists = list(ctx.composite_lists) if args.NAME is None else [ctx.composite_lists.get_by_name(args.NAME)]
 
         table = [['uid', 'name', 'lists', 'filter', 'default-fetch?', 'default-find?']]
-        table.extend(
+        table.extend(sorted(
             [
                 typing.cast(str, cl.uid).split('-')[0],
                 cl.name,
@@ -293,7 +293,7 @@ class SubcommandConfigComposite:
                 Choice.bool2yesno(cl.is_default_find),
             ]
             for cl in composite_lists
-        )
+        ))
 
         print_table(table)
 
