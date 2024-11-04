@@ -45,6 +45,7 @@ pylint_ignore+=R0402, # consider-using-from-import
 pylint_ignore+=R0801, # duplicate-code
 pylint_ignore+=R0902, # too-many-instance-attributes
 pylint_ignore+=R0903, # too-few-public-methods
+pylint_ignore+=R0912, # too-many-branches
 pylint_ignore+=R0913, # too-many-arguments
 pylint_ignore+=R0917, # too-many-positional-arguments
 pylint_ignore+=R1708, # stop-iteration-return

@@ -17,7 +17,6 @@ from __future__ import annotations
 
 from . import _file
 
-# TODO: Possibly better to just include the md in the mlf itself.
 class CompositeListMetadata(_file._FlamSerializable):
     uid:                    str
     dependency_mtime:       dict[str, float]

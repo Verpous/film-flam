@@ -26,7 +26,7 @@ from . import _dbg
 UnsetType = msgspec.UnsetType
 
 # Parent class for all the kinds of files we have. We use msgspec for serialization, and this class adds some niceities on top.
-class _FlamSerializable(msgspec.Struct, forbid_unknown_fields=True):
+class _FlamSerializable(msgspec.Struct, forbid_unknown_fields=True, weakref=True, order=True):
     # msgspec creates files through their __init__ and checks that all fields exist and things like that.
     # If a field has a default, it will silently handle it when the field doesn't exist.
     # We want fields to have defaults, but only so that users can initialize them after creation. We do NOT want files to be encoded/decoded with default values.
@@ -40,7 +40,7 @@ class _FlamSerializable(msgspec.Struct, forbid_unknown_fields=True):
         return obj
 
     @classmethod
-    def _defaults(cls) -> typing.Iterator[tuple[str, typing.Any]]:
+    def _defaults(cls) -> typing.Iterable[tuple[str, typing.Any]]:
         for field in msgspec.structs.fields(cls):
             origin = typing.get_origin(field.type)
             args = typing.get_args(field.type)
@@ -127,7 +127,7 @@ class _FlamSerializable(msgspec.Struct, forbid_unknown_fields=True):
 
         return None, None
 
-    def depth_first_iter(self) -> typing.Iterator[_FlamSerializable]:
+    def depth_first_iter(self) -> typing.Iterable[_FlamSerializable]:
         for field in msgspec.structs.fields(self):
             value = getattr(self, field.name)
 

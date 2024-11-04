@@ -25,6 +25,7 @@ import tempfile
 import weakref
 import itertools
 import difflib
+import contextlib
 
 from . import _cfg
 from . import _exc
@@ -39,27 +40,6 @@ from . import _ml
 from . import _dbg
 from . import _attr
 from . import utils
-
-# Data structure for using simple/composite lists generically.
-class ConfigurationLists[T: (_cfg.SimpleList, _cfg.CompositeList)]:
-    def __init__(self, lists: list[T], list_type: str) -> None:
-        self._lists: list[T] = lists
-        self._list_type = list_type
-
-    def __iter__(self) -> typing.Iterator[T]:
-        return iter(self._lists)
-
-    def get_by_uid(self, uid: str) -> T:
-        try:
-            return next(l for l in self._lists if l.uid == uid)
-        except StopIteration as e:
-            raise _exc.InputError(f"Invalid {self._list_type} UID: '{uid}'.") from e
-
-    def get_by_name(self, name: str) -> T:
-        try:
-            return next(l for l in self._lists if l.name == name)
-        except StopIteration as e:
-            raise _exc.InputError(f"Invalid {self._list_type} name: '{name}'.") from e
 
 # Utility for "inverting" registries: instead of first the registration level then the item type, it's first the item type then the levels.
 # Has to be implemented this way because some of the registries are contextual, some global.
@@ -126,20 +106,15 @@ class FlamContext:
             self._flam_dir = os.path.normpath(flam_dir)
 
         self._make_flam_dir()
-        self._cfg = _cfg.Configuration.load_or_create(self._get_cfg_path())
-        self._metadata = _md.FlamMetadata.load_or_create(self._get_metadata_path()) # TODO: Clean metadata of old lists?
+        self._cfg = _cfg.Configuration.load_or_create(self._cfg_path)
+        self._metadata = _md.FlamMetadata.load_or_create(self._metadata_path)
 
         # I wish I could print these prettier but it's not worth the hassle.
         _dbg.logger.info(f'Loaded configuration: {self._cfg=}')
         _dbg.logger.info(f'Loaded metadata: {self._metadata=}')
 
         self._movie_list_files_cache: dict[_ldef.CanonListdef, _mlf.MovieListFile] = {}
-
-        # Since Configuration needs to be serializable, we can't store the lists in there in some funky data structure,
-        # and we can't add fields to the object that aren't meant for serialization.
-        # The solution I've got is to wrap those lists in this Context.
-        self._simple_lists = ConfigurationLists(self.cfg._simple_lists, _ldef.SpecialListType.SIMPLE)
-        self._composite_lists = ConfigurationLists(self.cfg._composite_lists, _ldef.SpecialListType.COMPOSITE)
+        self._should_import_extensions = import_extensions
 
         ctx_extensions = _reg.Registry()
         self._fetchers = RegistriesOf(lambda reg: reg.fetchers, ctx_extensions, import_extensions)
@@ -149,7 +124,7 @@ class FlamContext:
         # import_extensions does 2 things: import all configured extensions, and subscribe to any globally registered extensions.
         # It's good to make this an option with default false for security, and I prefer to keep the two options as one for simplicity.
         if import_extensions:
-            for extension in self.cfg.extensions:
+            for extension in self._cfg.extensions:
                 self._import_extension(extension)
 
         # Cache empty filters for optimization.
@@ -164,14 +139,6 @@ class FlamContext:
         return self._cfg
 
     @property
-    def simple_lists(self) -> ConfigurationLists[_cfg.SimpleList]:
-        return self._simple_lists
-
-    @property
-    def composite_lists(self) -> ConfigurationLists[_cfg.CompositeList]:
-        return self._composite_lists
-
-    @property
     def fetchers(self) -> RegistriesOf[type[_fetch.ListFetcher]]:
         return self._fetchers
 
@@ -182,6 +149,14 @@ class FlamContext:
     @property
     def attributes(self) -> RegistriesOf[_attr.Attribute]:
         return self._attributes
+
+    @property
+    def _cfg_path(self) -> str:
+        return os.path.join(self._flam_dir, self._CONFIGURATION_FILE)
+
+    @property
+    def _metadata_path(self) -> str:
+        return os.path.join(self._flam_dir, self._METADATA_FILE)
 
     def _make_flam_dir(self) -> None:
         # Make sure to keep it topologically sorted.
@@ -225,7 +200,7 @@ class FlamContext:
         # First we check if it's a composite list that needs regeneration. In that case even if it's cached it needs to be redone.
         if abstract_listdef.list_type == _ldef.SpecialListType.COMPOSITE and self._is_composite_list_outdated(abstract_listdef.address):
             # First generate it.
-            composite_list = self._composite_lists.get_by_uid(abstract_listdef.address)
+            composite_list = self._cfg.composite_lists.get_by_uid(abstract_listdef.address)
             filter = self.compile_filter(composite_list.filter_tokens, _ml.FindableType.MOVIES)
             dependencies = [_ldef.CanonListdef(_ldef.SpecialListType.SIMPLE, sl_uid) for sl_uid in composite_list.simple_list_uids]
             movie_list_file = self._generate_composite_movie_list_file(dependencies, filter, abstract_listdef.address)
@@ -273,7 +248,7 @@ class FlamContext:
             _dbg.logger.info(f"Composite list {uid=} is not in the metadata.")
             return True
 
-        cl_config = self._composite_lists.get_by_uid(uid)
+        cl_config = self._cfg.composite_lists.get_by_uid(uid)
         cl_meta = self._metadata.composite_lists_by_uid[uid]
 
         for sl_uid in cl_config.simple_list_uids:
@@ -349,67 +324,6 @@ class FlamContext:
             case _:
                 return os.path.join(self._flam_dir, self._LISTFILES_DIR, filename)
 
-    # Configuration.
-    def lists_of_type(self, list_type: str) -> ConfigurationLists[_cfg.SimpleList] | ConfigurationLists[_cfg.CompositeList]:
-        match list_type:
-            case _ldef.SpecialListType.SIMPLE:
-                return self._simple_lists
-            case _ldef.SpecialListType.COMPOSITE:
-                return self._composite_lists
-            case _:
-                raise _exc.InputError(f"Invalid list type '{list_type}': not any kind of stored list.")
-
-    def get_list_by_abstract_listdef(self, abstract_listdef: _ldef.CanonListdef) -> _cfg.SimpleList | _cfg.CompositeList:
-        return self.lists_of_type(abstract_listdef.list_type).get_by_uid(abstract_listdef.address)
-
-    def add_simple_list(self, simple_list: _cfg.SimpleList) -> None:
-        simple_list.uid = str(uuid.uuid4())
-        self.cfg._simple_lists.append(simple_list)
-
-        # See if the list was already fetched before it was named, and "claim" the file.
-        concrete_filename = self._get_movie_list_file_path(simple_list.concrete_listdef)
-        abstract_filename = self._get_movie_list_file_path(simple_list.abstract_listdef)
-        
-        try:
-            os.rename(concrete_filename, abstract_filename)
-        except FileNotFoundError:
-            pass
-
-    def delete_simple_list(self, uid: str) -> None:
-        simple_list = self._simple_lists.get_by_uid(uid)
-
-        # We don't mess with removing the list from its dependent composite lists. Let the user do that.
-        dependents = [cl.name for cl in self._composite_lists if uid in cl.simple_list_uids]
-
-        if len(dependents) > 0:
-            raise _exc.InputError(f"Failed to delete list '{simple_list.name}' because it is depended on by composite lists: {', '.join(dependents)}.")
-
-        # Deleting a list doesn't delete it from local storage, only gets it renamed to be anonymous.
-        concrete_filename = self._get_movie_list_file_path(simple_list.concrete_listdef)
-        abstract_filename = self._get_movie_list_file_path(simple_list.abstract_listdef)
-
-        try:
-            os.rename(abstract_filename, concrete_filename)
-        except FileNotFoundError:
-            pass
-
-        self.cfg._simple_lists.remove(simple_list)
-
-    def add_composite_list(self, composite_list: _cfg.CompositeList) -> None:
-        composite_list.uid = str(uuid.uuid4())
-        self.cfg._composite_lists.append(composite_list)
-
-    def delete_composite_list(self, uid: str) -> None:
-        composite_list = self._composite_lists.get_by_uid(uid)
-        # TODO: delete files
-        self.cfg._composite_lists.remove(composite_list)
-
-    def add_extension(self, extension: str):
-        pass
-    
-    def delete_extension(self, extension: str):
-        pass
-
     def _import_extension(self, extension: str) -> None:
         # Try both ways.
         try:
@@ -422,21 +336,169 @@ class FlamContext:
             except ModuleNotFoundError as e:
                 raise _exc.InputError(str(e)) from e
 
-    def write_cfg(self) -> None:
-        # TODO: In all the write() functions, actually write to a .partial and mov to the true dest once complete? In case the user exits in the middle.
-        _dbg.logger.info(f"Writing configuration: {self._cfg=}")
-        self.cfg.write(self._get_cfg_path())
-        
-    def _get_cfg_path(self) -> str:
-        return os.path.join(self._flam_dir, self._CONFIGURATION_FILE)
+    # We embrace a weird approach to configuring. Users are to use this context manager with which they can free edit a copy of the configuration file,
+    # and at the end we diff the result against the old file and find what was deleted, what was added, and check for validity of everything.
+    # The reasons:
+    # * Avoid boilerplate of writing a function for every possible way you can edit every field in the configuration.
+    # * Allows for bundling multiple edits with a single save at the end, instead of saving after every operation.
+    # * Ability to rollback the changes if something isn't valid.
+    # The downsides:
+    # * Users technically can access ctx.cfg so they just have to know that that copy is readonly with no enforcement.
+    # * Users may shoot themselves in the foot, if you make an invalid edit you will only know it when you close the context (hopefully we catch every case).
+    @contextlib.contextmanager
+    def configure(self) -> typing.Iterator[_cfg.Configuration]:
+        editable_copy = copy.deepcopy(self._cfg)
+        error_occured = False
 
+        _dbg.logger.info(f"Begin configuring of: {self._cfg=}")
+
+        try:
+            yield editable_copy
+        except:
+            error_occured = True
+            raise
+        finally:
+            _dbg.logger.info(f"End configuration, {error_occured=}, {editable_copy=}")
+
+            if not error_occured:
+                self._find_changes_and_write_cfg(editable_copy)
+
+    def _find_changes_and_write_cfg(self, editable_copy: _cfg.Configuration) -> None:
+        # Must canonicalize for _find_added_deleted_modified.
+        editable_copy.canonicalize()
+
+        added_sls, deleted_sls, modified_sls = self._find_added_deleted_modified(editable_copy.simple_lists, self._cfg.simple_lists)
+        added_cls, deleted_cls, modified_cls = self._find_added_deleted_modified(editable_copy.composite_lists, self._cfg.composite_lists)
+
+        _dbg.logger.info(f"Results of diff with old config:\n{added_sls=}, {deleted_sls=}, {modified_sls=}\n{added_cls=}, {deleted_cls=}, {modified_cls=}")
+
+        # Generate UUIDs for new simple lists.
+        for sl in added_sls:
+            sl.uid = str(uuid.uuid4())
+            _dbg.logger.info(f"Generated uid {sl.uid} for simple list named '{sl.name}'")
+
+        # Generate UUIDs for new composite lists.
+        for cl in added_cls:
+            cl.uid = str(uuid.uuid4())
+            _dbg.logger.info(f"Generated uid {cl.uid} for composite list named '{cl.name}'")
+
+        # Verify deleted simple lists aren't depended on by a composite list.
+        for sl in deleted_sls:
+            # We don't mess with removing the list from its dependent composite lists. Let the user do that.
+            dependents = [cl.name for cl in editable_copy.composite_lists if sl.uid in cl.simple_list_uids]
+
+            if len(dependents) > 0:
+                raise _exc.InputError(f"Failed to delete list '{sl.name}' because it is depended on by composite lists: {', '.join(dependents)}.")
+
+        # "Touch" MLFs of modified simple lists so that their dependent composite lists will know to be regenerated when next we get them.
+        # We should do this before saving the file because when it comes to regenerating composite lists, false positives hurt less than false negatives.
+        for sl in modified_sls:
+            try:
+                os.utime(self._get_movie_list_file_path(sl.abstract_listdef))
+                _dbg.logger.info(f"Touched file of {sl.abstract_listdef=}")
+            except FileNotFoundError:
+                pass
+
+        # For the same reason as above, delete MLFs and md of modified or deleted composite lists before even saving the file.
+        for cl in itertools.chain(modified_cls, deleted_cls):
+            try:
+                os.remove(self._get_movie_list_file_path(cl.abstract_listdef))
+                _dbg.logger.info(f"Removed file of {cl.abstract_listdef=}")
+            except FileNotFoundError:
+                pass
+
+            try:
+                del self._metadata.composite_lists_by_uid[cl.uid]
+            except KeyError:
+                pass
+
+        if len(modified_cls) + len(deleted_cls) > 0:
+            self._write_metadata()
+
+        # Import extensions if needed before even fully confirming the file is good.
+        # Pro: catch that you have a bad extension before saving.
+        # Con: if the save is aborted we've imported an extension that isn't saved (not so bad).
+        if self._should_import_extensions:
+            for extension in editable_copy.extensions:
+                if extension not in self._cfg.extensions:
+                    self._import_extension(extension)
+
+        # At this point we're done with all the checks except sanity checks that happen while saving.
+        # It's time to save and then do things we'd like to do only after we know the file is valid.
+        old_cfg = self._cfg
+
+        try:
+            self._cfg = editable_copy
+            self._write_cfg()
+        except:
+            _dbg.logger.info("Caught exception while writing configuration change. Will rollback.")
+            self._cfg = old_cfg
+            raise
+
+        # Check if added simple lists are already fetched under their concrete filename, and "claim" the file.
+        for sl in added_sls:
+            concrete_filename = self._get_movie_list_file_path(sl.concrete_listdef)
+            abstract_filename = self._get_movie_list_file_path(sl.abstract_listdef)
+            
+            try:
+                os.rename(concrete_filename, abstract_filename)
+                _dbg.logger.info(f"Claimed an existing file for a new list: {abstract_filename=}, {concrete_filename=}")
+            except FileNotFoundError:
+                pass
+
+        # For deleted simple lists, their fetch data is not deleted, just renamed to the concrete name.
+        # TODO: Do we really want the orphaned file to linger forever? Maybe clean them up after a while?
+        for sl in deleted_sls:
+            concrete_filename = self._get_movie_list_file_path(sl.concrete_listdef)
+            abstract_filename = self._get_movie_list_file_path(sl.abstract_listdef)
+
+            try:
+                os.rename(abstract_filename, concrete_filename)
+                _dbg.logger.info(f"Disowned the file of a deleted list: {abstract_filename=}, {concrete_filename=}")
+            except FileNotFoundError:
+                pass
+
+    def _find_added_deleted_modified[T: (_cfg.SimpleList, _cfg.CompositeList)](self, lists: _cfg.ConfigurationLists[T], old_lists: _cfg.ConfigurationLists[T]
+            ) -> tuple[list[T], list[T], list[T]]:
+        added_lists = []
+        deleted_lists = []
+        modified_lists = []
+
+        for cfg_list in lists:
+            # Try to get matching list in the old cfg.
+            if isinstance(cfg_list.uid, _file.UnsetType):
+                old_list = None
+            else:
+                try:
+                    old_list = old_lists.get_by_uid(cfg_list.uid)
+                except _exc.InputError:
+                    # Importantly, to cover for users who mistakenly edit the uid,
+                    # we consider a "not unset but not preexisting" UID to be equivalent to an unset UID.
+                    old_list = None
+
+            if old_list is None:
+                added_lists.append(cfg_list)
+            # Note: this check assumes the object is canonicalized.
+            elif cfg_list != old_list:
+                modified_lists.append(cfg_list)
+
+        for old_sl in old_lists:
+            try:
+                assert not isinstance(old_sl.uid, _file.UnsetType)
+                lists.get_by_uid(old_sl.uid)
+            except _exc.InputError:
+                deleted_lists.append(old_sl)
+
+        return added_lists, deleted_lists, modified_lists
+        
+    def _write_cfg(self) -> None:
+        _dbg.logger.info(f"Writing configuration: {self._cfg=}")
+        self._cfg.write(self._cfg_path)
+        
     # Metadata
     def _write_metadata(self) -> None:
-        _dbg.logger.info(f"Writing metadata: {self._cfg=}")
-        self._metadata.write(self._get_metadata_path())
-
-    def _get_metadata_path(self) -> str:
-        return os.path.join(self._flam_dir, self._METADATA_FILE)
+        _dbg.logger.info(f"Writing metadata: {self._metadata=}")
+        self._metadata.write(self._metadata_path)
 
     # Fetching.
     def fetch(self, listdefs: typing.Iterable[str], refetch_pattern: None | str = None, quiet: bool = True) -> None:
@@ -494,7 +556,7 @@ class FlamContext:
         if canon_listdef.is_abstract:
             # Assume it's a SimpleList.
             abstract_listdef = canon_listdef
-            concrete_listdef = self._simple_lists.get_by_uid(abstract_listdef.address).concrete_listdef
+            concrete_listdef = self._cfg.simple_lists.get_by_uid(abstract_listdef.address).concrete_listdef
         else:
             abstract_listdef = concrete_listdef = canon_listdef
 

@@ -132,6 +132,60 @@ class SubcommandConfig:
         config_subparsers = parser.add_subparsers(required=True)
         SubcommandConfigList.configure_parser(config_subparsers.add_parser('list', formatter_class=argparse.RawTextHelpFormatter))
         SubcommandConfigComposite.configure_parser(config_subparsers.add_parser('composite', formatter_class=argparse.RawTextHelpFormatter))
+        SubcommandConfigExtension.configure_parser(config_subparsers.add_parser('extension', formatter_class=argparse.RawTextHelpFormatter))
+
+class SubcommandConfigExtension:
+    @classmethod
+    def configure_parser(cls, parser: argparse.ArgumentParser) -> None:
+        parser.set_defaults(function=cls.execute)
+
+        action_group = parser.add_mutually_exclusive_group(required=False)
+        action_group.add_argument('-A', '--add', action='store_true', help='Add an extension. This is the default behavior')
+        action_group.add_argument('-D', '--delete', action='store_true', help='Delete an extension')
+        action_group.add_argument('-P', '--print', action='store_true', help='Print all extensions')
+
+        parser.add_argument('IMPORT', action='store', nargs='?', help='Specify which module or file to import')
+
+    @classmethod
+    def execute(cls, ctx: flam.FlamContext, args: argparse.Namespace) -> None:
+        if args.delete:
+            cls.delete(ctx, args)
+        elif args.print:
+            cls.print(ctx, args)
+        # Default add.
+        else:
+            cls.add(ctx, args)
+
+    @classmethod
+    def delete(cls, ctx: flam.FlamContext, args: argparse.Namespace) -> None:
+        if args.IMPORT is None:
+            raise flam.InputError(f"Must specify a IMPORT to delete an extension.")
+
+        with ctx.configure() as cfg:
+            try:
+                cfg.extensions.remove(args.IMPORT)
+            except ValueError as e:
+                raise flam.InputError(f"No extension named '{args.IMPORT}'.") from e
+
+    @classmethod
+    def print(cls, ctx: flam.FlamContext, args: argparse.Namespace) -> None:
+        table = [['module / script']]
+        table.extend(sorted(
+            [
+                e,
+            ]
+            for e in ctx.cfg.extensions
+        ))
+
+        print_table(table)
+
+    @classmethod
+    def add(cls, ctx: flam.FlamContext, args: argparse.Namespace) -> None:
+        if args.IMPORT is None:
+            raise flam.InputError(f"Must specify a IMPORT to add an extension.")
+
+        with ctx.configure() as cfg:
+            cfg.extensions.append(args.IMPORT)
 
 class SubcommandConfigList:
     @classmethod
@@ -158,25 +212,23 @@ class SubcommandConfigList:
         # Default edit/create.
         else:
             try:
-                simple_list = ctx.simple_lists.get_by_name(args.NAME)
+                ctx.cfg.simple_lists.get_by_name(args.NAME)
             except flam.InputError:
                 cls.create(ctx, args)
             else:
-                cls.edit(ctx, args, simple_list)
+                cls.edit(ctx, args)
 
     @classmethod
     def delete(cls, ctx: flam.FlamContext, args: argparse.Namespace) -> None:
         if args.NAME is None:
             raise flam.InputError(f"Must specify a NAME to delete a list.")
 
-        simple_list = ctx.simple_lists.get_by_name(args.NAME)
-        assert not isinstance(simple_list.uid, flam.UnsetType)
-        ctx.delete_simple_list(simple_list.uid)
-        ctx.write_cfg()
+        with ctx.configure() as cfg:
+            del cfg.simple_lists_raw[cfg.simple_lists.get_idx_by_name(args.NAME)]
 
     @classmethod
     def print(cls, ctx: flam.FlamContext, args: argparse.Namespace) -> None:
-        simple_lists = list(ctx.simple_lists) if args.NAME is None else [ctx.simple_lists.get_by_name(args.NAME)]
+        simple_lists = list(ctx.cfg.simple_lists) if args.NAME is None else [ctx.cfg.simple_lists.get_by_name(args.NAME)]
 
         table = [['uid', 'name', 'type', 'address', 'default-fetch?', 'default-find?']]
         table.extend(sorted(
@@ -194,22 +246,24 @@ class SubcommandConfigList:
         print_table(table)
 
     @classmethod
-    def edit(cls, ctx: flam.FlamContext, args: argparse.Namespace, simple_list: flam.SimpleList) -> None:
-        if args.rename is not None and args.rename != simple_list.name:
-            simple_list.name = args.rename
+    def edit(cls, ctx: flam.FlamContext, args: argparse.Namespace) -> None:
+        with ctx.configure() as cfg:
+            # We trust that this succeeds because otherwise this function wouldn't be called.
+            simple_list = cfg.simple_lists.get_by_name(args.NAME)
 
-        if args.LISTDEF is not None:
-            cldef = flam.CanonListdef.parse(args.LISTDEF, ctx)
-            simple_list.list_type = cldef.list_type
-            simple_list.address = cldef.address
+            if args.rename is not None:
+                simple_list.name = args.rename
 
-        if args.default_fetch != Choice.AUTO:
-            simple_list.is_default_fetch = args.default_fetch == Choice.YES
+            if args.LISTDEF is not None:
+                cldef = flam.CanonListdef.parse(args.LISTDEF, ctx)
+                simple_list.list_type = cldef.list_type
+                simple_list.address = cldef.address
 
-        if args.default_find != Choice.AUTO:
-            simple_list.is_default_find = args.default_find == Choice.YES
+            if args.default_fetch != Choice.AUTO:
+                simple_list.is_default_fetch = args.default_fetch == Choice.YES
 
-        ctx.write_cfg()
+            if args.default_find != Choice.AUTO:
+                simple_list.is_default_find = args.default_find == Choice.YES
 
     @classmethod
     def create(cls, ctx: flam.FlamContext, args: argparse.Namespace) -> None:
@@ -229,8 +283,8 @@ class SubcommandConfigList:
             is_default_find = args.default_find == Choice.YES,
         )
 
-        ctx.add_simple_list(simple_list)
-        ctx.write_cfg()
+        with ctx.configure() as cfg:
+            cfg.simple_lists_raw.append(simple_list)
 
 class SubcommandConfigComposite:
     @classmethod
@@ -243,8 +297,8 @@ class SubcommandConfigComposite:
         action_group.add_argument('-P', '--print', action='store_true', help='print the list, or if NAME not provided, print all lists')
 
         parser.add_argument('-n', '--rename', metavar='NAME', default=None, action='store', help='in edit mode, rename the list to %(metavar)s')
-        parser.add_argument('-i', '--default-find', choices=Choice.yes_no_auto(), default=Choice.AUTO, action='store', help='decide if this list should be default for flam find %(metavar)s')
-        parser.add_argument('-e', '--default-fetch', choices=Choice.yes_no_auto(), default=Choice.AUTO, action='store', help='decide if this list should be fetched by default %(metavar)s')
+        parser.add_argument('-i', '--default-find', choices=Choice.yes_no_auto(), default=Choice.AUTO, action='store', help='decide if this list should be default for flam find')
+        parser.add_argument('-e', '--default-fetch', choices=Choice.yes_no_auto(), default=Choice.AUTO, action='store', help='decide if this list should be fetched by default')
         parser.add_argument('NAME', nargs='?', action='store', default=None, help='Operate on the list named %(dest)s')
         parser.add_argument('LIST', nargs='*', action='store', help='Set the list names to %(dest)s')
         parser.add_argument('FILTER', nargs='*', action='store', help='Set the FILTER to %(dest)s')
@@ -262,32 +316,30 @@ class SubcommandConfigComposite:
         # Default edit/create.
         else:
             try:
-                composite_list = ctx.composite_lists.get_by_name(args.NAME)
+                ctx.cfg.composite_lists.get_by_name(args.NAME)
             except flam.InputError:
                 cls.create(ctx, args)
             else:
-                cls.edit(ctx, args, composite_list)
+                cls.edit(ctx, args)
 
     @classmethod
     def delete(cls, ctx: flam.FlamContext, args: argparse.Namespace) -> None:
         if args.NAME is None:
             raise flam.InputError(f"Must specify a NAME to delete a composite list.")
 
-        composite_list = ctx.composite_lists.get_by_name(args.NAME)
-        assert not isinstance(composite_list.uid, flam.UnsetType)
-        ctx.delete_composite_list(composite_list.uid)
-        ctx.write_cfg()
+        with ctx.configure() as cfg:
+            del cfg.composite_lists_raw[cfg.composite_lists.get_idx_by_name(args.NAME)]
 
     @classmethod
     def print(cls, ctx: flam.FlamContext, args: argparse.Namespace) -> None:
-        composite_lists = list(ctx.composite_lists) if args.NAME is None else [ctx.composite_lists.get_by_name(args.NAME)]
+        composite_lists = list(ctx.cfg.composite_lists) if args.NAME is None else [ctx.cfg.composite_lists.get_by_name(args.NAME)]
 
         table = [['uid', 'name', 'lists', 'filter', 'default-fetch?', 'default-find?']]
         table.extend(sorted(
             [
                 typing.cast(str, cl.uid).split('-')[0],
                 cl.name,
-                ', '.join(ctx.simple_lists.get_by_uid(sl_uid).name for sl_uid in cl.simple_list_uids),
+                ', '.join(ctx.cfg.simple_lists.get_by_uid(sl_uid).name for sl_uid in cl.simple_list_uids),
                 ' '.join(cl.filter_tokens) if len(cl.filter_tokens) > 0 else '-',
                 Choice.bool2yesno(cl.is_default_fetch),
                 Choice.bool2yesno(cl.is_default_find),
@@ -298,29 +350,33 @@ class SubcommandConfigComposite:
         print_table(table)
 
     @classmethod
-    def edit(cls, ctx: flam.FlamContext, args: argparse.Namespace, composite_list: flam.CompositeList) -> None:
-        if args.rename is not None:
-            composite_list.name = args.rename
+    def edit(cls, ctx: flam.FlamContext, args: argparse.Namespace) -> None:
+        with ctx.configure() as cfg:
+            composite_list = cfg.composite_lists.get_by_name(args.NAME)
 
-        simple_list_names, filter_tokens = split_at_filter(args.LIST + args.FILTER)
+            if args.rename is not None:
+                composite_list.name = args.rename
 
-        if len(simple_list_names) > 0:
-            # The unset check should always be true, but the type checker wants it.
-            composite_list.simple_list_uids = [sl_uid for sl_name in simple_list_names if not isinstance(sl_uid := ctx.simple_lists.get_by_name(sl_name).uid, flam.UnsetType)]
+            simple_list_names, filter_tokens = split_at_filter(args.LIST + args.FILTER)
 
-        if len(filter_tokens) > 0:
-            # Don't have anything to do with this for now, but we can raise an exception if it doesn't compile.
-            ctx.compile_filter(filter_tokens, flam.FindableType.MOVIES)
-            composite_list.filter_tokens = filter_tokens
+            if len(simple_list_names) > 0:
+                # The unset check should always be true, but the type checker wants it.
+                composite_list.simple_list_uids = [
+                    sl_uid
+                    for sl_name in simple_list_names
+                    if not isinstance(sl_uid := ctx.cfg.simple_lists.get_by_name(sl_name).uid, flam.UnsetType)
+                ]
 
-        if args.default_fetch != Choice.AUTO:
-            composite_list.is_default_fetch = args.default_fetch == Choice.YES
+            if len(filter_tokens) > 0:
+                # Don't have anything to do with this for now, but we can raise an exception if it doesn't compile.
+                ctx.compile_filter(filter_tokens, flam.FindableType.MOVIES)
+                composite_list.filter_tokens = filter_tokens
 
-        if args.default_find != Choice.AUTO:
-            composite_list.is_default_find = args.default_find == Choice.YES
+            if args.default_fetch != Choice.AUTO:
+                composite_list.is_default_fetch = args.default_fetch == Choice.YES
 
-        # TODO: regenerate the composite list/mark it dirty so it gets regenerated? Probably should be an internal thing to the API.
-        ctx.write_cfg()
+            if args.default_find != Choice.AUTO:
+                composite_list.is_default_find = args.default_find == Choice.YES
 
     @classmethod
     def create(cls, ctx: flam.FlamContext, args: argparse.Namespace) -> None:
@@ -331,14 +387,14 @@ class SubcommandConfigComposite:
 
         composite_list = flam.CompositeList.create(
             name = args.NAME,
-            simple_list_uids = [ctx.simple_lists.get_by_name(sl_name).uid for sl_name in simple_list_names],
+            simple_list_uids = [ctx.cfg.simple_lists.get_by_name(sl_name).uid for sl_name in simple_list_names],
             filter_tokens = filter_tokens,
             is_default_fetch = args.default_fetch == Choice.YES,
             is_default_find = args.default_find == Choice.YES,
         )
 
-        ctx.add_composite_list(composite_list)
-        ctx.write_cfg()
+        with ctx.configure() as cfg:
+            cfg.composite_lists_raw.append(composite_list)
 
 class SubcommandFetch:
     @classmethod
@@ -379,7 +435,7 @@ If no %(dest)s provided, fetches all lists configured as defaults''')
             listdefs = args.LISTDEF if len(args.LISTDEF) != 0 else [flam.SpecialListType.DEFAULTS]
             ctx.fetch(listdefs, refetch_pattern=args.refetch, quiet=False)
 
-            with utils.ProgressBar(list(ctx.composite_lists),
+            with utils.ProgressBar(list(ctx.cfg.composite_lists),
                     desc='Regenerating composite lists',
                     keyfunc=lambda cl: cl.name) as bar:
                 for cl in bar:
@@ -687,9 +743,9 @@ def main() -> None:
 
             try:
                 args = find_mainparser.parse_args()
-            except argparse.ArgumentError as e:
+            except argparse.ArgumentError as e2:
                 # Print errors as if they came from "flam find".
-                find_subparser.error(str(e))
+                find_subparser.error(str(e2))
             
         flam.logger.info(f"Parsed args into: {args=}")
 

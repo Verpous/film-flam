@@ -56,7 +56,7 @@ class CanonListdef(typing.NamedTuple):
             result = cls(before_eq, after_eq)
         # For simple/composite lists we need to convert the name to a uid.
         elif eq_idx != -1 and (before_eq == SpecialListType.SIMPLE or before_eq == SpecialListType.COMPOSITE):
-            result = ctx.lists_of_type(before_eq).get_by_name(after_eq).abstract_listdef
+            result = ctx.cfg.lists_of_type(before_eq).get_by_name(after_eq).abstract_listdef
         # The generic case where it's whatever=whatever. This includes SpecialListType.ANNONYMOUS.
         elif eq_idx != -1:
             result = cls(before_eq, after_eq)
@@ -64,7 +64,7 @@ class CanonListdef(typing.NamedTuple):
         else:
             for list_type in (SpecialListType.SIMPLE, SpecialListType.COMPOSITE):
                 try:
-                    result = ctx.lists_of_type(list_type).get_by_name(before_eq).abstract_listdef
+                    result = ctx.cfg.lists_of_type(list_type).get_by_name(before_eq).abstract_listdef
                     break
                 except _exc.InputError:
                     pass
@@ -76,7 +76,7 @@ class CanonListdef(typing.NamedTuple):
         return result
 
     @classmethod
-    def parse_and_expand(cls, listdefs: typing.Iterable[str], ctx: _ctx.FlamContext, flavor: ExpandFlavor) -> typing.Iterator[CanonListdef]:
+    def parse_and_expand(cls, listdefs: typing.Iterable[str], ctx: _ctx.FlamContext, flavor: ExpandFlavor) -> typing.Iterable[CanonListdef]:
         for ldef in listdefs:
             cldef = cls.parse(ldef, ctx)
             
@@ -84,22 +84,22 @@ class CanonListdef(typing.NamedTuple):
                 _dbg.logger.info(f"Expansion of {cldef} includes {expanded}")
                 yield expanded
 
-    def expand(self, ctx: _ctx.FlamContext, flavor: ExpandFlavor) -> typing.Iterator[CanonListdef]:
+    def expand(self, ctx: _ctx.FlamContext, flavor: ExpandFlavor) -> typing.Iterable[CanonListdef]:
         match self.list_type:
             case SpecialListType.ALL:
-                yield from (sl.abstract_listdef for sl in ctx.simple_lists)
+                yield from (sl.abstract_listdef for sl in ctx.cfg.simple_lists)
             case SpecialListType.DEFAULTS:
                 match flavor:
                     case ExpandFlavor.FIND:
-                        yield from (sl.abstract_listdef for sl in ctx.simple_lists if sl.is_default_find)
-                        yield from (cl.abstract_listdef for cl in ctx.composite_lists if cl.is_default_find)
+                        yield from (sl.abstract_listdef for sl in ctx.cfg.simple_lists if sl.is_default_find)
+                        yield from (cl.abstract_listdef for cl in ctx.cfg.composite_lists if cl.is_default_find)
                     case ExpandFlavor.FETCH:
-                        yield from (sl.abstract_listdef for sl in ctx.simple_lists if sl.is_default_fetch)
+                        yield from (sl.abstract_listdef for sl in ctx.cfg.simple_lists if sl.is_default_fetch)
 
                         # Composite lists are not atomic for fetch, so after expanding to the defaults, we must double expand them.
                         yield from (
                             dbl_expanded
-                            for cl in ctx.composite_lists if cl.is_default_fetch
+                            for cl in ctx.cfg.composite_lists if cl.is_default_fetch
                                 for dbl_expanded in cl.abstract_listdef.expand(ctx, flavor)
                         )
                     case _:
@@ -110,7 +110,7 @@ class CanonListdef(typing.NamedTuple):
                         yield self
                     case ExpandFlavor.FETCH:
                         # Can't fetch composite lists, they must be expanded into simple lists.
-                        composite_list = ctx.composite_lists.get_by_uid(self.address)
+                        composite_list = ctx.cfg.composite_lists.get_by_uid(self.address)
                         yield from (CanonListdef(SpecialListType.SIMPLE, sl_uid) for sl_uid in composite_list.simple_list_uids)
                     case _:
                         raise RuntimeError(f"Unexpected {flavor=}")
@@ -150,7 +150,7 @@ class CanonListdef(typing.NamedTuple):
         if self.is_abstract:
             # Note that we're constructing a "CanonListdef" here which technically isn't "Canon". If you were to pretty() it, it will hit an error.
             # But it's ok because we're doing it internally and not returning it.
-            return str(CanonListdef(self.list_type, ctx.get_list_by_abstract_listdef(self).name))
+            return str(CanonListdef(self.list_type, ctx.cfg.get_list_by_abstract_listdef(self).name))
         
         return str(self)
 

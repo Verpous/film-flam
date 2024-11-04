@@ -259,17 +259,16 @@ def tabulate(
 _magnitudes = ['', 'K', 'M', 'B', 'T']
 
 def num_pretty(num: int | float, abbreviate: bool = True) -> str:
-    if abbreviate:
-        # I graciously thank this StackOverflow user https://stackoverflow.com/a/45846841/12553917.
-        num = float(f'{num:.3g}')
-        magnitude = 0
-
-        while abs(num) >= 1000 and magnitude + 1 < len(_magnitudes):
-            magnitude += 1
-            num /= 1000
-
-        num_str = f'{num:,f}'.rstrip('0').rstrip('.')
-        return num_str + _magnitudes[magnitude]
-    else:
+    if not abbreviate:
         return f'{num:,}'
-        
+
+    # I graciously thank this StackOverflow user https://stackoverflow.com/a/45846841/12553917.
+    num = float(f'{num:.3g}')
+    magnitude = 0
+
+    while abs(num) >= 1000 and magnitude + 1 < len(_magnitudes):
+        magnitude += 1
+        num /= 1000
+
+    num_str = f'{num:,f}'.rstrip('0').rstrip('.')
+    return num_str + _magnitudes[magnitude]

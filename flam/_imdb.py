@@ -306,7 +306,7 @@ def _refetch_person(mlf_person: _mlf.MLFPerson, ia: imdb.Cinemagoer) -> None:
     mlf_person.name = _safe_get(person_imdb, 'name', mlf_person.name)
 
 # I don't know wtf current_role might be.
-def _build_characters(current_role: typing.Any) -> typing.Iterator[None | str]:
+def _build_characters(current_role: typing.Any) -> typing.Iterable[None | str]:
     # Sometimes it's empty.
     if not current_role:
         return
@@ -318,7 +318,7 @@ def _build_characters(current_role: typing.Any) -> typing.Iterator[None | str]:
     else:
         _dbg.logger.warning(f"Type is not recognized: {current_role=}, {type(current_role)=}")
 
-def _build_roles(crew_imdb_by_uid: dict[str, imdb.Person.Person]) -> typing.Iterator[_mlf.MLFRole]:
+def _build_roles(crew_imdb_by_uid: dict[str, imdb.Person.Person]) -> typing.Iterable[_mlf.MLFRole]:
     for person_imdb in crew_imdb_by_uid.values():
         mlf_role = _mlf.MLFRole.create(
             person_uid=person_imdb.getID(),
@@ -326,7 +326,7 @@ def _build_roles(crew_imdb_by_uid: dict[str, imdb.Person.Person]) -> typing.Iter
 
         yield mlf_role
 
-def _build_people(crew_imdb_by_uid: dict[str, imdb.Person.Person]) -> typing.Iterator[_mlf.MLFPerson]:
+def _build_people(crew_imdb_by_uid: dict[str, imdb.Person.Person]) -> typing.Iterable[_mlf.MLFPerson]:
     for person_imdb in crew_imdb_by_uid.values():
         mlf_person = _mlf.MLFPerson.create(uid=person_imdb.getID())
         mlf_person.name = _safe_get(person_imdb, 'name', mlf_person.uid)

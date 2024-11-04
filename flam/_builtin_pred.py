@@ -62,7 +62,7 @@ class All(_filter.Predicate, name='all'):
 
         return self._cmpto(actual)
 
-    def regurgitate(self) -> typing.Iterator[str]:
+    def regurgitate(self) -> typing.Iterable[str]:
         yield from super().regurgitate()
         yield self._attribute.name
         yield str(self._cmpto)
@@ -81,7 +81,7 @@ class Has(_filter.Predicate, name='has'):
         actual = findable.extract(self._attribute)
         return actual is not None and (not isinstance(actual, list) or len(actual) > 0)
 
-    def regurgitate(self) -> typing.Iterator[str]:
+    def regurgitate(self) -> typing.Iterable[str]:
         yield from super().regurgitate()
         yield self._attribute.name
 
@@ -123,7 +123,7 @@ class InList(_filter.Predicate, name='in-list'):
         assert self._found_uids is not None
         return findable.uid in self._found_uids
 
-    def regurgitate(self) -> typing.Iterator[str]:
+    def regurgitate(self) -> typing.Iterable[str]:
         yield from super().regurgitate()
         yield min(_filter.Pipeline.LPAREN)
 
@@ -154,7 +154,7 @@ class CrewContains(_filter.Predicate, name='crew-contains', findable_type=_ml.Fi
                 for role in findable.movie_list.find_roles(*ct_gm, filter=self._filter)
         )
 
-    def regurgitate(self) -> typing.Iterator[str]:
+    def regurgitate(self) -> typing.Iterable[str]:
         yield from super().regurgitate()
         yield min(_filter.Pipeline.LPAREN)
         yield from (f"{ct_gm[0]}:{ct_gm[1]}" for ct_gm in self._ct_gms)

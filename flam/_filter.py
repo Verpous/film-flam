@@ -60,7 +60,7 @@ class FilterMember(abc.ABC):
 
     # Decompiles the filter into a list of tokens.
     @abc.abstractmethod
-    def regurgitate(self) -> typing.Iterator[str]:
+    def regurgitate(self) -> typing.Iterable[str]:
         pass
 
     def __str__(self) -> str:
@@ -197,7 +197,7 @@ class Filter(FilterMember):
     def excrete(self, findable: _ml.Findable, ctx: _ctx.FlamContext) -> bool:
         return self._filter is None or self._filter.excrete(findable, ctx)
 
-    def regurgitate(self) -> typing.Iterator[str]:
+    def regurgitate(self) -> typing.Iterable[str]:
         # Cache it since due to logging it's pretty much guaranteed we will want this multiple times.
         if self._regurgitation is None:
             self._regurgitation = [] if self._filter is None else list(self._filter.regurgitate())
@@ -258,7 +258,7 @@ class Pipeline(FilterMember):
 
         return accept
 
-    def regurgitate(self) -> typing.Iterator[str]:
+    def regurgitate(self) -> typing.Iterable[str]:
         # Parentheses around entire filters are useless, and they make it so if you repeatedly compile(regurgitate(compile(regurgitate...))),
         # each iteration wraps the expression in an additional parentheses.
         if not self._is_entire_filter:
@@ -313,7 +313,7 @@ class Negative(FilterMember):
     def excrete(self, findable: _ml.Findable, ctx: _ctx.FlamContext) -> bool:
         return not self._positive.excrete(findable, ctx)
 
-    def regurgitate(self) -> typing.Iterator[str]:
+    def regurgitate(self) -> typing.Iterable[str]:
         yield min(self.NEGATE)
         yield from self._positive.regurgitate()
 
@@ -362,7 +362,7 @@ class Disjoined(FilterMember):
     def excrete(self, findable: _ml.Findable, ctx: _ctx.FlamContext) -> bool:
         return self._single.excrete(findable, ctx)
 
-    def regurgitate(self) -> typing.Iterator[str]:
+    def regurgitate(self) -> typing.Iterable[str]:
         yield min(self.DISJOIN)
         yield from self._single.regurgitate()
 
@@ -419,7 +419,7 @@ class Predicate(FilterMember):
         suggestions = f' (did you mean: {", ".join(close_matches)}?)' if len(close_matches) > 0 else '.'
         raise _EinGafrurError(f"Expected valid predicate name, but got: '{prefixed_name}'{suggestions}", tokens=params.tokens, error_indices=at)
 
-    def regurgitate(self) -> typing.Iterator[str]:
+    def regurgitate(self) -> typing.Iterable[str]:
         yield self.PREFIX + self.name
 
 # This should be the only concrete predicate that is in this file, because it's special.
@@ -446,7 +446,7 @@ class AttributePredicate(Predicate, name='attribute'):
 
         return self._cmpto(actual)
 
-    def regurgitate(self) -> typing.Iterator[str]:
+    def regurgitate(self) -> typing.Iterable[str]:
         yield from super().regurgitate()
         yield str(self._cmpto)
 
