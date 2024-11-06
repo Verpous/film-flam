@@ -97,10 +97,23 @@ class _FlamSerializable(msgspec.Struct, forbid_unknown_fields=True, weakref=True
 
     # Subclasses can override this to add file validity checks beyond what msgspec already does.
     def sanity_checks(self) -> None:
-        obj_with_unset, unset_field = self.get_first_unset()
+        obj_with_unset, unset_field = self._get_first_unset()
 
         if obj_with_unset is not None:
             raise self._validation_error(f'Found unset field: {type(obj_with_unset).__name__}.{unset_field}.')
+
+    # Finds the first field it can which is UNSET, recursively.
+    # We do a bit of a hack, UNSET is intended to mark fields which are allowed to be missing from the JSON when decoded.
+    # Instead, we will check if any fields are unset before encoding and after decoding, and raise an exception.
+    # The reason: to force the user to initialize all fields even if only to initialize them as None,
+    # while allowing them to be initialized one by one and not at the constructor.
+    def _get_first_unset(self) -> tuple[_FlamSerializable, str] | tuple[None, None]:
+        for node in self.depth_first_iter():
+            for field in msgspec.structs.fields(node):
+                if getattr(node, field.name) == msgspec.UNSET:
+                    return self, field.name
+
+        return None, None
 
     # Sorts all lists in the file recursively so that we can compare files for equality.
     def canonicalize(self) -> None:
@@ -111,21 +124,9 @@ class _FlamSerializable(msgspec.Struct, forbid_unknown_fields=True, weakref=True
             for field in msgspec.structs.fields(node):
                 value = getattr(node, field.name)
 
-                if isinstance(value, list):
+                # For now only have one field we want to exclude from sorting so we hack it.
+                if isinstance(value, list) and field.name != 'filter_tokens':
                     value.sort()
-
-    # Finds the first field it can which is UNSET, recursively.
-    # We do a bit of a hack, UNSET is intended to mark fields which are allowed to be missing from the JSON when decoded.
-    # Instead, we will check if any fields are unset before encoding and after decoding, and raise an exception.
-    # The reason: to force the user to initialize all fields even if only to initialize them as None,
-    # while allowing them to be initialized one by one and not at the constructor.
-    def get_first_unset(self) -> tuple[_FlamSerializable, str] | tuple[None, None]:
-        for node in self.depth_first_iter():
-            for field in msgspec.structs.fields(node):
-                if getattr(node, field.name) == msgspec.UNSET:
-                    return self, field.name
-
-        return None, None
 
     def depth_first_iter(self) -> typing.Iterable[_FlamSerializable]:
         for field in msgspec.structs.fields(self):

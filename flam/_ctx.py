@@ -364,9 +364,6 @@ class FlamContext:
                 self._find_changes_and_write_cfg(editable_copy)
 
     def _find_changes_and_write_cfg(self, editable_copy: _cfg.Configuration) -> None:
-        # Must canonicalize for _find_added_deleted_modified.
-        editable_copy.canonicalize()
-
         added_sls, deleted_sls, modified_sls = self._find_added_deleted_modified(editable_copy.simple_lists, self._cfg.simple_lists)
         added_cls, deleted_cls, modified_cls = self._find_added_deleted_modified(editable_copy.composite_lists, self._cfg.composite_lists)
 
@@ -408,6 +405,7 @@ class FlamContext:
                 pass
 
             try:
+                assert not isinstance(cl.uid, _file.UnsetType)
                 del self._metadata.composite_lists_by_uid[cl.uid]
             except KeyError:
                 pass
@@ -447,7 +445,7 @@ class FlamContext:
                 pass
 
         # For deleted simple lists, their fetch data is not deleted, just renamed to the concrete name.
-        # TODO: Do we really want the orphaned file to linger forever? Maybe clean them up after a while?
+        # This means the files will linger on forever. I considered cleaning them up, but I think there's no need.
         for sl in deleted_sls:
             concrete_filename = self._get_movie_list_file_path(sl.concrete_listdef)
             abstract_filename = self._get_movie_list_file_path(sl.abstract_listdef)
@@ -478,7 +476,9 @@ class FlamContext:
 
             if old_list is None:
                 added_lists.append(cfg_list)
-            # Note: this check assumes the object is canonicalized.
+            # Note: this check would be better if we first canonicalized the file, but that throws an error if the file consists of unset fields,
+            # and we can tolerate false positives on this check. Anyway if the lists compare unequal, it does mean the list was "touched",
+            # just maybe touched with the same data in a different order.
             elif cfg_list != old_list:
                 modified_lists.append(cfg_list)
 
@@ -493,6 +493,7 @@ class FlamContext:
         
     def _write_cfg(self) -> None:
         _dbg.logger.info(f"Writing configuration: {self._cfg=}")
+        self._cfg.canonicalize()
         self._cfg.write(self._cfg_path)
         
     # Metadata

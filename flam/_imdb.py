@@ -351,7 +351,7 @@ def _safe_get(obj: typing.Any, key: str, default: typing.Any = None) -> typing.A
     try:
         val = obj[key]
     except KeyError as e:
-        _dbg.logger.warning(f"{obj=} is missing {key=}. Defaulting to {default=} (error: {e})")
+        _dbg.logger.warning(f"{obj=} is missing {key=}. Defaulting to {default} (error: {e})")
         val = default
 
     return val

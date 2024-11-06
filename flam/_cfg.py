@@ -43,7 +43,7 @@ class CompositeList(_file._FlamSerializable):
     uid:                    _file.UnsetType | str
     name:                   str
     simple_list_uids:       list[str]
-    filter_tokens:          list[str]
+    filter_tokens:          list[str] # Order matters so this list is hardcoded excluded from canonicalization.
     is_default_fetch:       bool
     is_default_find:        bool
 
@@ -53,6 +53,9 @@ class CompositeList(_file._FlamSerializable):
         return _ldef.CanonListdef(_ldef.SpecialListType.COMPOSITE, self.uid)
 
 # TODO: Maybe the configuration should use "schema evolution".
+#       How: add version field, and new fields will allow UnsetType. When loading a file, only if the versions are different, replace unsets with default values.
+#       Somehow circumvent create() permitting unset as default for these fields.
+#       Look into msgspec.defstruct both for this and for getting rid of all these annoying-ass unset checks, and also look at typing.Annotated
 class Configuration(_file._FlamSerializable):
     simple_lists_raw:       list[SimpleList]
     composite_lists_raw:    list[CompositeList]
