@@ -275,7 +275,8 @@ class SubcommandConfigList:
 
         cldef = flam.CanonListdef.parse(args.LISTDEF, ctx)
 
-        simple_list = flam.SimpleList.create(
+        simple_list = flam.SimpleList(
+            uid = 'INITIALIZED LATER',
             name = args.NAME,
             list_type = cldef.list_type,
             address = cldef.address,
@@ -360,12 +361,7 @@ class SubcommandConfigComposite:
             simple_list_names, filter_tokens = split_at_filter(args.LIST + args.FILTER)
 
             if len(simple_list_names) > 0:
-                # The unset check should always be true, but the type checker wants it.
-                composite_list.simple_list_uids = [
-                    sl_uid
-                    for sl_name in simple_list_names
-                    if not isinstance(sl_uid := ctx.cfg.simple_lists.get_by_name(sl_name).uid, flam.UnsetType)
-                ]
+                composite_list.simple_list_uids = [ctx.cfg.simple_lists.get_by_name(sl_name).uid for sl_name in simple_list_names]
 
             if len(filter_tokens) > 0:
                 # Don't have anything to do with this for now, but we can raise an exception if it doesn't compile.
@@ -385,7 +381,8 @@ class SubcommandConfigComposite:
 
         simple_list_names, filter_tokens = split_at_filter(args.LIST + args.FILTER)
 
-        composite_list = flam.CompositeList.create(
+        composite_list = flam.CompositeList(
+            uid = 'INITIALIZED LATER',
             name = args.NAME,
             simple_list_uids = [ctx.cfg.simple_lists.get_by_name(sl_name).uid for sl_name in simple_list_names],
             filter_tokens = filter_tokens,

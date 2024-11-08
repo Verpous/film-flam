@@ -25,7 +25,6 @@ from . import _ldef
 from . import _mlf
 from . import _exc
 from . import _ctx
-from . import _file
 from . import _dbg
 
 class ListFetcher(abc.ABC):
@@ -35,6 +34,7 @@ class ListFetcher(abc.ABC):
     # Subclasses must provide a list_type, and may optionally provide an uid_family if they have multiple fetchers that they want to be compatible.
     def __init_subclass__(cls, list_type: str, uid_family: None | str = None, **kwargs: typing.Any) -> None:
         super().__init_subclass__(**kwargs)
+
         # I like the name list_type better, but for registration it needs to be named "name".
         cls.name = list_type
         cls.uid_family = uid_family if uid_family is not None else list_type
@@ -52,14 +52,13 @@ class ListFetcher(abc.ABC):
         return self._abstract_listdef
 
     def fetch(self, movie_list_file: _mlf.MovieListFile, ctx: _ctx.FlamContext, refetch_re: None | re.Pattern, quiet: bool) -> None:
-        if not isinstance(movie_list_file.uid_family, _file.UnsetType) and movie_list_file.uid_family != self.uid_family:
+        if movie_list_file is not None and movie_list_file.uid_family != self.uid_family:
             raise _exc.InputError(f"Cannot fetch '{self.abstract_listdef.pretty(ctx)}' because it's already fetched with a different ID family "
                 f"(old: '{movie_list_file.uid_family}', new: '{self.uid_family}'). "
                 "This can happen if you changed a list's LISTDEF to one from a different family. "
                 "You can resolve it by fetching the list from scratch, or reverting it to its old type.")
 
         _dbg.logger.info(f"Running fetcher {type(self)=}, abstract={self.abstract_listdef}, concrete={self.concrete_listdef}")
-        interrupt_error = None
 
         if refetch_re is not None:
             nmovies_before = len(movie_list_file.movies_by_uid)
@@ -68,7 +67,7 @@ class ListFetcher(abc.ABC):
             movie_list_file.movies_by_uid = {
                 uid: mlf_movie
                 for uid, mlf_movie in movie_list_file.movies_by_uid.items()
-                if not isinstance(mlf_movie.title, _file.UnsetType) and not refetch_re.search(mlf_movie.title)
+                if not refetch_re.search(mlf_movie.title)
             }
 
             _remove_unused_people(movie_list_file)
@@ -80,23 +79,25 @@ class ListFetcher(abc.ABC):
             try:
                 self.fetch_into_file(movie_list_file)
             except _exc.FetchInterrupt as e:
-                interrupt_error = e
+                # Do this part even in case of FetchInterrupt because we intend to save the partial data.
+                self._close_fetch(movie_list_file)
+                raise _exc.FetchInterrupt(f"Fetching of '{self.abstract_listdef.pretty(ctx)}' got interrupted due to {e}. "
+                    "You may retry to pick up where it left off.") from e
 
+        self._close_fetch(movie_list_file)
+
+    def _close_fetch(self, movie_list_file: _mlf.MovieListFile) -> None:
         # Fetcher may have removed some movies from the list. Over here we remove people who are orphaned because of that.
         _remove_unused_people(movie_list_file)
 
+        # Set these in the end in case fetch_into_file wrote some bad data there.
         movie_list_file.uid_family = self.uid_family
         movie_list_file.list_type = self.abstract_listdef.list_type
         movie_list_file.address = self.abstract_listdef.address
 
-        if interrupt_error is not None:
-            raise _exc.FetchInterrupt(f"Fetching of '{self.abstract_listdef.pretty(ctx)}' got interrupted due to {interrupt_error}. "
-                "You may retry to pick up where it left off.")
-
     @abc.abstractmethod
     def fetch_into_file(self, movie_list_file: _mlf.MovieListFile) -> None:
         # Populates movie_list_file with data. It may already have preexisting data if updating an existing file.
-        # Must leave no field unset. Even if it's an optional field it must explicitly be set to None.
         pass
 
 def _remove_unused_people(movie_list_file: _mlf.MovieListFile) -> None:

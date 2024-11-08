@@ -31,7 +31,6 @@ from . import _cfg
 from . import _exc
 from . import _filter
 from . import _ldef
-from . import _file
 from . import _mlf
 from . import _md
 from . import _reg
@@ -106,8 +105,28 @@ class FlamContext:
             self._flam_dir = os.path.normpath(flam_dir)
 
         self._make_flam_dir()
-        self._cfg = _cfg.Configuration.load_or_create(self._cfg_path)
-        self._metadata = _md.FlamMetadata.load_or_create(self._metadata_path)
+
+        try:
+            self._cfg = _cfg.Configuration.load(self._cfg_path)
+        except FileNotFoundError:
+            self._cfg = _cfg.Configuration(
+                simple_lists_raw = [],
+                composite_lists_raw = [],
+                extensions = [],
+            )
+
+            _dbg.logger.info(f"Configuration file doesn't exist, creating a new one.")
+            self._write_cfg()
+
+        try:
+            self._metadata = _md.FlamMetadata.load(self._metadata_path)
+        except FileNotFoundError:
+            self._metadata = _md.FlamMetadata(
+                composite_lists_by_uid = {},
+            )
+
+            _dbg.logger.info(f"Metadata file doesn't exist, creating a new one.")
+            self._write_metadata()
 
         # I wish I could print these prettier but it's not worth the hassle.
         _dbg.logger.info(f'Loaded configuration: {self._cfg=}')
@@ -207,13 +226,12 @@ class FlamContext:
 
             # Update metadata.
             if abstract_listdef.address not in self._metadata.composite_lists_by_uid:
-                self._metadata.composite_lists_by_uid[abstract_listdef.address] = _md.CompositeListMetadata.create(uid=abstract_listdef.address)
+                self._metadata.composite_lists_by_uid[abstract_listdef.address] = _md.CompositeListMetadata(
+                    uid = abstract_listdef.address,
 
-            # Assume os.path won't throw an error because it would've been caught by _is_composite_list_outdated.
-            self._metadata.composite_lists_by_uid[abstract_listdef.address].dependency_mtime = {
-                cldef.address: os.path.getmtime(self._get_movie_list_file_path(cldef))
-                for cldef in dependencies
-            }
+                    # Assume os.path won't throw an error because it would've been caught by _is_composite_list_outdated.
+                    dependency_mtime = {cldef.address: os.path.getmtime(self._get_movie_list_file_path(cldef)) for cldef in dependencies},
+                )
 
             # Writing the mlf before the metadata I think is important.
             self._write_movie_list_file(movie_list_file)
@@ -238,7 +256,6 @@ class FlamContext:
         except _exc.FileValidationError as e:
             raise _exc.FileValidationError(f"{e} You may need to fetch '{abstract_listdef.pretty(self)}' again from scratch.") from e
 
-        assert not isinstance(movie_list_file.address, _file.UnsetType)
         self._movie_list_files_cache[abstract_listdef] = movie_list_file
         _dbg.logger.info(f"Returning from disk: '{abstract_listdef}'")
         return movie_list_file
@@ -272,8 +289,14 @@ class FlamContext:
     def _generate_composite_movie_list_file(self, abstract_listdefs: list[_ldef.CanonListdef], filter: _filter.Filter, composite_uid: None | str) -> _mlf.MovieListFile:
         dependency_mlfs = [self._get_movie_list_file(cldef) for cldef in abstract_listdefs]
 
-        merged_mlf = _mlf.MovieListFile.create()
-        merged_mlf.uid_family = dependency_mlfs[0].uid_family
+        # The address on annonymous lists is only present for pretty-printing purposes. It must contain all the information about how the list was built.
+        merged_mlf = _mlf.MovieListFile(
+            uid_family = dependency_mlfs[0].uid_family,
+            list_type = _ldef.SpecialListType.ANNONYMOUS if composite_uid is None else _ldef.SpecialListType.COMPOSITE,
+            address = ' '.join(itertools.chain((cldef.pretty(self) for cldef in abstract_listdefs), filter.regurgitate())) if composite_uid is None else composite_uid,
+            movies_by_uid = {},
+            people_by_uid = {},
+        )
 
         # When building the list, we use the same objects from the dependency lists. At the end we deepcopy the result.
         # In case of duplicates we arbitrarily choose which to keep. We don't allow non-uniqueness.
@@ -286,16 +309,8 @@ class FlamContext:
             merged_mlf.movies_by_uid.update(mlf.movies_by_uid)
             merged_mlf.people_by_uid.update(mlf.people_by_uid)
 
-        # If composite_uid is none treat it as an annonymous composite list.
-        if composite_uid is None:
-            # The address on annonymous lists is only present for pretty-printing purposes. It must contain all the information about how the list was built.
-            merged_mlf.list_type = _ldef.SpecialListType.ANNONYMOUS
-            merged_mlf.address = ' '.join(itertools.chain((cldef.pretty(self) for cldef in abstract_listdefs), filter.regurgitate()))
-        else:
-            merged_mlf.list_type = _ldef.SpecialListType.COMPOSITE
-            merged_mlf.address = composite_uid
-
         if filter.is_empty:
+            # Deepcopy because we built it using some objects from other files.
             merged_mlf = copy.deepcopy(merged_mlf)
         else:
             merged_mlf = _ml.MovieList(merged_mlf, self).export(filter)
@@ -405,7 +420,6 @@ class FlamContext:
                 pass
 
             try:
-                assert not isinstance(cl.uid, _file.UnsetType)
                 del self._metadata.composite_lists_by_uid[cl.uid]
             except KeyError:
                 pass
@@ -464,27 +478,20 @@ class FlamContext:
 
         for cfg_list in lists:
             # Try to get matching list in the old cfg.
-            if isinstance(cfg_list.uid, _file.UnsetType):
+            try:
+                old_list = old_lists.get_by_uid(cfg_list.uid)
+            except _exc.InputError:
                 old_list = None
-            else:
-                try:
-                    old_list = old_lists.get_by_uid(cfg_list.uid)
-                except _exc.InputError:
-                    # Importantly, to cover for users who mistakenly edit the uid,
-                    # we consider a "not unset but not preexisting" UID to be equivalent to an unset UID.
-                    old_list = None
 
             if old_list is None:
                 added_lists.append(cfg_list)
-            # Note: this check would be better if we first canonicalized the file, but that throws an error if the file consists of unset fields,
-            # and we can tolerate false positives on this check. Anyway if the lists compare unequal, it does mean the list was "touched",
-            # just maybe touched with the same data in a different order.
+            # Note: would be better if we first canonicalized the file, but that may throw errors, and we can tolerate false positives on this check.
+            # Anyway if the lists compare unequal, it does mean the list was "touched", just maybe touched with the same data in a different order.
             elif cfg_list != old_list:
                 modified_lists.append(cfg_list)
 
         for old_sl in old_lists:
             try:
-                assert not isinstance(old_sl.uid, _file.UnsetType)
                 lists.get_by_uid(old_sl.uid)
             except _exc.InputError:
                 deleted_lists.append(old_sl)
@@ -521,37 +528,41 @@ class FlamContext:
                 movie_list_file = self._get_movie_list_file(fetcher.abstract_listdef)
             # If the list were composite there'd be another case where this exception is raised, but it's not possible to reach here with a composite list.
             except _exc.InputError:
-                movie_list_file = _mlf.MovieListFile.create()
+                movie_list_file = _mlf.MovieListFile(
+                    uid_family = 'INITIALIZED LATER',
+                    list_type = 'INITIALIZED LATER',
+                    address = 'INITIALIZED LATER',
+                    movies_by_uid = {},
+                    people_by_uid = {},
+                )
 
             _dbg.logger.info(f"Fetching {fetcher.abstract_listdef} into file with nmovies={len(movie_list_file.movies_by_uid)} npeople={len(movie_list_file.people_by_uid)}")
                 
             # We need both the old and new versions to compare at the end. But it's important that the new one is the deepcopy,
             # so that anyone currently holding on to a list handle won't have the underlying list file changed.
             new_movie_list_file = copy.deepcopy(movie_list_file)
-            interrupt_error = None
             
             try:
                 fetcher.fetch(new_movie_list_file, self, refetch_re, quiet)
-            except _exc.FetchInterrupt as e:
-                interrupt_error = e
+            except _exc.FetchInterrupt:
+                _dbg.logger.info(f"Partially fetched {fetcher.abstract_listdef} due to an interrupt.")
+                self._close_fetch(movie_list_file, new_movie_list_file)
+                raise
 
-            # Must canonicalize before comparing for equality.
-            new_movie_list_file.canonicalize()
-
-            # We'll only write the new contents if they're different than before, and we'll return whether there was a diff or not.
-            # This allows us to check the file mtime to know if it's dirty and dependent files need to be regenerated.
-            if movie_list_file != new_movie_list_file:
-                self._write_movie_list_file(new_movie_list_file)
-
-            # Because it's a dictionary we easily overwrite an existing outdated cached file.
-            assert not isinstance(new_movie_list_file.address, _file.UnsetType)
-            self._movie_list_files_cache[new_movie_list_file.abstract_listdef] = new_movie_list_file
-
-            if interrupt_error is not None:
-                _dbg.logger.info(f"Partially fetched {fetcher.abstract_listdef} due to interrupt: {interrupt_error}")
-                raise interrupt_error
-
+            self._close_fetch(movie_list_file, new_movie_list_file)
             _dbg.logger.info(f"Fetched {fetcher.abstract_listdef} with no interrupts")
+
+    def _close_fetch(self, movie_list_file: _mlf.MovieListFile, new_movie_list_file: _mlf.MovieListFile) -> None:
+        # Must canonicalize before comparing for equality.
+        new_movie_list_file.canonicalize()
+
+        # We'll only write the new contents if they're different than before, and we'll return whether there was a diff or not.
+        # This allows us to check the file mtime to know if it's dirty and dependent files need to be regenerated.
+        if movie_list_file != new_movie_list_file:
+            self._write_movie_list_file(new_movie_list_file)
+
+        # Because it's a dictionary we easily overwrite an existing outdated cached file.
+        self._movie_list_files_cache[new_movie_list_file.abstract_listdef] = new_movie_list_file
 
     def _get_fetcher(self, canon_listdef: _ldef.CanonListdef) -> _fetch.ListFetcher:
         if canon_listdef.is_abstract:

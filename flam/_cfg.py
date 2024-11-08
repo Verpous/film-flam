@@ -23,7 +23,7 @@ import typing
 import weakref
 
 class SimpleList(_file._FlamSerializable):
-    uid:                    _file.UnsetType | str
+    uid:                    str
     name:                   str
     list_type:              str
     address:                str
@@ -32,7 +32,6 @@ class SimpleList(_file._FlamSerializable):
 
     @property
     def abstract_listdef(self) -> _ldef.CanonListdef:
-        assert not isinstance(self.uid, _file.UnsetType)
         return _ldef.CanonListdef(_ldef.SpecialListType.SIMPLE, self.uid)
 
     @property
@@ -40,7 +39,7 @@ class SimpleList(_file._FlamSerializable):
         return _ldef.CanonListdef(self.list_type, self.address)
 
 class CompositeList(_file._FlamSerializable):
-    uid:                    _file.UnsetType | str
+    uid:                    str
     name:                   str
     simple_list_uids:       list[str]
     filter_tokens:          list[str] # Order matters so this list is hardcoded excluded from canonicalization.
@@ -49,7 +48,6 @@ class CompositeList(_file._FlamSerializable):
 
     @property
     def abstract_listdef(self) -> _ldef.CanonListdef:
-        assert not isinstance(self.uid, _file.UnsetType)
         return _ldef.CanonListdef(_ldef.SpecialListType.COMPOSITE, self.uid)
 
 # TODO: Maybe the configuration should use "schema evolution".

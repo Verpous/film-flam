@@ -27,7 +27,6 @@ from . import _fetch
 from . import _attr
 from . import _exc
 from . import _dbg
-from . import _file
 from . import _ldef
 
 class GroupMode(enum.StrEnum):
@@ -261,17 +260,14 @@ class MovieList:
 
     @property
     def list_type(self) -> str:
-        assert not isinstance(self._movie_list_file.list_type, _file.UnsetType)
         return self._movie_list_file.list_type
 
     @property
     def address(self) -> str:
-        assert not isinstance(self._movie_list_file.address, _file.UnsetType)
         return self._movie_list_file.address
 
     @property
     def uid_family(self) -> str:
-        assert not isinstance(self._movie_list_file.uid_family, _file.UnsetType)
         return self._movie_list_file.uid_family
 
     def __iter__(self) -> typing.Iterator[Movie]:

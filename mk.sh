@@ -47,9 +47,11 @@ pylint_ignore+=R0902, # too-many-instance-attributes
 pylint_ignore+=R0903, # too-few-public-methods
 pylint_ignore+=R0912, # too-many-branches
 pylint_ignore+=R0913, # too-many-arguments
+pylint_ignore+=R0915, # too-many-statements
 pylint_ignore+=R0917, # too-many-positional-arguments
 pylint_ignore+=R1708, # stop-iteration-return
 pylint_ignore+=R1714, # consider-using-in
+pylint_ignore+=R1735, # use-dict-literal
 
 pylint_ignore+=W0124, # confusing-with-statement
 pylint_ignore+=W0212, # protected-access
@@ -100,7 +102,6 @@ release() {
             ;;
     esac
 
-    # Pipreqs gets confused if we don't clean for some reason.
     _gen_requirements
     _gen_version $flavor
 

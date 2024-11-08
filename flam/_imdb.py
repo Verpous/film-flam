@@ -42,7 +42,6 @@ from . import _reg
 from . import _fetch
 from . import _exc
 from . import _mlf
-from . import _file
 from . import _ml
 from . import _dbg
 from . import utils
@@ -75,6 +74,31 @@ class _CsvRow:
     # These have defaults because they only appear in CSVs of lists made by the logged in user.
     myrating:           None | str = None
     myrating_date:      None | str = None
+
+    def mlf_fields(self) -> dict[str, typing.Any]:
+        # If any of the conversions fail we simply propagate the error.
+        return dict(
+            list_index        = int(self.list_index),
+            description       = self.description,
+            rating            = float(self.rating) if self.rating != '' else None, # I've actually found shorts which have no rating.
+            runtime_minutes   = int(self.runtime_minutes),
+            genres            = self.genres.split(', '),
+            votes             = int(self.votes),
+            myrating          = float(self.myrating) if (self.myrating is not None and self.myrating != '') else None,
+            watch_date        = self._date(self.watch_date),
+            release_date      = self._date(self.release_date),
+        )
+
+    @classmethod
+    def _date(cls, date: str) -> datetime.date:
+        # IMDb used to only serve %Y-%m-%d, but now it sometimes serves a partial date.
+        for fmt in ('%Y-%m-%d', '%Y-%m', '%Y'):
+            try:
+                return datetime.datetime.strptime(date, fmt).date()
+            except ValueError:
+                pass
+
+        raise ValueError(f'Invalid date: {date}')
 
 @_reg._register_builtin
 class SeleniumListFetcher(_fetch.ListFetcher, list_type='imdb-id', uid_family=_UID_FAMILY):
@@ -202,7 +226,6 @@ def _fetch_movies_in_csv(movies_csv: list[_CsvRow], movie_list_file: _mlf.MovieL
     _dbg.logger.info(f"MLF has {len(movie_list_file.movies_by_uid)} movies after omitting ones not in the CSV")
 
     ia = imdb.Cinemagoer()
-    interrupting_error = None
 
     try:
         # Now we do a pass where we fetch fields using Cinemagoer.
@@ -226,29 +249,22 @@ def _fetch_movies_in_csv(movies_csv: list[_CsvRow], movie_list_file: _mlf.MovieL
     # If _fetch_movie or _refetch_person raise an IMDb error, or we get a KeyboardInterrupt,
     # it will break us out of that loop, seal the progress bar nicely, and then we'll handle the exception here by turning it into a FetchInterrupt.
     except (imdb.IMDbError, KeyboardInterrupt) as e:
-        interrupting_error = e
+        # Do this even if an IMDb error took place.
+        _add_csv_fields(movies_csv, movie_list_file)
+        raise _exc.FetchInterrupt(f"{type(e).__name__}: {e}") from e
         
-    # Now a pass where we add CSV fields. We reach this even if an IMDb error took place, it's not in a finally block because we don't want to do it for just any exception.
+    _add_csv_fields(movies_csv, movie_list_file)
+
+def _add_csv_fields(movies_csv: list[_CsvRow], movie_list_file: _mlf.MovieListFile) -> None:
     for movie_csv in movies_csv:
         if movie_csv.uid not in movie_list_file.movies_by_uid:
             _dbg.logger.warning(f"Movie by UID {movie_csv.uid} wasn't fetched. This shouldn't happen unless we hit an IMDbError while fetching")
             continue
 
-        mlf_movie = movie_list_file.movies_by_uid[movie_csv.uid]
-
-        # If any of the conversions fail we simply propagate the error.
-        mlf_movie.list_index        = int(movie_csv.list_index)
-        mlf_movie.description       = movie_csv.description
-        mlf_movie.rating            = float(movie_csv.rating) if movie_csv.rating != '' else None # I've actually found shorts which have no rating.
-        mlf_movie.runtime_minutes   = int(movie_csv.runtime_minutes)
-        mlf_movie.genres            = movie_csv.genres.split(', ')
-        mlf_movie.votes             = int(movie_csv.votes)
-        mlf_movie.myrating          = float(movie_csv.myrating) if (movie_csv.myrating is not None and movie_csv.myrating != '') else None
-        mlf_movie.watch_date        = _date_from_csv(movie_csv.watch_date)
-        mlf_movie.release_date      = _date_from_csv(movie_csv.release_date)
-
-    if interrupting_error is not None:
-        raise _exc.FetchInterrupt(f"{type(interrupting_error).__name__}: {interrupting_error}")
+        # This isn't very efficient - we create a copy instead of modifying inplace,
+        # and we do this even for newly fetched files, even though they were already constructed with the right CSV fields.
+        # I don't think this is the place to worry about performance though, and this is just the easiest way.
+        movie_list_file.movies_by_uid[movie_csv.uid] = movie_list_file.movies_by_uid[movie_csv.uid].replace(**movie_csv.mlf_fields())
 
 def _fetch_movie(movie_csv: _CsvRow, movie_list_file: _mlf.MovieListFile, ia: imdb.Cinemagoer) -> None:
     NUM_RETRIES = 5
@@ -265,12 +281,9 @@ def _fetch_movie(movie_csv: _CsvRow, movie_list_file: _mlf.MovieListFile, ia: im
             if i == NUM_RETRIES - 1:
                 raise
 
-    mlf_movie = _mlf.MLFMovie.create(uid=movie_csv.uid)
-
-    # Prefer to get the title from Cinemagoer because they have better titles for foreign language films, but it's good to have a fallback (not that we ever need it).
-    mlf_movie.title = _safe_get(movie_imdb, 'title', default=movie_csv.title) 
-    mlf_movie.metascore = _safe_get(movie_imdb, 'metascore')
-
+    # Build crews dictionary and also people.
+    crew = {}
+    
     for crew_type in _ml.CrewType:
         # I generally tried to choose the CrewType values to match imdb's, but this one goddamn type has a space in it and I don't like that.
         imdb_crew_type = crew_type.value if crew_type != _ml.CrewType.STUNTCAST else 'stunt performer'
@@ -280,12 +293,26 @@ def _fetch_movie(movie_csv: _CsvRow, movie_list_file: _mlf.MovieListFile, ia: im
         # 2. Sometimes you get the same person twice. Also discarded.
         crew_imdb_by_uid = {p.getID(): p for p in _safe_get(movie_imdb, imdb_crew_type, default=[]) if p}
 
-        mlf_movie.crew[crew_type] = _mlf.MLFCrew.create(
-            crew_type=crew_type,
-            roles_by_uid={r.person_uid: r for r in _build_roles(crew_imdb_by_uid)})
+        crew[str(crew_type)] = _mlf.MLFCrew(
+            crew_type = crew_type,
+            roles_by_uid = {r.person_uid: r for r in _build_roles(crew_imdb_by_uid)}
+        )
+
+        # We are unafraid to add people to the file before the movie, because we "clean up" unused people before the file is written.
         _update_people_by_uid(movie_list_file.people_by_uid, ((p.uid, p) for p in _build_people(crew_imdb_by_uid)))
 
-    movie_list_file.movies_by_uid[movie_csv.uid] = mlf_movie
+    mlf_movie = _mlf.MLFMovie(
+        uid = movie_csv.uid,
+
+        # I prefer to get the title from Cinemagoer because they have better titles for foreign language films, but it's good to have a fallback (not that we ever need it).
+        title = _safe_get(movie_imdb, 'title', default=movie_csv.title),
+        metascore = _safe_get(movie_imdb, 'metascore'),
+        crew = crew,
+
+        **movie_csv.mlf_fields(),
+    )
+
+    movie_list_file.movies_by_uid[mlf_movie.uid] = mlf_movie
 
 def _refetch_person(mlf_person: _mlf.MLFPerson, ia: imdb.Cinemagoer) -> None:
     NUM_RETRIES = 5
@@ -320,17 +347,17 @@ def _build_characters(current_role: typing.Any) -> typing.Iterable[None | str]:
 
 def _build_roles(crew_imdb_by_uid: dict[str, imdb.Person.Person]) -> typing.Iterable[_mlf.MLFRole]:
     for person_imdb in crew_imdb_by_uid.values():
-        mlf_role = _mlf.MLFRole.create(
-            person_uid=person_imdb.getID(),
-            characters=[c for c in _build_characters(person_imdb.currentRole) if c is not None])
-
-        yield mlf_role
+        yield _mlf.MLFRole(
+            person_uid = person_imdb.getID(),
+            characters = [c for c in _build_characters(person_imdb.currentRole) if c is not None],
+        )
 
 def _build_people(crew_imdb_by_uid: dict[str, imdb.Person.Person]) -> typing.Iterable[_mlf.MLFPerson]:
     for person_imdb in crew_imdb_by_uid.values():
-        mlf_person = _mlf.MLFPerson.create(uid=person_imdb.getID())
-        mlf_person.name = _safe_get(person_imdb, 'name', mlf_person.uid)
-        yield mlf_person
+        yield _mlf.MLFPerson(
+            uid = person_imdb.getID(),
+            name = _safe_get(person_imdb, 'name', person_imdb.getID())
+        )
 
 # Because of this deal with bad names, when we merge two people dictionaries we want to keep the person with the good name if there is one.
 def _update_people_by_uid(dst_people: dict[str, _mlf.MLFPerson], src_people: typing.Iterable[tuple[str, _mlf.MLFPerson]]) -> None:
@@ -342,8 +369,8 @@ def _update_people_by_uid(dst_people: dict[str, _mlf.MLFPerson], src_people: typ
 # We fix this by trying to find people with a name like that and replacing it with the correct name.
 # By doing this after everything is downloaded and not when the name was added to the dictionary,
 # we are able to optimize by using the same person's appearance in something else instead of doing the big download when possible.
-def _is_person_name_bad(name: _file.UnsetType | None | str) -> bool:
-    assert isinstance(name, str)
+def _is_person_name_bad(name: None | str) -> bool:
+    assert name is not None
     return '\n' in name or ' episode' in name.lower()
 
 def _safe_get(obj: typing.Any, key: str, default: typing.Any = None) -> typing.Any:
@@ -355,16 +382,6 @@ def _safe_get(obj: typing.Any, key: str, default: typing.Any = None) -> typing.A
         val = default
 
     return val
-
-def _date_from_csv(date: str) -> datetime.date:
-    # IMDb used to only serve %Y-%m-%d, but now it sometimes serves a partial date.
-    for fmt in ('%Y-%m-%d', '%Y-%m', '%Y'):
-        try:
-            return datetime.datetime.strptime(date, fmt).date()
-        except ValueError:
-            pass
-
-    raise ValueError(f'Invalid date: {date}')
 
 #endregion
 

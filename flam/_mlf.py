@@ -32,7 +32,7 @@ class MLFCrew(_file._FlamSerializable):
 
 class MLFPerson(_file._FlamSerializable):
     uid:                    str
-    name:                   _file.UnsetType | None | str
+    name:                   None | str
     # TODO: Check if can support birthday?
     # Would love to add gender, nationality but cinemagoer doesn't have them.
 
@@ -40,16 +40,16 @@ class MLFPerson(_file._FlamSerializable):
 # I.e., 'watch_date', 'description', 'list_index' are not the same as the rest, and when merging lists, we should keep them all.
 class MLFMovie(_file._FlamSerializable):
     uid:                    str
-    title:                  _file.UnsetType | None | str
-    watch_date:             _file.UnsetType | None | datetime.date
-    release_date:           _file.UnsetType | None | datetime.date
-    description:            _file.UnsetType | None | str
-    list_index:             _file.UnsetType | None | int
-    runtime_minutes:        _file.UnsetType | None | int
-    metascore:              _file.UnsetType | None | int
-    votes:                  _file.UnsetType | None | int
-    rating:                 _file.UnsetType | None | float
-    myrating:               _file.UnsetType | None | float
+    title:                  None | str
+    watch_date:             None | datetime.date
+    release_date:           None | datetime.date
+    description:            None | str
+    list_index:             None | int
+    runtime_minutes:        None | int
+    metascore:              None | int
+    votes:                  None | int
+    rating:                 None | float
+    myrating:               None | float
     genres:                 list[str]
     # TODO: consider adding languages, countries
 
@@ -60,19 +60,18 @@ class MLFMovie(_file._FlamSerializable):
 
 class MovieListFile(_file._FlamSerializable):
     # These two fields are redundant, they are essentially the filename so the user must already know them to reach them. but if I'll omit them I'll regret it.
-    list_type:              _file.UnsetType | str
-    address:                _file.UnsetType | str
+    list_type:              str
+    address:                str
 
     # Files are "compatible" if they have a matching uid_family. This is because I have no good way of identifying matching items between, say, IMDb and Letterboxd.
     # If a list originates from IMDb, all the uids in the file will be from IMDb, and so it will only be compatible with other IMDb-based lists.
-    uid_family:               _file.UnsetType | str
+    uid_family:             str
 
     movies_by_uid:          dict[str, MLFMovie]
     people_by_uid:          dict[str, MLFPerson]
 
     @property
     def abstract_listdef(self) -> _ldef.CanonListdef:
-        assert not isinstance(self.list_type, _file.UnsetType) and not isinstance(self.address, _file.UnsetType)
         return _ldef.CanonListdef(self.list_type, self.address)
 
     def sanity_checks(self) -> None:

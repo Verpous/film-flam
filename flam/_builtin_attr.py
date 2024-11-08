@@ -23,7 +23,6 @@ from . import _exc
 from . import _reg
 from . import _ml
 from . import _mlf
-from . import _file
 from . import _attr
 from . import attrutils
 
@@ -61,7 +60,6 @@ def mean(data: typing.Iterable) -> None | float:
     is_ascending = True,
 ))
 def _movie_muid_extractor(self: attrutils.EasyAttribute, movie: _ml.Movie, mlf_movie: _mlf.MLFMovie) -> str:
-    assert not isinstance(mlf_movie.uid, _file.UnsetType)
     return mlf_movie.uid
 
 @_register_easy_attribute(attrutils.EasyAttributeParams(
@@ -72,7 +70,6 @@ def _movie_muid_extractor(self: attrutils.EasyAttribute, movie: _ml.Movie, mlf_m
     is_ascending = True,
 ))
 def _movie_title_extractor(self: attrutils.EasyAttribute, movie: _ml.Movie, mlf_movie: _mlf.MLFMovie) -> None | str:
-    assert not isinstance(mlf_movie.title, _file.UnsetType)
     return mlf_movie.title
 
 for handler in attrutils.DATE_HANDLERS:
@@ -84,7 +81,6 @@ for handler in attrutils.DATE_HANDLERS:
         is_ascending = handler.is_ascending, # pylint: disable=cell-var-from-loop
     ))
     def _movie_watched_extractor(self: attrutils.EasyAttribute, movie: _ml.Movie, mlf_movie: _mlf.MLFMovie) -> None | datetime.date:
-        assert not isinstance(mlf_movie.watch_date, _file.UnsetType)
         return None if mlf_movie.watch_date is None else typing.cast(attrutils.DateHandler, self._params.type_handler).strip(mlf_movie.watch_date)
 
     @_register_easy_attribute(attrutils.EasyAttributeParams(
@@ -95,7 +91,6 @@ for handler in attrutils.DATE_HANDLERS:
         is_ascending = handler.is_ascending, # pylint: disable=cell-var-from-loop
     ))
     def _movie_released_extractor(self: attrutils.EasyAttribute, movie: _ml.Movie, mlf_movie: _mlf.MLFMovie) -> None | datetime.date:
-        assert not isinstance(mlf_movie.release_date, _file.UnsetType)
         return None if mlf_movie.release_date is None else typing.cast(attrutils.DateHandler, self._params.type_handler).strip(mlf_movie.release_date)
 
 @_register_easy_attribute(attrutils.EasyAttributeParams(
@@ -106,7 +101,6 @@ for handler in attrutils.DATE_HANDLERS:
     is_ascending = True,
 ))
 def _movie_description_extractor(self: attrutils.EasyAttribute, movie: _ml.Movie, mlf_movie: _mlf.MLFMovie) -> None | str:
-    assert not isinstance(mlf_movie.description, _file.UnsetType)
     return mlf_movie.description
 
 @_register_easy_attribute(attrutils.EasyAttributeParams(
@@ -117,7 +111,6 @@ def _movie_description_extractor(self: attrutils.EasyAttribute, movie: _ml.Movie
     is_ascending = True,
 ))
 def _movie_index_extractor(self: attrutils.EasyAttribute, movie: _ml.Movie, mlf_movie: _mlf.MLFMovie) -> None | int:
-    assert not isinstance(mlf_movie.list_index, _file.UnsetType)
     return mlf_movie.list_index
 
 @_register_easy_attribute(attrutils.EasyAttributeParams(
@@ -128,7 +121,6 @@ def _movie_index_extractor(self: attrutils.EasyAttribute, movie: _ml.Movie, mlf_
     is_ascending = True,
 ))
 def _movie_runtime_extractor(self: attrutils.EasyAttribute, movie: _ml.Movie, mlf_movie: _mlf.MLFMovie) -> None | int:
-    assert not isinstance(mlf_movie.runtime_minutes, _file.UnsetType)
     return mlf_movie.runtime_minutes
 
 @_register_easy_attribute(attrutils.EasyAttributeParams(
@@ -139,7 +131,6 @@ def _movie_runtime_extractor(self: attrutils.EasyAttribute, movie: _ml.Movie, ml
     is_ascending = False,
 ))
 def _movie_metascore_extractor(self: attrutils.EasyAttribute, movie: _ml.Movie, mlf_movie: _mlf.MLFMovie) -> None | int:
-    assert not isinstance(mlf_movie.metascore, _file.UnsetType)
     return mlf_movie.metascore
 
 # TODO: human-readable str_of (i.e. add K, M, for thousands and millions)
@@ -151,7 +142,6 @@ def _movie_metascore_extractor(self: attrutils.EasyAttribute, movie: _ml.Movie, 
     is_ascending = False,
 ))
 def _movie_votes_extractor(self: attrutils.EasyAttribute, movie: _ml.Movie, mlf_movie: _mlf.MLFMovie) -> None | int:
-    assert not isinstance(mlf_movie.votes, _file.UnsetType)
     return mlf_movie.votes
 
 @_register_easy_attribute(attrutils.EasyAttributeParams(
@@ -162,7 +152,6 @@ def _movie_votes_extractor(self: attrutils.EasyAttribute, movie: _ml.Movie, mlf_
     is_ascending = False,
 ))
 def _movie_rating_extractor(self: attrutils.EasyAttribute, movie: _ml.Movie, mlf_movie: _mlf.MLFMovie) -> None | float:
-    assert not isinstance(mlf_movie.rating, _file.UnsetType)
     return mlf_movie.rating
 
 @_register_easy_attribute(attrutils.EasyAttributeParams(
@@ -173,7 +162,6 @@ def _movie_rating_extractor(self: attrutils.EasyAttribute, movie: _ml.Movie, mlf
     is_ascending = False,
 ))
 def _movie_myrating_extractor(self: attrutils.EasyAttribute, movie: _ml.Movie, mlf_movie: _mlf.MLFMovie) -> None | float:
-    assert not isinstance(mlf_movie.myrating, _file.UnsetType)
     return mlf_movie.myrating
 
 @_register_easy_attribute(attrutils.EasyAttributeParams(
@@ -211,8 +199,7 @@ for crew_type in _ml.CrewType:
     is_big_endian = True,
     is_ascending = True,
 ))
-def _person_puid_extractor(self: attrutils.EasyAttribute, person: _ml.Person, mlf_person: _mlf.MLFPerson) -> None | str:
-    assert not isinstance(mlf_person.uid, _file.UnsetType)
+def _person_puid_extractor(self: attrutils.EasyAttribute, person: _ml.Person, mlf_person: _mlf.MLFPerson) -> str:
     return mlf_person.uid
 
 @_register_easy_attribute(attrutils.EasyAttributeParams(
@@ -223,7 +210,6 @@ def _person_puid_extractor(self: attrutils.EasyAttribute, person: _ml.Person, ml
     is_ascending = True,
 ))
 def _person_name_extractor(self: attrutils.EasyAttribute, person: _ml.Person, mlf_person: _mlf.MLFPerson) -> None | str:
-    assert not isinstance(mlf_person.name, _file.UnsetType)
     return mlf_person.name
 
 # TODO: Some of these things are expensive. Maybe we'll need to do some post-processing on MLFs and cache lots of expensive attributes.
