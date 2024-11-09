@@ -31,8 +31,7 @@ import shutil
 import functools
 import re
 
-# This script is meant to be a CLI tool which uses the API. I wish I could place it outside the dir of package modules,
-# But there's poor support for that in pyproject.toml so we place it here but pretend like it's outside by doing things like "import flam".
+# Unlike all other modules in this package, this one pretends it's from outside the package and simply "imports flam".
 import flam
 from flam import utils
 

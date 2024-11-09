@@ -20,7 +20,7 @@ dynamic = ["dependencies", "version"]
 Repository = "https://github.com/Verpous/film-flam"
 
 [project.scripts]
-flam = "flam._cli:main"
+flam = "flam.__main__:main"
 
 [tool.setuptools.dynamic]
 dependencies = { file = ["_gen_requirements.txt"] }
