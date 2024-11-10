@@ -59,6 +59,8 @@ class MLFMovie(_file._FlamSerializable):
     crew:                   dict[str, MLFCrew]
 
 class MovieListFile(_file._FlamSerializable):
+    version:                str
+    
     # These two fields are redundant, they are essentially the filename so the user must already know them to reach them. but if I'll omit them I'll regret it.
     list_type:              str
     address:                str

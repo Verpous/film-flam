@@ -42,7 +42,7 @@ class CompositeList(_file._FlamSerializable):
     uid:                    str
     name:                   str
     simple_list_uids:       list[str]
-    filter_tokens:          list[str] # Order matters so this list is hardcoded excluded from canonicalization.
+    filter_tokens:          typing.Annotated[list[str], _file.FieldMeta(order_matters=True)]
     is_default_fetch:       bool
     is_default_find:        bool
 
@@ -55,6 +55,7 @@ class CompositeList(_file._FlamSerializable):
 #       Somehow circumvent create() permitting unset as default for these fields.
 #       Look into msgspec.defstruct both for this and for getting rid of all these annoying-ass unset checks, and also look at typing.Annotated
 class Configuration(_file._FlamSerializable):
+    version:                str
     simple_lists_raw:       list[SimpleList]
     composite_lists_raw:    list[CompositeList]
     extensions:             list[str]

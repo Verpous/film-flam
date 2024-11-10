@@ -39,6 +39,7 @@ from . import _ml
 from . import _dbg
 from . import _attr
 from . import utils
+from . import _gen_version
 
 # Utility for "inverting" registries: instead of first the registration level then the item type, it's first the item type then the levels.
 # Has to be implemented this way because some of the registries are contextual, some global.
@@ -110,6 +111,7 @@ class FlamContext:
             self._cfg = _cfg.Configuration.load(self._cfg_path)
         except FileNotFoundError:
             self._cfg = _cfg.Configuration(
+                version = _gen_version.__version__,
                 simple_lists_raw = [],
                 composite_lists_raw = [],
                 extensions = [],
@@ -122,6 +124,7 @@ class FlamContext:
             self._metadata = _md.FlamMetadata.load(self._metadata_path)
         except FileNotFoundError:
             self._metadata = _md.FlamMetadata(
+                version = _gen_version.__version__,
                 composite_lists_by_uid = {},
             )
 
@@ -291,6 +294,7 @@ class FlamContext:
 
         # The address on annonymous lists is only present for pretty-printing purposes. It must contain all the information about how the list was built.
         merged_mlf = _mlf.MovieListFile(
+            version = _gen_version.__version__,
             uid_family = dependency_mlfs[0].uid_family,
             list_type = _ldef.SpecialListType.ANNONYMOUS if composite_uid is None else _ldef.SpecialListType.COMPOSITE,
             address = ' '.join(itertools.chain((cldef.pretty(self) for cldef in abstract_listdefs), filter.regurgitate())) if composite_uid is None else composite_uid,
@@ -529,9 +533,10 @@ class FlamContext:
             # If the list were composite there'd be another case where this exception is raised, but it's not possible to reach here with a composite list.
             except _exc.InputError:
                 movie_list_file = _mlf.MovieListFile(
-                    uid_family = 'INITIALIZED LATER',
-                    list_type = 'INITIALIZED LATER',
-                    address = 'INITIALIZED LATER',
+                    version = _gen_version.__version__,
+                    uid_family = fetcher.uid_family,
+                    list_type = fetcher.abstract_listdef.list_type,
+                    address = fetcher.abstract_listdef.address,
                     movies_by_uid = {},
                     people_by_uid = {},
                 )

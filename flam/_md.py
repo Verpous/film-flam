@@ -22,4 +22,5 @@ class CompositeListMetadata(_file._FlamSerializable):
     dependency_mtime:       dict[str, float]
 
 class FlamMetadata(_file._FlamSerializable):
-    composite_lists_by_uid:  dict[str, CompositeListMetadata]
+    version:                str
+    composite_lists_by_uid: dict[str, CompositeListMetadata]

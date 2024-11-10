@@ -13,10 +13,7 @@
 # You should have received a copy of the GNU General Public License
 # along with this program. If not, see <https://www.gnu.org/licenses/>.
 
-try:
-    from ._gen_version import __version__
-except ModuleNotFoundError:
-    __version__ = '6969.69.69.dev69'
+from ._gen_version import __version__
 
 # Important to import _reg first, because it's the only module with a function that should be callable during the import process (the register() function).
 # Counterintuitively, by importing it first, what we're actually ensuring is that it's imported *last*.

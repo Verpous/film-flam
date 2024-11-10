@@ -436,7 +436,11 @@ If no %(dest)s provided, fetches all lists configured as defaults''')
                     keyfunc=lambda cl: cl.name) as bar:
                 for cl in bar:
                     # Easiest way to regenerate dependencies is to just get every composite list and do nothing with it.
-                    ctx.get_movie_list(f'{flam.SpecialListType.COMPOSITE}={cl.name}')
+                    try:
+                        ctx.get_movie_list(f'{flam.SpecialListType.COMPOSITE}={cl.name}')
+                    except flam.FlamError as e:
+                        # Don't care if this fails, and it might fail because we haven't checked if the composite list has all its dependencies.
+                        pass
 
 class SubcommandClean:
     @classmethod
@@ -675,10 +679,12 @@ class SubcommandChart:
 
 def make_main_parser(add_subparsers: bool) -> tuple[argparse.ArgumentParser, argparse.ArgumentParser]:
     parser = argparse.ArgumentParser(
-        formatter_class=argparse.RawTextHelpFormatter,
-        description='I dunno lol',
-        exit_on_error=False,
-        add_help=add_subparsers) # Don't conflict helps.
+        formatter_class = argparse.RawTextHelpFormatter,
+        description = 'I dunno lol',
+        exit_on_error = False,
+        prog = 'flam', # Needed for when running the script using python -m.
+        add_help = add_subparsers, # Don't conflict helps.
+    )
 
     # Main parser option letters mustn't conflict with find's option letters (or: I wish -F could be -C).
     parser.add_argument('-F', '--flam-dir', metavar='PATH', default=flam.FlamContext.DEFAULT_FLAM_DIR, action='store', help=
