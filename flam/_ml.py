@@ -277,10 +277,7 @@ class MovieList:
             filter: None | _filter.Filter = None) -> typing.Iterable[Findable]:
         _dbg.logger.info(f"Going to find {what} with {crew_type=}, {group_mode=} in '{self._movie_list_file.abstract_listdef}' with {filter=!s}")
 
-        if filter is None:
-            filter = self._ctx.compile_filter(None, what)
-
-        if filter.findable_type != what:
+        if filter is not None and filter.findable_type != what:
             raise _exc.InputError(f"Requested to find {what} but filter is of type {filter.findable_type}.")
 
         findables: list[Movie] | list[Person] | list[Role]
@@ -296,7 +293,7 @@ class MovieList:
 
                 findables = self._generate_roles(crew_type, group_mode)
 
-        if filter.is_empty:
+        if filter is None or filter.is_empty:
             yield from findables
         else:
             yield from (f for f in findables if filter.excrete(f, self._ctx))

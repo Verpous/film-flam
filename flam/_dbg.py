@@ -37,11 +37,16 @@ class FlamEnv(enum.StrEnum):
     def is_defined(self) -> bool:
         return self in os.environ
 
-    def get(self, default: str = '') -> str:
+    @property
+    def is_truthy(self) -> bool:
+        val = self.get_or_default()
+        return val != '' and val != '0'
+
+    def get_or_default(self, default: str = '') -> str:
         return os.environ.get(self, default)
 
 def is_debug() -> bool:
-    return FlamEnv.DEBUG.is_defined
+    return FlamEnv.DEBUG.is_truthy
 
 def get_log_file_path() -> str:
     DIRNAME = 'film_flam'
@@ -65,7 +70,7 @@ def _make_logger() -> logging.Logger:
 
     # Underscore to not conflict with the global.
     logger_ = logging.Logger('film_flam')
-    logger_.setLevel(getattr(logging, FlamEnv.LOGLEVEL.get('DEBUG').upper()))
+    logger_.setLevel(getattr(logging, FlamEnv.LOGLEVEL.get_or_default('DEBUG').upper()))
 
     # Timestamp is first because when catenating log with backups it's easy to sort.
     formatter = logging.Formatter(
@@ -88,7 +93,7 @@ def _make_logger() -> logging.Logger:
     fh.setFormatter(formatter)
     logger_.addHandler(fh)
 
-    if FlamEnv.LOG2CONSOLE.is_defined:
+    if FlamEnv.LOG2CONSOLE.is_truthy:
         ch = logging.StreamHandler()
         ch.setLevel(logging.DEBUG)
         ch.setFormatter(formatter)

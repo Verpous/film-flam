@@ -109,7 +109,7 @@ class SeleniumListFetcher(_fetch.ListFetcher, list_type='imdb-id', uid_family=_U
         NUM_RETRIES = 2
         CSV_DOWNLOAD_TIMEOUT_SECS = 40
 
-        downloads_dir = _dbg.FlamEnv.DOWNLOADS_DIR.get(os.path.join(os.path.expanduser('~'), 'Downloads'))
+        downloads_dir = _dbg.FlamEnv.DOWNLOADS_DIR.get_or_default(os.path.join(os.path.expanduser('~'), 'Downloads'))
 
         if not os.path.isdir(downloads_dir):
             raise _exc.InputError(f"Invalid FLAM_DOWNLOADS: '{downloads_dir}': not a directory.")
@@ -152,8 +152,8 @@ class SeleniumListFetcher(_fetch.ListFetcher, list_type='imdb-id', uid_family=_U
             _dbg.logger.info("CSV server is alive, no need to spin it.")
             return
 
-        profile = _dbg.FlamEnv.BROWSER_PROFILE.get()
-        browser_type_str = _dbg.FlamEnv.BROWSER.get(_BrowserType.AUTO)
+        profile = _dbg.FlamEnv.BROWSER_PROFILE.get_or_default()
+        browser_type_str = _dbg.FlamEnv.BROWSER.get_or_default(_BrowserType.AUTO)
 
         try:
             browser_type = _BrowserType(browser_type_str)

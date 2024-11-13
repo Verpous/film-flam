@@ -41,6 +41,8 @@ from . import _attr
 from . import utils
 from . import _gen_version
 
+DEFAULT_FLAM_DIR = _dbg.FlamEnv.CTX_DIR.get_or_default(os.path.join(os.path.expanduser('~'), '.film_flam'))
+
 # Utility for "inverting" registries: instead of first the registration level then the item type, it's first the item type then the levels.
 # Has to be implemented this way because some of the registries are contextual, some global.
 class RegistriesOf[T: (type[_fetch.ListFetcher], type[_filter.Predicate], _attr.Attribute)]:
@@ -83,7 +85,6 @@ class RegistriesOf[T: (type[_fetch.ListFetcher], type[_filter.Predicate], _attr.
 
 # This class is the user's entry point to basically everything that is "built in" to this API: accessing lists, filtering, configuring.
 class FlamContext:
-    DEFAULT_FLAM_DIR = _dbg.FlamEnv.CTX_DIR.get(os.path.join(os.path.expanduser('~'), '.film_flam'))
     _LISTFILES_DIR = 'movie_lists'
     _CACHE_DIR = 'cache'
     _CONFIGURATION_FILE = 'config.json'
@@ -103,7 +104,8 @@ class FlamContext:
         else:
             # TODO: Acquire OS lock on the flam_dir so that you can't have multiple contexts operating on it at once?
             # I'll leave this idea for later, since I think we may need a "readonly" mode to allow multiple users on the same list...
-            self._flam_dir = os.path.normpath(flam_dir)
+            # and we'll need a way to "close" a context when done with it.
+            self._flam_dir = os.path.abspath(flam_dir)
 
         self._make_flam_dir()
 
@@ -135,7 +137,6 @@ class FlamContext:
         _dbg.logger.info(f'Loaded configuration: {self._cfg=}')
         _dbg.logger.info(f'Loaded metadata: {self._metadata=}')
 
-        self._movie_list_files_cache: dict[_ldef.CanonListdef, _mlf.MovieListFile] = {}
         self._should_import_extensions = import_extensions
 
         ctx_extensions = _reg.Registry()
@@ -148,9 +149,6 @@ class FlamContext:
         if import_extensions:
             for extension in self._cfg.extensions:
                 self._import_extension(extension)
-
-        # Cache empty filters for optimization.
-        self._empty_filters = {find: _filter.Filter.eat(_filter.EatParams(tokens=[], find=find, ctx=self)) for find in _ml.FindableType}
 
     @property
     def flam_dir(self) -> str:
@@ -208,7 +206,7 @@ class FlamContext:
 
         # Replace None with empty filter to make the rest of the code nicer.
         if filter is None:
-            filter = self.compile_filter(None, _ml.FindableType.MOVIES)
+            filter = self.compile_filter([], _ml.FindableType.MOVIES)
 
         if len(canon_listdefs) == 1 and filter.is_empty:
             movie_list_file = self._get_movie_list_file(canon_listdefs[0])
@@ -219,51 +217,49 @@ class FlamContext:
         return _ml.MovieList(movie_list_file, self)
 
     def _get_movie_list_file(self, abstract_listdef: _ldef.CanonListdef) -> _mlf.MovieListFile:
-        # First we check if it's a composite list that needs regeneration. In that case even if it's cached it needs to be redone.
-        if abstract_listdef.list_type == _ldef.SpecialListType.COMPOSITE and self._is_composite_list_outdated(abstract_listdef.address):
-            # First generate it.
-            composite_list = self._cfg.composite_lists.get_by_uid(abstract_listdef.address)
-            filter = self.compile_filter(composite_list.filter_tokens, _ml.FindableType.MOVIES)
-            dependencies = [_ldef.CanonListdef(_ldef.SpecialListType.SIMPLE, sl_uid) for sl_uid in composite_list.simple_list_uids]
-            movie_list_file = self._generate_composite_movie_list_file(dependencies, filter, abstract_listdef.address)
+        # Special flow for composite lists because they are classified as cache files which should always be prepared to be regenerated.
+        if abstract_listdef.list_type == _ldef.SpecialListType.COMPOSITE:
+            movie_list_file = None
 
-            # Update metadata.
-            if abstract_listdef.address not in self._metadata.composite_lists_by_uid:
+            if not self._should_regenerate_composite_list(abstract_listdef.address):
+                try:
+                    movie_list_file = _mlf.MovieListFile.load(self._get_movie_list_file_path(abstract_listdef))
+                except (FileNotFoundError, _exc.FileValidationError) as e:
+                    # Simply regenerate if we failed to load it.
+                    _dbg.logger.info(f"Composite list {abstract_listdef.address=} failed to load from disk due to error: {e}")
+
+            if movie_list_file is None:
+                _dbg.logger.info(f"Regenerating composite list: '{abstract_listdef}'")
+
+                # First generate it.
+                composite_list = self._cfg.composite_lists.get_by_uid(abstract_listdef.address)
+                filter = self.compile_filter(composite_list.filter_tokens, _ml.FindableType.MOVIES)
+                dependencies = [_ldef.CanonListdef(_ldef.SpecialListType.SIMPLE, sl_uid) for sl_uid in composite_list.simple_list_uids]
+                movie_list_file = self._generate_composite_movie_list_file(dependencies, filter, abstract_listdef.address)
+
+                # Update metadata. Even if the uid is already in the file just replace it with a new object, because why not.
                 self._metadata.composite_lists_by_uid[abstract_listdef.address] = _md.CompositeListMetadata(
                     uid = abstract_listdef.address,
 
-                    # Assume os.path won't throw an error because it would've been caught by _is_composite_list_outdated.
+                    # Assume os.path won't throw an error because it would've been caught by _should_regenerate_composite_list.
                     dependency_mtime = {cldef.address: os.path.getmtime(self._get_movie_list_file_path(cldef)) for cldef in dependencies},
                 )
 
-            # Writing the mlf before the metadata I think is important.
-            self._write_movie_list_file(movie_list_file)
-            self._write_metadata()
+                # Writing the mlf before the metadata I think is important.
+                self._write_movie_list_file(movie_list_file)
+                self._write_metadata()
+        else:
+            try:
+                movie_list_file = _mlf.MovieListFile.load(self._get_movie_list_file_path(abstract_listdef))
+            except FileNotFoundError as e:
+                raise _exc.InputError(f"LISTDEF '{abstract_listdef.pretty(self)}' isn't fetched.") from e
 
-            # Update cache and we can skiddadle.
-            self._movie_list_files_cache[abstract_listdef] = movie_list_file
-
-            _dbg.logger.info(f"Regenerated and returning: '{abstract_listdef}'")
-            return movie_list_file
-
-        # Now we try to get it from memory.
-        if abstract_listdef in self._movie_list_files_cache:
-            _dbg.logger.info(f"Returning from cache: '{abstract_listdef}'")
-            return self._movie_list_files_cache[abstract_listdef]
-            
-        # Memory didn't work out, try to load it from disk.
-        try:
-            movie_list_file = _mlf.MovieListFile.load(self._get_movie_list_file_path(abstract_listdef))
-        except FileNotFoundError as e:
-            raise _exc.InputError(f"No fetched file for LISTDEF '{abstract_listdef.pretty(self)}'.") from e
-        except _exc.FileValidationError as e:
-            raise _exc.FileValidationError(f"{e} You may need to fetch '{abstract_listdef.pretty(self)}' again from scratch.") from e
-
-        self._movie_list_files_cache[abstract_listdef] = movie_list_file
-        _dbg.logger.info(f"Returning from disk: '{abstract_listdef}'")
+        _dbg.logger.info(f"Got movie list file: '{abstract_listdef}'")
         return movie_list_file
     
-    def _is_composite_list_outdated(self, uid: str) -> bool:
+    # Note that this function doesn't check if the composite list file exists. In normal circumstances we should never hit that case,
+    # and if we hit it anyway because the user is a file-meddling bitch, _get_movie_list_file will handle that.
+    def _should_regenerate_composite_list(self, uid: str) -> bool:
         if uid not in self._metadata.composite_lists_by_uid:
             _dbg.logger.info(f"Composite list {uid=} is not in the metadata.")
             return True
@@ -273,14 +269,14 @@ class FlamContext:
 
         for sl_uid in cl_config.simple_list_uids:
             if sl_uid not in cl_meta.dependency_mtime:
-                _dbg.logger.info(f"Composite list {uid=} requires regeneration because of missing dependency: {sl_uid=}")
+                _dbg.logger.info(f"Composite list {uid=} has a missing dependency: {sl_uid=}")
                 return True
 
             sl_path = self._get_movie_list_file_path(_ldef.CanonListdef(_ldef.SpecialListType.SIMPLE, sl_uid))
 
             try:
                 if sl_uid not in cl_meta.dependency_mtime or os.path.getmtime(sl_path) > cl_meta.dependency_mtime[sl_uid]:
-                    _dbg.logger.info(f"Composite list {uid=} requires regeneration because of outdated dependency: {sl_uid=}")
+                    _dbg.logger.info(f"Composite list {uid=} has an outdated dependency: {sl_uid=}")
                     return True
             except FileNotFoundError as e:
                 cl_listdef = _ldef.CanonListdef(_ldef.SpecialListType.COMPOSITE, uid)
@@ -451,28 +447,28 @@ class FlamContext:
             self._cfg = old_cfg
             raise
 
-        # Check if added simple lists are already fetched under their concrete filename, and "claim" the file.
-        for sl in added_sls:
-            concrete_filename = self._get_movie_list_file_path(sl.concrete_listdef)
-            abstract_filename = self._get_movie_list_file_path(sl.abstract_listdef)
-            
-            try:
-                os.rename(concrete_filename, abstract_filename)
-                _dbg.logger.info(f"Claimed an existing file for a new list: {abstract_filename=}, {concrete_filename=}")
-            except FileNotFoundError:
-                pass
-
         # For deleted simple lists, their fetch data is not deleted, just renamed to the concrete name.
         # This means the files will linger on forever. I considered cleaning them up, but I think there's no need.
         for sl in deleted_sls:
             concrete_filename = self._get_movie_list_file_path(sl.concrete_listdef)
             abstract_filename = self._get_movie_list_file_path(sl.abstract_listdef)
 
-            try:
+            # os.rename has platform-dependent behavior w.r.t. erroring out if the destination file already exists, so we must check ourselves.
+            # Note: it's possible for users to add a list, then also fetch it under the concrete filename and have both files exist.
+            if os.path.isfile(abstract_filename) and not os.path.exists(concrete_filename):
+                _dbg.logger.info(f"Disowning the file of a deleted list: {abstract_filename=}, {concrete_filename=}")
                 os.rename(abstract_filename, concrete_filename)
-                _dbg.logger.info(f"Disowned the file of a deleted list: {abstract_filename=}, {concrete_filename=}")
-            except FileNotFoundError:
-                pass
+
+        # Check if added simple lists are already fetched under their concrete filename, and "claim" the file.
+        # Note that we intentionally place this below the deleted_sls handling.
+        for sl in added_sls:
+            concrete_filename = self._get_movie_list_file_path(sl.concrete_listdef)
+            abstract_filename = self._get_movie_list_file_path(sl.abstract_listdef)
+            
+            # For the record, I don't think it's actually possible to create a case where both files exist.
+            if os.path.isfile(concrete_filename) and not os.path.exists(abstract_filename):
+                _dbg.logger.info(f"Claiming an existing file for a new list: {abstract_filename=}, {concrete_filename=}")
+                os.rename(concrete_filename, abstract_filename)
 
     def _find_added_deleted_modified[T: (_cfg.SimpleList, _cfg.CompositeList)](self, lists: _cfg.ConfigurationLists[T], old_lists: _cfg.ConfigurationLists[T]
             ) -> tuple[list[T], list[T], list[T]]:
@@ -528,10 +524,21 @@ class FlamContext:
             raise _exc.InputError(f"Invalid PATTERN: '{refetch_pattern}': {e}") from e
 
         for fetcher in fetchers:
-            try:
-                movie_list_file = self._get_movie_list_file(fetcher.abstract_listdef)
-            # If the list were composite there'd be another case where this exception is raised, but it's not possible to reach here with a composite list.
-            except _exc.InputError:
+            movie_list_file = None
+
+            # Secret feature: if refetch pattern is '.*', we'll go a little extra and start the entire file from scratch.
+            # This lets you overcome (im)possible cases where the file is fucked and you cannot run fetch because of it.
+            if refetch_re is None or refetch_re.pattern != '.*':
+                try:
+                    movie_list_file = self._get_movie_list_file(fetcher.abstract_listdef)
+                # If the list were composite there'd be another case where this exception is raised, but it's not possible to reach here with a composite list.
+                except _exc.InputError:
+                    pass
+
+            # Fetch the entire list "from scratch" if we didn't read it from disk, or there's a uid family mismatch.
+            # This silent handling of uid mismatch makes handling LISTDEF configuration changes much simpler,
+            # and it also makes sense because uid families are mostly meant for checking composite list compatiblity, not fetch compatibility.
+            if movie_list_file is None or movie_list_file.uid_family != fetcher.uid_family:
                 movie_list_file = _mlf.MovieListFile(
                     version = _gen_version.__version__,
                     uid_family = fetcher.uid_family,
@@ -540,7 +547,7 @@ class FlamContext:
                     movies_by_uid = {},
                     people_by_uid = {},
                 )
-
+                
             _dbg.logger.info(f"Fetching {fetcher.abstract_listdef} into file with nmovies={len(movie_list_file.movies_by_uid)} npeople={len(movie_list_file.people_by_uid)}")
                 
             # We need both the old and new versions to compare at the end. But it's important that the new one is the deepcopy,
@@ -566,9 +573,6 @@ class FlamContext:
         if movie_list_file != new_movie_list_file:
             self._write_movie_list_file(new_movie_list_file)
 
-        # Because it's a dictionary we easily overwrite an existing outdated cached file.
-        self._movie_list_files_cache[new_movie_list_file.abstract_listdef] = new_movie_list_file
-
     def _get_fetcher(self, canon_listdef: _ldef.CanonListdef) -> _fetch.ListFetcher:
         if canon_listdef.is_abstract:
             # Assume it's a SimpleList.
@@ -582,10 +586,7 @@ class FlamContext:
         return fetcher_cls(concrete_listdef, abstract_listdef)
 
     # Filtering.
-    def compile_filter(self, tokens: None | list[str], find: _ml.FindableType) -> _filter.Filter:
-        if tokens is None or len(tokens) == 0:
-            return self._empty_filters[find]
-
+    def compile_filter(self, tokens: list[str], find: _ml.FindableType) -> _filter.Filter:
         params = _filter.EatParams(tokens=tokens, find=find, ctx=self)
         filter = _filter.Filter.eat(params)
         _dbg.logger.info(f"Compiled {tokens=}, {find=} into: {filter}")

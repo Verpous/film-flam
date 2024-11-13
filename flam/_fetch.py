@@ -52,12 +52,6 @@ class ListFetcher(abc.ABC):
         return self._abstract_listdef
 
     def fetch(self, movie_list_file: _mlf.MovieListFile, ctx: _ctx.FlamContext, refetch_re: None | re.Pattern, quiet: bool) -> None:
-        if movie_list_file is not None and movie_list_file.uid_family != self.uid_family:
-            raise _exc.InputError(f"Cannot fetch '{self.abstract_listdef.pretty(ctx)}' because it's already fetched with a different ID family "
-                f"(old: '{movie_list_file.uid_family}', new: '{self.uid_family}'). "
-                "This can happen if you changed a list's LISTDEF to one from a different family. "
-                "You can resolve it by fetching the list from scratch, or reverting it to its old type.")
-
         _dbg.logger.info(f"Running fetcher {type(self)=}, abstract={self.abstract_listdef}, concrete={self.concrete_listdef}")
 
         if refetch_re is not None:

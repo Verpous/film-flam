@@ -30,6 +30,8 @@ import subprocess
 import shutil
 import functools
 import re
+import glob
+import time
 
 # Unlike all other modules in this package, this one pretends it's from outside the package and simply "imports flam".
 import flam
@@ -397,9 +399,8 @@ class SubcommandFetch:
     def configure_parser(cls, parser: argparse.ArgumentParser) -> None:
         parser.set_defaults(function=cls.execute)
         
-        parser.add_argument('-u', '--undo', action='store_true', help="Restore LISTDEFs to their previous versions."
+        parser.add_argument('-u', '--undo', action='store_true', help="Undo the previous fetch operation in its entirety. Note this will also restore configuration to the old state."
             "Fetch can be expensive so if something goes wrong and files get messed up this is good to have.")
-        parser.add_argument('-s', '--from-scratch', action='store_true', help="Don't try to update existing fetched lists. Refetch everything from scratch.") # TODO: re-implement some nicer way
         parser.add_argument('-r', '--refetch', metavar='PATTERN', default=None, action='store', help=
             '''Forces titles that match %(metavar)s (case-insensitive) to be redownloaded even if they are already locally stored.
 It's enough for %(metavar)s to match any part of the title, not necessarily the whole title.
@@ -424,10 +425,15 @@ If no %(dest)s provided, fetches all lists configured as defaults''')
 
     @classmethod
     def execute(cls, ctx: flam.FlamContext, args: argparse.Namespace) -> None:
-        # TODO: Hate this feature. It should either be scratched or changed to be a CLI feature that we backup the entire folder
         if args.undo:
-            pass
+            cls.pop_undo(ctx)
         else:
+            try:
+                cls.push_undo(ctx)
+            except Exception as e:
+                # Sweep this one silently.
+                flam.logger.warning(f"Failed to store state for later undoing with error: {e}")
+
             listdefs = args.LISTDEF if len(args.LISTDEF) != 0 else [flam.SpecialListType.DEFAULTS]
             ctx.fetch(listdefs, refetch_pattern=args.refetch, quiet=False)
 
@@ -442,21 +448,39 @@ If no %(dest)s provided, fetches all lists configured as defaults''')
                         # Don't care if this fails, and it might fail because we haven't checked if the composite list has all its dependencies.
                         pass
 
-class SubcommandClean:
     @classmethod
-    def configure_parser(cls, parser: argparse.ArgumentParser) -> None:
-        # TODO: still gotta figure this one out. Maybe it should just be flags in the other commands? I don't want to complicate this program with "not user friendly" subcommands.
-        parser.set_defaults(function=cls.execute)
-        parser.add_argument('-t', '--tempfiles', action='store_true', help='Deletes tempfiles related to the %(dest)s as well')
-        parser.add_argument('-f', '--fetched', action='store_true', help='Deletes tempfiles related to the %(dest)s as well')
-        parser.add_argument('-a', '--all', action='store_true', help='Delete everything fetched or stored by this program')
+    def push_undo(cls, ctx: flam.FlamContext) -> None:
+        # TODO: Undo is trouble, because it's weird to operate on flam dir while it's in use,
+        #       especially pop which needs to completely overwrite it while a context is using it. For now we just live with it.
+        #       Maybe if we only backed up the movie_lists folder it will be better, because then we could tell the context to reset its cache,
+        #       and everything should more or less work.
+        slug = utils.slugify(ctx.flam_dir)
+        backups = glob.glob(os.path.join(tempfile.gettempdir(), f'*_{slug}'))
+        backups.sort(key=lambda d: os.path.basename(d).split('_')[0])
 
-        parser.add_argument('LISTDEF', nargs='*', action='store', help=
-            '''Like find. Will delete ''')
+        while len(backups) >= 3:
+            flam.logger.info(f"Deleting old backup: {backups[0]}")
+            shutil.rmtree(backups[0])
+            del backups[0]
+
+        new_backup = os.path.join(tempfile.gettempdir(), f'{int(time.time())}_{slug}')
+        shutil.copytree(ctx.flam_dir, new_backup)
+        flam.logger.info(f"Created restoration point: {new_backup} for {ctx.flam_dir=}")
 
     @classmethod
-    def execute(cls, ctx: flam.FlamContext, args: argparse.Namespace) -> None:
-        print('clean')
+    def pop_undo(cls, ctx: flam.FlamContext) -> None:
+        flam_dir = ctx.flam_dir
+
+        slug = utils.slugify(flam_dir)
+        backups = glob.glob(os.path.join(tempfile.gettempdir(), f'*_{slug}'))
+        backups.sort(key=lambda d: os.path.basename(d).split('_')[0])
+
+        if len(backups) == 0:
+            raise flam.FlamError("Nothing to undo.")
+
+        shutil.rmtree(flam_dir)
+        shutil.move(backups[-1], flam_dir)
+        flam.logger.info(f"Restored backup: {backups[-1]} to: {flam_dir=}")
 
 class SubcommandFind:
     @classmethod
@@ -687,7 +711,7 @@ def make_main_parser(add_subparsers: bool) -> tuple[argparse.ArgumentParser, arg
     )
 
     # Main parser option letters mustn't conflict with find's option letters (or: I wish -F could be -C).
-    parser.add_argument('-F', '--flam-dir', metavar='PATH', default=flam.FlamContext.DEFAULT_FLAM_DIR, action='store', help=
+    parser.add_argument('-F', '--flam-dir', metavar='PATH', default=flam.DEFAULT_FLAM_DIR, action='store', help=
         f'Use %(metavar)s as the flam directory. Uses {flam.FlamEnv.CTX_DIR} environment variable by default, or ~/.film_flam if it is not defined')
     parser.add_argument('-E', '--no-extensions', action='store_true', help=
         "Don't import configured extensions")

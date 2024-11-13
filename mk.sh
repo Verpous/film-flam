@@ -206,7 +206,7 @@ log() {
 }
 
 flam() {
-    FLAM_DEBUG=1 FLAM_DIR="$flam_dir" command flam "$@"
+    FLAM_DEBUG="${FLAM_DEBUG:-1}" FLAM_DIR="$flam_dir" command flam "$@"
 }
 
 help() {
