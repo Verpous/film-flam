@@ -38,14 +38,14 @@ from . import _fetch
 from . import _ml
 from . import _dbg
 from . import _attr
-from . import utils
 from . import _gen_version
+from . import utils
 
 DEFAULT_FLAM_DIR = _dbg.FlamEnv.CTX_DIR.get_or_default(os.path.join(os.path.expanduser('~'), '.film_flam'))
 
 # Utility for "inverting" registries: instead of first the registration level then the item type, it's first the item type then the levels.
 # Has to be implemented this way because some of the registries are contextual, some global.
-class RegistriesOf[T: (type[_fetch.ListFetcher], type[_filter.Predicate], _attr.Attribute)]:
+class RegistriesOf[T: (type[_fetch.ListFetcher], type[_filter.Predicate], _attr.Attribute, type[_filter.Predicate] | _attr.Attribute)]:
     def __init__(self, type_selector: typing.Callable[[_reg.Registry], _reg.RegistryOf[T]], ctx_registry: _reg.Registry, use_global_extensions: bool) -> None:
         # Ordering lets you shadow builtins with extensions.
         self._registries_to_try = [
@@ -58,20 +58,12 @@ class RegistriesOf[T: (type[_fetch.ListFetcher], type[_filter.Predicate], _attr.
         ]
 
         self._type_selector: typing.Callable[[_reg.Registry], _reg.RegistryOf[T]] = type_selector
+    
+    def __getitem__(self, qualified_name: str) -> T:
+        return self.get(qualified_name)
 
-    def __getitem__(self, name: str) -> T:
-        for reg in self._registries_to_try:
-            try:
-                return self._type_selector(reg)[name]
-            except KeyError:
-                pass
-
-        close_matches = difflib.get_close_matches(name, (item.name for item in self))
-        suggestions = f' (did you mean: {", ".join(close_matches)}?)' if len(close_matches) > 0 else '.'
-        raise _exc.InputError(f"No registered item with the name: '{name}'{suggestions}")
-
-    def __contains__(self, name: str) -> bool:
-        return any(name in self._type_selector(reg) for reg in self._registries_to_try)
+    def __contains__(self, qualified_name: str) -> bool:
+        return any(qualified_name in self._type_selector(reg) for reg in self._registries_to_try)
 
     def __iter__(self) -> typing.Iterator[T]:
         for reg in self._registries_to_try:
@@ -82,6 +74,41 @@ class RegistriesOf[T: (type[_fetch.ListFetcher], type[_filter.Predicate], _attr.
 
         # Last registry is the context extensions.
         self._type_selector(self._registries_to_try[-1]).register(item)
+
+    # __getitem__ expects a qualified name. This function supports inferring the full name from a partial one.
+    def get(self, name: str, type_hint: None | _ml.FindableType = None) -> T:
+        for reg in self._registries_to_try:
+            reg_of_type = self._type_selector(reg)
+            
+            # First try if it was a qualified name.
+            # TODO: what about ambiguities between predicates and attributes?? I'm beginning to think the only right solution is to create a predicate for every attribute after all..
+            try:
+                return reg_of_type[name]
+            except KeyError:
+                pass
+
+            # If got a type hint, try all types, but try the hinted type first.
+            # Note that type_hint does *not* guarantee the result will be applicable to this type.
+            # It only activates support for non-qualified names, and promises to resolve ambiguities by preferring the hinted type.
+            if type_hint is not None:
+                # Try hinted type.
+                try:
+                    return reg_of_type[f'{type_hint}-{name}']
+                except KeyError:
+                    pass
+
+                # Try the others.
+                for findable_type in _ml.FindableType:
+                    if findable_type != type_hint:
+                        try:
+                            return reg_of_type[f'{findable_type}-{name}']
+                        except KeyError:
+                            pass
+        
+        # Use a smaller-than-default cutoff so that it finds matches even if you tried a name without the type (e.g. 'title' should closely match 'movies-title').
+        close_matches = difflib.get_close_matches(name, (item.qualified_name for item in self), cutoff=0.45)
+        suggestions = f' (did you mean: {", ".join(close_matches)}?)' if len(close_matches) > 0 else '.'
+        raise _exc.CloseInputError(f"No registered item with the name: '{name}'{suggestions}", close_matches)
 
 # This class is the user's entry point to basically everything that is "built in" to this API: accessing lists, filtering, configuring.
 class FlamContext:
@@ -143,6 +170,7 @@ class FlamContext:
         self._fetchers = RegistriesOf(lambda reg: reg.fetchers, ctx_extensions, import_extensions)
         self._predicates = RegistriesOf(lambda reg: reg.predicates, ctx_extensions, import_extensions)
         self._attributes = RegistriesOf(lambda reg: reg.attributes, ctx_extensions, import_extensions)
+        self._predicates_and_attributes = RegistriesOf(lambda reg: reg.predicates_and_attributes, ctx_extensions, import_extensions)
 
         # import_extensions does 2 things: import all configured extensions, and subscribe to any globally registered extensions.
         # It's good to make this an option with default false for security, and I prefer to keep the two options as one for simplicity.
@@ -169,6 +197,10 @@ class FlamContext:
     @property
     def attributes(self) -> RegistriesOf[_attr.Attribute]:
         return self._attributes
+
+    @property
+    def predicates_and_attributes(self) -> RegistriesOf[type[_filter.Predicate] | _attr.Attribute]:
+        return self._predicates_and_attributes
 
     @property
     def _cfg_path(self) -> str:

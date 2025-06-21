@@ -17,7 +17,6 @@ from __future__ import annotations
 
 import abc
 import typing
-import difflib
 import dataclasses
 import itertools
 
@@ -105,7 +104,7 @@ class FilterMember(abc.ABC):
         attribute_name = cls.eat_str(params, at, description)
 
         try:
-            attribute = params.ctx.attributes[attribute_name]
+            attribute = params.ctx.attributes.get(attribute_name, params.find)
         except _exc.InputError as e:
             raise _EinGafrurError(f"Expected {description}, but got: '{attribute_name}'.", tokens=params.tokens, error_indices=at) from e
 
@@ -368,59 +367,47 @@ class Disjoined(FilterMember):
 
 class Predicate(FilterMember):
     PREFIX = '-'
-    name: str
+    qualified_name: str
     findable_type: None | _ml.FindableType
     
-    def __init_subclass__(cls, name: str, findable_type: None | _ml.FindableType = None, **kwargs: typing.Any) -> None:
+    def __init_subclass__(cls, name_without_type: str, findable_type: None | _ml.FindableType = None, **kwargs: typing.Any) -> None:
         super().__init_subclass__(**kwargs)
-        cls.name = name
+        cls.qualified_name = name_without_type if findable_type is None else f'{findable_type}-{name_without_type}'
         cls.findable_type = findable_type
 
     @classmethod
     def eat(cls, params: EatParams, at: int) -> tuple[Predicate, int]:
         prefixed_name = cls.eat_str(params, at, 'a predicate name')
-        name = prefixed_name.removeprefix(Predicate.PREFIX)
-
-        if name != prefixed_name:
-            # Hacky use of registry because we want to lookup both predicates and attributes but prefer going level-by-level,
-            # so that a low-priority predicate won't shadow a high-priority attribute.
-            for reg in params.ctx.predicates._registries_to_try:
-                # Instead of going predicate by predicate and checking for _EinGafrurError,
-                # it's more optimal to pick the only possibly right predicate from a dictionary,
-                # and eat the name token right here and let the predicate eat its arguments alone.
-                if name in reg.predicates:
-                    # Mypy wouldn't like this line if we annotated with typing.Self.
-                    predicate = reg.predicates[name]
-
-                    if predicate.findable_type is not None and not predicate.findable_type.is_applicable_to(params.find):
-                        raise _EinGafrurError(f"Expected predicate of {params.find}, but got: '{prefixed_name}' which belongs to {predicate.findable_type}.",
-                            tokens=params.tokens, error_indices=at)
-
-                    return predicate.eat(params, at + 1)
-
-                # Special treatment for AttributePredicate because it's not wise to make a predicate for each attribute.
-                if name in reg.attributes:
-                    attribute = reg.attributes[name]
-
-                    if not attribute.findable_type.is_applicable_to(params.find):
-                        raise _EinGafrurError(f"Expected attribute of {params.find}, but got: '{attribute.name}' which belongs to {attribute.findable_type}.",
-                            tokens=params.tokens, error_indices=at)
-
-                    return AttributePredicate.eat_shit(params, at + 1, attribute)                
 
         if prefixed_name in Pipeline.RPAREN:
             raise _EinGafrurError('Unexpected right parenthesis. It either has no matching left parenthesis or a predicate was expected.',
                 tokens=params.tokens, error_indices=at)
-            
-        close_matches = difflib.get_close_matches(prefixed_name, itertools.chain(
-            (Predicate.PREFIX + pred.name for pred in params.ctx.predicates),
-            (Predicate.PREFIX + attr.name for attr in params.ctx.attributes)))
-            
-        suggestions = f' (did you mean: {", ".join(close_matches)}?)' if len(close_matches) > 0 else '.'
-        raise _EinGafrurError(f"Expected valid predicate name, but got: '{prefixed_name}'{suggestions}", tokens=params.tokens, error_indices=at)
 
+        name = prefixed_name.removeprefix(Predicate.PREFIX)
+
+        if name == prefixed_name:
+            raise _EinGafrurError(f"Expected predicate {prefixed_name} to start with a '{cls.PREFIX}'.", tokens=params.tokens, error_indices=at)
+
+        try:
+            predicate_or_attribute = params.ctx.predicates_and_attributes.get(name, params.find)
+        except _exc.CloseInputError as e:
+            suggestions = f' (did you mean: {", ".join(e.suggestions)}?)' if len(e.suggestions) > 0 else '.'
+            raise _EinGafrurError(f"Expected a valid predicate name, but got: '{prefixed_name}'{suggestions}", tokens=params.tokens, error_indices=at) from e
+
+        # Both predicates and attributes support cross-applicability!
+        if predicate_or_attribute.findable_type is not None and not predicate_or_attribute.findable_type.is_applicable_to(params.find):
+            raise _EinGafrurError(f"Expected predicate of {params.find}, but got: '{prefixed_name}' which belongs to {predicate_or_attribute.findable_type}.",
+                tokens=params.tokens, error_indices=at)
+
+        if isinstance(predicate_or_attribute, _attr.Attribute):
+            # Special treatment for AttributePredicate because it's not wise to make a predicate for each attribute.
+            return AttributePredicate.eat_shit(params, at + 1, predicate_or_attribute)
+
+        # Mypy wouldn't like this line if we annotated with typing.Self.
+        return predicate_or_attribute.eat(params, at + 1)
+        
     def regurgitate(self) -> typing.Iterable[str]:
-        yield self.PREFIX + self.name
+        yield self.PREFIX + self.qualified_name
 
 # This should be the only concrete predicate that is in this file, because it's special.
 class AttributePredicate(Predicate, name='attribute'):
@@ -429,7 +416,7 @@ class AttributePredicate(Predicate, name='attribute'):
         self._cmpto = cmpto
 
         # Shadow the name with that of the attribute. Python lets you shadow class variables with instance variables like this.
-        self.name = attribute.name
+        self.qualified_name = attribute.qualified_name
 
     # Part of being a special predicate means its "eat" has a different signature so we have to give it a different name.
     @classmethod
@@ -450,11 +437,39 @@ class AttributePredicate(Predicate, name='attribute'):
         yield from super().regurgitate()
         yield str(self._cmpto)
 
+def make_attribute_predicate(attribute: _attr.Attribute) -> type[Predicate]:
+    class AttributePredicate(Predicate, name_without_type=attribute.name_without_type, findable_type=attribute.findable_type):
+        ATTRIBUTE: _attr.Attribute = attribute
+
+        def __init__(self, cmpto: _attr.CmpTo) -> None:
+            self._cmpto = cmpto
+
+        # Part of being a special predicate means its "eat" has a different signature so we have to give it a different name.
+        @classmethod
+        def eat(cls, params: EatParams, at: int) -> tuple[Predicate, int]:
+            cmpto = cls.eat_cmpto(params, at, cls.ATTRIBUTE)
+            return cls(cmpto), at + 1
+
+        def excrete(self, findable: _ml.Findable, ctx: _ctx.FlamContext) -> bool:
+            actual = findable.extract(self.ATTRIBUTE)
+
+            # For lists we do "contains". There is an "-all" predicate for those who want that behavior.
+            if isinstance(actual, list):
+                return any(self._cmpto(elem) for elem in actual)
+
+            return self._cmpto(actual)
+
+        def regurgitate(self) -> typing.Iterable[str]:
+            yield from super().regurgitate()
+            yield str(self._cmpto)
+
+    return AttributePredicate
+
 # Doesn't guarantee that token is valid, only indicates that it looks like it should be.
 def is_filter_token(token: str) -> bool:
     return (token.startswith(Predicate.PREFIX)
-            or token in Negative.NEGATE
-            or token in Disjoined.DISJOIN
-            or token in Conjoined.CONJOIN
-            or token in Pipeline.LPAREN
-            or token in Pipeline.RPAREN)
+        or token in Negative.NEGATE
+        or token in Disjoined.DISJOIN
+        or token in Conjoined.CONJOIN
+        or token in Pipeline.LPAREN
+        or token in Pipeline.RPAREN)

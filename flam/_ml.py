@@ -91,7 +91,7 @@ class FindableType(enum.StrEnum):
     def is_applicable_to(self, find: FindableType) -> bool:
         # Roles are compatible with everything because a role is associated with people and a movie.
         return find == self.ROLES or self == find
-        
+
     def __repr__(self) -> str:
         return str(self)
 
@@ -439,3 +439,11 @@ class MovieList:
 #   I guess maybe so because we want people to be able to search by many crew types at once with the same filter
 # * does FindableType stay as it is or have just 3 possible values?
 # * How to pass in whether to group when searching by crew type
+
+# flam find movies
+# flam find director/cast/people - NO combining at least for now!
+# flam find director-only (for short director-x? xdirector?? as in exclusively)
+# And for all the other problems, just simplify them - don't omit nones from arrays, don't try to re-sort arrays on joining?? preds like -name always check "contains",
+# for other purposes we have preds like "-all", "-movies-contains" (rename to -foreach-movie??) etc
+# And perhaps predicates should only ever target one type of object. And implement the idea of multiple predicates with the same name but different findable types,
+# and the ability to resolve ambiguities with a findable type prefix

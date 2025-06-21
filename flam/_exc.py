@@ -29,6 +29,11 @@ class FlamError(Exception):
 class InputError(FlamError):
     pass
 
+class CloseInputError(FlamError):
+    def __init__(self, message: str, suggestions: list) -> None:
+        super().__init__(message, stacklevel=3)
+        self.suggestions = suggestions
+
 class FilterSyntaxError(InputError):
     def __init__(self, message: str, tokens: list[str], error_indices: int | typing.Iterable[int] = -1, is_terminal: bool = True) -> None:
         super().__init__(f'FILTER syntax error{'' if is_terminal else ' (not terminal)'}: {message}\nIn: {self.join_tokens(tokens, error_indices)}',

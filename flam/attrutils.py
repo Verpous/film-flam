@@ -220,19 +220,19 @@ DATE_HANDLERS = [
 # 4. Lots of little constraints to please mypy and pylint about what we're doing.
 @dataclasses.dataclass
 class EasyAttributeParams:
-    name: str
+    name_without_type: str
     findable_type: _ml.FindableType
     type_handler: TypeHandler
     is_big_endian: bool
     is_ascending: bool
 
 class EasyAttribute(_attr.Attribute):
-    def __init__(self, params: EasyAttributeParams) -> None: 
+    def __init__(self, params: EasyAttributeParams) -> None:
         self._params = params
 
     @property
-    def name(self) -> str:
-        return self._params.name
+    def name_without_type(self) -> str:
+        return self._params.name_without_type
     
     @property
     def findable_type(self) -> _ml.FindableType:
@@ -258,15 +258,15 @@ class EasyAttribute(_attr.Attribute):
         try:
             return self._params.type_handler.parse(value_str)
         except ValueError as e:
-            raise _exc.InputError(f"Invalid {self.name}: '{value_str}'.") from e
+            raise _exc.InputError(f"Invalid {self.qualified_name}: '{value_str}'.") from e
 
     def _str_of_single(self, value: _attr.AttributeValue) -> str:
         return self._params.type_handler.str_of(value)
 
 class LenAttribute(EasyAttribute):
-    def __init__(self, len_of: _attr.Attribute) -> None: 
+    def __init__(self, len_of: _attr.Attribute) -> None:
         super().__init__(EasyAttributeParams(
-            name = 'n' + len_of.name,
+            name_without_type = 'n' + len_of.name_without_type,
             findable_type = len_of.findable_type,
             type_handler = INT_HANDLER,
             is_big_endian = True,

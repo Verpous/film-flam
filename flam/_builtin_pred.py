@@ -25,7 +25,7 @@ from . import _ml
 from . import attrutils
 
 @_reg._register_builtin
-class TruePredicate(_filter.Predicate, name='true'):
+class TruePredicate(_filter.Predicate, name_without_type='true'):
     @classmethod
     def eat(cls, params: _filter.EatParams, at: int) -> tuple[_filter.Predicate, int]:
         return cls(), at
@@ -34,7 +34,7 @@ class TruePredicate(_filter.Predicate, name='true'):
         return True
 
 @_reg._register_builtin
-class FalsePredicate(_filter.Predicate, name='false'):
+class FalsePredicate(_filter.Predicate, name_without_type='false'):
     @classmethod
     def eat(cls, params: _filter.EatParams, at: int) -> tuple[_filter.Predicate, int]:
         return cls(), at
@@ -43,7 +43,7 @@ class FalsePredicate(_filter.Predicate, name='false'):
         return False
 
 @_reg._register_builtin
-class All(_filter.Predicate, name='all'):
+class All(_filter.Predicate, name_without_type='all'):
     def __init__(self, attribute: _attr.Attribute, cmpto: _attr.CmpTo) -> None:
         self._attribute = attribute
         self._cmpto = cmpto
@@ -64,11 +64,11 @@ class All(_filter.Predicate, name='all'):
 
     def regurgitate(self) -> typing.Iterable[str]:
         yield from super().regurgitate()
-        yield self._attribute.name
+        yield self._attribute.qualified_name
         yield str(self._cmpto)
 
 @_reg._register_builtin
-class Has(_filter.Predicate, name='has'):
+class Has(_filter.Predicate, name_without_type='has'):
     def __init__(self, attribute: _attr.Attribute) -> None:
         self._attribute = attribute
     
@@ -83,10 +83,10 @@ class Has(_filter.Predicate, name='has'):
 
     def regurgitate(self) -> typing.Iterable[str]:
         yield from super().regurgitate()
-        yield self._attribute.name
+        yield self._attribute.qualified_name
 
 @_reg._register_builtin
-class InList(_filter.Predicate, name='in-list'):
+class InList(_filter.Predicate, name_without_type='in-list'):
     def __init__(self, movie_list: _ml.MovieList, filter: _filter.Filter) -> None:
         self._movie_list = movie_list
         self._filter = filter
@@ -94,7 +94,7 @@ class InList(_filter.Predicate, name='in-list'):
         self._found_uids: None | set[str]
         self._found_uids_ct_gm: None | tuple[_ml.CrewType, _ml.GroupMode]
 
-        # For optimization we cache the set of found uids. 
+        # For optimization we cache the set of found uids.
         # But because a role filter can be reused with different modal_crew_types, we can't precompute that here, have to do it when the filter is used.
         match filter.findable_type:
             case _ml.FindableType.MOVIES | _ml.FindableType.PEOPLE:
@@ -134,11 +134,11 @@ class InList(_filter.Predicate, name='in-list'):
         yield from self._filter.regurgitate()
 
 @_reg._register_builtin
-class CrewContains(_filter.Predicate, name='crew-contains', findable_type=_ml.FindableType.MOVIES):
+class CrewContains(_filter.Predicate, name_without_type='crew-contains', findable_type=_ml.FindableType.MOVIES):
     def __init__(self, ct_gms: list[tuple[_ml.CrewType, _ml.GroupMode]], filter: _filter.Filter) -> None:
         self._ct_gms = ct_gms
         self._filter = filter
-        self._muid_attr = _reg._builtins.attributes['muid']
+        self._muid_attr = _reg._builtins.attributes['movies-uid']
     
     @classmethod
     def eat(cls, params: _filter.EatParams, at: int) -> tuple[_filter.Predicate, int]:

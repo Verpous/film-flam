@@ -213,7 +213,7 @@ def tabulate(
         records: list[list[str]],
         fillchar: str = ' ',
         use_color: bool = True,
-        header_color: str = '', 
+        header_color: str = '',
         fill_color: str = colorama.Fore.BLACK + colorama.Style.BRIGHT,
         column_colors: None | list[str] = None) -> typing.Iterable[str]:
 
@@ -272,3 +272,11 @@ def num_pretty(num: int | float, abbreviate: bool = True) -> str:
 
     num_str = f'{num:,f}'.rstrip('0').rstrip('.')
     return num_str + _magnitudes[magnitude]
+
+def parse_num_pretty(num_str: str) -> float:
+    try:
+        magnitude = 3 * _magnitudes.index(num_str[-1])
+    except (ValueError, IndexError):
+        magnitude = 0
+
+    return float(num_str.replace(',', '')) * (10 ** magnitude)

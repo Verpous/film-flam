@@ -19,6 +19,7 @@ import typing
 import enum
 import abc
 import re
+import operator
 
 from . import _ml
 from . import _exc
@@ -30,11 +31,11 @@ type AttributeValue = None | typing.Any
 
 class ComparisonOp(enum.Enum):
     # IMPORTANT: use prefix-free signs.
-    LE = ('-', lambda v1, v2: v1 <= v2)
-    GE = ('+', lambda v1, v2: v1 >= v2)
-    EQ = ('==', lambda v1, v2: v1 == v2)
-    LT = ('.-', lambda v1, v2: v1 < v2)
-    GT = ('.+', lambda v1, v2: v1 > v2)
+    LE = ('-', operator.le)
+    GE = ('+', operator.ge)
+    EQ = ('==', operator.eq)
+    LT = ('.-', operator.lt)
+    GT = ('.+', operator.gt)
     RX = ('=~', lambda v, pattern: bool(pattern.search(v)))
 
     def __init__(self, sign: str, compare: typing.Callable[[AttributeValue, AttributeValue | re.Pattern], bool]) -> None:
@@ -74,7 +75,7 @@ class CmpTo:
 class Attribute(abc.ABC):
     @property
     @abc.abstractmethod
-    def name(self) -> str:
+    def name_without_type(self) -> str:
         pass
     
     @property
@@ -103,6 +104,10 @@ class Attribute(abc.ABC):
     @abc.abstractmethod
     def default_op(self) -> ComparisonOp:
         pass
+
+    @property
+    def qualified_name(self) -> str:
+        return f'{self.findable_type}-{self.name_without_type}'
 
     @abc.abstractmethod
     def parse(self, value_str: str) -> AttributeValue:

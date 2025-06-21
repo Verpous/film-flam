@@ -113,7 +113,7 @@ def print_table(table: list[list[str]],
             line_spacing = '\n\n' if spacious else '\n'
             out.write(line_spacing.join(utils.tabulate(
                 table,
-                fillchar = '.' if use_color else ' ', 
+                fillchar = '.' if use_color else ' ',
                 use_color = use_color,
                 header_color = '' if no_titles else '\033[4m\033[K' # Underline, not supported by colorama.
             )))
@@ -581,13 +581,13 @@ Valid column names: ...''')
         else:
             attribute_names = args.sort.split(',') if args.sort != '' else []
 
-        attributes = [ctx.attributes[a] for a in attribute_names]
+        attributes = [ctx.attributes.get(a, findable_type) for a in attribute_names]
 
-        for attr in attributes:
+        for i, attr in enumerate(attributes):
             if not attr.findable_type.is_applicable_to(findable_type):
-                raise flam.InputError(f"ATTRIBUTE '{attr.name}' is a {attr.findable_type} attribute, so it is not found on {findable_type}.")
+                raise flam.InputError(f"ATTRIBUTE '{attribute_names[i]}' is a {attr.findable_type} attribute, so it is not found on {findable_type}.")
         
-        flam.logger.info(f"Got sort keys: {', '.join(attr.name for attr in attributes)}")
+        flam.logger.info(f"Got sort keys: {', '.join(attr.qualified_name for attr in attributes)}")
         return attributes
 
     # Can't do this at argparse time because it depends on the context and sortkeys.
@@ -602,6 +602,7 @@ Valid column names: ...''')
             # TODO: we could make more attributes compatible: movie attributes on a person are the array of the attribute for each movie the person is in,
             #       person attributes for movies are the array of the attributes for every person in the movie.
             #       Part of the benefit is that attributes like 'nmovies' can become 'ntitle' when extracted from a person.
+            # TODO: qualified names.
             default_columns = {
                 flam.FindableType.MOVIES: ['title', 'runtime', 'release-year', 'rating', 'metascore', 'director'],
                 flam.FindableType.PEOPLE: ['name', 'nmovies', 'avg-rating', 'avg-metascore'],
@@ -613,17 +614,17 @@ Valid column names: ...''')
             # "Smart" columns that aren't default unless conditions are met.
             # TODO: maybe we should generalize and just say that any sort key also becomes a column key,
             # and maybe we should consider not just sort keys but also attributes referenced in the filter?
-            if any(attr.name == 'watched' for attr in sort_attrs):
-                uniq_append(columns, 'watched')
+            if any(attr.qualified_name == 'movies-watched' for attr in sort_attrs):
+                uniq_append(columns, 'movies-watched')
 
-            if any(attr.name == 'votes' for attr in sort_attrs):
-                uniq_append(columns, 'votes')
+            if any(attr.qualified_name == 'movies-votes' for attr in sort_attrs):
+                uniq_append(columns, 'movies-votes')
 
-            if any(attr.name == 'myrating' for attr in sort_attrs):
-                uniq_append(columns, 'myrating')
+            if any(attr.qualified_name == 'movies-myrating' for attr in sort_attrs):
+                uniq_append(columns, 'movies-myrating')
 
-            if any(attr.name == 'description' for attr in sort_attrs):
-                uniq_append(columns, 'description')
+            if any(attr.qualified_name == 'movies-description' for attr in sort_attrs):
+                uniq_append(columns, 'movies-description')
             
             if len(ct_gms) > 1:
                 uniq_append(columns, 'crew-type')
@@ -635,13 +636,13 @@ Valid column names: ...''')
             if movie_list.list_type == flam.SpecialListType.ANNONYMOUS:
                 uniq_append(columns, 'origin')
 
-        attributes = [ctx.attributes[c] for c in columns]
+        attributes = [ctx.attributes.get(c, findable_type) for c in columns]
 
         for attr in attributes:
             if not attr.findable_type.is_applicable_to(findable_type):
-                raise flam.InputError(f"ATTRIBUTE '{attr.name}' is a {attr.findable_type} attribute, so it is not found on {findable_type}.")
+                raise flam.InputError(f"ATTRIBUTE '{attr.qualified_name}' is a {attr.findable_type} attribute, so it is not found on {findable_type}.")
 
-        flam.logger.info(f"Got columns: {', '.join(attr.name for attr in attributes)}")
+        flam.logger.info(f"Got columns: {', '.join(attr.qualified_name for attr in attributes)}")
         return attributes
 
     @classmethod
@@ -654,7 +655,8 @@ Valid column names: ...''')
     @classmethod
     def build_strs_table(cls, attributes: list[flam.Attribute], values_table: list[list[flam.AttributeValue]], args: argparse.Namespace) -> typing.Iterable[list[str]]:
         if not args.no_titles:
-            yield [attr.name for attr in attributes]
+            # TODO: use name_without_type when there is no ambiguity, else use qualified name?
+            yield [attr.name_without_type for attr in attributes]
 
         for record in values_table:
             yield [attributes[i].str_of(record[i]) for i in range(len(attributes))]
@@ -665,7 +667,7 @@ Valid column names: ...''')
             for row in table:
                 for i in range(len(row)):
                     # For now I'm ok with this being tacked on instead of max_len as a property of each attribute.
-                    max_len = 45 if attributes[i].name == 'title' else 30
+                    max_len = 45 if attributes[i].qualified_name == 'movies-title' else 30
                     row[i] = utils.truncate(row[i], max_len, is_big_endian=attributes[i].is_big_endian)
 
         print_table(table, args.color, args.paginate, args.spacious, args.no_titles, args.dsv)

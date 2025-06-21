@@ -53,17 +53,17 @@ def mean(data: typing.Iterable) -> None | float:
 
 # TODO: if/when we allow same name across different types, change this to just 'uid'.
 @_register_easy_attribute(attrutils.EasyAttributeParams(
-    name = 'muid',
+    name_without_type = 'uid',
     findable_type = _ml.FindableType.MOVIES,
     type_handler = attrutils.STR_HANDLER,
     is_big_endian = True,
     is_ascending = True,
 ))
-def _movie_muid_extractor(self: attrutils.EasyAttribute, movie: _ml.Movie, mlf_movie: _mlf.MLFMovie) -> str:
+def _movie_uid_extractor(self: attrutils.EasyAttribute, movie: _ml.Movie, mlf_movie: _mlf.MLFMovie) -> str:
     return mlf_movie.uid
 
 @_register_easy_attribute(attrutils.EasyAttributeParams(
-    name = 'title',
+    name_without_type = 'title',
     findable_type = _ml.FindableType.MOVIES,
     type_handler = attrutils.STR_HANDLER,
     is_big_endian = True,
@@ -74,7 +74,7 @@ def _movie_title_extractor(self: attrutils.EasyAttribute, movie: _ml.Movie, mlf_
 
 for handler in attrutils.DATE_HANDLERS:
     @_register_easy_attribute(attrutils.EasyAttributeParams(
-        name = 'watch' + handler.name, # pylint: disable=cell-var-from-loop
+        name_without_type = 'watch' + handler.name, # pylint: disable=cell-var-from-loop
         findable_type = _ml.FindableType.MOVIES,
         type_handler = handler, # pylint: disable=cell-var-from-loop
         is_big_endian = True,
@@ -84,7 +84,7 @@ for handler in attrutils.DATE_HANDLERS:
         return None if mlf_movie.watch_date is None else typing.cast(attrutils.DateHandler, self._params.type_handler).strip(mlf_movie.watch_date)
 
     @_register_easy_attribute(attrutils.EasyAttributeParams(
-        name = 'release' + handler.name, # pylint: disable=cell-var-from-loop
+        name_without_type = 'release' + handler.name, # pylint: disable=cell-var-from-loop
         findable_type = _ml.FindableType.MOVIES,
         type_handler = handler, # pylint: disable=cell-var-from-loop
         is_big_endian = True,
@@ -94,7 +94,7 @@ for handler in attrutils.DATE_HANDLERS:
         return None if mlf_movie.release_date is None else typing.cast(attrutils.DateHandler, self._params.type_handler).strip(mlf_movie.release_date)
 
 @_register_easy_attribute(attrutils.EasyAttributeParams(
-    name = 'description',
+    name_without_type = 'description',
     findable_type = _ml.FindableType.MOVIES,
     type_handler = attrutils.STR_HANDLER,
     is_big_endian = True,
@@ -104,7 +104,7 @@ def _movie_description_extractor(self: attrutils.EasyAttribute, movie: _ml.Movie
     return mlf_movie.description
 
 @_register_easy_attribute(attrutils.EasyAttributeParams(
-    name = 'index',
+    name_without_type = 'index',
     findable_type = _ml.FindableType.MOVIES,
     type_handler = attrutils.INT_HANDLER,
     is_big_endian = True,
@@ -114,7 +114,7 @@ def _movie_index_extractor(self: attrutils.EasyAttribute, movie: _ml.Movie, mlf_
     return mlf_movie.list_index
 
 @_register_easy_attribute(attrutils.EasyAttributeParams(
-    name = 'runtime',
+    name_without_type = 'runtime',
     findable_type = _ml.FindableType.MOVIES,
     type_handler = attrutils.MINUTES_HANDLER,
     is_big_endian = True,
@@ -124,7 +124,7 @@ def _movie_runtime_extractor(self: attrutils.EasyAttribute, movie: _ml.Movie, ml
     return mlf_movie.runtime_minutes
 
 @_register_easy_attribute(attrutils.EasyAttributeParams(
-    name = 'metascore',
+    name_without_type = 'metascore',
     findable_type = _ml.FindableType.MOVIES,
     type_handler = attrutils.INT_HANDLER,
     is_big_endian = True,
@@ -135,7 +135,7 @@ def _movie_metascore_extractor(self: attrutils.EasyAttribute, movie: _ml.Movie, 
 
 # TODO: human-readable str_of (i.e. add K, M, for thousands and millions)
 @_register_easy_attribute(attrutils.EasyAttributeParams(
-    name = 'votes',
+    name_without_type = 'votes',
     findable_type = _ml.FindableType.MOVIES,
     type_handler = attrutils.INT_HANDLER,
     is_big_endian = True,
@@ -145,7 +145,7 @@ def _movie_votes_extractor(self: attrutils.EasyAttribute, movie: _ml.Movie, mlf_
     return mlf_movie.votes
 
 @_register_easy_attribute(attrutils.EasyAttributeParams(
-    name = 'rating',
+    name_without_type = 'rating',
     findable_type = _ml.FindableType.MOVIES,
     type_handler = attrutils.FLOAT_HANDLER,
     is_big_endian = True,
@@ -155,7 +155,7 @@ def _movie_rating_extractor(self: attrutils.EasyAttribute, movie: _ml.Movie, mlf
     return mlf_movie.rating
 
 @_register_easy_attribute(attrutils.EasyAttributeParams(
-    name = 'myrating',
+    name_without_type = 'myrating',
     findable_type = _ml.FindableType.MOVIES,
     type_handler = attrutils.FLOAT_HANDLER,
     is_big_endian = True,
@@ -165,7 +165,7 @@ def _movie_myrating_extractor(self: attrutils.EasyAttribute, movie: _ml.Movie, m
     return mlf_movie.myrating
 
 @_register_easy_attribute(attrutils.EasyAttributeParams(
-    name = 'genres',
+    name_without_type = 'genres',
     findable_type = _ml.FindableType.MOVIES,
     type_handler = attrutils.STR_HANDLER,
     is_big_endian = True,
@@ -176,7 +176,7 @@ def _movie_genres_extractor(self: attrutils.EasyAttribute, movie: _ml.Movie, mlf
 
 for crew_type in _ml.CrewType:
     @_register_easy_attribute(attrutils.EasyAttributeParams(
-        name = crew_type, # pylint: disable=cell-var-from-loop
+        name_without_type = crew_type, # pylint: disable=cell-var-from-loop
         findable_type = _ml.FindableType.MOVIES,
         type_handler = attrutils.STR_HANDLER,
         is_big_endian = True,
@@ -185,25 +185,25 @@ for crew_type in _ml.CrewType:
     def _movie_crew_type_extractor(self: attrutils.EasyAttribute, movie: _ml.Movie, mlf_movie: _mlf.MLFMovie) -> list[str]:
         mlf = movie.movie_list.underlying_file
         
-        # Use self.name instead of crew_type to avoid cell-var-from-loop error.
-        return sorted(name for uid in mlf_movie.crew[self.name].roles_by_uid if isinstance(name := mlf.people_by_uid[uid].name, str))
+        # Use self.name_without_type instead of crew_type to avoid cell-var-from-loop error.
+        return sorted(name for uid in mlf_movie.crew[self.name_without_type].roles_by_uid if isinstance(name := mlf.people_by_uid[uid].name, str))
 
 #endregion movie attributes
 
 #region person attributes
 
 @_register_easy_attribute(attrutils.EasyAttributeParams(
-    name = 'puid',
+    name_without_type = 'uid',
     findable_type = _ml.FindableType.PEOPLE,
     type_handler = attrutils.STR_HANDLER,
     is_big_endian = True,
     is_ascending = True,
 ))
-def _person_puid_extractor(self: attrutils.EasyAttribute, person: _ml.Person, mlf_person: _mlf.MLFPerson) -> str:
+def _person_uid_extractor(self: attrutils.EasyAttribute, person: _ml.Person, mlf_person: _mlf.MLFPerson) -> str:
     return mlf_person.uid
 
 @_register_easy_attribute(attrutils.EasyAttributeParams(
-    name = 'name',
+    name_without_type = 'name',
     findable_type = _ml.FindableType.PEOPLE,
     type_handler = attrutils.STR_HANDLER,
     is_big_endian = True,
@@ -214,7 +214,7 @@ def _person_name_extractor(self: attrutils.EasyAttribute, person: _ml.Person, ml
 
 # TODO: Some of these things are expensive. Maybe we'll need to do some post-processing on MLFs and cache lots of expensive attributes.
 @_register_easy_attribute(attrutils.EasyAttributeParams(
-    name = 'nmovies',
+    name_without_type = 'nmovies',
     findable_type = _ml.FindableType.PEOPLE,
     type_handler = attrutils.INT_HANDLER,
     is_big_endian = True,
@@ -229,7 +229,7 @@ def _person_nmovies_extractor(self: attrutils.EasyAttribute, person: _ml.Person,
     )
 
 @_register_easy_attribute(attrutils.EasyAttributeParams(
-    name = 'avg-metascore',
+    name_without_type = 'avg-metascore',
     findable_type = _ml.FindableType.PEOPLE,
     type_handler = attrutils.FLOAT_HANDLER,
     is_big_endian = True,
@@ -244,7 +244,7 @@ def _person_avgmetascore_extractor(self: attrutils.EasyAttribute, person: _ml.Pe
     )
 
 @_register_easy_attribute(attrutils.EasyAttributeParams(
-    name = 'avg-rating',
+    name_without_type = 'avg-rating',
     findable_type = _ml.FindableType.PEOPLE,
     type_handler = attrutils.FLOAT_HANDLER,
     is_big_endian = True,
@@ -263,7 +263,7 @@ def _person_avgrating_extractor(self: attrutils.EasyAttribute, person: _ml.Perso
 #region role attributes
 
 @_register_easy_attribute(attrutils.EasyAttributeParams(
-    name = 'characters',
+    name_without_type = 'characters',
     findable_type = _ml.FindableType.ROLES,
     type_handler = attrutils.STR_HANDLER,
     is_big_endian = True,
@@ -273,7 +273,7 @@ def _role_characters_extractor(self: attrutils.EasyAttribute, role: _ml.Role, ml
     return sorted(c for mlf_role in mlf_roles for c in mlf_role.characters)
 
 @_register_easy_attribute(attrutils.EasyAttributeParams(
-    name = 'crew-type',
+    name_without_type = 'crew-type',
     findable_type = _ml.FindableType.ROLES,
     type_handler = attrutils.STR_HANDLER,
     is_big_endian = True,
@@ -283,7 +283,7 @@ def _role_crewtype_extractor(self: attrutils.EasyAttribute, role: _ml.Role, mlf_
     return role.crew_type
 
 @_register_easy_attribute(attrutils.EasyAttributeParams(
-    name = 'group-mode',
+    name_without_type = 'group-mode',
     findable_type = _ml.FindableType.ROLES,
     type_handler = attrutils.STR_HANDLER,
     is_big_endian = True,
