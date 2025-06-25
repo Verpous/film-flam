@@ -77,6 +77,11 @@ class Attribute(abc.ABC):
     @abc.abstractmethod
     def name_without_type(self) -> str:
         pass
+
+    @property
+    @abc.abstractmethod
+    def aliases_without_type(self) -> list[str]:
+        pass
     
     @property
     @abc.abstractmethod
@@ -105,9 +110,14 @@ class Attribute(abc.ABC):
     def default_op(self) -> ComparisonOp:
         pass
 
+    # TODO: cache these. Also some util for transforming type,name to qualified names
     @property
     def qualified_name(self) -> str:
         return f'{self.findable_type}-{self.name_without_type}'
+
+    @property
+    def qualified_aliases(self) -> list[str]:
+        return [f'{self.findable_type}-{alias_without_type}' for alias_without_type in self.aliases_without_type]
 
     @abc.abstractmethod
     def parse(self, value_str: str) -> AttributeValue:

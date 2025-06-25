@@ -16,7 +16,6 @@
 from __future__ import annotations
 
 import typing
-import abc
 
 from . import _exc
 from . import _fetch
@@ -24,77 +23,93 @@ from . import _filter
 from . import _attr
 from . import _dbg
 
-class RegistryOf[T: (type[_fetch.ListFetcher], type[_filter.Predicate], _attr.Attribute, type[_filter.Predicate] | _attr.Attribute)](abc.ABC):
-    @abc.abstractmethod
-    def register(self, item: T) -> None:
-        pass
+class RegistryOf[T: (type[_fetch.ListFetcher], type[_filter.Predicate], _attr.Attribute)]:
+    def __init__(self, reg: Registry) -> None:
+        self._registered_items: dict[str, None | T] = {}
+        self._parent_reg = reg
 
-    @abc.abstractmethod
-    def __getitem__(self, qualified_name: str) -> T:
-        pass
+    # as_none flag is used for a hack related to lazy creation of AttributePredicates. It's ok because this function is only ever meant to be called internally.
+    def register(self, item: T, as_none: bool = False) -> None:
+        register_value = item if not as_none else None
 
-    @abc.abstractmethod
-    def __contains__(self, qualified_name: str) -> bool:
-        pass
-
-    @abc.abstractmethod
-    def __iter__(self) -> typing.Iterator[T]:
-        pass
-
-class DictionaryRegistry[T: (type[_fetch.ListFetcher], type[_filter.Predicate], _attr.Attribute)](RegistryOf[T]):
-    def __init__(self) -> None:
-        self._registered_items: dict[str, T] = {}
-
-    def register(self, item: T) -> None:
+        # Register primary name.
         if item.qualified_name in self:
             raise _exc.InputError(f"Cannot register '{item}' with name '{item.qualified_name}' because an item with that name is already registered.")
+        
+        self._registered_items[item.qualified_name] = register_value
 
-        self._registered_items[item.qualified_name] = item
+        # Also register aliases, with rollback support if any of them are taken.
+        try:
+            for alias in item.qualified_aliases:
+                if alias in self:
+                    raise _exc.InputError(f"Cannot register '{item}' with name '{alias}' because an item with that name is already registered.")
+                
+                self._registered_items[alias] = register_value
+        except _exc.InputError:
+            # Rollback.
+            del self._registered_items[item.qualified_name]
+
+            for alias in item.qualified_aliases:
+                try:
+                    del self._registered_items[alias]
+                except KeyError:
+                    # No reason to try the next ones if this one was where we failed to add.
+                    break
+
+            # I tested, this is safe even though we had other exceptions inside this scope.
+            raise
+            
         _dbg.logger.info(f"Registered {item=}, {item.qualified_name=}")
 
+    # Important that due to lazy creation of AttributePredicates, this is the only function that may return registered items.
     def __getitem__(self, qualified_name: str) -> T:
-        return self._registered_items[qualified_name]
+        item = self._registered_items[qualified_name]
+        assert item is not None
+        return item
 
     def __contains__(self, qualified_name: str) -> bool:
         return qualified_name in self._registered_items
 
-    def __iter__(self) -> typing.Iterator[T]:
-        return iter(self._registered_items.values())
+    def __iter__(self) -> typing.Iterator[str]:
+        return iter(self._registered_items)
 
-# For now only used for predicates and attributes so don't bother with better type hints.
-class UnionRegistry(RegistryOf[type[_filter.Predicate] | _attr.Attribute]):
-    def __init__(self, registries: list[RegistryOf[type[_filter.Predicate]] | RegistryOf[_attr.Attribute]]) -> None:
-        self._registries = registries
+# Attributes are technically also predicates, but there can be hundreds of attributes and I don't want to create an AttributePredicate for each one.
+# So we do it lazy. When an attribute is registered, it's also registered as a predicate with item = None.
+# When we __getitem__ that predicate, we create the actual AttributePredicate class.
+class RegistryOfAttributes(RegistryOf[_attr.Attribute]):
+    def register(self, item: _attr.Attribute, as_none: bool = False) -> None:
+        super().register(item)
 
-    def register(self, item: type[_filter.Predicate] | _attr.Attribute) -> None:
-        raise _exc.InputError("Registering is not supported on a union registry")
+        # This completely violates type-safety but we hacky boys.
+        self._parent_reg.predicates.register(item, as_none=True) # type: ignore
 
-    def __getitem__(self, qualified_name: str) -> type[_filter.Predicate] | _attr.Attribute:
-        for reg in self._registries:
-            try:
-                return reg[qualified_name]
-            except KeyError:
-                pass
+class RegistryOfPredicates(RegistryOf[type[_filter.Predicate]]):
+    def __getitem__(self, qualified_name: str) -> type[_filter.Predicate]:
+        predicate = self._registered_items[qualified_name]
+        
+        if predicate is None:
+            attr = self._parent_reg.attributes[qualified_name]
 
-        raise KeyError(f"Item '{qualified_name}' is not in the registry")
+            # Remember attributes support aliasing, so qualified_name might not be equal to attr.qualified_name.
+            # We'll optimize by always caching the AttributePredicate to the primary name of the predicate,
+            # and if we request a the predicate by an alias, we'll return the result cached in the primary name.
+            primary_predicate = self._registered_items[attr.qualified_name]
 
-    def __contains__(self, qualified_name: str) -> bool:
-        return any(qualified_name in reg for reg in self._registries)
+            if primary_predicate is None:
+                predicate = _filter._make_attribute_predicate(attr)
+                self._registered_items[attr.qualified_name] = predicate
+            else:
+                predicate = primary_predicate
 
-    def __iter__(self) -> typing.Iterator[type[_filter.Predicate] | _attr.Attribute]:
-        for reg in self._registries:
-            yield from reg
+            self._registered_items[qualified_name] = predicate
+
+        return predicate
 
 class Registry:
     def __init__(self) -> None:
-        self._fetchers: RegistryOf[type[_fetch.ListFetcher]] = DictionaryRegistry()
-        self._predicates: RegistryOf[type[_filter.Predicate]] = DictionaryRegistry()
-        self._attributes: RegistryOf[_attr.Attribute] = DictionaryRegistry()
-
-        # Ugly but helpful because attributes can function as predicates.
-        # Obviously you could also just hit the predicates registry and then the attributes registry, but then you'd need special handling for things like "close match" suggestions,
-        # checking "contains", iterating, the whole lot. And most importantly - we want to be able to go level by level of registries to try.
-        self._predicates_and_attributes = UnionRegistry([self._predicates, self._attributes])
+        self._fetchers: RegistryOf[type[_fetch.ListFetcher]] = RegistryOf(self)
+        self._predicates: RegistryOf[type[_filter.Predicate]] = RegistryOfPredicates(self)
+        self._attributes: RegistryOf[_attr.Attribute] = RegistryOfAttributes(self)
 
     @property
     def fetchers(self) -> RegistryOf[type[_fetch.ListFetcher]]:
@@ -107,10 +122,6 @@ class Registry:
     @property
     def attributes(self) -> RegistryOf[_attr.Attribute]:
         return self._attributes
-
-    @property
-    def predicates_and_attributes(self) -> RegistryOf[type[_filter.Predicate] | _attr.Attribute]:
-        return self._predicates_and_attributes
 
     def register(self, obj: typing.Any) -> None:
         if isinstance(obj, type) and issubclass(obj, _fetch.ListFetcher):

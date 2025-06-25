@@ -29,14 +29,16 @@ from . import _dbg
 
 class ListFetcher(abc.ABC):
     qualified_name: str
+    qualified_aliases: list[str]
     uid_family: str
 
     # Subclasses must provide a list_type, and may optionally provide an uid_family if they have multiple fetchers that they want to be compatible.
-    def __init_subclass__(cls, list_type: str, uid_family: None | str = None, **kwargs: typing.Any) -> None:
+    def __init_subclass__(cls, list_type: str, qualified_aliases: None | list[str] = None, uid_family: None | str = None, **kwargs: typing.Any) -> None:
         super().__init_subclass__(**kwargs)
 
         # I like the name list_type better, but for registration it needs to be named "qualified_name".
         cls.qualified_name = list_type
+        cls.qualified_aliases = [] if qualified_aliases is None else qualified_aliases
         cls.uid_family = uid_family if uid_family is not None else list_type
 
     def __init__(self, concrete_listdef: _ldef.CanonListdef, abstract_listdef: _ldef.CanonListdef) -> None:

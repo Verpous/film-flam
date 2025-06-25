@@ -25,6 +25,7 @@ from . import _attr
 from . import _exc
 from . import _ml
 
+# TODO: should filters be case insensitive??
 # FILTER    := PIPELINE | <epsilon>
 # PIPELINE  := SINGLE JOINABLE*
 # SINGLE    := NEGATIVE | POSITIVE
@@ -368,12 +369,17 @@ class Disjoined(FilterMember):
 class Predicate(FilterMember):
     PREFIX = '-'
     qualified_name: str
+    qualified_aliases: list[str]
     findable_type: None | _ml.FindableType
     
-    def __init_subclass__(cls, name_without_type: str, findable_type: None | _ml.FindableType = None, **kwargs: typing.Any) -> None:
+    def __init_subclass__(cls, name_without_type: str, aliases_without_type: None | list[str] = None, findable_type: None | _ml.FindableType = None, **kwargs: typing.Any) -> None:
         super().__init_subclass__(**kwargs)
-        cls.qualified_name = name_without_type if findable_type is None else f'{findable_type}-{name_without_type}'
         cls.findable_type = findable_type
+        
+        cls.qualified_name = name_without_type if findable_type is None else f'{findable_type}-{name_without_type}'
+        cls.qualified_aliases = ([] if aliases_without_type is None
+            else aliases_without_type if findable_type is None
+            else [f'{findable_type}-{alias_without_type}' for alias_without_type in aliases_without_type])
 
     @classmethod
     def eat(cls, params: EatParams, at: int) -> tuple[Predicate, int]:
@@ -389,56 +395,24 @@ class Predicate(FilterMember):
             raise _EinGafrurError(f"Expected predicate {prefixed_name} to start with a '{cls.PREFIX}'.", tokens=params.tokens, error_indices=at)
 
         try:
-            predicate_or_attribute = params.ctx.predicates_and_attributes.get(name, params.find)
+            predicate = params.ctx.predicates.get(name, params.find)
         except _exc.CloseInputError as e:
             suggestions = f' (did you mean: {", ".join(e.suggestions)}?)' if len(e.suggestions) > 0 else '.'
             raise _EinGafrurError(f"Expected a valid predicate name, but got: '{prefixed_name}'{suggestions}", tokens=params.tokens, error_indices=at) from e
 
         # Both predicates and attributes support cross-applicability!
-        if predicate_or_attribute.findable_type is not None and not predicate_or_attribute.findable_type.is_applicable_to(params.find):
-            raise _EinGafrurError(f"Expected predicate of {params.find}, but got: '{prefixed_name}' which belongs to {predicate_or_attribute.findable_type}.",
+        if predicate.findable_type is not None and not predicate.findable_type.is_applicable_to(params.find):
+            raise _EinGafrurError(f"Expected predicate of {params.find}, but got: '{prefixed_name}' which belongs to {predicate.findable_type}.",
                 tokens=params.tokens, error_indices=at)
 
-        if isinstance(predicate_or_attribute, _attr.Attribute):
-            # Special treatment for AttributePredicate because it's not wise to make a predicate for each attribute.
-            return AttributePredicate.eat_shit(params, at + 1, predicate_or_attribute)
-
         # Mypy wouldn't like this line if we annotated with typing.Self.
-        return predicate_or_attribute.eat(params, at + 1)
+        return predicate.eat(params, at + 1)
         
     def regurgitate(self) -> typing.Iterable[str]:
         yield self.PREFIX + self.qualified_name
 
-# This should be the only concrete predicate that is in this file, because it's special.
-class AttributePredicate(Predicate, name='attribute'):
-    def __init__(self, attribute: _attr.Attribute, cmpto: _attr.CmpTo) -> None:
-        self._attribute = attribute
-        self._cmpto = cmpto
-
-        # Shadow the name with that of the attribute. Python lets you shadow class variables with instance variables like this.
-        self.qualified_name = attribute.qualified_name
-
-    # Part of being a special predicate means its "eat" has a different signature so we have to give it a different name.
-    @classmethod
-    def eat_shit(cls, params: EatParams, at: int, attribute: _attr.Attribute) -> tuple[Predicate, int]:
-        cmpto = cls.eat_cmpto(params, at, attribute)
-        return cls(attribute, cmpto), at + 1
-
-    def excrete(self, findable: _ml.Findable, ctx: _ctx.FlamContext) -> bool:
-        actual = findable.extract(self._attribute)
-
-        # For lists we do "contains". There is an "-all" predicate for those who want that behavior.
-        if isinstance(actual, list):
-            return any(self._cmpto(elem) for elem in actual)
-
-        return self._cmpto(actual)
-
-    def regurgitate(self) -> typing.Iterable[str]:
-        yield from super().regurgitate()
-        yield str(self._cmpto)
-
-def make_attribute_predicate(attribute: _attr.Attribute) -> type[Predicate]:
-    class AttributePredicate(Predicate, name_without_type=attribute.name_without_type, findable_type=attribute.findable_type):
+def _make_attribute_predicate(attribute: _attr.Attribute) -> type[Predicate]:
+    class AttributePredicate(Predicate, name_without_type=attribute.name_without_type, aliases_without_type=attribute.aliases_without_type, findable_type=attribute.findable_type):
         ATTRIBUTE: _attr.Attribute = attribute
 
         def __init__(self, cmpto: _attr.CmpTo) -> None:

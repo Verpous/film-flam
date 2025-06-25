@@ -221,6 +221,7 @@ DATE_HANDLERS = [
 @dataclasses.dataclass
 class EasyAttributeParams:
     name_without_type: str
+    aliases_without_type: list[str]
     findable_type: _ml.FindableType
     type_handler: TypeHandler
     is_big_endian: bool
@@ -233,7 +234,11 @@ class EasyAttribute(_attr.Attribute):
     @property
     def name_without_type(self) -> str:
         return self._params.name_without_type
-    
+
+    @property
+    def aliases_without_type(self) -> list[str]:
+        return self._params.aliases_without_type
+
     @property
     def findable_type(self) -> _ml.FindableType:
         return self._params.findable_type
@@ -267,6 +272,7 @@ class LenAttribute(EasyAttribute):
     def __init__(self, len_of: _attr.Attribute) -> None:
         super().__init__(EasyAttributeParams(
             name_without_type = 'n' + len_of.name_without_type,
+            aliases_without_type = ['n' + alias_without_type for alias_without_type in len_of.aliases_without_type],
             findable_type = len_of.findable_type,
             type_handler = INT_HANDLER,
             is_big_endian = True,
