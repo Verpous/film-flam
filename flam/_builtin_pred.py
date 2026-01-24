@@ -24,6 +24,7 @@ from . import _attr
 from . import _ml
 from . import attrutils
 
+# -true : Always true.
 @_reg._register_builtin
 class TruePredicate(_filter.Predicate, name_without_type='true'):
     @classmethod
@@ -33,6 +34,7 @@ class TruePredicate(_filter.Predicate, name_without_type='true'):
     def excrete(self, findable: _ml.Findable, ctx: _ctx.FlamContext) -> bool:
         return True
 
+# -false : Always false.
 @_reg._register_builtin
 class FalsePredicate(_filter.Predicate, name_without_type='false'):
     @classmethod
@@ -42,6 +44,7 @@ class FalsePredicate(_filter.Predicate, name_without_type='false'):
     def excrete(self, findable: _ml.Findable, ctx: _ctx.FlamContext) -> bool:
         return False
 
+# -all ATTRIBUTE CMPTO : for array attributes, compare every array element according to CMPTO.
 @_reg._register_builtin
 class All(_filter.Predicate, name_without_type='all'):
     def __init__(self, attribute: _attr.Attribute, cmpto: _attr.CmpTo) -> None:
@@ -67,6 +70,7 @@ class All(_filter.Predicate, name_without_type='all'):
         yield self._attribute.qualified_name
         yield str(self._cmpto)
 
+# -has ATTRIBUTE : true if ATTRIBUTE isn't None
 @_reg._register_builtin
 class Has(_filter.Predicate, name_without_type='has'):
     def __init__(self, attribute: _attr.Attribute) -> None:
@@ -85,6 +89,7 @@ class Has(_filter.Predicate, name_without_type='has'):
         yield from super().regurgitate()
         yield self._attribute.qualified_name
 
+# -in-list LISTDEF : true if the findable is also in the list defined by LISTDEF.
 @_reg._register_builtin
 class InList(_filter.Predicate, name_without_type='in-list'):
     def __init__(self, movie_list: _ml.MovieList, filter: _filter.Filter) -> None:
@@ -111,6 +116,7 @@ class InList(_filter.Predicate, name_without_type='in-list'):
         return cls(movie_list, filter), until
 
     def excrete(self, findable: _ml.Findable, ctx: _ctx.FlamContext) -> bool:
+        # TODO: this could be more efficient and simple if the API provided a quick lookup by UID.
         if self._filter.findable_type == _ml.FindableType.ROLES:
             assert isinstance(findable, _ml.Role)
 
@@ -133,6 +139,7 @@ class InList(_filter.Predicate, name_without_type='in-list'):
         yield min(_filter.Pipeline.RPAREN)
         yield from self._filter.regurgitate()
 
+# -crew-contains CT_GM... SINGLE : scan the movie's crew according to CT_GMs for a group which passes the filter SINGLE.
 @_reg._register_builtin
 class CrewContains(_filter.Predicate, name_without_type='crew-contains', findable_type=_ml.FindableType.MOVIES):
     def __init__(self, ct_gms: list[tuple[_ml.CrewType, _ml.GroupMode]], filter: _filter.Filter) -> None:
@@ -148,6 +155,7 @@ class CrewContains(_filter.Predicate, name_without_type='crew-contains', findabl
         return cls(ct_gms, filter), until
 
     def excrete(self, findable: _ml.Findable, ctx: _ctx.FlamContext) -> bool:
+        # TODO: optimize by iterating PEOPLE not ROLES and caching in the PEOPLE which movies they were in?
         return any(
             role.extract(self._muid_attr) == findable.uid
             for ct_gm in self._ct_gms

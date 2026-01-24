@@ -13,6 +13,7 @@
 # You should have received a copy of the GNU General Public License
 # along with this program. If not, see <https://www.gnu.org/licenses/>.
 
+# TODO: if I upgrade to python 3.14 they have a change that probably makes this line no longer needed.
 from __future__ import annotations
 
 import os
@@ -180,6 +181,7 @@ class FlamContext:
     def flam_dir(self) -> str:
         return self._flam_dir
 
+    # TODO: rename to cfg_readonly or something?
     @property
     def cfg(self) -> _cfg.Configuration:
         return self._cfg
