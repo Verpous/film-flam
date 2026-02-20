@@ -55,6 +55,7 @@ class Configuration(_file._FlamSerializable):
     simple_lists_raw:       list[SimpleList]
     composite_lists_raw:    list[CompositeList]
     extensions:             list[str]
+    # TODO: environmental variables dictionary? s.t. loading the ctx also modifies the environment, useful for fetchers?
 
     @property
     def simple_lists(self) -> ConfigurationLists[SimpleList]:

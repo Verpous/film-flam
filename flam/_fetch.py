@@ -27,8 +27,6 @@ from . import _exc
 from . import _ctx
 from . import _dbg
 
-# TODO: implement a fetcher for https://github.com/tveronesi/imdbinfo? cinemagoer is dead at the moment
-#       there's also https://github.com/itsmehemant7/PyMovieDb but I think it uses the official IMDB API so you have to authenticate and pay
 class ListFetcher(abc.ABC):
     qualified_name: str
     qualified_aliases: list[str]

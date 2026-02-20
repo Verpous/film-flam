@@ -399,7 +399,7 @@ class SubcommandFetch:
     def configure_parser(cls, parser: argparse.ArgumentParser) -> None:
         parser.set_defaults(function=cls.execute)
         
-        parser.add_argument('-u', '--undo', action='store_true', help="Undo the previous fetch operation in its entirety. Note this will also restore configuration to the old state."
+        parser.add_argument('-u', '--undo', action='store_true', help="Undo the previous fetch operation in its entirety. Note this will also restore configuration to the old state. "
             "Fetch can be expensive so if something goes wrong and files get messed up this is good to have.")
         parser.add_argument('-r', '--refetch', metavar='PATTERN', default=None, action='store', help=
             '''Forces titles that match %(metavar)s (case-insensitive) to be redownloaded even if they are already locally stored.
