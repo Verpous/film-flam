@@ -51,7 +51,6 @@ def mean(data: typing.Iterable) -> None | float:
 
 #region movie attributes
 
-# TODO: if/when we allow same name across different types, change this to just 'uid'.
 @_register_easy_attribute(attrutils.EasyAttributeParams(
     name_without_type = 'uid',
     aliases_without_type = ['id', 'guid', 'identifier'],

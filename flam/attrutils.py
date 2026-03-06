@@ -315,22 +315,3 @@ def easy_attribute[ET](params: EasyAttributeParams) -> typing.Callable[[Extracto
         setattr(SpecificAttribute, _extractor_names[params.findable_type], extractor)
         return SpecificAttribute(params)
     return inner
-
-# TODO: attribute ideas:
-# Generic:
-# * for every array type predicate have a length attribute
-# * every field in list files should have a corresponding attribute
-# 
-# Person:
-# * nmovies appeared in
-# * n<crew-type>, like ndirector for num of movies directed
-# * average rating (per crew type?)
-# 
-# Movie:
-# * days until it leaves, this should be a personal extension of mine
-# * release/watch date in many formats? day of week, month of year, etc.
-# 
-# Crew:
-# * which crew type
-# * npeople in the group
-# * ncrewed (or some different name), adaptive version of n<crew-type>

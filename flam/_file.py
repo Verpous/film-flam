@@ -80,7 +80,6 @@ class _FlamSerializable(msgspec.Struct, forbid_unknown_fields=True, weakref=True
 
         for _, upgrade_from_version in version_upgrades[first_upgrade_idx:]:
             try:
-                # TODO: Annotate fields with their version and use that to generate the struct of the old version, to verify that the JSON is valid?
                 upgrade_from_version(obj_json)
             except Exception as e:
                 raise cls._validation_error(f"Failed to upgrade version due to error: {e}") from e

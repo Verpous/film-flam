@@ -155,7 +155,6 @@ class CrewContains(_filter.Predicate, name_without_type='crew-contains', findabl
         return cls(ct_gms, filter), until
 
     def excrete(self, findable: _ml.Findable, ctx: _ctx.FlamContext) -> bool:
-        # TODO: optimize by iterating PEOPLE not ROLES and caching in the PEOPLE which movies they were in?
         return any(
             role.extract(self._muid_attr) == findable.uid
             for ct_gm in self._ct_gms
@@ -168,22 +167,6 @@ class CrewContains(_filter.Predicate, name_without_type='crew-contains', findabl
         yield from (f"{ct_gm[0]}:{ct_gm[1]}" for ct_gm in self._ct_gms)
         yield min(_filter.Pipeline.RPAREN)
         yield from self._filter.regurgitate()
-
-# TODO: Predicate ideas:
-# Don't forget for string predicates we should support regex with "anywhere in the string" matching by default!
-# Generic predicates:
-# * In <value>s support %<attribute> expressions which expand to the value of this attribute on this findable?
-# * In <value>s support prefixing with [idx] (e.g. [0]==thing) to actual compare to the first value? If not then at least have an -index predicate?
-# 
-# Person predicates:
-# * -appeared-in <single with movie predicates> (searches all crew types)
-# * -<crew-type>-in <single with movie predicates> (ex: cast-in, director-in, etc. IDEA: "-cast-in -true" as a way to check if a person is an actor at all)
-#
-# Movie predicates:
-# * -crews-contain <single with role predicates> (searches all crew types, beware of people who appear in multiple crew types!)
-#
-# Role predicates:
-# * -crewed-in <single with movie predicates> (generic version if -<crew-type>-in)
 
 def _test_compile(line: str, find: _ml.FindableType = _ml.FindableType.ROLES, ctx: None | _ctx.FlamContext = None) -> None:
     import shlex

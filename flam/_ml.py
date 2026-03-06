@@ -90,6 +90,8 @@ class FindableType(enum.StrEnum):
 
     def is_applicable_to(self, find: FindableType) -> bool:
         # Roles are compatible with everything because a role is associated with people and a movie.
+        # DECISION: I considered allowing total cross applicability, by say applying movie attributes to a person
+        # by returning the array of results for every movie the person is in. But that's ridiculous and confusing and we're not doing it.
         return find == self.ROLES or self == find
 
     def __repr__(self) -> str:

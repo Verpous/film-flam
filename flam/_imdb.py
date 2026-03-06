@@ -483,7 +483,7 @@ def _fetch_movies_in_csv(movies_csv: list[_CsvRow], movie_list_file: _mlf.MovieL
         fetch_from_api_func(movies_csv, movie_list_file)
     # If fetch_movie or refetch_person raise an IMDb error, or we get a KeyboardInterrupt,
     # it will break us out of that loop, seal the progress bar nicely, and then we'll handle the exception here by turning it into a FetchInterrupt.
-    # TODO: Shouldn't reference imdb here. Encapsulate it.
+    # HACK: technically we shouldn't reference imdb here, it should be encapsulated. But whatever.
     except (imdb.IMDbError, KeyboardInterrupt) as e:
         # Do this even if an IMDb error took place.
         _add_csv_fields(movies_csv, movie_list_file)

@@ -548,7 +548,6 @@ Valid column names: ...''')
 
         flam.logger.info(f"Building findables list")
 
-        # TODO: if searching role attributes, optimization: extract and stringify person/movie attributes only once and not once per role.
         findables = [
             findable
             for crew_type, group_mode in ct_gms
@@ -598,10 +597,7 @@ Valid column names: ...''')
         columns = [] if args.columns is None else args.columns.removeprefix('+').split(',')
 
         if is_additive:
-            # TODO: Decide on default columns for PEOPLE, ROLES, and also what do we do about the 'leaving' column?
-            # TODO: we could make more attributes compatible: movie attributes on a person are the array of the attribute for each movie the person is in,
-            #       person attributes for movies are the array of the attributes for every person in the movie.
-            #       Part of the benefit is that attributes like 'nmovies' can become 'ntitle' when extracted from a person.
+            # TODO: Decide on default columns for PEOPLE, ROLES
             # TODO: qualified names.
             default_columns = {
                 flam.FindableType.MOVIES: ['title', 'runtime', 'release-year', 'rating', 'metascore', 'director'],

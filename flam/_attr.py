@@ -70,8 +70,6 @@ class CmpTo:
             case _:
                 return f"{self._op.sign}{self._attribute.str_of(self._value)}"
 
-# TODO: Thoughts on supporting aliases: will need to register the attribute with each alias name, separate the registry by findable type,
-# prevent collisions (but allow them across types), and support '<findable-type>-<attr name>' (e.g. movies-name, person-age) to prevent ambiguity when there is any
 class Attribute(abc.ABC):
     @property
     @abc.abstractmethod
@@ -167,22 +165,3 @@ def iter_value(value: AttributeValue) -> typing.Iterable[AttributeValue]:
         yield from value
     else:
         yield value
-
-# TODO: attribute ideas:
-# Generic:
-# * for every array type predicate have a length attribute
-# * every field in list files should have a corresponding attribute
-# 
-# Person:
-# * nmovies appeared in
-# * n<crew-type>, like ndirector for num of movies directed
-# * average rating (per crew type?)
-# 
-# Movie:
-# * days until it leaves, this should be a personal extension of mine
-# * release/watch date in many formats? day of week, month of year, etc.
-# 
-# Crew:
-# * which crew type
-# * npeople in the group
-# * ncrewed (or some different name), adaptive version of n<crew-type>
