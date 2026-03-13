@@ -171,13 +171,7 @@ class SubcommandConfigExtension:
     @classmethod
     def print(cls, ctx: flam.FlamContext, args: argparse.Namespace) -> None:
         table = [['module / script']]
-        table.extend(sorted(
-            [
-                e,
-            ]
-            for e in ctx.cfg.extensions
-        ))
-
+        table.extend(sorted([e] for e in ctx.cfg_readonly.extensions))
         print_table(table)
 
     @classmethod
@@ -213,7 +207,7 @@ class SubcommandConfigList:
         # Default edit/create.
         else:
             try:
-                ctx.cfg.simple_lists.get_by_name(args.NAME)
+                ctx.cfg_readonly.simple_lists.get_by_name(args.NAME)
             except flam.InputError:
                 cls.create(ctx, args)
             else:
@@ -229,7 +223,7 @@ class SubcommandConfigList:
 
     @classmethod
     def print(cls, ctx: flam.FlamContext, args: argparse.Namespace) -> None:
-        simple_lists = list(ctx.cfg.simple_lists) if args.NAME is None else [ctx.cfg.simple_lists.get_by_name(args.NAME)]
+        simple_lists = list(ctx.cfg_readonly.simple_lists) if args.NAME is None else [ctx.cfg_readonly.simple_lists.get_by_name(args.NAME)]
 
         table = [['uid', 'name', 'type', 'address', 'default-fetch?', 'default-find?']]
         table.extend(sorted(
@@ -318,7 +312,7 @@ class SubcommandConfigComposite:
         # Default edit/create.
         else:
             try:
-                ctx.cfg.composite_lists.get_by_name(args.NAME)
+                ctx.cfg_readonly.composite_lists.get_by_name(args.NAME)
             except flam.InputError:
                 cls.create(ctx, args)
             else:
@@ -334,14 +328,14 @@ class SubcommandConfigComposite:
 
     @classmethod
     def print(cls, ctx: flam.FlamContext, args: argparse.Namespace) -> None:
-        composite_lists = list(ctx.cfg.composite_lists) if args.NAME is None else [ctx.cfg.composite_lists.get_by_name(args.NAME)]
+        composite_lists = list(ctx.cfg_readonly.composite_lists) if args.NAME is None else [ctx.cfg_readonly.composite_lists.get_by_name(args.NAME)]
 
         table = [['uid', 'name', 'lists', 'filter', 'default-fetch?', 'default-find?']]
         table.extend(sorted(
             [
                 typing.cast(str, cl.uid).split('-')[0],
                 cl.name,
-                ', '.join(ctx.cfg.simple_lists.get_by_uid(sl_uid).name for sl_uid in cl.simple_list_uids),
+                ', '.join(ctx.cfg_readonly.simple_lists.get_by_uid(sl_uid).name for sl_uid in cl.simple_list_uids),
                 ' '.join(cl.filter_tokens) if len(cl.filter_tokens) > 0 else '-',
                 Choice.bool2yesno(cl.is_default_fetch),
                 Choice.bool2yesno(cl.is_default_find),
@@ -362,7 +356,7 @@ class SubcommandConfigComposite:
             simple_list_names, filter_tokens = split_at_filter(args.LIST + args.FILTER)
 
             if len(simple_list_names) > 0:
-                composite_list.simple_list_uids = [ctx.cfg.simple_lists.get_by_name(sl_name).uid for sl_name in simple_list_names]
+                composite_list.simple_list_uids = [ctx.cfg_readonly.simple_lists.get_by_name(sl_name).uid for sl_name in simple_list_names]
 
             if len(filter_tokens) > 0:
                 # Don't have anything to do with this for now, but we can raise an exception if it doesn't compile.
@@ -385,7 +379,7 @@ class SubcommandConfigComposite:
         composite_list = flam.CompositeList(
             uid = 'INITIALIZED LATER',
             name = args.NAME,
-            simple_list_uids = [ctx.cfg.simple_lists.get_by_name(sl_name).uid for sl_name in simple_list_names],
+            simple_list_uids = [ctx.cfg_readonly.simple_lists.get_by_name(sl_name).uid for sl_name in simple_list_names],
             filter_tokens = filter_tokens,
             is_default_fetch = args.default_fetch == Choice.YES,
             is_default_find = args.default_find == Choice.YES,
@@ -437,7 +431,7 @@ If no %(dest)s provided, fetches all lists configured as defaults''')
             listdefs = args.LISTDEF if len(args.LISTDEF) != 0 else [flam.SpecialListType.DEFAULTS]
             ctx.fetch(listdefs, refetch_pattern=args.refetch, quiet=False)
 
-            with utils.ProgressBar(list(ctx.cfg.composite_lists),
+            with utils.ProgressBar(list(ctx.cfg_readonly.composite_lists),
                     desc='Regenerating composite lists',
                     keyfunc=lambda cl: cl.name) as bar:
                 for cl in bar:

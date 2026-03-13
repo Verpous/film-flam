@@ -181,9 +181,8 @@ class FlamContext:
     def flam_dir(self) -> str:
         return self._flam_dir
 
-    # TODO: rename to cfg_readonly or something?
     @property
-    def cfg(self) -> _cfg.Configuration:
+    def cfg_readonly(self) -> _cfg.Configuration:
         return self._cfg
 
     @property
@@ -386,7 +385,7 @@ class FlamContext:
     # * Allows for bundling multiple edits with a single save at the end, instead of saving after every operation.
     # * Ability to rollback the changes if something isn't valid.
     # The downsides:
-    # * Users technically can access ctx.cfg so they just have to know that that copy is readonly with no enforcement.
+    # * Users technically can access ctx.cfg_readonly so they just have to know that that copy is readonly with no enforcement.
     # * Users may shoot themselves in the foot, if you make an invalid edit you will only know it when you close the context (hopefully we catch every case).
     @contextlib.contextmanager
     def configure(self) -> typing.Iterator[_cfg.Configuration]:
