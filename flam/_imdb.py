@@ -91,8 +91,8 @@ class _CsvRow:
     directors:          str
 
     # These have defaults because they only appear in CSVs of lists made by the logged in user.
-    myrating:           None | str = None
-    myrating_date:      None | str = None
+    my_rating:          None | str = None
+    my_rating_date:     None | str = None
 
     def mlf_fields(self) -> dict[str, typing.Any]:
         # If any of the conversions fail we simply propagate the error.
@@ -103,7 +103,7 @@ class _CsvRow:
             runtime_minutes   = int(self.runtime_minutes),
             genres            = self.genres.split(', '),
             votes             = int(self.votes),
-            myrating          = float(self.myrating) if (self.myrating is not None and self.myrating != '') else None,
+            my_rating         = float(self.my_rating) if (self.my_rating is not None and self.my_rating != '') else None,
             watch_date        = self._date(self.watch_date),
             release_date      = self._date(self.release_date),
         )
@@ -287,9 +287,9 @@ class _Cinemagoer:
         # Build crews dictionary and also people.
         crew = {}
         
-        for crew_type in _ml.CrewType:
+        for crew_type in _ml.CrewType.iterate_except_any():
             # I generally tried to choose the CrewType values to match imdb's, but this one goddamn type has a space in it and I don't like that.
-            imdb_crew_type = crew_type.value if crew_type != _ml.CrewType.STUNTCAST else 'stunt performer'
+            imdb_crew_type = str(crew_type) if crew_type != _ml.CrewType.STUNTCAST else 'stunt performer'
 
             # Building this list as a dictionary solves two problems:
             # 1. Sometimes you get empty people, so those are discarded.
@@ -400,11 +400,8 @@ class _IMDbREST:
 
         # Build crews dictionary and also people.
         crew = {
-            str(crew_type): _mlf.MLFCrew(
-                    crew_type = crew_type,
-                    roles_by_uid = {}
-                )
-            for crew_type in _ml.CrewType
+            str(crew_type): _mlf.MLFCrew(crew_type=crew_type, roles_by_uid={})
+            for crew_type in _ml.CrewType.iterate_except_any()
         }
 
         characters: list[str] = []

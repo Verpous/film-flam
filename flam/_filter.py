@@ -18,7 +18,6 @@ from __future__ import annotations
 import abc
 import typing
 import dataclasses
-import itertools
 
 from . import _ctx
 from . import _attr
@@ -440,7 +439,7 @@ def _make_attribute_predicate(attribute: _attr.Attribute) -> type[Predicate]:
     return AttributePredicate
 
 # Doesn't guarantee that token is valid, only indicates that it looks like it should be.
-def is_filter_token(token: str) -> bool:
+def looks_like_filter_token(token: str) -> bool:
     return (token.startswith(Predicate.PREFIX)
         or token in Negative.NEGATE
         or token in Disjoined.DISJOIN

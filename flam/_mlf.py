@@ -49,7 +49,7 @@ class MLFMovie(_file._FlamSerializable):
     metascore:              None | int
     votes:                  None | int
     rating:                 None | float
-    myrating:               None | float
+    my_rating:              None | float
     genres:                 list[str]
     # TODO: consider adding languages, countries
 
@@ -78,7 +78,7 @@ class MovieListFile(_file._FlamSerializable):
 
     def sanity_checks(self) -> None:
         super().sanity_checks()
-        crew_types_set = set(ct.value for ct in _ml.CrewType)
+        crew_types_set = set(str(ct) for ct in _ml.CrewType.iterate_except_any())
 
         for movie in self.movies_by_uid.values():
             # I verified this check works.

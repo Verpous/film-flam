@@ -249,7 +249,7 @@ class EasyAttribute(_attr.Attribute):
 
     @property
     def is_ascending(self) -> bool:
-        return self._params.is_big_endian
+        return self._params.is_ascending
 
     @property
     def type_(self) -> type:
@@ -285,10 +285,10 @@ class LenAttribute(EasyAttribute):
     def _extract_from_movie(self, movie: _ml.Movie, mlf_movie: _mlf.MLFMovie) -> int: # pylint: disable=unused-argument
         return self._len(movie)
     
-    def _extract_from_person(self, person: _ml.Person, mlf_person: _mlf.MLFPerson) -> int: # pylint: disable=unused-argument
-        return self._len(person)
+    def _extract_from_people(self, people: _ml.People, mlf_people: list[_mlf.MLFPerson]) -> int: # pylint: disable=unused-argument
+        return self._len(people)
     
-    def _extract_from_role(self, role: _ml.Role, mlf_roles: list[_mlf.MLFRole]) -> int: # pylint: disable=unused-argument
+    def _extract_from_role(self, role: _ml.Role, mlf_roles: _ml.MLFRolesDict, mlf_movie: _mlf.MLFMovie, mlf_people: list[_mlf.MLFPerson]) -> int: # pylint: disable=unused-argument
         return self._len(role)
 
     def _len(self, findable: _ml.Findable) -> int:
@@ -297,13 +297,13 @@ class LenAttribute(EasyAttribute):
         return len(actual) if isinstance(actual, list) else 1
 
 type MovieExtractor[T] = typing.Callable[[EasyAttribute, _ml.Movie, _mlf.MLFMovie], T]
-type PersonExtractor[T] = typing.Callable[[EasyAttribute, _ml.Person, _mlf.MLFPerson], T]
-type RoleExtractor[T] = typing.Callable[[EasyAttribute, _ml.Role, list[_mlf.MLFRole]], T]
-type Extractor[T] = MovieExtractor | PersonExtractor[T] | RoleExtractor[T]
+type PeopleExtractor[T] = typing.Callable[[EasyAttribute, _ml.People, list[_mlf.MLFPerson]], T]
+type RoleExtractor[T] = typing.Callable[[EasyAttribute, _ml.Role, _ml.MLFRolesDict, _mlf.MLFMovie, list[_mlf.MLFPerson]], T]
+type Extractor[T] = MovieExtractor | PeopleExtractor[T] | RoleExtractor[T]
 
 _extractor_names = {
     _ml.FindableType.MOVIES: '_extract_from_movie',
-    _ml.FindableType.PEOPLE: '_extract_from_person',
+    _ml.FindableType.PEOPLE: '_extract_from_people',
     _ml.FindableType.ROLES: '_extract_from_role',
 }
 

@@ -146,7 +146,7 @@ class FlamContext:
                 extensions = [],
             )
 
-            _dbg.logger.info(f"Configuration file doesn't exist, creating a new one.")
+            _dbg.logger.info("Configuration file doesn't exist, creating a new one.")
             self._write_cfg()
 
         try:
@@ -157,7 +157,7 @@ class FlamContext:
                 composite_lists_by_uid = {},
             )
 
-            _dbg.logger.info(f"Metadata file doesn't exist, creating a new one.")
+            _dbg.logger.info("Metadata file doesn't exist, creating a new one.")
             self._write_metadata()
 
         # I wish I could print these prettier but it's not worth the hassle.

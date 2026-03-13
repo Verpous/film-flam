@@ -80,7 +80,7 @@ class Configuration(_file._FlamSerializable):
     def sanity_checks(self) -> None:
         super().sanity_checks()
 
-        # We permit names that satisfy is_filter_token, as the ambiguity can be defeated with explicit listdefs if the user chooses to punish himself.
+        # We permit names that satisfy looks_like_filter_token, as the ambiguity can be defeated with explicit listdefs if the user chooses to punish himself.
         # We permit names with wacky special characters, because we slugify everything when turning it into a filename.
         for sl in self.simple_lists_raw:
             if sum(1 for rl2 in self.simple_lists_raw if sl.name == rl2.name) > 1:

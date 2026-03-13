@@ -65,7 +65,7 @@ class Choice(enum.StrEnum):
         return str(self)
 
 def split_at_filter(strs: list[str]) -> tuple[list[str], list[str]]:
-    filter_begin = next((i for i, s in enumerate(strs) if flam.is_filter_token(s)), len(strs))
+    filter_begin = next((i for i, s in enumerate(strs) if flam.looks_like_filter_token(s)), len(strs))
     return strs[:filter_begin], strs[filter_begin:]
 
 def uniq_append(l: list, x: typing.Any) -> None:
@@ -444,7 +444,7 @@ If no %(dest)s provided, fetches all lists configured as defaults''')
                     # Easiest way to regenerate dependencies is to just get every composite list and do nothing with it.
                     try:
                         ctx.get_movie_list(f'{flam.SpecialListType.COMPOSITE}={cl.name}')
-                    except flam.FlamError as e:
+                    except flam.FlamError:
                         # Don't care if this fails, and it might fail because we haven't checked if the composite list has all its dependencies.
                         pass
 
@@ -516,7 +516,10 @@ Valid column names: ...''')
             'Don\'t print a row with the column titles')
 
         parser.add_argument('FINDABLE', type=cls.parse_findable, action='store', help=
-            '''Choose what to find: movies, people, or roles. Roles have all the attributes of the movie and the person, and then a few role-specific ones''')
+            '''Choose what to find: movies, people, or roles.
+For people and roles, supports limiting the search to a specific crew type and group mode, and supports comma-delimited several types. Use 'crew' to catenate all types.
+For roles, it looks like: 'cast', 'director:group', 'composer:separate,stuntcast', 'crew', etc.
+For people, it looks like 'cast-people', 'director-people:group', etc.''')
         parser.add_argument('LISTDEF', nargs='*', action='store', help=
             '''Like fetch but with different defaults, and if the LISTDEFs aren't already fetched, it fails with a nice error message''')
         parser.add_argument('FILTER', nargs='*', action='store', help=
@@ -524,16 +527,55 @@ Valid column names: ...''')
         parser.add_argument('REMAINDER', nargs=argparse.REMAINDER, action='store', help=argparse.SUPPRESS)
 
     @classmethod
-    def parse_findable(cls, findable: str) -> tuple[flam.FindableType, list[tuple[None | flam.CrewType, flam.GroupMode]]]:
-        if findable == flam.FindableType.ROLES:
-            return flam.FindableType.ROLES, list(zip(flam.CrewType, [flam.GroupMode.DEFAULT] * len(flam.CrewType)))
+    def parse_findable(cls, findable: str) -> tuple[flam.FindableType, list[tuple[flam.CrewType, flam.GroupMode]]]:
+        if findable == '':
+            raise ValueError(f"Cannot be empty string.")
 
-        try:
-            return flam.FindableType(findable), [(None, flam.GroupMode.DEFAULT)]
-        except ValueError:
-            pass
+        if findable == flam.FindableType.MOVIES:
+            # Need to return a list of size 1 for execute to work even if its contents are irrelevant.
+            return flam.FindableType(findable), [(flam.CrewType.ANY, flam.GroupMode.DEFAULT)]
 
-        return flam.FindableType.ROLES, [flam.parse_ct_gm(ct_gm_str) for ct_gm_str in findable.split(',')]
+        split = findable.split(',')
+        sample_findable: None | flam.FindableType = None
+        ct_gms: list[tuple[flam.CrewType, flam.GroupMode]] = []
+
+        for subfindable in split:
+            # If there is a group_mode it will be separated with a colon.
+            ct_gm_strs = subfindable.split(':', maxsplit=1)
+
+            # Forgive excess commas, but later we'll have to verify there was at least one non-empty subfindable.
+            if len(ct_gm_strs) == 0:
+                continue
+
+            crew_type_str = ct_gm_strs[0]
+            group_mode = flam.GroupMode.DEFAULT if len(ct_gm_strs) == 1 else flam.GroupMode(ct_gm_strs[1])
+
+            # Support 'roles', 'people' as an alias for 'any', 'any-people'.
+            if crew_type_str == flam.FindableType.ROLES or crew_type_str == flam.FindableType.PEOPLE:
+                findable_type = flam.FindableType(crew_type_str)
+                crew_types = [flam.CrewType.ANY]
+            else:
+                # Handle whether this is a '-people' or just a roles findable.
+                findable_type = flam.FindableType.PEOPLE if crew_type_str.endswith(f'-{flam.FindableType.PEOPLE}') else flam.FindableType.ROLES
+                crew_type_str = crew_type_str.removesuffix(f'-{flam.FindableType.PEOPLE}')
+                
+                # Support 'crew' as a shorthand for the list of all crew types.
+                if crew_type_str == 'crew':
+                    crew_types = list(flam.CrewType.iterate_except_any())
+                else:
+                    crew_types = [flam.CrewType(crew_type_str)]
+
+            if sample_findable is None:
+                sample_findable = findable_type
+            elif sample_findable != findable_type:
+                raise ValueError('All FINDABLEs must have the same type')
+
+            ct_gms.extend((crew_type, group_mode) for crew_type in crew_types)
+
+        if sample_findable is None:
+            raise ValueError('Must specify at least one FINDABLE')
+
+        return sample_findable, ct_gms
 
     @classmethod
     def execute(cls, ctx: flam.FlamContext, args: argparse.Namespace) -> None:
@@ -572,8 +614,8 @@ Valid column names: ...''')
         if args.sort is None:
             default_attribute_names = {
                 flam.FindableType.MOVIES: ['runtime', 'title'],
-                flam.FindableType.PEOPLE: ['nmovies', 'name'],
-                flam.FindableType.ROLES: ['nmovies', 'name', 'release-year', 'title'],
+                flam.FindableType.PEOPLE: ['crew-type', 'group-mode', 'nmovies', 'name'],
+                flam.FindableType.ROLES: ['crew-type', 'group-mode', 'nmovies', 'name', 'release-year', 'title'],
             }
 
             attribute_names = default_attribute_names[findable_type]
@@ -591,18 +633,18 @@ Valid column names: ...''')
 
     # Can't do this at argparse time because it depends on the context and sortkeys.
     @classmethod
-    def parse_columns(cls, args: argparse.Namespace, findable_type: flam.FindableType, ct_gms: list[tuple[None | flam.CrewType, flam.GroupMode]],
+    def parse_columns(cls, args: argparse.Namespace, findable_type: flam.FindableType, ct_gms: list[tuple[flam.CrewType, flam.GroupMode]],
             sort_attrs: list[flam.Attribute], movie_list: flam.MovieList, ctx: flam.FlamContext) -> list[flam.Attribute]:
         is_additive = args.columns is None or args.columns.startswith('+')
         columns = [] if args.columns is None else args.columns.removeprefix('+').split(',')
 
         if is_additive:
             # TODO: Decide on default columns for PEOPLE, ROLES
-            # TODO: qualified names.
+            # TODO: qualified names. Also need to handle uniq_append also deduping short names and qualified names.
             default_columns = {
                 flam.FindableType.MOVIES: ['title', 'runtime', 'release-year', 'rating', 'metascore', 'director'],
                 flam.FindableType.PEOPLE: ['name', 'nmovies', 'avg-rating', 'avg-metascore'],
-                flam.FindableType.ROLES: ['name', 'title', 'avg-rating', 'avg-metascore'],
+                flam.FindableType.ROLES: ['people-name', 'title', 'avg-rating', 'avg-metascore'],
             }
 
             columns = default_columns[findable_type] + columns
@@ -616,8 +658,8 @@ Valid column names: ...''')
             if any(attr.qualified_name == 'movies-votes' for attr in sort_attrs):
                 uniq_append(columns, 'movies-votes')
 
-            if any(attr.qualified_name == 'movies-myrating' for attr in sort_attrs):
-                uniq_append(columns, 'movies-myrating')
+            if any(attr.qualified_name == 'movies-my-rating' for attr in sort_attrs):
+                uniq_append(columns, 'movies-my-rating')
 
             if any(attr.qualified_name == 'movies-description' for attr in sort_attrs):
                 uniq_append(columns, 'movies-description')
@@ -625,12 +667,15 @@ Valid column names: ...''')
             if len(ct_gms) > 1:
                 uniq_append(columns, 'crew-type')
 
-            if any(crew_type == flam.CrewType.CAST for crew_type, _ in ct_gms):
+            if len(ct_gms) > 1 and any(group_mode != crew_type.default_group_mode for crew_type, group_mode in ct_gms):
+                uniq_append(columns, 'group-mode')
+
+            if findable_type == flam.FindableType.ROLES and any(crew_type == flam.CrewType.CAST for crew_type, _ in ct_gms):
                 uniq_append(columns, 'characters')
 
             # If we combined multiple lists, tag each element with the list(s) it came from.
-            if movie_list.list_type == flam.SpecialListType.ANNONYMOUS:
-                uniq_append(columns, 'origin')
+            # if movie_list.list_type == flam.SpecialListType.ANNONYMOUS:
+            #     uniq_append(columns, 'origin')
 
         attributes = [ctx.attributes.get(c, findable_type) for c in columns]
 
