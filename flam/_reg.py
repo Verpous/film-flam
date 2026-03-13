@@ -149,6 +149,17 @@ def register[T](obj: T) -> T:
     _global_extensions.register(obj)
     return obj
 
+def compose_qualified_attr_or_pred_name(findable_type: str, name_without_type: str) -> str:
+    return f'{findable_type}-{name_without_type}'
+
+def decompose_qualified_attr_or_pred_name(qualified_name: str) -> tuple[str, str]:
+    split = qualified_name.split('-', maxsplit=1)
+
+    if len(split) != 2:
+        raise _exc.InputError(f"Invalid qualified_name: '{qualified_name}'")
+
+    return split[0], split[1]
+
 # Import builtin extensions only here to avoid cyclic dependency issues.
 from . import _imdb # pylint: disable=unused-import
 from . import _builtin_attr # pylint: disable=unused-import

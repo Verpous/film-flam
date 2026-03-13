@@ -23,6 +23,7 @@ from . import _ctx
 from . import _attr
 from . import _exc
 from . import _ml
+from . import _reg
 
 # TODO: should filters be case insensitive??
 # FILTER    := PIPELINE | <epsilon>
@@ -104,7 +105,7 @@ class FilterMember(abc.ABC):
         attribute_name = cls.eat_str(params, at, description)
 
         try:
-            attribute = params.ctx.attributes.get(attribute_name, params.find)
+            attribute = params.ctx.attributes.get(attribute_name, type_hint=params.find)
         except _exc.InputError as e:
             raise _EinGafrurError(f"Expected {description}, but got: '{attribute_name}'.", tokens=params.tokens, error_indices=at) from e
 
@@ -375,10 +376,10 @@ class Predicate(FilterMember):
         super().__init_subclass__(**kwargs)
         cls.findable_type = findable_type
         
-        cls.qualified_name = name_without_type if findable_type is None else f'{findable_type}-{name_without_type}'
+        cls.qualified_name = name_without_type if findable_type is None else _reg.compose_qualified_attr_or_pred_name(findable_type, name_without_type)
         cls.qualified_aliases = ([] if aliases_without_type is None
             else aliases_without_type if findable_type is None
-            else [f'{findable_type}-{alias_without_type}' for alias_without_type in aliases_without_type])
+            else [_reg.compose_qualified_attr_or_pred_name(findable_type, alias_without_type) for alias_without_type in aliases_without_type])
 
     @classmethod
     def eat(cls, params: EatParams, at: int) -> tuple[Predicate, int]:
@@ -388,13 +389,13 @@ class Predicate(FilterMember):
             raise _EinGafrurError('Unexpected right parenthesis. It either has no matching left parenthesis or a predicate was expected.',
                 tokens=params.tokens, error_indices=at)
 
-        name = prefixed_name.removeprefix(Predicate.PREFIX)
-
-        if name == prefixed_name:
+        if not prefixed_name.startswith(cls.PREFIX):
             raise _EinGafrurError(f"Expected predicate {prefixed_name} to start with a '{cls.PREFIX}'.", tokens=params.tokens, error_indices=at)
+        
+        name = prefixed_name.removeprefix(cls.PREFIX)
 
         try:
-            predicate = params.ctx.predicates.get(name, params.find)
+            predicate = params.ctx.predicates.get(name, type_hint=params.find)
         except _exc.CloseInputError as e:
             suggestions = f' (did you mean: {", ".join(e.suggestions)}?)' if len(e.suggestions) > 0 else '.'
             raise _EinGafrurError(f"Expected a valid predicate name, but got: '{prefixed_name}'{suggestions}", tokens=params.tokens, error_indices=at) from e

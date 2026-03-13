@@ -622,7 +622,7 @@ For people, it looks like 'cast-people', 'director-people:group', etc.''')
         else:
             attribute_names = args.sort.split(',') if args.sort != '' else []
 
-        attributes = [ctx.attributes.get(a, findable_type) for a in attribute_names]
+        attributes = [ctx.attributes.get(a, type_hint=findable_type) for a in attribute_names]
 
         for i, attr in enumerate(attributes):
             if not attr.findable_type.is_applicable_to(findable_type):
@@ -677,7 +677,7 @@ For people, it looks like 'cast-people', 'director-people:group', etc.''')
             # if movie_list.list_type == flam.SpecialListType.ANNONYMOUS:
             #     uniq_append(columns, 'origin')
 
-        attributes = [ctx.attributes.get(c, findable_type) for c in columns]
+        attributes = [ctx.attributes.get(c, type_hint=findable_type) for c in columns]
 
         for attr in attributes:
             if not attr.findable_type.is_applicable_to(findable_type):

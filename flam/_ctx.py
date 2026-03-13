@@ -93,7 +93,7 @@ class RegistriesOf[T: (type[_fetch.ListFetcher], type[_filter.Predicate], _attr.
             if type_hint is not None:
                 # Try hinted type.
                 try:
-                    return reg_of_type[f'{type_hint}-{name}']
+                    return reg_of_type[_reg.compose_qualified_attr_or_pred_name(type_hint, name)]
                 except KeyError:
                     pass
 
@@ -101,7 +101,7 @@ class RegistriesOf[T: (type[_fetch.ListFetcher], type[_filter.Predicate], _attr.
                 for findable_type in _ml.FindableType:
                     if findable_type != type_hint:
                         try:
-                            return reg_of_type[f'{findable_type}-{name}']
+                            return reg_of_type[_reg.compose_qualified_attr_or_pred_name(findable_type, name)]
                         except KeyError:
                             pass
         

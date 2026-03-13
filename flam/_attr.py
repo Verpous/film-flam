@@ -24,6 +24,7 @@ import operator
 from . import _ml
 from . import _exc
 from . import _dbg
+from . import _reg
 
 # For now typing.Any, but what we really want is an "intersection" of protocols value must support, which for now is sorting and stringification?
 # Unfortunately python has neither an intersection type, nor a "sortable" type.
@@ -108,14 +109,14 @@ class Attribute(abc.ABC):
     def default_op(self) -> ComparisonOp:
         pass
 
-    # TODO: cache these. Also some util for transforming type,name to qualified names
+    # TODO: cache these.
     @property
     def qualified_name(self) -> str:
-        return f'{self.findable_type}-{self.name_without_type}'
+        return _reg.compose_qualified_attr_or_pred_name(self.findable_type, self.name_without_type)
 
     @property
     def qualified_aliases(self) -> list[str]:
-        return [f'{self.findable_type}-{alias_without_type}' for alias_without_type in self.aliases_without_type]
+        return [_reg.compose_qualified_attr_or_pred_name(self.findable_type, alias_without_type) for alias_without_type in self.aliases_without_type]
 
     @abc.abstractmethod
     def parse(self, value_str: str) -> AttributeValue:
