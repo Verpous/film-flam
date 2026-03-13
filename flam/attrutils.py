@@ -229,19 +229,8 @@ class EasyAttributeParams:
 
 class EasyAttribute(_attr.Attribute):
     def __init__(self, params: EasyAttributeParams) -> None:
+        super().__init__(params.findable_type, params.name_without_type, params.aliases_without_type)
         self._params = params
-
-    @property
-    def name_without_type(self) -> str:
-        return self._params.name_without_type
-
-    @property
-    def aliases_without_type(self) -> list[str]:
-        return self._params.aliases_without_type
-
-    @property
-    def findable_type(self) -> _ml.FindableType:
-        return self._params.findable_type
 
     @property
     def is_big_endian(self) -> bool:

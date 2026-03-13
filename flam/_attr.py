@@ -72,20 +72,32 @@ class CmpTo:
                 return f"{self._op.sign}{self._attribute.str_of(self._value)}"
 
 class Attribute(abc.ABC):
-    @property
-    @abc.abstractmethod
-    def name_without_type(self) -> str:
-        pass
+    def __init__(self, findable_type: _ml.FindableType, name_without_type: str, aliases_without_type: None | list[str] = None, **kwargs: typing.Any):
+        self._findable_type = findable_type
+        self._name_without_type = name_without_type
+        self._qualified_name = _reg.compose_qualified_attr_or_pred_name(findable_type, name_without_type)
+        self._aliases_without_type = [] if aliases_without_type is None else aliases_without_type
 
     @property
-    @abc.abstractmethod
-    def aliases_without_type(self) -> list[str]:
-        pass
+    def name_without_type(self) -> str:
+        return self._name_without_type
+
+    @property
+    def aliases_without_type(self) -> typing.Iterable[str]:
+        yield from self._aliases_without_type
     
     @property
-    @abc.abstractmethod
     def findable_type(self) -> _ml.FindableType:
-        pass
+        return self._findable_type
+
+    @property
+    def qualified_name(self) -> str:
+        return self._qualified_name
+
+    @property
+    def qualified_aliases(self) -> typing.Iterable[str]:
+        for alias_without_type in self.aliases_without_type:
+            yield _reg.compose_qualified_attr_or_pred_name(self._findable_type, alias_without_type)
 
     # Of course we aren't talking about actual byte order here.
     # We're talking about generally, when stringified, does the string go from most to least significant or vice versa?
@@ -108,15 +120,6 @@ class Attribute(abc.ABC):
     @abc.abstractmethod
     def default_op(self) -> ComparisonOp:
         pass
-
-    # TODO: cache these.
-    @property
-    def qualified_name(self) -> str:
-        return _reg.compose_qualified_attr_or_pred_name(self.findable_type, self.name_without_type)
-
-    @property
-    def qualified_aliases(self) -> list[str]:
-        return [_reg.compose_qualified_attr_or_pred_name(self.findable_type, alias_without_type) for alias_without_type in self.aliases_without_type]
 
     @abc.abstractmethod
     def parse(self, value_str: str) -> AttributeValue:

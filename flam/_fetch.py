@@ -28,6 +28,8 @@ from . import _ctx
 from . import _dbg
 
 class ListFetcher(abc.ABC):
+    # These are READ ONLY. We would wrap them in a propety but classmethod-properties are not supported.
+    # We would UPPERCASE them to communicate that they're constants but the registry infra expects the name to be lowercased.
     qualified_name: str
     qualified_aliases: list[str]
     uid_family: str

@@ -368,6 +368,9 @@ class Disjoined(FilterMember):
 
 class Predicate(FilterMember):
     PREFIX = '-'
+    
+    # These are READ ONLY. We would wrap them in a propety but classmethod-properties are not supported.
+    # We would UPPERCASE them to communicate that they're constants but the registry infra expects the name to be lowercased.
     qualified_name: str
     qualified_aliases: list[str]
     findable_type: None | _ml.FindableType
@@ -412,7 +415,7 @@ class Predicate(FilterMember):
         yield self.PREFIX + self.qualified_name
 
 def _make_attribute_predicate(attribute: _attr.Attribute) -> type[Predicate]:
-    class AttributePredicate(Predicate, name_without_type=attribute.name_without_type, aliases_without_type=attribute.aliases_without_type, findable_type=attribute.findable_type):
+    class AttributePredicate(Predicate, name_without_type=attribute.name_without_type, aliases_without_type=list(attribute.aliases_without_type), findable_type=attribute.findable_type):
         ATTRIBUTE: _attr.Attribute = attribute
 
         def __init__(self, cmpto: _attr.CmpTo) -> None:
