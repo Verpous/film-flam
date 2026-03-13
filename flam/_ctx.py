@@ -100,12 +100,31 @@ class RegistriesOf[T: (type[_fetch.ListFetcher], type[_filter.Predicate], _attr.
                 # Try the others.
                 # TODO: if found one but by its alias, check if there's instead another type for which the match is not with an alias, and prefer to return that.
                 #       this will solve the issue of movies and people both having a 'name' but for movies it's an alias to 'titles' and for people it's the primary name.
+                best_match = None
+
                 for findable_type in _ml.FindableType:
-                    if findable_type != type_hint:
-                        try:
-                            return reg_of_type[_reg.compose_qualified_attr_or_pred_name(findable_type, name)]
-                        except KeyError:
-                            pass
+                    # Already checked the type hint.
+                    if findable_type == type_hint:
+                        continue
+
+                    qualified_name = _reg.compose_qualified_attr_or_pred_name(findable_type, name)
+
+                    try:
+                        match = reg_of_type[qualified_name]
+                    except KeyError:
+                        continue
+
+                    # This won't be true in case we actually found it by an alias. In that case, we'd rather see if we can find a match which isn't based on an alias.
+                    # This solves the issue of movies and people both having a 'name' but for movies it's an alias to 'titles' and for people it's the primary name.
+                    if match.qualified_name == qualified_name:
+                        best_match = match
+                        break
+
+                    if best_match is None:
+                        best_match = match
+                
+                if best_match is not None:
+                    return best_match
         
         # Use a smaller-than-default cutoff so that it finds matches even if you tried a name without the type (e.g. 'title' should closely match 'movies-title').
         close_matches = difflib.get_close_matches(name, self, cutoff=0.45)
