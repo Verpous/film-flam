@@ -98,6 +98,8 @@ class RegistriesOf[T: (type[_fetch.ListFetcher], type[_filter.Predicate], _attr.
                     pass
 
                 # Try the others.
+                # TODO: if found one but by its alias, check if there's instead another type for which the match is not with an alias, and prefer to return that.
+                #       this will solve the issue of movies and people both having a 'name' but for movies it's an alias to 'titles' and for people it's the primary name.
                 for findable_type in _ml.FindableType:
                     if findable_type != type_hint:
                         try:

@@ -24,7 +24,7 @@ import enum
 import colorama
 import typing
 
-# TODO: Hate this enum. Why did I add it?
+# Very on the fence about this enum. I guess it's kind of nice but also I kind of don't like it. Whatever. It stays.
 class FlamEnv(enum.StrEnum):
     DEBUG               = 'FLAM_DEBUG'
     LOG2CONSOLE         = 'FLAM_LOG2CONSOLE'

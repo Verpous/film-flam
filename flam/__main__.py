@@ -68,10 +68,6 @@ def split_at_filter(strs: list[str]) -> tuple[list[str], list[str]]:
     filter_begin = next((i for i, s in enumerate(strs) if flam.looks_like_filter_token(s)), len(strs))
     return strs[:filter_begin], strs[filter_begin:]
 
-def uniq_append(l: list, x: typing.Any) -> None:
-    if x not in l:
-        l.append(x)
-
 def print_table(table: list[list[str]],
         color_choice: Choice = Choice.AUTO,
         paginate_choice: Choice = Choice.AUTO,
@@ -530,7 +526,7 @@ For people, it looks like 'cast-people', 'director-people:group', etc.''')
             return flam.FindableType(findable), [(flam.CrewType.ANY, flam.GroupMode.DEFAULT)]
 
         split = findable.split(',')
-        sample_findable: None | flam.FindableType = None
+        sample_findable = None
         ct_gms: list[tuple[flam.CrewType, flam.GroupMode]] = []
 
         for subfindable in split:
@@ -594,13 +590,13 @@ For people, it looks like 'cast-people', 'director-people:group', etc.''')
         cls.sort_findables(sort_attrs, findables, args)
 
         flam.logger.info(f"Extracting columns from findables")
-        values_table = [[findable.extract(attr) for attr in column_attrs] for findable in findables]
+        values_table = [[findable.extract(attr) for attr, _ in column_attrs] for findable in findables]
 
         flam.logger.info(f"Stringifying the table")
         strs_table = list(cls.build_strs_table(column_attrs, values_table, args))
 
         flam.logger.info(f"Printing the table")
-        cls.print_table(strs_table, column_attrs, args)
+        cls.print_table(strs_table, [attr for attr, _ in column_attrs], args)
 
     # Can't do this at argparse time because it depends on the context.
     @classmethod
@@ -628,73 +624,95 @@ For people, it looks like 'cast-people', 'director-people:group', etc.''')
     # Can't do this at argparse time because it depends on the context and sortkeys.
     @classmethod
     def parse_columns(cls, args: argparse.Namespace, findable_type: flam.FindableType, ct_gms: list[tuple[flam.CrewType, flam.GroupMode]],
-            sort_attrs: list[flam.Attribute], movie_list: flam.MovieList, ctx: flam.FlamContext) -> list[flam.Attribute]:
+            sort_attrs: list[flam.Attribute], movie_list: flam.MovieList, ctx: flam.FlamContext) -> list[tuple[flam.Attribute, None | str]]:
         is_additive = args.columns is None or args.columns.startswith('+')
         columns = [] if args.columns is None else args.columns.removeprefix('+').split(',')
 
+        # We'll return a list of (attr, name) tuples where name is just a hint so that the table printer will user the user-provided name if it's an alias.
+        attributes = [(ctx.attributes.get(c, type_hint=findable_type), c) for c in columns]
+
         if is_additive:
             # TODO: Decide on default columns for PEOPLE, ROLES
-            # TODO: qualified names. Also need to handle uniq_append also deduping short names and qualified names.
             default_columns = {
                 flam.FindableType.MOVIES: ['title', 'runtime', 'release-year', 'rating', 'metascore', 'director'],
                 flam.FindableType.PEOPLE: ['name', 'nmovies', 'avg-rating', 'avg-metascore'],
                 flam.FindableType.ROLES: ['people-name', 'title', 'avg-rating', 'avg-metascore'],
             }
 
-            columns = default_columns[findable_type] + columns
+            # Use default columns even if the same attribute is also in the custom columns from the user.
+            # Print the default columns before the additions, and additions before smart columns.
+            attributes = [(ctx.attributes.get(c, type_hint=findable_type), None) for c in default_columns[findable_type]] + attributes
+            smart_columns = []
 
             # "Smart" columns that aren't default unless conditions are met.
             # TODO: maybe we should generalize and just say that any sort key also becomes a column key,
             # and maybe we should consider not just sort keys but also attributes referenced in the filter?
             if any(attr.qualified_name == 'movies-watched' for attr in sort_attrs):
-                uniq_append(columns, 'movies-watched')
+                smart_columns.append('movies-watched')
 
             if any(attr.qualified_name == 'movies-votes' for attr in sort_attrs):
-                uniq_append(columns, 'movies-votes')
+                smart_columns.append('movies-votes')
 
             if any(attr.qualified_name == 'movies-my-rating' for attr in sort_attrs):
-                uniq_append(columns, 'movies-my-rating')
+                smart_columns.append('movies-my-rating')
 
             if any(attr.qualified_name == 'movies-description' for attr in sort_attrs):
-                uniq_append(columns, 'movies-description')
+                smart_columns.append('movies-description')
             
             if len(ct_gms) > 1:
-                uniq_append(columns, 'crew-type')
+                smart_columns.append('crew-type')
 
+            # If more than one CTGM and one of them isn't the default group mode, show the group mode.
             if len(ct_gms) > 1 and any(group_mode != crew_type.default_group_mode for crew_type, group_mode in ct_gms):
-                uniq_append(columns, 'group-mode')
+                smart_columns.append('group-mode')
 
             if findable_type == flam.FindableType.ROLES and any(crew_type == flam.CrewType.CAST for crew_type, _ in ct_gms):
-                uniq_append(columns, 'characters')
+                smart_columns.append('characters')
 
             # If we combined multiple lists, tag each element with the list(s) it came from.
             # if movie_list.list_type == flam.SpecialListType.ANNONYMOUS:
-            #     uniq_append(columns, 'origin')
+            #     smart_columns.append('origin')
 
-        attributes = [ctx.attributes.get(c, type_hint=findable_type) for c in columns]
+            # Only use smart columns that aren't already in the attributes list.
+            for c in smart_columns:
+                smart_attr = ctx.attributes.get(c, type_hint=findable_type)
 
-        for attr in attributes:
+                if all(a.qualified_name != smart_attr.qualified_name for a, _ in attributes):
+                    attributes.append((smart_attr, None))
+
+        for attr, _ in attributes:
             if not attr.findable_type.is_applicable_to(findable_type):
                 raise flam.InputError(f"ATTRIBUTE '{attr.qualified_name}' is a {attr.findable_type} attribute, so it is not found on {findable_type}.")
 
-        flam.logger.info(f"Got columns: {', '.join(attr.qualified_name for attr in attributes)}")
+        flam.logger.info(f"Got columns: {', '.join(attr.qualified_name for attr, _ in attributes)}")
         return attributes
 
     @classmethod
     def sort_findables(cls, sort_attrs: list[flam.Attribute], findables: list[flam.Findable], args: argparse.Namespace) -> None:
-        for attr in sort_attrs[::-1]:
+        for attr in reversed(sort_attrs):
             # Use functools.partial to silence "cell-var-from-loop" warning by pylint.
             key = functools.partial(lambda a, f: a.sort_key(f.extract(a)), attr)
             findables.sort(key=key, reverse=(not attr.is_ascending) ^ args.reverse)
 
     @classmethod
-    def build_strs_table(cls, attributes: list[flam.Attribute], values_table: list[list[flam.AttributeValue]], args: argparse.Namespace) -> typing.Iterable[list[str]]:
+    def build_strs_table(cls, attributes: list[tuple[flam.Attribute, None | str]], values_table: list[list[flam.AttributeValue]], args: argparse.Namespace) -> typing.Iterable[list[str]]:
         if not args.no_titles:
-            # TODO: use name_without_type when there is no ambiguity, else use qualified name?
-            yield [attr.name_without_type for attr in attributes]
+            titles = []
+
+            for attr, name_hint in attributes:
+                # If the user specified the attribute with an alias or a qualified name we want to also print it with that header.
+                if name_hint is not None:
+                    titles.append(name_hint)
+                # Use name_without_type unless that would lead to ambiguity.
+                elif all(a == attr or a.name_without_type != attr.name_without_type for a, _ in attributes):
+                    titles.append(attr.name_without_type)
+                else:
+                    titles.append(attr.qualified_name)
+
+            yield titles
 
         for record in values_table:
-            yield [attributes[i].str_of(record[i]) for i in range(len(attributes))]
+            yield [attributes[i][0].str_of(record[i]) for i in range(len(attributes))]
 
     @classmethod
     def print_table(cls, table: list[list[str]], attributes: list[flam.Attribute], args: argparse.Namespace) -> None:
