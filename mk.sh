@@ -19,12 +19,16 @@
 
 shopt -s extglob
 
+# Below this point assume we are in the project directory.
+project_folder="$(dirname -- "$BASH_SOURCE")"
+cd "$project_folder"
+
 mdl=flam
 cli=flam
 pkg=film-flam
 build=dist
 
-flam_dir=~/.film_flam_dev
+flam_dir=.film_flam_dev
 srcfiles=($mdl/*.py)
 
 pylint_ignore+=C0103, # invalid-name
@@ -61,12 +65,12 @@ pylint_ignore+=W0702, # bare-except
 pylint_ignore+=W1514, # unspecified-encoding
 pylint_ignore+=W1203, # logging-fstring-interpolation
 
+# Installs flam. Supports multiple install flavors: 'local' (for development, the default), 'test' (install from the test pypi site), and 'actual' (install the actual release).
 install() {
     uninstall
 
     case "${1,,}" in
         ""|local)
-            _gen_version local
             pip install -e .
             ;;
         test)
@@ -82,10 +86,12 @@ install() {
     esac
 }
 
+# Uninstalls flam.
 uninstall() {
     pip uninstall -y $pkg
 }
 
+# Creates AND PUBLISHES a flam release! Supports release flavors: 'test' (upload to the test pypi site), or 'actual' (upload to the real pypi site).
 release() {
     case "${1,,}" in
         ""|test)
@@ -104,7 +110,7 @@ release() {
     esac
 
     _gen_requirements
-    _gen_version $flavor
+    _gen_version $flavor force
 
     # For actual releases, require mypy and pylint to report no problems.
     [[ "$flavor" != actual ]] || { mypy && pylint; } > /dev/null
@@ -116,6 +122,7 @@ release() {
     echo "Successfully created a release with flavor: $flavor."
 }
 
+# Generates requirements.txt file for specifying to pip all flam dependencies.
 _gen_requirements() {
     # I refuse to manually keep track of dependencies, so we use pipreqs. But pipreqs SUCKS:
     # 1. Some folders confuse pipreqs so we --ignore them.
@@ -130,7 +137,10 @@ _gen_requirements() {
     (( "$(command wc -l < "$req_patterns")" == "$(command wc -l < _gen_requirements.txt)" ))
 }
 
+# Code-generation of the file containing the current version from use from within the code. Supports all release flavors. Optionally can check if the file already exists.
 _gen_version() {
+    [[ ! "$2" && -f $mdl/_gen_version.py ]] && return
+
     {
         # We use date versioning because it requires the least manual intervention.
         # TestPyPI won't accept the same version twice, so in dev builds, we also version it with the epoch seconds.
@@ -142,6 +152,7 @@ _gen_version() {
     } > $mdl/_gen_version.py
 }
 
+# Just some basic sanity checks to run before publishing a release.
 sanity() {
     case "${1,,}" in
         ""|test)
@@ -162,53 +173,64 @@ sanity() {
     install $flavor
     cfg
 
+    # This mystery function was sourced from the venv, it deactivates the venv.
     # If cfg fails we miss this but I don't suppose it's important.
     deactivate
 }
 
+# Deletes cache files, gitignored items generally. But NOT the dev flam dir!
 clean() {
     # Need this buffer so we don't delete a folder while find is iterating its contents.
     # It'd be a lot nicer if we could just not descend into ignored folders, but that's much slower.
     _mktemp ignored_files
-    find . -print0 | git check-ignore -z --stdin > "$ignored_files"
-    xargs -0 rm -rf < "$ignored_files"
+    find . -name "$(basename -- "$flam_dir")" -prune -o -print0 | git check-ignore -z --stdin > "$ignored_files"
+    xargs -0 rm -vrf < "$ignored_files"
 }
 
+# Deletes the dev flam dir.
 clean-ctx() {
     rm -rf "$flam_dir"
 }
 
+# Reconfigures the dev flam dir with some test lists.
 cfg() {
-    $cli config list --default-fetch=yes testlist imdb-id=540302193
-    $cli config list --default-fetch=yes netflix imdb-id=560256455
-    $cli config list --default-fetch=yes mubi imdb-id=571616524
+    $cli config list --default-fetch=yes testlist imdb-rest=540302193
+    $cli config list --default-fetch=yes netflix imdb-rest=560256455
+    $cli config list --default-fetch=yes mubi imdb-rest=571616524
     $cli config composite --default-find=yes testcomp testlist -true
     $cli config composite testcomp testlist -true
     $cli config composite streaming mubi netflix
 }
 
+# Runs mypy to check if our code "compiles".
 mypy() {
     MYPY_FORCE_COLOR=1 command mypy --disallow-untyped-defs --disallow-incomplete-defs --enable-incomplete-feature=NewGenericSyntax $cli
 }
 
+# Runs pylint to check if our code is nice and tidy.
 pylint() {
     # PEP 695 support seems to be a little shoddy at this time so we patch it with --additional-builtins.
     command pylint --output-format=colorized --disable="$pylint_ignore" --additional-builtins="T" -- "${srcfiles[@]}" | less -R
 }
 
+# Counts how many lines we have in the codebase ^_^
 wc() {
     command wc -l -- "${srcfiles[@]}" | sort -n
 }
 
+# Opens the logs, with tail -f by default but you can pass a different command to use.
 log() {
     # Use LOGLEVEL=critical so that this very action doesn't create new logs.
     ${@:-tail -f} "$(echo "import $mdl; print($mdl.get_log_file_path())" | FLAM_LOGLEVEL=critical python)"
 }
 
+# Just a wrapper around running the flam CLI in a debug environment.
 flam() {
+    _gen_version
     FLAM_DEBUG="${FLAM_DEBUG:-1}" FLAM_DIR="$flam_dir" command flam "$@"
 }
 
+# Prints which commands this "makefile" has.
 help() {
     if (( $# == 0 )); then
         # If no args, print all (public) functions.
