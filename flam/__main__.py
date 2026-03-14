@@ -137,9 +137,9 @@ class SubcommandConfigExtension:
         parser.set_defaults(function=cls.execute)
 
         action_group = parser.add_mutually_exclusive_group(required=False)
-        action_group.add_argument('-A', '--add', action='store_true', help='Add an extension. This is the default behavior')
+        action_group.add_argument('-A', '--add', action='store_true', help='Add an extension. The default if IMPORT is provided')
         action_group.add_argument('-D', '--delete', action='store_true', help='Delete an extension')
-        action_group.add_argument('-P', '--print', action='store_true', help='Print all extensions')
+        action_group.add_argument('-P', '--print', action='store_true', help='Print all extensions. The default if IMPORT is not provided')
 
         parser.add_argument('IMPORT', action='store', nargs='?', help='Specify which module or file to import')
 
@@ -147,7 +147,8 @@ class SubcommandConfigExtension:
     def execute(cls, ctx: flam.FlamContext, args: argparse.Namespace) -> None:
         if args.delete:
             cls.delete(ctx, args)
-        elif args.print:
+        # Default to print only if no args.
+        elif args.print or (not args.add and args.IMPORT is None):
             cls.print(ctx, args)
         # Default add.
         else:
@@ -184,9 +185,9 @@ class SubcommandConfigList:
         parser.set_defaults(function=cls.execute)
 
         action_group = parser.add_mutually_exclusive_group(required=False)
-        action_group.add_argument('-E', '--edit', action='store_true', help='edit or create a list. This is the default behavior')
+        action_group.add_argument('-E', '--edit', action='store_true', help='edit or create a list. The default if NAME is provided')
         action_group.add_argument('-D', '--delete', action='store_true', help='delete the list')
-        action_group.add_argument('-P', '--print', action='store_true', help='print the list, or if NAME not provided, print all lists')
+        action_group.add_argument('-P', '--print', action='store_true', help='print the list, or if NAME not provided, print all lists. The default if NAME is not provided')
 
         parser.add_argument('-n', '--rename', metavar='NAME', default=None, action='store', help='in edit mode, rename the list to %(metavar)s')
         parser.add_argument('-i', '--default-find', choices=Choice.yes_no_auto(), default=Choice.AUTO, action='store', help='decide if this list should be default for flam find')
@@ -198,7 +199,8 @@ class SubcommandConfigList:
     def execute(cls, ctx: flam.FlamContext, args: argparse.Namespace) -> None:
         if args.delete:
             cls.delete(ctx, args)
-        elif args.print:
+        # Default to print only if no args.
+        elif args.print or (not args.edit and args.NAME is None):
             cls.print(ctx, args)
         # Default edit/create.
         else:
@@ -284,9 +286,9 @@ class SubcommandConfigComposite:
         parser.set_defaults(function=cls.execute)
 
         action_group = parser.add_mutually_exclusive_group(required=False)
-        action_group.add_argument('-E', '--edit', action='store_true', help='edit or create a composite list. This is the default behavior')
+        action_group.add_argument('-E', '--edit', action='store_true', help='edit or create a composite list. The default if NAME is provided')
         action_group.add_argument('-D', '--delete', action='store_true', help='delete the list')
-        action_group.add_argument('-P', '--print', action='store_true', help='print the list, or if NAME not provided, print all lists')
+        action_group.add_argument('-P', '--print', action='store_true', help='print the list, or if NAME not provided, print all lists. The default if NAME is not provided')
 
         parser.add_argument('-n', '--rename', metavar='NAME', default=None, action='store', help='in edit mode, rename the list to %(metavar)s')
         parser.add_argument('-i', '--default-find', choices=Choice.yes_no_auto(), default=Choice.AUTO, action='store', help='decide if this list should be default for flam find')
@@ -303,7 +305,8 @@ class SubcommandConfigComposite:
     def execute(cls, ctx: flam.FlamContext, args: argparse.Namespace) -> None:
         if args.delete:
             cls.delete(ctx, args)
-        elif args.print:
+        # Default to print only if no args.
+        elif args.print or (not args.edit and args.NAME is None):
             cls.print(ctx, args)
         # Default edit/create.
         else:
@@ -779,7 +782,7 @@ def make_main_parser(add_subparsers: bool) -> tuple[argparse.ArgumentParser, arg
         SubcommandConfig.configure_parser(subparsers.add_parser('config', formatter_class=argparse.RawTextHelpFormatter))
         SubcommandFetch.configure_parser(subparsers.add_parser('fetch', formatter_class=argparse.RawTextHelpFormatter))
         SubcommandFind.configure_parser(find_subparser := subparsers.add_parser('find', formatter_class=argparse.RawTextHelpFormatter))
-        SubcommandChart.configure_parser(subparsers.add_parser('chart', formatter_class=argparse.RawTextHelpFormatter))
+        # SubcommandChart.configure_parser(subparsers.add_parser('chart', formatter_class=argparse.RawTextHelpFormatter))
     else:
         find_subparser = parser
         SubcommandFind.configure_parser(parser)
