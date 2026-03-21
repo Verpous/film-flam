@@ -13,6 +13,8 @@
 # You should have received a copy of the GNU General Public License
 # along with this program. If not, see <https://www.gnu.org/licenses/>.
 
+from __future__ import annotations
+
 import re
 import os
 import glob
@@ -23,6 +25,10 @@ import shutil
 import unicodedata
 import importlib.util
 import colorama
+import enum
+
+if typing.TYPE_CHECKING:
+    import _typeshed
 
 class ProgressBar[T]:
     MAX_DESC = 30
@@ -104,14 +110,6 @@ class Timeout:
 
     def __exit__(self, exc_type: type[BaseException], exc_value: None | BaseException, traceback: None | types.TracebackType) -> None:
         self._enter_time = float('nan')
-
-def truncate(s: str, max_len: int, ellipsis: str = '...', is_big_endian: bool = True) -> str:
-    if max_len < len(ellipsis):
-        raise ValueError(f'Ellipsis must not be longer than max_len. {ellipsis=}, {max_len=}.')
-
-    return (s if len(s) <= max_len
-        else s[:max_len - len(ellipsis)] + ellipsis if is_big_endian
-        else ellipsis + s[-(max_len - len(ellipsis)):])
 
 def subclasses_recursive(cls: type) -> set[type]:
     classes = set(cls.__subclasses__())
@@ -256,27 +254,88 @@ def tabulate(
         # Get rid of this after the first row.
         header_color = ''
 
+class TruncationStyle(enum.Enum):
+    NO_TRIM             = enum.auto() # 'abcdefghijklmnopqrstuvwxyz' -> 'abcdefghijklmnopqrstuvwxyz'
+    TRIM_END            = enum.auto() # 'abcdefghijklmnopqrstuvwxyz' -> 'abcdefghi...'
+    TRIM_START          = enum.auto() # 'abcdefghijklmnopqrstuvwxyz' -> '...rstuvwxyz'
+    TRIM_MIDDLE_START   = enum.auto() # 'abcdefghijklmnopqrstuvwxyz' -> 'abc...uvwxyz'
+    TRIM_MIDDLE_END     = enum.auto() # 'abcdefghijklmnopqrstuvwxyz' -> 'abcdef...xyz'
+
+def truncate(s: str, max_len: int, ellipsis: str = '...', truncation_style: TruncationStyle = TruncationStyle.TRIM_END) -> str:
+    if max_len < len(ellipsis):
+        raise ValueError(f'Ellipsis must not be longer than max_len. {ellipsis=}, {max_len=}.')
+
+    if len(s) <= max_len:
+        return s
+
+    # This is like, how many characters you want to have from the side that you are mostly trimming.
+    # Like, if you TRIM_MIDDLE_END, that means you want only 3 characters from the end, and the rest from the start.
+    TRIM_MIDDLE_SAMPLE_SIZE = 3
+
+    match truncation_style:
+        case TruncationStyle.NO_TRIM:
+            return s
+        case TruncationStyle.TRIM_END:
+            return s[:max_len - len(ellipsis)] + ellipsis
+        case TruncationStyle.TRIM_START:
+            # Technically there's a nifty syntax s[-X:] to take X characters from the end. BUT it breaks if X is 0, so don't use it.
+            return ellipsis + s[len(s) - (max_len - len(ellipsis)):]
+        case TruncationStyle.TRIM_MIDDLE_START:
+            # There are two edge cases to consider here:
+            # 1. What if max_len is so small there's no room for 3 characters from the end?
+            # 2. What if max_len is big enough to allow 3 characters from the end, but not also from the start?
+            # The behavior we want is to first take as many as we can from the end up to 3, then as many as we can from the start up to 3, then the rest from the end.
+            # Easiest to just demonstrate:
+            # max_len=3:  abcdefghijk->...
+            # max_len=4:  abcdefghijk->...k
+            # max_len=5:  abcdefghijk->...jk
+            # max_len=6:  abcdefghijk->...ijk
+            # max_len=7:  abcdefghijk->a...ijk
+            # max_len=8:  abcdefghijk->ab...ijk
+            # max_len=9:  abcdefghijk->abc...ijk
+            # max_len=10: abcdefghijk->abc...hijk
+
+            # Take the max len, sans the ellipsis, sans the 3 we prioritize to take from the end. That's how much we want from the start, but bounded between 0 and 3.
+            take_from_start = clamp(max_len - len(ellipsis) - TRIM_MIDDLE_SAMPLE_SIZE, 0, TRIM_MIDDLE_SAMPLE_SIZE)
+            
+            # From the end, take "the rest".
+            take_from_end = max_len - len(ellipsis) - take_from_start
+
+            # Again avoid the s[-X:] trick because of the edge case of X=0.
+            return s[:take_from_start] + ellipsis + s[len(s) - take_from_end:]
+        case TruncationStyle.TRIM_MIDDLE_END:
+            # See the comments on TRIM_MIDDLE_START to explain all this fuckery.
+            take_from_end = clamp(max_len - len(ellipsis) - TRIM_MIDDLE_SAMPLE_SIZE, 0, TRIM_MIDDLE_SAMPLE_SIZE)
+            take_from_start = max_len - len(ellipsis) - take_from_end
+            return s[:take_from_start] + ellipsis + s[len(s) - take_from_end:]
+        case _:
+            raise RuntimeError(f'Unexpected {truncation_style=}')
+
 _magnitudes = ['', 'K', 'M', 'B', 'T']
 
-def num_pretty(num: int | float, abbreviate: bool = True) -> str:
+def num_pretty(num: int, abbreviate: bool = True) -> str:
     if not abbreviate:
         return f'{num:,}'
 
     # I graciously thank this StackOverflow user https://stackoverflow.com/a/45846841/12553917.
-    num = float(f'{num:.3g}')
+    fnum = float(f'{num:.3g}')
     magnitude = 0
 
-    while abs(num) >= 1000 and magnitude + 1 < len(_magnitudes):
+    while abs(fnum) >= 1000 and magnitude + 1 < len(_magnitudes):
         magnitude += 1
-        num /= 1000
+        fnum /= 1000
 
-    num_str = f'{num:,f}'.rstrip('0').rstrip('.')
+    # This line turns small floats like 0.0000001 into just '0', so we just don't support floats.
+    num_str = f'{fnum:,f}'.rstrip('0').rstrip('.')
     return num_str + _magnitudes[magnitude]
 
-def parse_num_pretty(num_str: str) -> float:
+def parse_num_pretty(num_str: str) -> int:
     try:
         magnitude = 3 * _magnitudes.index(num_str[-1])
     except (ValueError, IndexError):
         magnitude = 0
 
-    return float(num_str.replace(',', '')) * (10 ** magnitude)
+    return int(float(num_str.replace(',', '')) * (10 ** magnitude))
+
+def clamp(num: _typeshed.SupportsRichComparisonT, lower_bound: _typeshed.SupportsRichComparisonT, upper_bound: _typeshed.SupportsRichComparisonT) -> _typeshed.SupportsRichComparisonT:
+    return min(upper_bound, max(lower_bound, num))
