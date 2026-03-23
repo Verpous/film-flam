@@ -25,6 +25,7 @@ from . import _attr
 from . import _mlf
 from . import _ml
 from . import _exc
+from . import utils
 
 # There are some facilities that we need out of every possible value attributes may extract (e.g.: parse, str_of, etc.).
 # I don't want to wrap every such value in a "Value" class to provide those facitilites because that would mean making lots of small objects.
@@ -33,48 +34,82 @@ from . import _exc
 class TypeHandler(abc.ABC):
     @property
     @abc.abstractmethod
-    def type_(self) -> type:
-        pass
-
-    @property
-    @abc.abstractmethod
     def default_op(self) -> _attr.ComparisonOp:
         pass
 
     @abc.abstractmethod
-    def parse(self, value_str: str) -> _attr.AttributeValue:
+    def parse(self, primitive_str: str) -> _attr.AttributePrimitive:
         pass
 
-    # Assumes value is not None.
-    def str_of(self, value: _attr.AttributeValue) -> str:
-        return str(value)
+    # Assumes primitive is not None.
+    @abc.abstractmethod
+    def str_of(self, primitive: _attr.AttributePrimitive, abbreviate: bool, extras: dict[str, typing.Any]) -> str:
+        pass
 
-class EasyTypeHandler(TypeHandler):
-    def __init__(
-            self,
-            type_: type,
-            default_op: _attr.ComparisonOp,
-            parse: typing.Callable[[str], _attr.AttributeValue],
-            str_of: typing.Callable[[_attr.AttributeValue], str]) -> None:
+class IntHandler(TypeHandler):
+    def __init__(self, abbreviable: bool) -> None:
         super().__init__()
-        self._type = type_
-        self._default_op = default_op
-        self._parse = parse
-        self._str_of = str_of
-
-    @property
-    def type_(self) -> type:
-        return self._type
+        self._abbreviable = abbreviable
 
     @property
     def default_op(self) -> _attr.ComparisonOp:
-        return self._default_op
+        return _attr.ComparisonOp.EQ
 
-    def parse(self, value_str: str) -> _attr.AttributeValue:
-        return self._parse(value_str)
+    def parse(self, primitive_str: str) -> int:
+        return utils.parse_num_pretty(primitive_str)
 
-    def str_of(self, value: _attr.AttributeValue) -> str:
-        return self._str_of(value)
+    def str_of(self, primitive: _attr.AttributePrimitive, abbreviate: bool, extras: dict[str, typing.Any]) -> str:
+        assert isinstance(primitive, int)
+        
+        if abbreviate and self._abbreviable:
+            return utils.num_pretty(primitive)
+
+        return str(primitive)
+
+class FloatHandler(TypeHandler):
+    @property
+    def default_op(self) -> _attr.ComparisonOp:
+        return _attr.ComparisonOp.EQ
+
+    def parse(self, primitive_str: str) -> float:
+        return float(primitive_str)
+
+    def str_of(self, primitive: _attr.AttributePrimitive, abbreviate: bool, extras: dict[str, typing.Any]) -> str:
+        # We currently don't have a reason to support float abbreviation, and python will abbreviate to scientific notation by default anyway.
+        return str(primitive)
+
+class StrHandler(TypeHandler):
+    @property
+    def default_op(self) -> _attr.ComparisonOp:
+        return _attr.ComparisonOp.RX
+
+    def parse(self, primitive_str: str) -> str:
+        return primitive_str
+
+    def str_of(self, primitive: _attr.AttributePrimitive, abbreviate: bool, extras: dict[str, typing.Any]) -> str:
+        return typing.cast(str, primitive)
+
+class MinutesHandler(TypeHandler):
+    @property
+    def default_op(self) -> _attr.ComparisonOp:
+        return _attr.ComparisonOp.EQ
+
+    def parse(self, primitive_str: str) -> int:
+        # We don't check for things like negative numbers, minutes exceeding 60, etc. because what the hell for.
+        colon_idx = primitive_str.find(':')
+        hrs_str, mins_str = (primitive_str[:colon_idx], primitive_str[colon_idx + 1:]) if colon_idx != -1 else ('0', primitive_str)
+        
+        # Support only base 10 because A: it makes sense, and B: base=0 doesn't support leading zeroes like '07'.
+        hrs, mins = int(hrs_str), int(mins_str)
+        return hrs * 60 + mins
+
+    def str_of(self, primitive: _attr.AttributePrimitive, abbreviate: bool, extras: dict[str, typing.Any]) -> str:
+        assert isinstance(primitive, int)
+
+        if abbreviate:
+            return f'{str(primitive // 60)}:{str(primitive % 60).zfill(2)}'
+
+        return str(primitive)
 
 class DateHandler(TypeHandler):
     def __init__(self, name: str, datefmt: str, is_ascending: bool, strmap: None | dict[str, str] = None) -> None:
@@ -83,10 +118,6 @@ class DateHandler(TypeHandler):
         self._datefmt = datefmt
         self._is_ascending = is_ascending
         self._strmap = strmap
-
-    @property
-    def type_(self) -> type:
-        return datetime.date
 
     @property
     def default_op(self) -> _attr.ComparisonOp:
@@ -104,20 +135,21 @@ class DateHandler(TypeHandler):
     def is_ascending(self) -> bool:
         return self._is_ascending
 
-    def parse(self, value_str: str) -> _attr.AttributeValue:
+    def parse(self, primitive_str: str) -> datetime.date:
         # First try to parse it with its datefmt. Otherwise use freeform parsing, and then drop the parts that aren't part of the format.
         try:
-            return self._strptime(value_str)
+            return self._strptime(primitive_str)
         except ValueError:
-            return self.strip(dateutil.parser.parse(value_str, default=datetime.datetime.min))
+            return self.strip(dateutil.parser.parse(primitive_str, default=datetime.datetime.min))
 
+    # This function is to take date objects which have more than the datefmt cares about and zero out the parts we want to ignore in the date.
     def strip(self, date: datetime.date) -> datetime.date:
         # As an optimization, don't do anything for complete dates.
-        return self._strptime(date.strftime(self._datefmt)) if date != "%Y-%m-%d" else date
+        return self._strptime(date.strftime(self._datefmt)) if self._datefmt != "%Y-%m-%d" else date
 
-    def str_of(self, value: _attr.AttributeValue) -> str:
-        assert isinstance(value, datetime.date)
-        datestr = value.strftime(self._datefmt)
+    def str_of(self, primitive: _attr.AttributePrimitive, abbreviate: bool, extras: dict[str, typing.Any]) -> str:
+        assert isinstance(primitive, datetime.date)
+        datestr = primitive.strftime(self._datefmt)
         return datestr if self._strmap is None else self._strmap[datestr]
 
     # This function is a hack because strptime won't work correctly with certain formats unless additional information is supplied.
@@ -132,50 +164,21 @@ class DateHandler(TypeHandler):
             case _:
                 return datetime.datetime.strptime(date_str, self._datefmt).date()
 
-INT_HANDLER = EasyTypeHandler(
-    type_ = int,
-    default_op = _attr.ComparisonOp.EQ,
-    parse = lambda s: int(s, base=0), # 0 means deduce the base from the str.
-    str_of = str,
-)
-
-FLOAT_HANDLER = EasyTypeHandler(
-    type_ = float,
-    default_op = _attr.ComparisonOp.EQ,
-    parse = float,
-    str_of = str,
-)
-
-STR_HANDLER = EasyTypeHandler(
-    type_ = str,
-    default_op = _attr.ComparisonOp.RX,
-    parse = lambda s: s,
-    str_of = lambda s: typing.cast(str, s),
-)
-
-def _parse_minutes(value_str: str) -> int:
-    # We don't check for things like negative numbers, minutes exceeding 60, what base the numbers are in, etc. Because what the hell for.
-    colon_idx = value_str.find(':')
-    hrs_str, mins_str = (value_str[:colon_idx], value_str[colon_idx + 1:]) if colon_idx != -1 else ('0', value_str)
-    hrs, mins = int(hrs_str, base=0), int(mins_str, base=0)
-    return hrs * 60 + mins
-
-MINUTES_HANDLER = EasyTypeHandler(
-    type_ = int,
-    default_op = _attr.ComparisonOp.EQ,
-    parse = _parse_minutes,
-    str_of = lambda mins: f'{str(mins // 60)}:{str(mins % 60).zfill(2)}', # type: ignore
-)
+SMALL_INT_HANDLER               = IntHandler(abbreviable=False)
+BIG_INT_HANDLER                 = IntHandler(abbreviable=True)
+FLOAT_HANDLER                   = FloatHandler()
+STR_HANDLER                     = StrHandler()
+MINUTES_HANDLER                 = MinutesHandler()
 
 DATE_HANDLERS = [
-    DateHandler('',                     "%Y-%m-%d", False),
-    DateHandler('-year',                "%Y",       False),
-    DateHandler('-month',               "%Y-%m",    False),
-    DateHandler('-week-of-year',        "%U",       True),
-    DateHandler('-week-of-year-monday', "%W",       True),
-    DateHandler('-day-of-year',         "%j",       True),
-    DateHandler('-day-of-month',        "%d",       True),
-    DateHandler('-month-of-year',       "%m",       True,
+    DateHandler('',                     '%Y-%m-%d', False),
+    DateHandler('-year',                '%Y',       False),
+    DateHandler('-month',               '%Y-%m',    False),
+    DateHandler('-week-of-year',        '%U',       True),
+    DateHandler('-week-of-year-monday', '%W',       True),
+    DateHandler('-day-of-year',         '%j',       True),
+    DateHandler('-day-of-month',        '%d',       True),
+    DateHandler('-month-of-year',       '%m',       True,
         strmap={
             '01': 'January',
             '02': 'February',
@@ -190,7 +193,7 @@ DATE_HANDLERS = [
             '11': 'November',
             '12': 'December',
         }),
-    DateHandler('-day-of-week',         "%w",       True,
+    DateHandler('-day-of-week',         '%w',       True,
         strmap={
             '0': 'Sunday',
             '1': 'Monday',
@@ -200,7 +203,7 @@ DATE_HANDLERS = [
             '5': 'Friday',
             '6': 'Saturday',
         }),
-    DateHandler('-day-of-week-monday',  "%u",       True,
+    DateHandler('-day-of-week-monday',  '%u',       True,
         strmap={
             '1': 'Monday',
             '2': 'Tuesday',
@@ -224,8 +227,9 @@ class EasyAttributeParams:
     aliases_without_type: list[str]
     findable_type: _ml.FindableType
     type_handler: TypeHandler
-    is_big_endian: bool
     is_ascending: bool
+    truncation_style: utils.TruncationStyle
+    default_max_len: int
 
 class EasyAttribute(_attr.Attribute):
     def __init__(self, params: EasyAttributeParams) -> None:
@@ -233,42 +237,52 @@ class EasyAttribute(_attr.Attribute):
         self._params = params
 
     @property
-    def is_big_endian(self) -> bool:
-        return self._params.is_big_endian
-
-    @property
     def is_ascending(self) -> bool:
         return self._params.is_ascending
-
-    @property
-    def type_(self) -> type:
-        return self._params.type_handler.type_
 
     @property
     def default_op(self) -> _attr.ComparisonOp:
         return self._params.type_handler.default_op
 
-    def parse(self, value_str: str) -> _attr.AttributeValue:
+    def str_of_value(self, value: _attr.AttributeValue, abbreviate: bool = False, **extras: typing.Any) -> str:
+        value_str = super().str_of_value(value, abbreviate, **extras)
+
+        if not abbreviate:
+            return value_str
+            
+        max_len = extras.get('max_len', self._params.default_max_len)
+        ellipsis = extras.get('ellipsis', '...')
+
+        if not isinstance(max_len, int):
+            raise _exc.InputError(f"Invalid max_len type: '{type(max_len)}': must be int.")
+
+        if not isinstance(ellipsis, str):
+            raise _exc.InputError(f"Invalid ellipsis type: '{type(ellipsis)}': must be str.")
+
+        return utils.truncate(value_str, max_len, ellipsis=ellipsis, truncation_style=self._params.truncation_style)
+
+    def _parse_primitive_not_none(self, primitive_str: str) -> _attr.AttributePrimitive:
         try:
-            return self._params.type_handler.parse(value_str)
+            return self._params.type_handler.parse(primitive_str)
         except ValueError as e:
-            raise _exc.InputError(f"Invalid {self.qualified_name}: '{value_str}'.") from e
+            raise _exc.InputError(f"Invalid {self.qualified_name}: '{primitive_str}'.") from e
 
-    def _str_of_single(self, value: _attr.AttributeValue) -> str:
-        return self._params.type_handler.str_of(value)
+    def _str_of_primitive_not_none(self, primitive: _attr.AttributePrimitive, abbreviate: bool, extras: dict[str, typing.Any]) -> str:
+        return self._params.type_handler.str_of(primitive, abbreviate, extras)
 
-class LenAttribute(EasyAttribute):
-    def __init__(self, len_of: _attr.Attribute) -> None:
+class ArrayLengthAttribute(EasyAttribute):
+    def __init__(self, wrapped_attr: _attr.Attribute) -> None:
         super().__init__(EasyAttributeParams(
-            name_without_type = 'n' + len_of.name_without_type,
-            aliases_without_type = ['n' + alias_without_type for alias_without_type in len_of.aliases_without_type],
-            findable_type = len_of.findable_type,
-            type_handler = INT_HANDLER,
-            is_big_endian = True,
+            name_without_type = 'num-' + wrapped_attr.name_without_type,
+            aliases_without_type = ['num-' + alias_without_type for alias_without_type in wrapped_attr.aliases_without_type],
+            findable_type = wrapped_attr.findable_type,
+            type_handler = SMALL_INT_HANDLER,
             is_ascending = False,
+            truncation_style = utils.TruncationStyle.NO_TRIM,
+            default_max_len = 999, # Don't care.
         ))
 
-        self._len_of = len_of
+        self._wrapped_attr = wrapped_attr
 
     # Have to support all 3 extractors because if it's a person/movie attribute, it could be an array only when extracted from roles.
     def _extract_from_movie(self, movie: _ml.Movie, mlf_movie: _mlf.MLFMovie) -> int: # pylint: disable=unused-argument
@@ -281,9 +295,36 @@ class LenAttribute(EasyAttribute):
         return self._len(role)
 
     def _len(self, findable: _ml.Findable) -> int:
-        # TODO: Actually support len of strs too?
-        actual = findable.extract(self._len_of)
-        return len(actual) if isinstance(actual, list) else 1
+        value = findable.extract(self._wrapped_attr)
+        return len(value) if isinstance(value, list) else 1
+
+class StringLengthAttribute(EasyAttribute):
+    def __init__(self, wrapped_attr: _attr.Attribute) -> None:
+        super().__init__(EasyAttributeParams(
+            name_without_type = 'len-' + wrapped_attr.name_without_type,
+            aliases_without_type = ['len-' + alias_without_type for alias_without_type in wrapped_attr.aliases_without_type],
+            findable_type = wrapped_attr.findable_type,
+            type_handler = SMALL_INT_HANDLER,
+            is_ascending = False,
+            truncation_style = utils.TruncationStyle.NO_TRIM,
+            default_max_len = 999, # Don't care.
+        ))
+
+        self._wrapped_attr = wrapped_attr
+
+    # Have to support all 3 extractors because if it's a person/movie attribute, it could be an array only when extracted from roles.
+    def _extract_from_movie(self, movie: _ml.Movie, mlf_movie: _mlf.MLFMovie) -> int: # pylint: disable=unused-argument
+        return self._len(movie)
+    
+    def _extract_from_people(self, people: _ml.People, mlf_people: list[_mlf.MLFPerson]) -> int: # pylint: disable=unused-argument
+        return self._len(people)
+    
+    def _extract_from_role(self, role: _ml.Role, mlf_roles: _ml.MLFRolesDict, mlf_movie: _mlf.MLFMovie, mlf_people: list[_mlf.MLFPerson]) -> int: # pylint: disable=unused-argument
+        return self._len(role)
+
+    def _len(self, findable: _ml.Findable) -> int:
+        value = findable.extract(self._wrapped_attr)
+        return len(self._wrapped_attr.str_of_value(value))
 
 type MovieExtractor[T] = typing.Callable[[EasyAttribute, _ml.Movie, _mlf.MLFMovie], T]
 type PeopleExtractor[T] = typing.Callable[[EasyAttribute, _ml.People, list[_mlf.MLFPerson]], T]

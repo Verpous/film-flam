@@ -18,6 +18,7 @@ from __future__ import annotations
 import abc
 import typing
 import dataclasses
+import re
 
 from . import _ctx
 from . import _attr
@@ -117,18 +118,32 @@ class FilterMember(abc.ABC):
 
     @classmethod
     def eat_cmpto(cls, params: EatParams, at: int, attribute: _attr.Attribute) -> _attr.CmpTo:
+        # Express it to the user as a value even if to us it's a primitive.
         cmpto_str = cls.eat_str(params, at, 'a value')
-        op, value_str = cls.split_cmpto_str(cmpto_str, attribute.default_op)
+        op, primitive_str = cls.split_cmpto_str(cmpto_str, attribute.default_op)
+        primitive: _attr.AttributePrimitive | re.Pattern
 
         try:
-            return attribute.make_cmpto(op, value_str)
+            match op:
+                case _attr.ComparisonOp.RX:
+                    primitive = re.compile(primitive_str, flags=re.IGNORECASE)
+                case _:
+                    primitive = attribute.parse_primitive(primitive_str)
         except _exc.InputError as e:
             raise _EinGafrurError(str(e), tokens=params.tokens, error_indices=at) from e
+        except re.error as e:
+            raise _EinGafrurError(f"Failed to parse value '{primitive_str}' as a regular expression: {e}", tokens=params.tokens, error_indices=at) from e
+
+        return _attr.CmpTo(op, primitive, attribute)
 
     @classmethod
     def split_cmpto_str(cls, cmpto: str, default_op: _attr.ComparisonOp) -> tuple[_attr.ComparisonOp, str]:
         for op in _attr.ComparisonOp:
             if cmpto.startswith(op.sign):
+                # NOTE: I considered that if the RHS is the empty string then maybe we should return default_op, cmpto.
+                # This is because '-' is the str rep of Nones and also the sign of 'less than'.
+                # But ultimately I think we won't do it because it will make error messages less helpful,
+                # and there are ways around the Nones issue, which most users probably won't care about anyway.
                 return op, cmpto.removeprefix(op.sign)
 
         return default_op, cmpto

@@ -599,7 +599,7 @@ For people, it looks like 'cast-people', 'director-people:group', etc.''')
         strs_table = list(cls.build_strs_table(column_attrs, values_table, args))
 
         flam.logger.info(f"Printing the table")
-        cls.print_table(strs_table, [attr for attr, _ in column_attrs], args)
+        print_table(strs_table, args.color, args.paginate, args.spacious, args.no_titles, args.dsv)
 
     # Can't do this at argparse time because it depends on the context.
     @classmethod
@@ -715,18 +715,7 @@ For people, it looks like 'cast-people', 'director-people:group', etc.''')
             yield titles
 
         for record in values_table:
-            yield [attributes[i][0].str_of(record[i]) for i in range(len(attributes))]
-
-    @classmethod
-    def print_table(cls, table: list[list[str]], attributes: list[flam.Attribute], args: argparse.Namespace) -> None:
-        if not args.verbose:
-            for row in table:
-                for i in range(len(row)):
-                    # For now I'm ok with this being tacked on instead of max_len as a property of each attribute.
-                    max_len = 45 if attributes[i].qualified_name == 'movies-title' else 30
-                    row[i] = utils.truncate(row[i], max_len, is_big_endian=attributes[i].is_big_endian)
-
-        print_table(table, args.color, args.paginate, args.spacious, args.no_titles, args.dsv)
+            yield [attributes[i][0].str_of_value(record[i], abbreviate=not args.verbose) for i in range(len(attributes))]
 
 class SubcommandChart:
     @classmethod

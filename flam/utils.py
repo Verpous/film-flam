@@ -258,8 +258,7 @@ class TruncationStyle(enum.Enum):
     NO_TRIM             = enum.auto() # 'abcdefghijklmnopqrstuvwxyz' -> 'abcdefghijklmnopqrstuvwxyz'
     TRIM_END            = enum.auto() # 'abcdefghijklmnopqrstuvwxyz' -> 'abcdefghi...'
     TRIM_START          = enum.auto() # 'abcdefghijklmnopqrstuvwxyz' -> '...rstuvwxyz'
-    TRIM_MIDDLE_START   = enum.auto() # 'abcdefghijklmnopqrstuvwxyz' -> 'abc...uvwxyz'
-    TRIM_MIDDLE_END     = enum.auto() # 'abcdefghijklmnopqrstuvwxyz' -> 'abcdef...xyz'
+    TRIM_MIDDLE         = enum.auto() # 'abcdefghijklmnopqrstuvwxyz' -> 'abcde...wxyz'
 
 def truncate(s: str, max_len: int, ellipsis: str = '...', truncation_style: TruncationStyle = TruncationStyle.TRIM_END) -> str:
     if max_len < len(ellipsis):
@@ -267,10 +266,6 @@ def truncate(s: str, max_len: int, ellipsis: str = '...', truncation_style: Trun
 
     if len(s) <= max_len:
         return s
-
-    # This is like, how many characters you want to have from the side that you are mostly trimming.
-    # Like, if you TRIM_MIDDLE_END, that means you want only 3 characters from the end, and the rest from the start.
-    TRIM_MIDDLE_SAMPLE_SIZE = 3
 
     match truncation_style:
         case TruncationStyle.NO_TRIM:
@@ -280,32 +275,9 @@ def truncate(s: str, max_len: int, ellipsis: str = '...', truncation_style: Trun
         case TruncationStyle.TRIM_START:
             # Technically there's a nifty syntax s[-X:] to take X characters from the end. BUT it breaks if X is 0, so don't use it.
             return ellipsis + s[len(s) - (max_len - len(ellipsis)):]
-        case TruncationStyle.TRIM_MIDDLE_START:
-            # There are two edge cases to consider here:
-            # 1. What if max_len is so small there's no room for 3 characters from the end?
-            # 2. What if max_len is big enough to allow 3 characters from the end, but not also from the start?
-            # The behavior we want is to first take as many as we can from the end up to 3, then as many as we can from the start up to 3, then the rest from the end.
-            # Easiest to just demonstrate:
-            # max_len=3:  abcdefghijk->...
-            # max_len=4:  abcdefghijk->...k
-            # max_len=5:  abcdefghijk->...jk
-            # max_len=6:  abcdefghijk->...ijk
-            # max_len=7:  abcdefghijk->a...ijk
-            # max_len=8:  abcdefghijk->ab...ijk
-            # max_len=9:  abcdefghijk->abc...ijk
-            # max_len=10: abcdefghijk->abc...hijk
-
-            # Take the max len, sans the ellipsis, sans the 3 we prioritize to take from the end. That's how much we want from the start, but bounded between 0 and 3.
-            take_from_start = clamp(max_len - len(ellipsis) - TRIM_MIDDLE_SAMPLE_SIZE, 0, TRIM_MIDDLE_SAMPLE_SIZE)
-            
-            # From the end, take "the rest".
-            take_from_end = max_len - len(ellipsis) - take_from_start
-
-            # Again avoid the s[-X:] trick because of the edge case of X=0.
-            return s[:take_from_start] + ellipsis + s[len(s) - take_from_end:]
-        case TruncationStyle.TRIM_MIDDLE_END:
-            # See the comments on TRIM_MIDDLE_START to explain all this fuckery.
-            take_from_end = clamp(max_len - len(ellipsis) - TRIM_MIDDLE_SAMPLE_SIZE, 0, TRIM_MIDDLE_SAMPLE_SIZE)
+        case TruncationStyle.TRIM_MIDDLE:
+            # Try to take about the same chars from the start and the end, but if they don't split even, prefer the start.
+            take_from_end = (max_len - len(ellipsis)) // 2
             take_from_start = max_len - len(ellipsis) - take_from_end
             return s[:take_from_start] + ellipsis + s[len(s) - take_from_end:]
         case _:
