@@ -18,12 +18,9 @@
 import typing
 import datetime
 
-from . import _dbg
-from . import _exc
 from . import _reg
 from . import _ml
 from . import _mlf
-from . import _attr
 from . import attrutils
 from . import utils
 
@@ -71,8 +68,22 @@ def _mean_except_nones(data: typing.Iterable[None | typing.SupportsFloat]) -> No
     default_max_len = _STR_LEN_DONTCARE,
 ))
 def _movie_uid_extractor(self: attrutils.EasyAttribute, movie: _ml.Movie, mlf_movie: _mlf.MLFMovie) -> str:
+    return movie.uid
+
+# For movies specifically the ML uid and the MLF uid are the same, but still implement them separately.
+@_register_easy_attribute(attrutils.EasyAttributeParams(
+    name_without_type = 'origin-uid',
+    aliases_without_type = ['origin-id', 'origin-guid', 'origin-identifier'],
+    findable_type = _ml.FindableType.MOVIES,
+    type_handler = attrutils.STR_HANDLER,
+    is_ascending = True,
+    truncation_style = utils.TruncationStyle.NO_TRIM,
+    default_max_len = _STR_LEN_DONTCARE,
+))
+def _movie_origin_uid_extractor(self: attrutils.EasyAttribute, movie: _ml.Movie, mlf_movie: _mlf.MLFMovie) -> str:
     return mlf_movie.uid
 
+# Primary name should be 'title' because People have an attribute named 'name'.
 @_register_easy_attribute(attrutils.EasyAttributeParams(
     name_without_type = 'title',
     aliases_without_type = ['name', 'movie'],
@@ -80,15 +91,24 @@ def _movie_uid_extractor(self: attrutils.EasyAttribute, movie: _ml.Movie, mlf_mo
     type_handler = attrutils.STR_HANDLER,
     is_ascending = True,
     truncation_style = utils.TruncationStyle.TRIM_END,
-    default_max_len = _STR_LEN_LONG, # Longer than usual max len for movie titles.
+    default_max_len = _STR_LEN_LONG,
 ))
 def _movie_title_extractor(self: attrutils.EasyAttribute, movie: _ml.Movie, mlf_movie: _mlf.MLFMovie) -> None | str:
     return mlf_movie.title
 
+def _make_date_aliases(name_without_type: str) -> list[str]:
+    # Basically keeps the first letter of each part separated by '-'s.
+    # Ex: 'release-date' -> 'r-d', 'watch-month-of-year' -> 'w-m-o-y'.
+    return ['-'.join(part[0] for part in name_without_type.split('-'))]
+
+# Dates come in many forms: release year, the full date, just the day of the week, etc.
+# For each of those we want a watch date variant, and release date variant.
 for handler in attrutils.DATE_HANDLERS:
+    name_without_type = 'watch' + handler.name
+    
     @_register_easy_attribute(attrutils.EasyAttributeParams(
-        name_without_type = 'watch' + handler.name, # pylint: disable=cell-var-from-loop
-        aliases_without_type = [],
+        name_without_type = name_without_type, # pylint: disable=cell-var-from-loop
+        aliases_without_type = _make_date_aliases(name_without_type),
         findable_type = _ml.FindableType.MOVIES,
         type_handler = handler, # pylint: disable=cell-var-from-loop
         is_ascending = handler.is_ascending, # pylint: disable=cell-var-from-loop
@@ -98,9 +118,11 @@ for handler in attrutils.DATE_HANDLERS:
     def _movie_watched_extractor(self: attrutils.EasyAttribute, movie: _ml.Movie, mlf_movie: _mlf.MLFMovie) -> None | datetime.date:
         return None if mlf_movie.watch_date is None else typing.cast(attrutils.DateHandler, self._params.type_handler).strip(mlf_movie.watch_date)
 
+    name_without_type = 'release' + handler.name
+
     @_register_easy_attribute(attrutils.EasyAttributeParams(
-        name_without_type = 'release' + handler.name, # pylint: disable=cell-var-from-loop
-        aliases_without_type = [],
+        name_without_type = name_without_type, # pylint: disable=cell-var-from-loop
+        aliases_without_type = _make_date_aliases(name_without_type),
         findable_type = _ml.FindableType.MOVIES,
         type_handler = handler, # pylint: disable=cell-var-from-loop
         is_ascending = handler.is_ascending, # pylint: disable=cell-var-from-loop
@@ -112,7 +134,7 @@ for handler in attrutils.DATE_HANDLERS:
 
 @_register_easy_attribute(attrutils.EasyAttributeParams(
     name_without_type = 'description',
-    aliases_without_type = [],
+    aliases_without_type = ['desc', 'comment'],
     findable_type = _ml.FindableType.MOVIES,
     type_handler = attrutils.STR_HANDLER,
     is_ascending = True,
@@ -122,9 +144,10 @@ for handler in attrutils.DATE_HANDLERS:
 def _movie_description_extractor(self: attrutils.EasyAttribute, movie: _ml.Movie, mlf_movie: _mlf.MLFMovie) -> None | str:
     return mlf_movie.description
 
+# 'index' only as an alias because there's a predicate by the same name.
 @_register_easy_attribute(attrutils.EasyAttributeParams(
     name_without_type = 'list-index',
-    aliases_without_type = [],
+    aliases_without_type = ['index'],
     findable_type = _ml.FindableType.MOVIES,
     type_handler = attrutils.SMALL_INT_HANDLER,
     is_ascending = True,
@@ -136,7 +159,7 @@ def _movie_index_extractor(self: attrutils.EasyAttribute, movie: _ml.Movie, mlf_
 
 @_register_easy_attribute(attrutils.EasyAttributeParams(
     name_without_type = 'runtime',
-    aliases_without_type = [],
+    aliases_without_type = ['runtime-minutes', 'length', 'minutes', 'run-length', 'run-time'],
     findable_type = _ml.FindableType.MOVIES,
     type_handler = attrutils.MINUTES_HANDLER,
     is_ascending = True,
@@ -148,7 +171,7 @@ def _movie_runtime_extractor(self: attrutils.EasyAttribute, movie: _ml.Movie, ml
 
 @_register_easy_attribute(attrutils.EasyAttributeParams(
     name_without_type = 'metascore',
-    aliases_without_type = [],
+    aliases_without_type = ['meta-score'],
     findable_type = _ml.FindableType.MOVIES,
     type_handler = attrutils.SMALL_INT_HANDLER,
     is_ascending = False,
@@ -160,7 +183,7 @@ def _movie_metascore_extractor(self: attrutils.EasyAttribute, movie: _ml.Movie, 
 
 @_register_easy_attribute(attrutils.EasyAttributeParams(
     name_without_type = 'votes',
-    aliases_without_type = [],
+    aliases_without_type = ['vote-count'],
     findable_type = _ml.FindableType.MOVIES,
     type_handler = attrutils.BIG_INT_HANDLER,
     is_ascending = False,
@@ -172,7 +195,7 @@ def _movie_votes_extractor(self: attrutils.EasyAttribute, movie: _ml.Movie, mlf_
 
 @_register_easy_attribute(attrutils.EasyAttributeParams(
     name_without_type = 'rating',
-    aliases_without_type = [],
+    aliases_without_type = ['user-rating', 'user-score', 'ratings'],
     findable_type = _ml.FindableType.MOVIES,
     type_handler = attrutils.FLOAT_HANDLER,
     is_ascending = False,
@@ -184,7 +207,7 @@ def _movie_rating_extractor(self: attrutils.EasyAttribute, movie: _ml.Movie, mlf
 
 @_register_easy_attribute(attrutils.EasyAttributeParams(
     name_without_type = 'my-rating',
-    aliases_without_type = [],
+    aliases_without_type = ['my-score', 'my-ratings', 'myrating'],
     findable_type = _ml.FindableType.MOVIES,
     type_handler = attrutils.FLOAT_HANDLER,
     is_ascending = False,
@@ -196,20 +219,24 @@ def _movie_my_rating_extractor(self: attrutils.EasyAttribute, movie: _ml.Movie, 
 
 @_register_easy_attribute(attrutils.EasyAttributeParams(
     name_without_type = 'genres',
-    aliases_without_type = [],
+    aliases_without_type = ['genre', 'category', 'categories'],
     findable_type = _ml.FindableType.MOVIES,
     type_handler = attrutils.STR_HANDLER,
     is_ascending = True,
     truncation_style = utils.TruncationStyle.TRIM_MIDDLE,
-    default_max_len = _STR_LEN_SHORT,
+    default_max_len = _STR_LEN_LONG,
 ))
 def _movie_genres_extractor(self: attrutils.EasyAttribute, movie: _ml.Movie, mlf_movie: _mlf.MLFMovie) -> list[str]:
-    return sorted(mlf_movie.genres)
+    # Assume lists are sorted at the source, because of canonicalization. So we won't sort them here.
+    # However we do have to copy the list to prevent giving the user access to memory he shouldn't have.
+    return list(mlf_movie.genres)
 
-# TODO: support CrewType.ANY?
-for crew_type in _ml.CrewType.iterate_except_any():
+# Returns the names of all people in a certain crew type. Supports CrewType.ANY, but an attribute named 'any' will be very unclear, so we name that one 'people' instead.
+# There are many aliases to consider supporting here: 'crew' instead of 'people', 'directors' instead of 'director', 'actors' instead of 'cast'...
+# But crew types show up in many places and it will be confusing to support them here but not in other places.
+for crew_type in _ml.CrewType:
     @_register_easy_attribute(attrutils.EasyAttributeParams(
-        name_without_type = crew_type, # pylint: disable=cell-var-from-loop
+        name_without_type = crew_type if crew_type != _ml.CrewType.ANY else 'people', # pylint: disable=cell-var-from-loop
         aliases_without_type = [],
         findable_type = _ml.FindableType.MOVIES,
         type_handler = attrutils.STR_HANDLER,
@@ -217,11 +244,19 @@ for crew_type in _ml.CrewType.iterate_except_any():
         truncation_style = utils.TruncationStyle.TRIM_MIDDLE,
         default_max_len = _STR_LEN_SHORT,
     ))
-    def _movie_crew_type_extractor(self: attrutils.EasyAttribute, movie: _ml.Movie, mlf_movie: _mlf.MLFMovie) -> list[str]:
-        mlf = movie.movie_list.underlying_file
+    def _movie_crew_type_extractor(self: attrutils.EasyAttribute, movie: _ml.Movie, mlf_movie: _mlf.MLFMovie) -> list[None | str]:
+        global _people_name_attr
         
-        # Use self.name_without_type instead of crew_type to avoid cell-var-from-loop error.
-        return sorted(name for uid in mlf_movie.crew[self.name_without_type].roles_by_uid if isinstance(name := mlf.people_by_uid[uid].name, str))
+        # Use self.name_without_type instead of crew_type to avoid cell-var-from-loop error. This is important.
+        ct = _ml.CrewType(self.name_without_type) if self.name_without_type != 'people' else _ml.CrewType.ANY
+
+        # This implementation is inefficient. We could improve it by reading from the mlf_movie.crew directly,
+        # but that would require sorting and will also be more complicated to support CrewType.ANY.
+        # Here we rely on associated_people already guaranteeing a consistent ordering.
+        return [
+            typing.cast(list[None | str], person.extract(_people_name_attr))[0]
+            for person in movie.associated_people(ct, _ml.GroupMode.SEPARATE)
+        ]
 
 #endregion movie attributes
 
@@ -249,6 +284,7 @@ def _people_uid_extractor(self: attrutils.EasyAttribute, people: _ml.People, mlf
     default_max_len = _STR_LEN_LONG,
 ))
 def _people_name_extractor(self: attrutils.EasyAttribute, people: _ml.People, mlf_people: list[_mlf.MLFPerson]) -> list[None | str]:
+    # Guaranteed consistent ordering because mlf_people should already be sorted by uid.
     return [mlf_person.name for mlf_person in mlf_people]
 
 @_register_easy_attribute(attrutils.EasyAttributeParams(
@@ -344,3 +380,6 @@ def _people_group_mode_extractor(self: attrutils.EasyAttribute, people: _ml.Peop
 #     return sorted(c for mlf_role in mlf_roles for c in mlf_role.characters)
 
 #endregion role attributes
+
+# Cache some attributes for efficiency. Do it at the end of the file after everything's been added.
+_people_name_attr = _reg._builtins.attributes['people-name']

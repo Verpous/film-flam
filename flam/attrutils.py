@@ -171,7 +171,7 @@ STR_HANDLER                     = StrHandler()
 MINUTES_HANDLER                 = MinutesHandler()
 
 DATE_HANDLERS = [
-    DateHandler('',                     '%Y-%m-%d', False),
+    DateHandler('-date',                '%Y-%m-%d', False),
     DateHandler('-year',                '%Y',       False),
     DateHandler('-month',               '%Y-%m',    False),
     DateHandler('-week-of-year',        '%U',       True),

@@ -22,8 +22,6 @@ import re
 import operator
 
 from . import _ml
-from . import _exc
-from . import _dbg
 from . import _reg
 
 if typing.TYPE_CHECKING:

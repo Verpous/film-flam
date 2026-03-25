@@ -22,7 +22,6 @@ from . import _exc
 from . import _reg
 from . import _attr
 from . import _ml
-from . import attrutils
 
 # -true : Always true.
 @_reg._register_builtin

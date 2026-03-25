@@ -637,9 +637,9 @@ For people, it looks like 'cast-people', 'director-people:group', etc.''')
         if is_additive:
             # TODO: Decide on default columns for PEOPLE, ROLES
             default_columns = {
-                flam.FindableType.MOVIES: ['title', 'runtime', 'release-year', 'rating', 'metascore', 'director'],
-                flam.FindableType.PEOPLE: ['name', 'nmovies', 'avg-rating', 'avg-metascore'],
-                flam.FindableType.ROLES: ['people-name', 'title', 'avg-rating', 'avg-metascore'],
+                flam.FindableType.MOVIES: ['movies-title', 'movies-runtime', 'movies-release-year', 'movies-rating', 'movies-metascore', 'movies-director'],
+                flam.FindableType.PEOPLE: ['people-name', 'people-num-movies', 'people-avg-rating', 'people-avg-metascore'],
+                flam.FindableType.ROLES: ['people-name', 'movie-title', 'people-avg-rating', 'people-avg-metascore'],
             }
 
             # Use default columns even if the same attribute is also in the custom columns from the user.
@@ -663,14 +663,14 @@ For people, it looks like 'cast-people', 'director-people:group', etc.''')
                 smart_columns.append('movies-description')
             
             if len(ct_gms) > 1:
-                smart_columns.append('crew-type')
+                smart_columns.append('people-crew-type')
 
             # If more than one CTGM and one of them isn't the default group mode, show the group mode.
             if len(ct_gms) > 1 and any(group_mode != crew_type.default_group_mode for crew_type, group_mode in ct_gms):
-                smart_columns.append('group-mode')
+                smart_columns.append('people-group-mode')
 
             if findable_type == flam.FindableType.ROLES and any(crew_type == flam.CrewType.CAST for crew_type, _ in ct_gms):
-                smart_columns.append('characters')
+                smart_columns.append('roles-characters')
 
             # If we combined multiple lists, tag each element with the list(s) it came from.
             # if movie_list.list_type == flam.SpecialListType.ANNONYMOUS:

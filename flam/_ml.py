@@ -161,7 +161,8 @@ class Movie(Findable):
         ct_gm = (crew_type, group_mode)
         
         if ct_gm not in self._associated_people_cache:
-            self._associated_people_cache[ct_gm] = list(self._associated_people_no_cache(crew_type, group_mode))
+            # Must guarantee consistent ordering.
+            self._associated_people_cache[ct_gm] = sorted(self._associated_people_no_cache(crew_type, group_mode), key=lambda people: people.uid)
         
         yield from self._associated_people_cache[ct_gm]
 
@@ -178,7 +179,7 @@ class Movie(Findable):
                     yield ml.get_people_by_uid(People.compose_uid([mlf_person_uid], crew_type, group_mode))
             case (_, GroupMode.SEPARATE):
                 for mlf_role in self._mlf_movie.crew[crew_type].roles_by_uid.values():
-                    yield ml.get_people_by_uid(People.compose_uid([mlf_role.uid], crew_type, group_mode))
+                    yield ml.get_people_by_uid(People.compose_uid([mlf_role.person_uid], crew_type, group_mode))
             case (_, GroupMode.GROUP):
                 # It's not optimal to go over all people just to find the ones in this movie but we have no better way right now.
                 for people in ml.find_people(crew_type, group_mode):
@@ -194,6 +195,7 @@ class Movie(Findable):
             group_mode = crew_type.default_group_mode
 
         # Since associated people are all guaranteed to be in the movie, they should each correspond to a Role object.
+        # Guaranteed consisted ordering because associated_people() has consistent ordering.
         for people in self.associated_people(crew_type, group_mode):
             role_uid = Role.compose_uid(self, people)
             yield ml.get_role_by_uid(role_uid)
@@ -208,8 +210,8 @@ class People(Findable):
             associated_movie_uids_hint: None | typing.Iterable[str] = None) -> None:
         super().__init__(movie_list)
 
-        # Keep people sorted by name, with some failsafes in case of nae name or same-named dames.
-        self._mlf_people = sorted(mlf_people, key=lambda mlf_person: (mlf_person.name is not None, mlf_person.name, mlf_person.uid))
+        # Keep people sorted by uid.
+        self._mlf_people = sorted(mlf_people, key=lambda mlf_person: mlf_person.uid)
         self._crew_type = crew_type
         self._group_mode = group_mode
         self._uid = self.compose_uid((mlf_person.uid for mlf_person in self._mlf_people), crew_type, group_mode)
@@ -237,6 +239,7 @@ class People(Findable):
         return attribute._extract_from_people(self, self._mlf_people) # type: ignore
 
     def associated_movies(self) -> typing.Iterable[Movie]:
+        # Guaranteed consisted ordering because find() has consistent ordering.
         if self._associated_movies_cache is None:
             self._associated_movies_cache = [
                 movie
@@ -250,6 +253,7 @@ class People(Findable):
         ml = self.movie_list
 
         # Since associated people are all guaranteed to be in the movie, they should each correspond to a Role object.
+        # Guaranteed consisted ordering because associated_movies() has consistent ordering.
         for movie in self.associated_movies():
             role_uid = Role.compose_uid(movie, self)
             yield ml.get_role_by_uid(role_uid)
@@ -423,7 +427,9 @@ class MovieList:
         if filter is not None and filter.findable_type != what:
             raise _exc.InputError(f"Requested to find {what} but filter is of type {filter.findable_type}.")
 
-        findables: dict[str, Movie] | dict[str, People] | dict[str, Role]
+        # Typing is covariant and dict is not.
+        # We assume findables is a dict with elements inserted in sorted by uid order.
+        findables: typing.Mapping[str, Findable]
         
         match what:
             case FindableType.MOVIES:
@@ -513,8 +519,7 @@ class MovieList:
 
     def _generate_movies(self) -> dict[str, Movie]:
         if self._movies is None:
-            # A small violation of abstraction to use mlf_movie.uid and not the .uid of the Movie we just built. But whatever.
-            self._movies = {mlf_movie.uid: Movie(self, mlf_movie) for mlf_movie in self._movie_list_file.movies_by_uid.values()}
+            self._movies = self._findables_to_sorted_dict(Movie(self, mlf_movie) for mlf_movie in self._movie_list_file.movies_by_uid.values())
             _dbg.logger.info(f"Generated movie list, {len(self._movies)=}")
 
         return self._movies
@@ -526,7 +531,7 @@ class MovieList:
         ct_gm = (crew_type, group_mode)
 
         if ct_gm not in self._peoples:
-            self._peoples[ct_gm] = {people.uid: people for people in self._generate_peoples_no_cache(crew_type, group_mode)}
+            self._peoples[ct_gm] = self._findables_to_sorted_dict(self._generate_peoples_no_cache(crew_type, group_mode))
             _dbg.logger.info(f"Generated people list, {ct_gm=}, {len(self._peoples[ct_gm])=}")
 
         return self._peoples[ct_gm]
@@ -631,7 +636,7 @@ class MovieList:
         ct_gm = (crew_type, group_mode)
 
         if ct_gm not in self._roles:
-            self._roles[ct_gm] = {role.uid: role for role in self._generate_roles_no_cache(crew_type, group_mode)}
+            self._roles[ct_gm] = self._findables_to_sorted_dict(self._generate_roles_no_cache(crew_type, group_mode))
             _dbg.logger.info(f"Generated roles list, {ct_gm=}, {len(self._roles[ct_gm])=}")
 
         return self._roles[ct_gm]
@@ -642,3 +647,9 @@ class MovieList:
         for people in peoples.values():
             for movie in people.associated_movies():
                 yield Role(self, movie, people)
+
+    # We want to guarantee a consistent ordering on find(), and associated_X() functions because it spares attribute implementations from worrying about ordering on their end.
+    # Python dictionaries guarantee to preserve the order keys were added so we can have both efficient lookups and ordering in one data structure if we build it right.
+    @classmethod
+    def _findables_to_sorted_dict[T: Findable](cls, findables: typing.Iterable[T]) -> dict[str, T]:
+        return {f.uid: f for f in sorted(findables, key=lambda fi: fi.uid)}
