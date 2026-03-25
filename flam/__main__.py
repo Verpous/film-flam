@@ -86,8 +86,23 @@ def print_table(table: list[list[str]],
 
     match paginate_choice:
         case Choice.AUTO:
-            # Slightly nudge up the length of the table to encourage pagination.
-            paginate = sys.stdout.isatty() and os.get_terminal_size().lines <= len(table) + 2 and shutil.which('less') is not None
+            HORIZONTAL_PAGINATION_ENCOURAGEMENT = 7
+            VERTICAL_PAGINATION_ENCOURAGEMENT = 2
+            terminal_cols, terminal_lines = shutil.get_terminal_size()
+
+            # Auto pagination is a function of a few things. The most complicated part is checking if the table fits in the terminal.
+            # Checking if it fits vertically is rather simple, but we do nudge it a bit to encourage pagination if it barely fits.
+            # Checking if it fits horizontally is more complicated.
+            # It's too complicated to compute exactly the length of the longest row before we generate the table, but we can't generate the table until we decide about pagination.
+            # So instead we go with a heuristical approach of estimating the longest row to be the sum of its parts + some encouragement for each cell.
+            paginate = (
+                sys.stdout.isatty()
+                and shutil.which('less') is not None
+                and (
+                    terminal_lines <= len(table) + VERTICAL_PAGINATION_ENCOURAGEMENT
+                    or terminal_cols < max(sum(HORIZONTAL_PAGINATION_ENCOURAGEMENT + len(cell) for cell in row) for row in table)
+                )
+            )
             spacious |= paginate
         case Choice.ALWAYS:
             paginate = True
@@ -628,6 +643,29 @@ For people, it looks like 'cast-people', 'director-people:group', etc.''')
     @classmethod
     def parse_columns(cls, args: argparse.Namespace, findable_type: flam.FindableType, ct_gms: list[tuple[flam.CrewType, flam.GroupMode]],
             sort_attrs: list[flam.Attribute], movie_list: flam.MovieList, ctx: flam.FlamContext) -> list[tuple[flam.Attribute, None | str]]:
+
+        # Support the entire string just being '*' and then we expand to every applicable attribute. Good for debugging mainly.
+        if args.columns == '*':
+            # We need to solve some issues here:
+            # 1. If the user shadowed an attribute we don't wait it to be repeated twice - so use a set.
+            # 2. If the attribute has aliases we don't want it to be repeated per alias - so put only qualified names in the set.
+            # 3. We want to have some kind of consistent sort order - so sort it.
+            # It might've been nice to mind the registry level when sorting, but meh.
+            attr_names_once = sorted(set(
+                ctx.attributes[alias].qualified_name
+                for alias in ctx.attributes
+            ))
+
+            attributes = []
+
+            for qualified_name in attr_names_once:
+                attr = ctx.attributes[qualified_name]
+
+                if attr.findable_type.is_applicable_to(findable_type):
+                    attributes.append((attr, None))
+
+            return attributes
+
         is_additive = args.columns is None or args.columns.startswith('+')
         columns = [] if args.columns is None else args.columns.removeprefix('+').split(',')
 

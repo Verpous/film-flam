@@ -66,6 +66,7 @@ class RegistriesOf[T: (type[_fetch.ListFetcher], type[_filter.Predicate], _attr.
     def __contains__(self, qualified_name: str) -> bool:
         return any(qualified_name in self._type_selector(reg) for reg in self._registries_to_try)
 
+    # Support iteration only over keys and not values, because some values may be lazily allocated once you __getitem__.
     def __iter__(self) -> typing.Iterator[str]:
         for reg in self._registries_to_try:
             yield from self._type_selector(reg)

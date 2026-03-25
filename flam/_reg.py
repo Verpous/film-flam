@@ -70,6 +70,7 @@ class RegistryOf[T: (type[_fetch.ListFetcher], type[_filter.Predicate], _attr.At
     def __contains__(self, qualified_name: str) -> bool:
         return qualified_name in self._registered_items
 
+    # Support iteration only over keys and not values, because some values may be lazily allocated once you __getitem__.
     def __iter__(self) -> typing.Iterator[str]:
         return iter(self._registered_items)
 
@@ -92,7 +93,7 @@ class RegistryOfPredicates(RegistryOf[type[_filter.Predicate]]):
 
             # Remember attributes support aliasing, so qualified_name might not be equal to attr.qualified_name.
             # We'll optimize by always caching the AttributePredicate to the primary name of the predicate,
-            # and if we request a the predicate by an alias, we'll return the result cached in the primary name.
+            # and if we request the predicate by an alias, we'll return the result cached in the primary name.
             primary_predicate = self._registered_items[attr.qualified_name]
 
             if primary_predicate is None:
