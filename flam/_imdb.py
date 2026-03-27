@@ -48,23 +48,6 @@ from . import _ldef
 from . import _dbg
 from . import utils
 
-# TODO: since cinemagoer is dead there are a few alternative fetchers to consider implementing:
-# * https://github.com/tveronesi/imdbinfo
-#   - actively maintained but currently broken which is not a good sign
-# * https://github.com/itsmehemant7/PyMovieDb - requires imdb API key?
-#   - seems to not work
-# * https://imdbapi.dev/
-#   - a little sus, wouldn't be surprised if it vanishes someday, but for now seems to work great and contains all the information I need and then some
-# * https://www.themoviedb.org/
-#   - requires API key so users will have to set themselves up with one
-#   - requires crediting tmdb somehow https://www.themoviedb.org/about/logos-attribution
-#   - supports querying by imdb ID
-#   - seems to have a lot of information
-#   - has rate limits to be mindful of but they should be rather generous
-# * https://www.omdbapi.com/
-#   - supports querying by imdb ID
-#   - very barebones
-
 _UID_FAMILY = 'imdb'
 _REQUEST_QUIT = 'quit'
 
@@ -75,7 +58,7 @@ class _CsvRow:
     # Order of the fields *must* match up with what is actually served by IMDb.
     list_index:         str
     uid:                str
-    watch_date:         str
+    listing_date:       str
     modified:           str
     description:        str
     title:              str
@@ -104,7 +87,8 @@ class _CsvRow:
             genres            = self.genres.split(', '),
             votes             = int(self.votes),
             my_rating         = float(self.my_rating) if (self.my_rating is not None and self.my_rating != '') else None,
-            watch_date        = self._date(self.watch_date),
+            listing_date      = self._date(self.listing_date),
+            watch_date        = self._date(self.listing_date), # Treat the listing date as the date the movie was watched.
             release_date      = self._date(self.release_date),
         )
 
@@ -132,7 +116,7 @@ class SeleniumCinemagoerListFetcher(_fetch.ListFetcher, list_type='imdb-id', uid
     @classmethod
     def download_csv(cls, concrete_listdef: _ldef.CanonListdef) -> list[_CsvRow]:
         NUM_RETRIES = 2
-        CSV_DOWNLOAD_TIMEOUT_SECS = 40
+        CSV_DOWNLOAD_TIMEOUT_SECS = 120
 
         downloads_dir = _dbg.FlamEnv.DOWNLOADS_DIR.get_or_default(os.path.join(os.path.expanduser('~'), 'Downloads'))
 
@@ -309,7 +293,11 @@ class _Cinemagoer:
 
             # I prefer to get the title from Cinemagoer because they have better titles for foreign language films, but it's good to have a fallback (not that we ever need it).
             title = _safe_get(movie_imdb, 'title', default=movie_csv.title),
+            synopsis = None,
             metascore = _safe_get(movie_imdb, 'metascore'),
+            metascore_votes = None,
+            languages = [],
+            countries = [],
             crew = crew,
 
             **movie_csv.mlf_fields(),
@@ -356,6 +344,7 @@ class _Cinemagoer:
             yield _mlf.MLFRole(
                 person_uid = person_imdb.getID(),
                 characters = [c for c in cls.build_characters(person_imdb.currentRole) if c is not None],
+                is_star = None,
             )
 
     @classmethod
@@ -363,7 +352,10 @@ class _Cinemagoer:
         for person_imdb in crew_imdb_by_uid.values():
             yield _mlf.MLFPerson(
                 uid = person_imdb.getID(),
-                name = _safe_get(person_imdb, 'name', person_imdb.getID())
+                name = _safe_get(person_imdb, 'name', person_imdb.getID()),
+                gender = None,
+                birthday = None,
+                countries = [],
             )
 
 class _IMDbREST:
@@ -393,54 +385,69 @@ class _IMDbREST:
 
     @classmethod
     def fetch_movie(cls, movie_csv: _CsvRow, movie_list_file: _mlf.MovieListFile, movie_json: dict[str, typing.Any]) -> None:
-        try:
-            metascore = movie_json['metacritic']['score']
-        except KeyError:
-            metascore = None
-
         # Build crews dictionary and also people.
         crew = {
             str(crew_type): _mlf.MLFCrew(crew_type=crew_type, roles_by_uid={})
             for crew_type in _ml.CrewType.iterate_except_any()
         }
 
-        characters: list[str] = []
-
         # Ex: https://api.imdbapi.dev/titles/tt0054331/credits?pageSize=50
         for credits_json in cls.paginated_rest_call(f'titles/tt{movie_csv.uid}/credits'):
             for person_json in credits_json['credits']:
+                person_uid = person_json['name']['id'][2:]
+                characters: list[str] = []
+                is_star = None
+                gender = None
+
                 match person_json['category']:
                     case 'director':
                         crew_type = _ml.CrewType.DIRECTOR
                     case 'writer':
                         crew_type = _ml.CrewType.WRITER
                     case 'actor' | 'actress':
-                        # TODO: Theoretically we could flag it if the actor is in a starring role!
                         crew_type = _ml.CrewType.CAST
                         characters.extend(person_json.get('characters', []))
+                        is_star = any(star['id'][2:] == person_uid for star in movie_json['stars'])
+                        gender = 'male' if person_json['category'] == 'actor' else 'female'
                     case _:
                         raise RuntimeError(f'Unexpected {person_json["category"]=}')
 
-                person_uid = person_json['name']['id'][2:]
                 crew[crew_type].roles_by_uid[person_uid] = _mlf.MLFRole(
                     person_uid = person_uid,
                     characters = characters,
+                    is_star = is_star,
                 )
 
                 # We are unafraid to add people to the file before the movie, because we "clean up" unused people before the file is written.
-                if person_uid not in movie_list_file.people_by_uid:
+                # Since we only have gender information for actors with this API, override any people who were added from a non-actor crew type.
+                if person_uid not in movie_list_file.people_by_uid or gender is not None:
                     movie_list_file.people_by_uid[person_uid] = _mlf.MLFPerson(
                         uid = person_uid,
                         name = person_json['name']['displayName'],
+                        gender = gender,
+                        birthday = None,
+                        countries = [],
                     )
         
-        # TODO: With this API we can also get interesting stuff like languages, countries.
+        try:
+            metascore = movie_json['metacritic']['score']
+            metascore_votes = movie_json['metacritic']['reviewCount']
+        except KeyError:
+            metascore = None
+            metascore_votes = None
+
         mlf_movie = _mlf.MLFMovie(
             uid = movie_csv.uid,
 
-            # I prefer to get the title from Cinemagoer because they have better titles for foreign language films, but it's good to have a fallback (not that we ever need it).
+            # I prefer to get the title not from the CSV because this API has better titles for foreign language films.
             title = movie_json['primaryTitle'],
+            synopsis = movie_json['plot'],
             metascore = metascore,
+            metascore_votes = metascore_votes,
+            
+            # Sometimes there's an empty lang object. For example if you query movie tt2177771 (the monuments men).
+            languages = [lang['name'] for lang in movie_json['spokenLanguages'] if 'name' in lang],
+            countries = [country['name'] for country in movie_json['originCountries']],
             crew = crew,
 
             **movie_csv.mlf_fields(),
@@ -684,6 +691,10 @@ def _export_list(driver: WebDriver, list_id: str) -> None:
     export_button = _do_with_retries(
         lambda: driver.find_element(By.XPATH, "//button[@aria-label='Export']"))
     _do_with_retries(lambda: _click_export_button(driver, export_button))
+
+    # Opening the link like this instead of below stage might be better but also might not confirm that the export actually started first. Needs more investigation.
+    # _dbg.logger.info("Stage: open exports page")
+    # driver.get(f'https://www.imdb.com/exports/')
 
     _dbg.logger.info("Stage: wait for exports page popup")
     exports_page_link = _do_with_retries(

@@ -25,6 +25,7 @@ from . import _ml
 class MLFRole(_file._FlamSerializable):
     person_uid:             str
     characters:             list[str]
+    is_star:                None | bool
 
 class MLFCrew(_file._FlamSerializable):
     crew_type:              str
@@ -33,25 +34,30 @@ class MLFCrew(_file._FlamSerializable):
 class MLFPerson(_file._FlamSerializable):
     uid:                    str
     name:                   None | str
-    # TODO: Check if can support birthday?
-    # Would love to add gender, nationality but cinemagoer doesn't have them.
+    gender:                 None | str # I am not going down the rabbit hole of enum-ing the possible gender values.
+    birthday:               None | datetime.date
+    countries:              list[str]
 
 # TODO: Separate properties of the movie from properties of its prescence in a list?
 # I.e., 'watch_date', 'description', 'list_index' are not the same as the rest, and when merging lists, we should keep them all.
 class MLFMovie(_file._FlamSerializable):
     uid:                    str
     title:                  None | str
+    synopsis:               None | str
     watch_date:             None | datetime.date
     release_date:           None | datetime.date
+    listing_date:           None | datetime.date
     description:            None | str
     list_index:             None | int
     runtime_minutes:        None | int
+    metascore_votes:        None | int
     metascore:              None | int
     votes:                  None | int
     rating:                 None | float
     my_rating:              None | float
     genres:                 list[str]
-    # TODO: consider adding languages, countries
+    languages:              list[str]
+    countries:              list[str]
 
     # crew type -> crew object. It makes things much nicer when you can reference the crew type you want with this indirection,
     # but the downside (as opposed to having a field for each crew type), is that we have to check dynamically that no crew types were added or are missing.

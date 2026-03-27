@@ -644,6 +644,8 @@ For people, it looks like 'cast-people', 'director-people:group', etc.''')
     def parse_columns(cls, args: argparse.Namespace, findable_type: flam.FindableType, ct_gms: list[tuple[flam.CrewType, flam.GroupMode]],
             sort_attrs: list[flam.Attribute], movie_list: flam.MovieList, ctx: flam.FlamContext) -> list[tuple[flam.Attribute, None | str]]:
 
+        attributes: list[tuple[flam.Attribute, None | str]]
+        
         # Support the entire string just being '*' and then we expand to every applicable attribute. Good for debugging mainly.
         if args.columns == '*':
             # We need to solve some issues here:
@@ -666,6 +668,7 @@ For people, it looks like 'cast-people', 'director-people:group', etc.''')
 
             return attributes
 
+        # Now handle the usual case of no '*'. If the string starts with '+' we'll treat it as additive mode and add all the requested columns on top of the default ones.
         is_additive = args.columns is None or args.columns.startswith('+')
         columns = [] if args.columns is None else args.columns.removeprefix('+').split(',')
 

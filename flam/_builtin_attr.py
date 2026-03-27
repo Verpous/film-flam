@@ -96,6 +96,18 @@ def _movie_origin_uid_extractor(self: attrutils.EasyAttribute, movie: _ml.Movie,
 def _movie_title_extractor(self: attrutils.EasyAttribute, movie: _ml.Movie, mlf_movie: _mlf.MLFMovie) -> None | str:
     return mlf_movie.title
 
+@_register_easy_attribute(attrutils.EasyAttributeParams(
+    name_without_type = 'synopsis',
+    aliases_without_type = ['plot', 'summary'],
+    findable_type = _ml.FindableType.MOVIES,
+    type_handler = attrutils.STR_HANDLER,
+    is_ascending = True,
+    truncation_style = utils.TruncationStyle.NO_TRIM, # No trimming synopses!
+    default_max_len = _STR_LEN_DONTCARE,
+))
+def _movie_synopsis_extractor(self: attrutils.EasyAttribute, movie: _ml.Movie, mlf_movie: _mlf.MLFMovie) -> None | str:
+    return mlf_movie.synopsis
+
 def _make_date_aliases(name_without_type: str) -> list[str]:
     # Basically keeps the first letter of each part separated by '-'s.
     # Ex: 'release-date' -> 'r-d', 'watch-month-of-year' -> 'w-m-o-y'.
@@ -131,6 +143,20 @@ for handler in attrutils.DATE_HANDLERS:
     ))
     def _movie_released_extractor(self: attrutils.EasyAttribute, movie: _ml.Movie, mlf_movie: _mlf.MLFMovie) -> None | datetime.date:
         return None if mlf_movie.release_date is None else typing.cast(attrutils.DateHandler, self._params.type_handler).strip(mlf_movie.release_date)
+
+    name_without_type = 'listing' + handler.name
+
+    @_register_easy_attribute(attrutils.EasyAttributeParams(
+        name_without_type = name_without_type, # pylint: disable=cell-var-from-loop
+        aliases_without_type = _make_date_aliases(name_without_type),
+        findable_type = _ml.FindableType.MOVIES,
+        type_handler = handler, # pylint: disable=cell-var-from-loop
+        is_ascending = handler.is_ascending, # pylint: disable=cell-var-from-loop
+        truncation_style = utils.TruncationStyle.NO_TRIM,
+        default_max_len = _STR_LEN_DONTCARE,
+    ))
+    def _movie_listed_extractor(self: attrutils.EasyAttribute, movie: _ml.Movie, mlf_movie: _mlf.MLFMovie) -> None | datetime.date:
+        return None if mlf_movie.listing_date is None else typing.cast(attrutils.DateHandler, self._params.type_handler).strip(mlf_movie.listing_date)
 
 @_register_easy_attribute(attrutils.EasyAttributeParams(
     name_without_type = 'description',
@@ -171,7 +197,7 @@ def _movie_runtime_extractor(self: attrutils.EasyAttribute, movie: _ml.Movie, ml
 
 @_register_easy_attribute(attrutils.EasyAttributeParams(
     name_without_type = 'metascore',
-    aliases_without_type = ['meta-score'],
+    aliases_without_type = ['meta-score', 'metacritic-score'],
     findable_type = _ml.FindableType.MOVIES,
     type_handler = attrutils.SMALL_INT_HANDLER,
     is_ascending = False,
@@ -180,6 +206,18 @@ def _movie_runtime_extractor(self: attrutils.EasyAttribute, movie: _ml.Movie, ml
 ))
 def _movie_metascore_extractor(self: attrutils.EasyAttribute, movie: _ml.Movie, mlf_movie: _mlf.MLFMovie) -> None | int:
     return mlf_movie.metascore
+
+@_register_easy_attribute(attrutils.EasyAttributeParams(
+    name_without_type = 'metascore-votes',
+    aliases_without_type = ['metacritic-review-count', 'metacritic-vote-count', 'metascore-review-count', 'metascore-vote-count', 'metacritic-rating'],
+    findable_type = _ml.FindableType.MOVIES,
+    type_handler = attrutils.SMALL_INT_HANDLER,
+    is_ascending = False,
+    truncation_style = utils.TruncationStyle.NO_TRIM,
+    default_max_len = _STR_LEN_DONTCARE,
+))
+def _movie_metascore_votes_extractor(self: attrutils.EasyAttribute, movie: _ml.Movie, mlf_movie: _mlf.MLFMovie) -> None | int:
+    return mlf_movie.metascore_votes
 
 @_register_easy_attribute(attrutils.EasyAttributeParams(
     name_without_type = 'votes',
@@ -231,6 +269,34 @@ def _movie_genres_extractor(self: attrutils.EasyAttribute, movie: _ml.Movie, mlf
     # However we do have to copy the list to prevent giving the user access to memory he shouldn't have.
     return list(mlf_movie.genres)
 
+@_register_easy_attribute(attrutils.EasyAttributeParams(
+    name_without_type = 'languages',
+    aliases_without_type = ['language'],
+    findable_type = _ml.FindableType.MOVIES,
+    type_handler = attrutils.STR_HANDLER,
+    is_ascending = True,
+    truncation_style = utils.TruncationStyle.TRIM_MIDDLE,
+    default_max_len = _STR_LEN_SHORT,
+))
+def _movie_languages_extractor(self: attrutils.EasyAttribute, movie: _ml.Movie, mlf_movie: _mlf.MLFMovie) -> list[str]:
+    # Assume lists are sorted at the source, because of canonicalization. So we won't sort them here.
+    # However we do have to copy the list to prevent giving the user access to memory he shouldn't have.
+    return list(mlf_movie.languages)
+
+@_register_easy_attribute(attrutils.EasyAttributeParams(
+    name_without_type = 'countries',
+    aliases_without_type = ['country'],
+    findable_type = _ml.FindableType.MOVIES,
+    type_handler = attrutils.STR_HANDLER,
+    is_ascending = True,
+    truncation_style = utils.TruncationStyle.TRIM_MIDDLE,
+    default_max_len = _STR_LEN_SHORT,
+))
+def _movie_countries_extractor(self: attrutils.EasyAttribute, movie: _ml.Movie, mlf_movie: _mlf.MLFMovie) -> list[str]:
+    # Assume lists are sorted at the source, because of canonicalization. So we won't sort them here.
+    # However we do have to copy the list to prevent giving the user access to memory he shouldn't have.
+    return list(mlf_movie.countries)
+
 # Returns the names of all people in a certain crew type. Supports CrewType.ANY, but an attribute named 'any' will be very unclear, so we name that one 'people' instead.
 # There are many aliases to consider supporting here: 'crew' instead of 'people', 'directors' instead of 'director', 'actors' instead of 'cast'...
 # But crew types show up in many places and it will be confusing to support them here but not in other places.
@@ -257,6 +323,29 @@ for crew_type in _ml.CrewType:
             typing.cast(list[None | str], person.extract(_people_name_attr))[0]
             for person in movie.associated_people(ct, _ml.GroupMode.SEPARATE)
         ]
+
+# TODO: uncomment and figure out exactly once we add roles' star attr.
+# @_register_easy_attribute(attrutils.EasyAttributeParams(
+#     name_without_type = 'stars',
+#     aliases_without_type = ['star-cast', 'leads', 'lead-actors', 'lead-cast'],
+#     findable_type = _ml.FindableType.MOVIES,
+#     type_handler = attrutils.STR_HANDLER,
+#     is_ascending = True,
+#     truncation_style = utils.TruncationStyle.TRIM_MIDDLE,
+#     default_max_len = _STR_LEN_SHORT,
+# ))
+# def _movie_stars_extractor(self: attrutils.EasyAttribute, movie: _ml.Movie, mlf_movie: _mlf.MLFMovie) -> list[None | str]:
+#     global _people_name_attr
+#     global _role_star_attr
+
+#     # This implementation is inefficient. We could improve it by reading from the mlf_movie.crew directly,
+#     # but that would require sorting and will also be more complicated to support CrewType.ANY.
+#     # Here we rely on associated_people already guaranteeing a consistent ordering.
+#     return [
+#         typing.cast(list[None | str], role.extract(_people_name_attr))[0]
+#         for role in movie.associated_roles(CrewType.CAST, _ml.GroupMode.SEPARATE)
+#         if role.extract(_role_star_attr)[0] is True
+#     ]
 
 #endregion movie attributes
 
