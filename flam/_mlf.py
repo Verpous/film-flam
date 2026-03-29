@@ -35,6 +35,7 @@ class MLFPerson(_file._FlamSerializable):
     uid:                    str
     name:                   None | str
     gender:                 None | str # I am not going down the rabbit hole of enum-ing the possible gender values.
+    height_cm:              None | float
     birthday:               None | datetime.date
     countries:              list[str]
 

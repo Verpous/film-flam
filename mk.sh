@@ -194,12 +194,21 @@ clean-ctx() {
 
 # Reconfigures the dev flam dir with some test lists.
 cfg() {
-    $cli config list --default-fetch=yes testlist imdb-rest=540302193
-    $cli config list --default-fetch=yes netflix imdb-rest=560256455
-    $cli config list --default-fetch=yes mubi imdb-rest=571616524
-    $cli config composite --default-find=yes testcomp testlist -true
-    $cli config composite testcomp testlist -true
-    $cli config composite streaming mubi netflix
+    $cli config list --default-fetch=no     testlist    imdb-rest=540302193
+    $cli config list --default-fetch=yes    movies      imdb-rest=083886771
+    $cli config list --default-fetch=yes    shows       imdb-rest=560024227
+    $cli config list --default-fetch=yes    specials    imdb-rest=560318295
+    $cli config list --default-fetch=no     mubi        imdb-rest=571616524
+    $cli config list --default-fetch=no     netflix     imdb-rest=560256455
+    $cli config list --default-fetch=no     disney      imdb-rest=565212657
+    $cli config list --default-fetch=no     blurays     imdb-rest=539518913
+    $cli config list --default-fetch=no     dvds        imdb-rest=537497285
+    $cli config list --default-fetch=no     elsewhere   imdb-rest=566138441
+
+    $cli config composite --default-find=yes    all         movies shows
+    $cli config composite --default-find=no     rated       movies shows    -has my-rating
+    $cli config composite --default-find=no     home        blurays dvds
+    $cli config composite --default-find=no     streaming   mubi netflix
 }
 
 # Runs mypy to check if our code "compiles".

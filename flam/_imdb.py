@@ -127,7 +127,7 @@ class SeleniumCinemagoerListFetcher(_fetch.ListFetcher, list_type='imdb-id', uid
 
         # We do retries because of a particularly horrible issue that makes the download sometimes fail.
         for i in range(NUM_RETRIES):
-            cls.spin_server_if_needed()
+            cls._spin_server_if_needed()
 
             try:
                 latest_csv = utils.download_file_using_browser(
@@ -156,7 +156,7 @@ class SeleniumCinemagoerListFetcher(_fetch.ListFetcher, list_type='imdb-id', uid
         return movies_csv
 
     @classmethod
-    def spin_server_if_needed(cls) -> None:
+    def _spin_server_if_needed(cls) -> None:
         if cls.exports_server is not None and cls.exports_server.is_alive():
             _dbg.logger.info("CSV server is alive, no need to spin it.")
             return
@@ -239,7 +239,7 @@ class _Cinemagoer:
                 desc='Downloading',
                 keyfunc=lambda m: m.title) as bar:
             for movie_csv in bar:
-                cls.fetch_movie(movie_csv, movie_list_file, ia)
+                cls._fetch_movie(movie_csv, movie_list_file, ia)
 
         _dbg.logger.info("Done fetching movies")
 
@@ -248,12 +248,12 @@ class _Cinemagoer:
                 desc='Cleansing data',
                 keyfunc=lambda p: p.uid) as bar:
             for mlf_person in bar:
-                cls.refetch_person(mlf_person, ia)
+                cls._refetch_person(mlf_person, ia)
 
         _dbg.logger.info("Done fetching people")
 
     @classmethod
-    def fetch_movie(cls, movie_csv: _CsvRow, movie_list_file: _mlf.MovieListFile, ia: imdb.Cinemagoer) -> None:
+    def _fetch_movie(cls, movie_csv: _CsvRow, movie_list_file: _mlf.MovieListFile, ia: imdb.Cinemagoer) -> None:
         NUM_RETRIES = 5
         info_to_fetch = (*imdb.Movie.Movie.default_info, 'critic reviews', 'full credits')
         _dbg.logger.info(f"Fetching movie: {movie_csv}")
@@ -306,7 +306,7 @@ class _Cinemagoer:
         movie_list_file.movies_by_uid[mlf_movie.uid] = mlf_movie
 
     @classmethod
-    def refetch_person(cls, mlf_person: _mlf.MLFPerson, ia: imdb.Cinemagoer) -> None:
+    def _refetch_person(cls, mlf_person: _mlf.MLFPerson, ia: imdb.Cinemagoer) -> None:
         NUM_RETRIES = 5
         _dbg.logger.info(f"Refetching person: {mlf_person.uid}")
 
@@ -326,7 +326,7 @@ class _Cinemagoer:
 
     # I don't know wtf current_role might be.
     @classmethod
-    def build_characters(cls, current_role: typing.Any) -> typing.Iterable[None | str]:
+    def _build_characters(cls, current_role: typing.Any) -> typing.Iterable[None | str]:
         # Sometimes it's empty.
         if not current_role:
             return
@@ -343,7 +343,7 @@ class _Cinemagoer:
         for person_imdb in crew_imdb_by_uid.values():
             yield _mlf.MLFRole(
                 person_uid = person_imdb.getID(),
-                characters = [c for c in cls.build_characters(person_imdb.currentRole) if c is not None],
+                characters = [c for c in cls._build_characters(person_imdb.currentRole) if c is not None],
                 is_star = None,
             )
 
@@ -355,9 +355,11 @@ class _Cinemagoer:
                 name = _safe_get(person_imdb, 'name', person_imdb.getID()),
                 gender = None,
                 birthday = None,
+                height_cm = None,
                 countries = [],
             )
 
+# As an alternative to Cinemagoer since Cinemagoer is dead, found this handy API: https://imdbapi.dev/.
 class _IMDbREST:
     @classmethod
     def fetch_movies_from_api(cls, movies_csv: list[_CsvRow], movie_list_file: _mlf.MovieListFile) -> None:
@@ -376,23 +378,25 @@ class _IMDbREST:
 
                     # Ex: https://api.imdbapi.dev/titles:batchGet?titleIds=tt0054331&titleIds=tt0110200&titleIds=tt0405422&titleIds=tt0047437&titleIds=tt27847051
                     title_ids = '&'.join(f'titleIds=tt{m.uid}' for m in batch)
-                    batch_json = cls.rest_call(f'titles:batchGet?{title_ids}')
+                    batch_json = cls._rest_call(f'titles:batchGet?{title_ids}')
                 
                 movie_json = next(m for m in batch_json['titles'] if movie_csv.uid in m['id'])
-                cls.fetch_movie(movie_csv, movie_list_file, movie_json)
+                cls._fetch_movie(movie_csv, movie_list_file, movie_json)
 
         _dbg.logger.info("Done fetching movies")
 
     @classmethod
-    def fetch_movie(cls, movie_csv: _CsvRow, movie_list_file: _mlf.MovieListFile, movie_json: dict[str, typing.Any]) -> None:
+    def _fetch_movie(cls, movie_csv: _CsvRow, movie_list_file: _mlf.MovieListFile, movie_json: dict[str, typing.Any]) -> None:
         # Build crews dictionary and also people.
         crew = {
             str(crew_type): _mlf.MLFCrew(crew_type=crew_type, roles_by_uid={})
             for crew_type in _ml.CrewType.iterate_except_any()
         }
 
+        people_to_add = []
+
         # Ex: https://api.imdbapi.dev/titles/tt0054331/credits?pageSize=50
-        for credits_json in cls.paginated_rest_call(f'titles/tt{movie_csv.uid}/credits'):
+        for credits_json in cls._paginated_rest_call(f'titles/tt{movie_csv.uid}/credits'):
             for person_json in credits_json['credits']:
                 person_uid = person_json['name']['id'][2:]
                 characters: list[str] = []
@@ -418,20 +422,16 @@ class _IMDbREST:
                     is_star = is_star,
                 )
 
-                # We are unafraid to add people to the file before the movie, because we "clean up" unused people before the file is written.
-                # Since we only have gender information for actors with this API, override any people who were added from a non-actor crew type.
-                if person_uid not in movie_list_file.people_by_uid or gender is not None:
-                    movie_list_file.people_by_uid[person_uid] = _mlf.MLFPerson(
-                        uid = person_uid,
-                        name = person_json['name']['displayName'],
-                        gender = gender,
-                        birthday = None,
-                        countries = [],
-                    )
+                people_to_add.append((person_uid, gender))
+
+        # Have to add the people before we add the movie, because otherwise we run the risk that we get an interrupt after adding the movie,
+        # and on the next retry this movie will be skipped due to already being in the list.
+        # Adding a person before the movie is safe because in case of an interrupt we'll "clean up" unreferenced people.
+        cls._fetch_people(movie_list_file, people_to_add)
         
         try:
             metascore = movie_json['metacritic']['score']
-            metascore_votes = movie_json['metacritic']['reviewCount']
+            metascore_votes = movie_json['metacritic'].get('reviewCount', None)
         except KeyError:
             metascore = None
             metascore_votes = None
@@ -456,20 +456,93 @@ class _IMDbREST:
         movie_list_file.movies_by_uid[mlf_movie.uid] = mlf_movie
 
     @classmethod
-    def rest_call(cls, endpoint: str, **kwargs: typing.Any) -> dict:
-        response = requests.get(f'https://api.imdbapi.dev/{endpoint}', timeout=30, params=kwargs)
-        _dbg.logger.info(f"Requested: {response.url} with res: {response.status_code}")
-        response.raise_for_status()
-        return response.json()
+    def _fetch_people(cls, movie_list_file: _mlf.MovieListFile, people_to_add: list[tuple[str, None | str]]) -> None:
+        BATCH_SIZE = 5
+        batch = []
+
+        new_uids = list(set(uid for uid, _ in people_to_add if uid not in movie_list_file.people_by_uid))
+
+        for i, uid in enumerate(new_uids):
+            if i % BATCH_SIZE == 0:
+                batch = new_uids[i: i + BATCH_SIZE]
+
+                # Ex: https://api.imdbapi.dev/names:batchGet?nameIds=nm0315041&nameIds=nm0577908
+                person_ids = '&'.join(f'nameIds=nm{uid}' for uid in batch)
+                batch_json = cls._rest_call(f'names:batchGet?{person_ids}')
+
+            person_json = next(p for p in batch_json['names'] if uid in p['id'])
+
+            try:
+                # Most people have a displayName, which is best.
+                name = person_json['displayName']
+            except KeyError:
+                # Some people have no displayName but have alternativeNames, so we'll take the longest alt name.
+                name = max(person_json['alternativeNames'], key=len)
+            except (KeyError, ValueError):
+                name = None
+
+            try:
+                birthday_year = person_json['birthDate']['year']
+            except KeyError:
+                # If there isn't even a year then we'll consider the birthday unknown.
+                birthday = None
+            else:
+                # If there is a year there may still not be the rest, but then we'll round it.
+                birthday_month = person_json['birthDate'].get('month', 1)
+                birthday_day = person_json['birthDate'].get('day', 1)
+                birthday = datetime.date(birthday_year, birthday_month, birthday_day)
+            
+            movie_list_file.people_by_uid[uid] = _mlf.MLFPerson(
+                uid = uid,
+                name = name,
+                gender = None,
+                birthday = birthday,
+                height_cm = float(person_json['heightCm']) if 'heightCm' in person_json else None,
+                countries = [person_json['birthLocation']] if 'birthLocation' in person_json else [],
+            )
+
+        # There is no gender information in the people query but for 'actors' and 'actresses' we can distinguish it based on their crew type in the movie information.
+        # So after all MLFPersons are created we'll do a pass of seeing if there's anyone we have a gender hint for and store that.
+        for uid, gender in people_to_add:
+            if gender is None:
+                continue
+
+            mlf_person = movie_list_file.people_by_uid[uid]
+
+            if mlf_person.gender is not None and mlf_person.gender != gender:
+                _dbg.logger.warning(f'Got two different genders for person {uid}: {mlf_person.gender} vs {gender}. Using {gender}')
+
+            mlf_person.gender = gender
 
     @classmethod
-    def paginated_rest_call(cls, endpoint: str, **kwargs: typing.Any) -> typing.Iterable[dict]:
+    def _rest_call(cls, endpoint: str, **kwargs: typing.Any) -> dict:
+        NUM_RETRIES = 10
+        SLEEP_BETWEEN_RETRIES = 3
+
+        for i in range(NUM_RETRIES):
+            response = requests.get(f'https://api.imdbapi.dev/{endpoint}', timeout=30, params=kwargs)
+            _dbg.logger.info(f"Requested: {response.url} with res: {response.status_code}")
+
+            # We actually get this a lot and it really slows us down. I tried to space out requests by like a second to preempt this warning,
+            # but nothing seems as fast as just firing requests at our maximum pace and then sleeping when the API complains.
+            if response.status_code == requests.codes.too_many_requests: # pylint: disable=no-member
+                time.sleep(SLEEP_BETWEEN_RETRIES)
+                _dbg.logger.warning(f"Request failed because of too many retries. Will try again in {SLEEP_BETWEEN_RETRIES} seconds (retry {i}/{NUM_RETRIES})")
+                continue
+
+            response.raise_for_status()
+            return response.json()
+
+        raise _exc.FlamError('imdbapi.dev is refusing our requests due to sending too many. Try again later.')
+
+    @classmethod
+    def _paginated_rest_call(cls, endpoint: str, **kwargs: typing.Any) -> typing.Iterable[dict]:
         PAGE_SIZE = 50
-        response = cls.rest_call(endpoint, pageSize=PAGE_SIZE, **kwargs)
+        response = cls._rest_call(endpoint, pageSize=PAGE_SIZE, **kwargs)
         yield response
 
         while 'nextPageToken' in response:
-            response = cls.rest_call(endpoint, pageSize=PAGE_SIZE, pageToken=response['nextPageToken'], **kwargs)
+            response = cls._rest_call(endpoint, pageSize=PAGE_SIZE, pageToken=response['nextPageToken'], **kwargs)
             yield response
 
 def _fetch_movies_in_csv(movies_csv: list[_CsvRow], movie_list_file: _mlf.MovieListFile,
@@ -485,7 +558,7 @@ def _fetch_movies_in_csv(movies_csv: list[_CsvRow], movie_list_file: _mlf.MovieL
 
     try:
         fetch_from_api_func(movies_csv, movie_list_file)
-    # If fetch_movie or refetch_person raise an IMDb error, or we get a KeyboardInterrupt,
+    # If _fetch_movie or _refetch_person raise an IMDb error, or we get a KeyboardInterrupt,
     # it will break us out of that loop, seal the progress bar nicely, and then we'll handle the exception here by turning it into a FetchInterrupt.
     # HACK: technically we shouldn't reference imdb here, it should be encapsulated. But whatever.
     except (imdb.IMDbError, KeyboardInterrupt) as e:
@@ -756,7 +829,10 @@ def _export_lists_handler(requests_queue: multiprocessing.Queue, browser_type: _
                 return
 
             try:
-                _export_list(driver, request)
+                # There are retries for specific steps within the exports process, and retries at the client side.
+                # But things go faster if we also have a retry for the entire flow at the server side.
+                # Maybe in the future we'll have two-way communication and could inform the client of the failure to let him retry without waiting the whole timeout.
+                _do_with_retries((lambda: _export_list(driver, request)), num_retries=3)
             except Exception as e: # pylint: disable=broad-exception-caught
                 _dbg.logger.error("Got exception while exporting list!", exc_info=True)
                 print(e, file=sys.stderr)
