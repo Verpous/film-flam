@@ -574,16 +574,57 @@ for handler in attrutils.DATE_HANDLERS:
 
 #region role attributes
 
-# @_register_easy_attribute(attrutils.EasyAttributeParams(
-#     name_without_type = 'characters',
-#     aliases_without_type = [],
-#     findable_type = _ml.FindableType.ROLES,
-#     type_handler = attrutils.STR_HANDLER,
-#     is_ascending = True,
-#     truncation_style = utils.TruncationStyle.TRIM_MIDDLE,
-#     default_max_len = _STR_LEN_SHORT,
-# ))
-# def _role_characters_extractor(self: attrutils.EasyAttribute, role: _ml.Role, mlf_roles: _ml.MLFRolesDict, mlf_movie: _mlf.MLFMovie, mlf_people: list[_mlf.MLFPerson]) -> list[str]:
-#     return sorted(c for mlf_role in mlf_roles for c in mlf_role.characters)
+@_register_easy_attribute(attrutils.EasyAttributeParams(
+    name_without_type = 'uid',
+    aliases_without_type = ['id', 'guid', 'identifier'],
+    findable_type = _ml.FindableType.ROLES,
+    type_handler = attrutils.STR_HANDLER,
+    is_ascending = True,
+    truncation_style = utils.TruncationStyle.NO_TRIM,
+    default_max_len = _STR_LEN_DONTCARE,
+))
+def _role_uid_extractor(self: attrutils.EasyAttribute, role: _ml.Role, mlf_roles: _ml.MLFRolesDict, mlf_movie: _mlf.MLFMovie, mlf_people: list[_mlf.MLFPerson]) -> str:
+    return role.uid
+
+@_register_easy_attribute(attrutils.EasyAttributeParams(
+    name_without_type = 'characters',
+    aliases_without_type = ['character'],
+    findable_type = _ml.FindableType.ROLES,
+    type_handler = attrutils.STR_HANDLER,
+    is_ascending = True,
+    truncation_style = utils.TruncationStyle.TRIM_MIDDLE,
+    default_max_len = _STR_LEN_SHORT,
+))
+def _role_characters_extractor(self: attrutils.EasyAttribute, role: _ml.Role, mlf_roles: _ml.MLFRolesDict, mlf_movie: _mlf.MLFMovie, mlf_people: list[_mlf.MLFPerson]) -> list[str]:
+    # Guaranteed consistent ordering because:
+    # * mlf_people is sorted by uids
+    # * python preserves dictionary order and crew types were added to mlf_roles[mlf_people] in the same order everytime
+    # * mlf_role.characters is sorted by canonicalization
+    return [
+        char
+        for mlf_person in mlf_people
+        for ct, mlf_role in mlf_roles[mlf_person.uid].items()
+        for char in mlf_role.characters
+    ]
+
+@_register_easy_attribute(attrutils.EasyAttributeParams(
+    name_without_type = 'is-star',
+    aliases_without_type = ['star'],
+    findable_type = _ml.FindableType.ROLES,
+    type_handler = attrutils.BOOL_HANDLER,
+    is_ascending = False,
+    truncation_style = utils.TruncationStyle.TRIM_MIDDLE,
+    default_max_len = _STR_LEN_SHORT,
+))
+def _role_chara_extractor(self: attrutils.EasyAttribute, role: _ml.Role, mlf_roles: _ml.MLFRolesDict, mlf_movie: _mlf.MLFMovie, mlf_people: list[_mlf.MLFPerson]) -> list[None | bool]:
+    # Guaranteed consistent ordering because:
+    # * mlf_people is sorted by uids
+    # * python preserves dictionary order and crew types were added to mlf_roles[mlf_people] in the same order everytime
+    # * mlf_role.characters is sorted by canonicalization
+    return [
+        mlf_role.is_star
+        for mlf_person in mlf_people
+        for ct, mlf_role in mlf_roles[mlf_person.uid].items()
+    ]
 
 #endregion role attributes

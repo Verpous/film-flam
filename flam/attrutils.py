@@ -81,6 +81,31 @@ class FloatHandler(TypeHandler):
         # Python will abbreviate to scientific notation which is lossless(ish?) so it's fine.
         return str(primitive)
 
+class BoolHandler(TypeHandler):
+    _str_reps = {
+        'true':     True,
+        't':        True,
+        'yes':      True,
+        'y':        True,
+        'false':    False,
+        'f':        False,
+        'no':       False,
+        'n':        False,
+    }
+
+    @property
+    def default_op(self) -> _attr.ComparisonOp:
+        return _attr.ComparisonOp.EQ
+
+    def parse(self, primitive_str: str) -> bool:
+        try:
+            return self._str_reps[primitive_str.lower()]
+        except KeyError as e:
+            raise ValueError(f"Invalid boolean string: '{primitive_str}'") from e
+
+    def str_of(self, primitive: _attr.AttributePrimitive, abbreviate: bool, extras: dict[str, typing.Any]) -> str:
+        return str(primitive)
+
 class StrHandler(TypeHandler):
     @property
     def default_op(self) -> _attr.ComparisonOp:
@@ -170,6 +195,7 @@ class DateHandler(TypeHandler):
 SMALL_INT_HANDLER               = IntHandler(abbreviable=False)
 BIG_INT_HANDLER                 = IntHandler(abbreviable=True)
 FLOAT_HANDLER                   = FloatHandler()
+BOOL_HANDLER                    = BoolHandler()
 STR_HANDLER                     = StrHandler()
 MINUTES_HANDLER                 = MinutesHandler()
 
