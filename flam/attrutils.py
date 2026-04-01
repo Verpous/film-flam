@@ -75,7 +75,10 @@ class FloatHandler(TypeHandler):
         return float(primitive_str)
 
     def str_of(self, primitive: _attr.AttributePrimitive, abbreviate: bool, extras: dict[str, typing.Any]) -> str:
-        # We currently don't have a reason to support float abbreviation, and python will abbreviate to scientific notation by default anyway.
+        if abbreviate:
+            return f'{primitive:.1f}'
+        
+        # Python will abbreviate to scientific notation which is lossless(ish?) so it's fine.
         return str(primitive)
 
 class StrHandler(TypeHandler):
@@ -325,6 +328,114 @@ class StringLengthAttribute(EasyAttribute):
     def _len(self, findable: _ml.Findable) -> int:
         value = findable.extract(self._wrapped_attr)
         return len(self._wrapped_attr.str_of_value(value))
+
+class AverageAttribute(EasyAttribute):
+    def __init__(self, wrapped_attr: _attr.Attribute, as_crew_type: None | _ml.CrewType = None) -> None:
+        as_suffix = '' if as_crew_type is None else f'-as-{as_crew_type}'
+
+        super().__init__(EasyAttributeParams(
+            name_without_type = f'avg-{wrapped_attr.name_without_type}{as_suffix}',
+            aliases_without_type = [f'avg-{alias_without_type}{as_suffix}' for alias_without_type in wrapped_attr.aliases_without_type],
+            findable_type = self._flip_findable_type(wrapped_attr.findable_type),
+            type_handler = FLOAT_HANDLER,
+            is_ascending = wrapped_attr.is_ascending,
+            truncation_style = utils.TruncationStyle.NO_TRIM,
+            default_max_len = 999, # Don't care.
+        ))
+
+        self._wrapped_attr = wrapped_attr
+        self._as_crew_type = as_crew_type
+
+    def _extract_from_movie(self, movie: _ml.Movie, mlf_movie: _mlf.MLFMovie) -> None | float: # pylint: disable=unused-argument
+        # For movie attributes, -as-X means the average over all the people in that movie in a specific crew type, default ANY.
+        ct = _ml.CrewType.ANY if self._as_crew_type is None else self._as_crew_type
+        return self._compute_average(people.extract(self._wrapped_attr)[0] for people in movie.associated_people(ct, _ml.GroupMode.SEPARATE)) # type: ignore
+    
+    def _extract_from_people(self, people: _ml.People, mlf_people: list[_mlf.MLFPerson]) -> None | float: # pylint: disable=unused-argument
+        # For people attributes, -as-X means the average over all the movies those people did while earing the hat of X, default to their current crew type.
+        try:
+            people_as = people if self._as_crew_type is None else people.minimal_superset_people(self._as_crew_type)
+        except _exc.InputError:
+            return None
+
+        return self._compute_average(movie.extract(self._wrapped_attr) for movie in people_as.associated_movies()) # type: ignore
+    
+    # Not really a generic utils function because its handling of Nones is pretty ad hoc.
+    @classmethod
+    def _compute_average(cls, data: typing.Iterable[None | typing.SupportsFloat]) -> None | float:
+        n = 0
+        mean = 0.0
+    
+        for x in data:
+            if x is not None:
+                n += 1
+                mean += (float(x) - mean) / n
+
+        return mean if n > 0 else None
+
+    # When wrapping movie attributes, the average is a property of people because it's the average over those people's associated movies.
+    # When wrapping people attributes, the average is a property of movies because it's the average over that movie's associated people.
+    # Roles don't support this attribute because there's no list of associated_X to iterate over.
+    @classmethod
+    def _flip_findable_type(cls, findable_type: _ml.FindableType) -> _ml.FindableType:
+        match findable_type:
+            case _ml.FindableType.PEOPLE:
+                return _ml.FindableType.MOVIES
+            case _ml.FindableType.MOVIES:
+                return _ml.FindableType.PEOPLE
+            case _:
+                raise RuntimeError(f'Unexpected {findable_type=}')
+
+class SumAttribute(EasyAttribute):
+    def __init__(self, wrapped_attr: _attr.Attribute, type_handler: TypeHandler, as_crew_type: None | _ml.CrewType = None) -> None:
+        # Works the same as AverageAttribute in many ways but for summing up instead.
+        # One difference is we have to accept a TypeHandler. Averaging turns everything to floats but summation preserves types.
+        # Valid type handlers are not just INT or FLOAT, but MINUTES too for example.
+        as_suffix = '' if as_crew_type is None else f'-as-{as_crew_type}'
+
+        super().__init__(EasyAttributeParams(
+            name_without_type = f'sum-{wrapped_attr.name_without_type}{as_suffix}',
+            aliases_without_type = [f'sum-{alias_without_type}{as_suffix}' for alias_without_type in wrapped_attr.aliases_without_type],
+            findable_type = AverageAttribute._flip_findable_type(wrapped_attr.findable_type),
+            type_handler = type_handler,
+            is_ascending = wrapped_attr.is_ascending,
+            truncation_style = utils.TruncationStyle.NO_TRIM,
+            default_max_len = 999, # Don't care.
+        ))
+
+        self._wrapped_attr = wrapped_attr
+        self._as_crew_type = as_crew_type
+
+    def _extract_from_movie[TAttr: (int, float)](self, movie: _ml.Movie, mlf_movie: _mlf.MLFMovie) -> None | TAttr: # pylint: disable=unused-argument
+        # For movie attributes, -as-X means the average over all the people in that movie in a specific crew type, default ANY.
+        ct = _ml.CrewType.ANY if self._as_crew_type is None else self._as_crew_type
+        return self._compute_sum(people.extract(self._wrapped_attr)[0] for people in movie.associated_people(ct, _ml.GroupMode.SEPARATE)) # type: ignore
+    
+    def _extract_from_people[TAttr: (int, float)](self, people: _ml.People, mlf_people: list[_mlf.MLFPerson]) -> None | TAttr: # pylint: disable=unused-argument
+        # For people attributes, -as-X means the average over all the movies those people did while earing the hat of X, default to their current crew type.
+        try:
+            people_as = people if self._as_crew_type is None else people.minimal_superset_people(self._as_crew_type)
+        except _exc.InputError:
+            return None
+
+        return self._compute_sum(movie.extract(self._wrapped_attr) for movie in people_as.associated_movies()) # type: ignore
+    
+    # Not really a generic utils function because its handling of Nones is pretty ad hoc.
+    @classmethod
+    def _compute_sum[TAttr: (int, float)](cls, data: typing.Iterable[None | TAttr]) -> None | TAttr:
+        # Written in such a way that it preserves the input type. I.e. we don't covert ints to floats.
+        total = None
+    
+        for x in data:
+            if x is None:
+                continue
+
+            if total is None:
+                total = x
+            else:
+                total += x
+
+        return total
 
 type MovieExtractor[T] = typing.Callable[[EasyAttribute, _ml.Movie, _mlf.MLFMovie], T]
 type PeopleExtractor[T] = typing.Callable[[EasyAttribute, _ml.People, list[_mlf.MLFPerson]], T]

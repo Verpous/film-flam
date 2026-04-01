@@ -621,9 +621,9 @@ For people, it looks like 'cast-people', 'director-people:group', etc.''')
     def parse_sortkeys(cls, args: argparse.Namespace, findable_type: flam.FindableType, ctx: flam.FlamContext) -> list[flam.Attribute]:
         if args.sort is None:
             default_attribute_names = {
-                flam.FindableType.MOVIES: ['runtime', 'title'],
-                flam.FindableType.PEOPLE: ['crew-type', 'group-mode', 'nmovies', 'name'],
-                flam.FindableType.ROLES: ['crew-type', 'group-mode', 'nmovies', 'name', 'release-year', 'title'],
+                flam.FindableType.MOVIES: ['movies-release-year', 'movies-title'],
+                flam.FindableType.PEOPLE: ['people-crew-type', 'people-group-mode', 'people-num-movies', 'people-name'],
+                flam.FindableType.ROLES: ['people-crew-type', 'people-group-mode', 'people-num-movies', 'people-name', 'movies-release-year', 'movies-title'],
             }
 
             attribute_names = default_attribute_names[findable_type]
@@ -679,8 +679,8 @@ For people, it looks like 'cast-people', 'director-people:group', etc.''')
             # TODO: Decide on default columns for PEOPLE, ROLES
             default_columns = {
                 flam.FindableType.MOVIES: ['movies-title', 'movies-runtime', 'movies-release-year', 'movies-rating', 'movies-metascore', 'movies-director'],
-                flam.FindableType.PEOPLE: ['people-name', 'people-num-movies', 'people-avg-rating', 'people-avg-metascore'],
-                flam.FindableType.ROLES: ['people-name', 'movie-title', 'people-avg-rating', 'people-avg-metascore'],
+                flam.FindableType.PEOPLE: ['people-name', 'people-birth-year', 'people-height-cm', 'people-num-movies', 'people-avg-rating', 'people-avg-metascore'],
+                flam.FindableType.ROLES: ['people-name', 'people-num-movies', 'people-avg-rating', 'people-avg-metascore', 'movies-title', 'movies-runtime', 'movies-release-year'],
             }
 
             # Use default columns even if the same attribute is also in the custom columns from the user.

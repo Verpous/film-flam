@@ -148,6 +148,10 @@ class Movie(Findable):
     def uid(self) -> str:
         return self._mlf_movie.uid
 
+    @property
+    def underlying_file_movie_readonly(self) -> _mlf.MLFMovie:
+        return self._mlf_movie
+
     def extract(self, attribute: _attr.Attribute) -> _attr.AttributeValue:
         return attribute._extract_from_movie(self, self._mlf_movie) # type: ignore
 
@@ -235,6 +239,10 @@ class People(Findable):
     def group_mode(self) -> GroupMode:
         return self._group_mode
 
+    @property
+    def underlying_file_people_readonly(self) -> list[_mlf.MLFPerson]:
+        return self._mlf_people
+    
     def extract(self, attribute: _attr.Attribute) -> _attr.AttributeValue:
         return attribute._extract_from_people(self, self._mlf_people) # type: ignore
 
@@ -257,6 +265,58 @@ class People(Findable):
         for movie in self.associated_movies():
             role_uid = Role.compose_uid(movie, self)
             yield ml.get_role_by_uid(role_uid)
+
+    # Find the smallest group of people in another crew type who contain every person in this group.
+    # I think by nature of our grouping algorithm, there is guaranteed to be either no such group, or exactly 1 unique group like this.
+    # Assume our group is P1,P2 and in another crew type there's the groups P1,P2,P3 and P1,P2,P4. So then the grouping algorithm would've created P1,P2 as well.
+    def minimal_superset_people(self, crew_type: CrewType) -> People:
+        # First some optimizations - same crew type, same people.
+        if crew_type == self.crew_type:
+            return self
+
+        # SEPARATE group mode, so it's much easier to check if this person is in another crew type.
+        if self.group_mode == GroupMode.SEPARATE:
+            uid = self.compose_uid([self._mlf_people[0].uid], crew_type, self.group_mode)
+            return self.movie_list.get_people_by_uid(uid)
+
+        # We'll try our luck at searching if this group appears exactly the same in another crew type.
+        uid = self.compose_uid((mlf_person.uid for mlf_person in self._mlf_people), crew_type, self.group_mode)
+
+        try:
+            return self.movie_list.get_people_by_uid(uid)
+        except _exc.InputError:
+            pass
+
+        # Now in the general case we must see if there's a strict superset in this other crew type.
+        min_superset = None
+        
+        for people in self.movie_list.find_people(crew_type, self.group_mode):
+            # We know we're searching for a group that has strictly more people than self.
+            if len(people._mlf_people) <= len(self._mlf_people):
+                continue
+
+            # We also know we're searching for a group that has fewer people than the current smallest one we've found.
+            if min_superset is not None and len(min_superset._mlf_people) <= len(people._mlf_people):
+                continue
+
+            # Efficient subset check assuming both are sorted by uid.
+            i_self = 0
+            i_other = 0
+            
+            while i_self < len(self._mlf_people) and i_other < len(people._mlf_people):
+                # Seek ahead until you find the person in this other group.
+                while i_other < len(people._mlf_people) and self._mlf_people[i_self] != people._mlf_people[i_other]:
+                    i_other += 1
+
+                # If found a match, move on to the next.
+                if i_other < len(people._mlf_people):
+                    i_other += 1
+                    i_self += 1
+            
+            if i_self == len(self._mlf_people):
+                return people
+
+        raise _exc.InputError(f'The People {self.uid} did not collaborate as the crew type {crew_type}.')
 
     def are_in_movie(self, movie: Movie) -> bool:
         # The hell with python one-liners using `any`, `all`, etc. This is more optimal and readable and modifiable.
@@ -354,6 +414,10 @@ class Role(Findable):
     def group_mode(self) -> GroupMode:
         return self._people.group_mode
 
+    @property
+    def underlying_file_roles_readonly(self) -> MLFRolesDict:
+        return self._mlf_roles
+
     def extract(self, attribute: _attr.Attribute) -> _attr.AttributeValue:
         # Support optionally implementing _extract_from_role on any type of attribute, for custom behavior on how to extract them from roles.
         # It's best not to abuse this power but we will allow it.
@@ -396,7 +460,7 @@ class MovieList:
     # and I don't believe in going so crazy about the API being "clean" and bulletproof that I sacrifice its efficiency.
     # If you're implementing an attribute you should be allowed to peek "under the hood" more than a typical user anyway.
     @property
-    def underlying_file(self) -> _mlf.MovieListFile:
+    def underlying_file_readonly(self) -> _mlf.MovieListFile:
         return self._movie_list_file
 
     @property

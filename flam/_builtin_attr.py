@@ -17,10 +17,12 @@
 
 import typing
 import datetime
+import collections
 
 from . import _reg
 from . import _ml
 from . import _mlf
+from . import _exc
 from . import attrutils
 from . import utils
 
@@ -31,7 +33,7 @@ _STR_LEN_DONTCARE = 999
 # Combine common decorator chain into a single decorator.
 # MUST be defined this way and not via lambda for mypy to work.
 def _register_easy_attribute[T](params: attrutils.EasyAttributeParams,
-        create_arrlen_attr: bool = True, create_strlen_attr: bool = True) -> typing.Callable[[attrutils.Extractor[T]], None]:
+        create_arrlen_attr: bool = True, create_strlen_attr: bool = True, create_numericals: bool = False) -> typing.Callable[[attrutils.Extractor[T]], None]:
     def inner(extractor: attrutils.Extractor[T]) -> None:
         attr = attrutils.easy_attribute(params)(extractor)
         _reg._register_builtin(attr)
@@ -41,20 +43,16 @@ def _register_easy_attribute[T](params: attrutils.EasyAttributeParams,
         
         if create_strlen_attr:
             _reg._register_builtin(attrutils.StringLengthAttribute(attr))
+        
+        if create_numericals:
+            _reg._register_builtin(attrutils.AverageAttribute(attr))
+            _reg._register_builtin(attrutils.SumAttribute(attr, params.type_handler))
+
+            for ct in _ml.CrewType:
+                _reg._register_builtin(attrutils.AverageAttribute(attr, as_crew_type=ct))
+                _reg._register_builtin(attrutils.SumAttribute(attr, params.type_handler, as_crew_type=ct))
 
     return inner
-
-# Not really a generic utils function because its handling of Nones is pretty ad hoc.
-def _mean_except_nones(data: typing.Iterable[None | typing.SupportsFloat]) -> None | float:
-    n = 0
-    mean = 0.0
- 
-    for x in data:
-        if x is not None:
-            n += 1
-            mean += (float(x) - mean) / n
-
-    return mean if n > 0 else None
 
 #region movie attributes
 
@@ -108,10 +106,16 @@ def _movie_title_extractor(self: attrutils.EasyAttribute, movie: _ml.Movie, mlf_
 def _movie_synopsis_extractor(self: attrutils.EasyAttribute, movie: _ml.Movie, mlf_movie: _mlf.MLFMovie) -> None | str:
     return mlf_movie.synopsis
 
-def _make_date_aliases(name_without_type: str) -> list[str]:
+def _make_date_aliases(name: str) -> list[str]:
+    aliases = []
+
+    if name == 'birth-date':
+        aliases.append('birthday')
+
     # Basically keeps the first letter of each part separated by '-'s.
     # Ex: 'release-date' -> 'r-d', 'watch-month-of-year' -> 'w-m-o-y'.
-    return ['-'.join(part[0] for part in name_without_type.split('-'))]
+    aliases.append('-'.join(part[0] for part in name.split('-')))
+    return aliases
 
 # Dates come in many forms: release year, the full date, just the day of the week, etc.
 # For each of those we want a watch date variant, and release date variant.
@@ -120,7 +124,7 @@ for handler in attrutils.DATE_HANDLERS:
     
     @_register_easy_attribute(attrutils.EasyAttributeParams(
         name_without_type = name_without_type, # pylint: disable=cell-var-from-loop
-        aliases_without_type = _make_date_aliases(name_without_type),
+        aliases_without_type = _make_date_aliases(name_without_type), # pylint: disable=cell-var-from-loop
         findable_type = _ml.FindableType.MOVIES,
         type_handler = handler, # pylint: disable=cell-var-from-loop
         is_ascending = handler.is_ascending, # pylint: disable=cell-var-from-loop
@@ -134,7 +138,7 @@ for handler in attrutils.DATE_HANDLERS:
 
     @_register_easy_attribute(attrutils.EasyAttributeParams(
         name_without_type = name_without_type, # pylint: disable=cell-var-from-loop
-        aliases_without_type = _make_date_aliases(name_without_type),
+        aliases_without_type = _make_date_aliases(name_without_type), # pylint: disable=cell-var-from-loop
         findable_type = _ml.FindableType.MOVIES,
         type_handler = handler, # pylint: disable=cell-var-from-loop
         is_ascending = handler.is_ascending, # pylint: disable=cell-var-from-loop
@@ -148,7 +152,7 @@ for handler in attrutils.DATE_HANDLERS:
 
     @_register_easy_attribute(attrutils.EasyAttributeParams(
         name_without_type = name_without_type, # pylint: disable=cell-var-from-loop
-        aliases_without_type = _make_date_aliases(name_without_type),
+        aliases_without_type = _make_date_aliases(name_without_type), # pylint: disable=cell-var-from-loop
         findable_type = _ml.FindableType.MOVIES,
         type_handler = handler, # pylint: disable=cell-var-from-loop
         is_ascending = handler.is_ascending, # pylint: disable=cell-var-from-loop
@@ -191,7 +195,7 @@ def _movie_index_extractor(self: attrutils.EasyAttribute, movie: _ml.Movie, mlf_
     is_ascending = True,
     truncation_style = utils.TruncationStyle.NO_TRIM,
     default_max_len = _STR_LEN_DONTCARE,
-))
+), create_numericals = True)
 def _movie_runtime_extractor(self: attrutils.EasyAttribute, movie: _ml.Movie, mlf_movie: _mlf.MLFMovie) -> None | int:
     return mlf_movie.runtime_minutes
 
@@ -203,7 +207,7 @@ def _movie_runtime_extractor(self: attrutils.EasyAttribute, movie: _ml.Movie, ml
     is_ascending = False,
     truncation_style = utils.TruncationStyle.NO_TRIM,
     default_max_len = _STR_LEN_DONTCARE,
-))
+), create_numericals = True)
 def _movie_metascore_extractor(self: attrutils.EasyAttribute, movie: _ml.Movie, mlf_movie: _mlf.MLFMovie) -> None | int:
     return mlf_movie.metascore
 
@@ -215,7 +219,7 @@ def _movie_metascore_extractor(self: attrutils.EasyAttribute, movie: _ml.Movie, 
     is_ascending = False,
     truncation_style = utils.TruncationStyle.NO_TRIM,
     default_max_len = _STR_LEN_DONTCARE,
-))
+), create_numericals = True)
 def _movie_metascore_votes_extractor(self: attrutils.EasyAttribute, movie: _ml.Movie, mlf_movie: _mlf.MLFMovie) -> None | int:
     return mlf_movie.metascore_votes
 
@@ -227,7 +231,7 @@ def _movie_metascore_votes_extractor(self: attrutils.EasyAttribute, movie: _ml.M
     is_ascending = False,
     truncation_style = utils.TruncationStyle.NO_TRIM,
     default_max_len = _STR_LEN_DONTCARE,
-))
+), create_numericals = True)
 def _movie_votes_extractor(self: attrutils.EasyAttribute, movie: _ml.Movie, mlf_movie: _mlf.MLFMovie) -> None | int:
     return mlf_movie.votes
 
@@ -239,7 +243,7 @@ def _movie_votes_extractor(self: attrutils.EasyAttribute, movie: _ml.Movie, mlf_
     is_ascending = False,
     truncation_style = utils.TruncationStyle.NO_TRIM,
     default_max_len = _STR_LEN_DONTCARE,
-))
+), create_numericals = True)
 def _movie_rating_extractor(self: attrutils.EasyAttribute, movie: _ml.Movie, mlf_movie: _mlf.MLFMovie) -> None | float:
     return mlf_movie.rating
 
@@ -251,7 +255,7 @@ def _movie_rating_extractor(self: attrutils.EasyAttribute, movie: _ml.Movie, mlf
     is_ascending = False,
     truncation_style = utils.TruncationStyle.NO_TRIM,
     default_max_len = _STR_LEN_DONTCARE,
-))
+), create_numericals = True)
 def _movie_my_rating_extractor(self: attrutils.EasyAttribute, movie: _ml.Movie, mlf_movie: _mlf.MLFMovie) -> None | float:
     return mlf_movie.my_rating
 
@@ -285,7 +289,7 @@ def _movie_languages_extractor(self: attrutils.EasyAttribute, movie: _ml.Movie, 
 
 @_register_easy_attribute(attrutils.EasyAttributeParams(
     name_without_type = 'countries',
-    aliases_without_type = ['country'],
+    aliases_without_type = ['country', 'nation', 'nations', 'nationality', 'nationalities'],
     findable_type = _ml.FindableType.MOVIES,
     type_handler = attrutils.STR_HANDLER,
     is_ascending = True,
@@ -311,8 +315,6 @@ for crew_type in _ml.CrewType:
         default_max_len = _STR_LEN_SHORT,
     ))
     def _movie_crew_type_extractor(self: attrutils.EasyAttribute, movie: _ml.Movie, mlf_movie: _mlf.MLFMovie) -> list[None | str]:
-        global _people_name_attr
-        
         # Use self.name_without_type instead of crew_type to avoid cell-var-from-loop error. This is important.
         ct = _ml.CrewType(self.name_without_type) if self.name_without_type != 'people' else _ml.CrewType.ANY
 
@@ -320,7 +322,7 @@ for crew_type in _ml.CrewType:
         # but that would require sorting and will also be more complicated to support CrewType.ANY.
         # Here we rely on associated_people already guaranteeing a consistent ordering.
         return [
-            typing.cast(list[None | str], person.extract(_people_name_attr))[0]
+            person.underlying_file_people_readonly[0].name
             for person in movie.associated_people(ct, _ml.GroupMode.SEPARATE)
         ]
 
@@ -364,19 +366,6 @@ def _people_uid_extractor(self: attrutils.EasyAttribute, people: _ml.People, mlf
     return people.uid
 
 @_register_easy_attribute(attrutils.EasyAttributeParams(
-    name_without_type = 'name',
-    aliases_without_type = ['names', 'person', 'people'],
-    findable_type = _ml.FindableType.PEOPLE,
-    type_handler = attrutils.STR_HANDLER,
-    is_ascending = True,
-    truncation_style = utils.TruncationStyle.TRIM_MIDDLE,
-    default_max_len = _STR_LEN_LONG,
-))
-def _people_name_extractor(self: attrutils.EasyAttribute, people: _ml.People, mlf_people: list[_mlf.MLFPerson]) -> list[None | str]:
-    # Guaranteed consistent ordering because mlf_people should already be sorted by uid.
-    return [mlf_person.name for mlf_person in mlf_people]
-
-@_register_easy_attribute(attrutils.EasyAttributeParams(
     name_without_type = 'crew-type',
     aliases_without_type = [],
     findable_type = _ml.FindableType.PEOPLE,
@@ -400,57 +389,186 @@ def _people_crew_type_extractor(self: attrutils.EasyAttribute, people: _ml.Peopl
 def _people_group_mode_extractor(self: attrutils.EasyAttribute, people: _ml.People, mlf_people: list[_mlf.MLFPerson]) -> str:
     return people.group_mode
 
-# TODO: Some of these things are expensive. Maybe we'll need to do some post-processing on MLFs and cache lots of expensive attributes.
-# @_register_easy_attribute(attrutils.EasyAttributeParams(
-#     name_without_type = 'nmovies',
-#     aliases_without_type = [],
-#     findable_type = _ml.FindableType.PEOPLE,
-#     type_handler = attrutils.SMALL_INT_HANDLER,
-#     is_ascending = False,
-#     truncation_style = utils.TruncationStyle.NO_TRIM,
-#     default_max_len = _STR_LEN_DONTCARE,
-# ))
-# def _people_nmovies_extractor(self: attrutils.EasyAttribute, people: _ml.People, mlf_people: list[_mlf.MLFPerson]) -> int:
-#     mlf = person.movie_list.underlying_file
-#     return sum(
-#         1
-#         for mlf_movie in mlf.movies_by_uid.values()
-#         if any(mlf_person.uid in mlf_movie.crew[crew_type].roles_by_uid for crew_type in _ml.CrewType.iterate_except_any())
-#     )
+@_register_easy_attribute(attrutils.EasyAttributeParams(
+    name_without_type = 'origin-uid',
+    aliases_without_type = ['origin-id', 'origin-guid', 'origin-identifier'],
+    findable_type = _ml.FindableType.PEOPLE,
+    type_handler = attrutils.STR_HANDLER,
+    is_ascending = True,
+    truncation_style = utils.TruncationStyle.TRIM_MIDDLE,
+    default_max_len = _STR_LEN_SHORT,
+))
+def _people_origin_uid_extractor(self: attrutils.EasyAttribute, people: _ml.People, mlf_people: list[_mlf.MLFPerson]) -> list[str]:
+    # Guaranteed consistent ordering because mlf_people should already be sorted by uid.
+    return [mlf_person.uid for mlf_person in mlf_people]
 
-# @_register_easy_attribute(attrutils.EasyAttributeParams(
-#     name_without_type = 'avg-metascore',
-#     aliases_without_type = [],
-#     findable_type = _ml.FindableType.PEOPLE,
-#     type_handler = attrutils.FLOAT_HANDLER,
-#     is_ascending = False,
-#     truncation_style = utils.TruncationStyle.NO_TRIM,
-#     default_max_len = _STR_LEN_DONTCARE,
-# ))
-# def _people_avg_metascore_extractor(self: attrutils.EasyAttribute, people: _ml.People, mlf_people: list[_mlf.MLFPerson]) -> None | float:
-#     mlf = person.movie_list.underlying_file
-#     return _mean_except_nones(
-#         mlf_movie.metascore
-#         for mlf_movie in mlf.movies_by_uid.values()
-#         if any(mlf_person.uid in mlf_movie.crew[crew_type].roles_by_uid for crew_type in _ml.CrewType.iterate_except_any())
-#     )
+@_register_easy_attribute(attrutils.EasyAttributeParams(
+    name_without_type = 'name',
+    aliases_without_type = ['names', 'person', 'people'],
+    findable_type = _ml.FindableType.PEOPLE,
+    type_handler = attrutils.STR_HANDLER,
+    is_ascending = True,
+    truncation_style = utils.TruncationStyle.TRIM_MIDDLE,
+    default_max_len = _STR_LEN_LONG,
+))
+def _people_name_extractor(self: attrutils.EasyAttribute, people: _ml.People, mlf_people: list[_mlf.MLFPerson]) -> list[None | str]:
+    # Guaranteed consistent ordering because mlf_people should already be sorted by uid.
+    return [mlf_person.name for mlf_person in mlf_people]
 
-# @_register_easy_attribute(attrutils.EasyAttributeParams(
-#     name_without_type = 'avg-rating',
-#     aliases_without_type = [],
-#     findable_type = _ml.FindableType.PEOPLE,
-#     type_handler = attrutils.FLOAT_HANDLER,
-#     is_ascending = False,
-#     truncation_style = utils.TruncationStyle.NO_TRIM,
-#     default_max_len = _STR_LEN_DONTCARE,
-# ))
-# def _people_avg_rating_extractor(self: attrutils.EasyAttribute, people: _ml.People, mlf_people: list[_mlf.MLFPerson]) -> None | float:
-#     mlf = person.movie_list.underlying_file
-#     return _mean_except_nones(
-#         mlf_movie.rating
-#         for mlf_movie in mlf.movies_by_uid.values()
-#         if any(mlf_person.uid in mlf_movie.crew[crew_type].roles_by_uid for crew_type in _ml.CrewType.iterate_except_any())
-#     )
+@_register_easy_attribute(attrutils.EasyAttributeParams(
+    name_without_type = 'gender',
+    aliases_without_type = ['sex'],
+    findable_type = _ml.FindableType.PEOPLE,
+    type_handler = attrutils.STR_HANDLER,
+    is_ascending = True,
+    truncation_style = utils.TruncationStyle.TRIM_MIDDLE,
+    default_max_len = _STR_LEN_SHORT,
+))
+def _people_gender_extractor(self: attrutils.EasyAttribute, people: _ml.People, mlf_people: list[_mlf.MLFPerson]) -> list[None | str]:
+    # Guaranteed consistent ordering because mlf_people should already be sorted by uid.
+    return [mlf_person.gender for mlf_person in mlf_people]
+
+# Considered supporting a height-ft too with its own FEET_HANDLER, but fuck that.
+@_register_easy_attribute(attrutils.EasyAttributeParams(
+    name_without_type = 'height-cm',
+    aliases_without_type = ['height'],
+    findable_type = _ml.FindableType.PEOPLE,
+    type_handler = attrutils.FLOAT_HANDLER,
+    is_ascending = False,
+    truncation_style = utils.TruncationStyle.TRIM_MIDDLE,
+    default_max_len = _STR_LEN_SHORT,
+), create_numericals = True)
+def _people_height_extractor(self: attrutils.EasyAttribute, people: _ml.People, mlf_people: list[_mlf.MLFPerson]) -> list[None | float]:
+    # Guaranteed consistent ordering because mlf_people should already be sorted by uid.
+    return [mlf_person.height_cm for mlf_person in mlf_people]
+
+@_register_easy_attribute(attrutils.EasyAttributeParams(
+    name_without_type = 'countries',
+    aliases_without_type = ['country', 'nation', 'nations', 'nationality', 'nationalities'],
+    findable_type = _ml.FindableType.PEOPLE,
+    type_handler = attrutils.STR_HANDLER,
+    is_ascending = True,
+    truncation_style = utils.TruncationStyle.TRIM_MIDDLE,
+    default_max_len = _STR_LEN_SHORT,
+))
+def _people_countries_extractor(self: attrutils.EasyAttribute, people: _ml.People, mlf_people: list[_mlf.MLFPerson]) -> list[str]:
+    # Guaranteed consistent ordering because mlf_people should already be sorted by uid.
+    # Considered printing the union of all people's countries (no duplicates), or the intersection..
+    # In the end I think the best is to print each person's entire nationalities joined with '-'.
+    # For example if P1 is French, American and P2 is Canadian you'll get French-American, Canadian.
+    return ['-'.join(mlf_person.countries) for mlf_person in mlf_people]
+
+@_register_easy_attribute(attrutils.EasyAttributeParams(
+    name_without_type = 'movies',
+    aliases_without_type = ['titles', 'credits'],
+    findable_type = _ml.FindableType.PEOPLE,
+    type_handler = attrutils.STR_HANDLER,
+    is_ascending = True,
+    truncation_style = utils.TruncationStyle.TRIM_MIDDLE,
+    default_max_len = _STR_LEN_LONG,
+))
+def _people_movies_extractor(self: attrutils.EasyAttribute, people: _ml.People, mlf_people: list[_mlf.MLFPerson]) -> list[None | str]:
+    # Guaranteed ordering by associated_movies().
+    return [
+        movie.underlying_file_movie_readonly.title
+        for movie in people.associated_movies()
+    ]
+
+for crew_type in _ml.CrewType:
+    @_register_easy_attribute(attrutils.EasyAttributeParams(
+        name_without_type = f'movies-as-{crew_type}', # pylint: disable=cell-var-from-loop
+        aliases_without_type = [f'titles-as-{crew_type}', f'credits-as-{crew_type}'], # pylint: disable=cell-var-from-loop
+        findable_type = _ml.FindableType.PEOPLE,
+        type_handler = attrutils.STR_HANDLER,
+        is_ascending = True,
+        truncation_style = utils.TruncationStyle.TRIM_MIDDLE,
+        default_max_len = _STR_LEN_LONG,
+    ))
+    def _people_movies_as_extractor(self: attrutils.EasyAttribute, people: _ml.People, mlf_people: list[_mlf.MLFPerson]) -> list[None | str]:
+        ct = _ml.CrewType(self.name_without_type.removeprefix('movies-as-'))
+
+        # Find the smallest group in another crew type which has at least the same people as this one, if one exists, and return their movies.
+        try:
+            minimal_superset_people = people.minimal_superset_people(ct)
+        except _exc.InputError:
+            return []
+
+        # Guaranteed ordering by associated_movies().
+        return [
+            movie.underlying_file_movie_readonly.title
+            for movie in minimal_superset_people.associated_movies()
+        ]
+
+@_register_easy_attribute(attrutils.EasyAttributeParams(
+    name_without_type = 'professions',
+    aliases_without_type = ['jobs', 'expertise'],
+    findable_type = _ml.FindableType.PEOPLE,
+    type_handler = attrutils.STR_HANDLER,
+    is_ascending = True,
+    truncation_style = utils.TruncationStyle.TRIM_MIDDLE,
+    default_max_len = _STR_LEN_SHORT,
+))
+def _people_professions_extractor(self: attrutils.EasyAttribute, people: _ml.People, mlf_people: list[_mlf.MLFPerson]) -> list[str]:
+    professions = []
+    
+    # Iterate over crew types and check if this group of people also collaborated on that crew type.
+    for ct in _ml.CrewType.iterate_except_any():
+        # If same crew type that we group is already known to be doing together - the answer is easy.
+        if ct == people.crew_type:
+            professions.append(str(ct))
+            continue
+
+        # For other crew types we will check if there is a group in that crew type which is a superset of the people in this group.
+        try:
+            minimal_superset_people = people.minimal_superset_people(ct)
+            professions.append(str(minimal_superset_people.crew_type))
+        except _exc.InputError:
+            pass
+
+    return professions
+
+# Might be nice to add top-genres-as-X someday. At that point I think I will add an infra for adding -as-X variants more easily as we have multiple use cases for it.
+@_register_easy_attribute(attrutils.EasyAttributeParams(
+    name_without_type = 'top-genres',
+    aliases_without_type = ['top-genre'],
+    findable_type = _ml.FindableType.PEOPLE,
+    type_handler = attrutils.STR_HANDLER,
+    is_ascending = True,
+    truncation_style = utils.TruncationStyle.TRIM_MIDDLE,
+    default_max_len = _STR_LEN_SHORT,
+))
+def _people_top_genres_extractor(self: attrutils.EasyAttribute, people: _ml.People, mlf_people: list[_mlf.MLFPerson]) -> list[str]:
+    genre_occurences: dict[str, int] = collections.defaultdict(lambda : 0)
+
+    # Count occurences of each genre these people were in.
+    for movie in people.associated_movies():
+        for genre in movie.underlying_file_movie_readonly.genres:
+            genre_occurences[genre] += 1
+
+    # Sort the items() so it sorts both by the num occurences as the primary sort key, but the genre string lexicographically as a tiebreaker. This guarantees stable ordering.
+    # Will take only the 3 top genres.
+    return [k for k, v in sorted(genre_occurences.items())][:3]
+
+for handler in attrutils.DATE_HANDLERS:
+    name_without_type = 'birth' + handler.name
+    
+    @_register_easy_attribute(attrutils.EasyAttributeParams(
+        name_without_type = name_without_type, # pylint: disable=cell-var-from-loop
+        aliases_without_type = _make_date_aliases(name_without_type), # pylint: disable=cell-var-from-loop
+        findable_type = _ml.FindableType.PEOPLE,
+        type_handler = handler, # pylint: disable=cell-var-from-loop
+        is_ascending = handler.is_ascending, # pylint: disable=cell-var-from-loop
+        truncation_style = utils.TruncationStyle.TRIM_MIDDLE,
+        default_max_len = _STR_LEN_SHORT,
+    ))
+    def _people_birthday_extractor(self: attrutils.EasyAttribute, people: _ml.People, mlf_people: list[_mlf.MLFPerson]) -> list[None | datetime.date]:
+        hnd = typing.cast(attrutils.DateHandler, self._params.type_handler)
+
+        # Guaranteed consistent ordering because mlf_people should already be sorted by uid.
+        return [
+            None if mlf_person.birthday is None else hnd.strip(mlf_person.birthday)
+            for mlf_person in mlf_people
+        ]
 
 #endregion person attributes
 
@@ -469,6 +587,3 @@ def _people_group_mode_extractor(self: attrutils.EasyAttribute, people: _ml.Peop
 #     return sorted(c for mlf_role in mlf_roles for c in mlf_role.characters)
 
 #endregion role attributes
-
-# Cache some attributes for efficiency. Do it at the end of the file after everything's been added.
-_people_name_attr = _reg._builtins.attributes['people-name']

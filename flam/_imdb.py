@@ -476,10 +476,11 @@ class _IMDbREST:
                 # Most people have a displayName, which is best.
                 name = person_json['displayName']
             except KeyError:
-                # Some people have no displayName but have alternativeNames, so we'll take the longest alt name.
-                name = max(person_json['alternativeNames'], key=len)
-            except (KeyError, ValueError):
-                name = None
+                try:
+                    # Some people have no displayName but have alternativeNames, so we'll take the longest alt name.
+                    name = max(person_json['alternativeNames'], key=len)
+                except (KeyError, ValueError):
+                    name = None
 
             try:
                 birthday_year = person_json['birthDate']['year']
