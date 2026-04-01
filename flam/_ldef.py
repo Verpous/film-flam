@@ -17,10 +17,13 @@ from __future__ import annotations
 
 import typing
 import enum
+import time
 
 from . import _ctx
 from . import _exc
 from . import _dbg
+
+_start_import_time = time.time()
 
 class SpecialListType(enum.StrEnum):
     ALL         = '*'           # *[=]
@@ -156,3 +159,5 @@ class CanonListdef(typing.NamedTuple):
 
     def __str__(self) -> str:
         return f'{self.list_type}={self.address}'
+
+_dbg.logger.info(f'Module import time: {time.time() - _start_import_time}s')

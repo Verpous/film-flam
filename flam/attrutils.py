@@ -20,12 +20,16 @@ import datetime
 import dateutil.parser
 import dataclasses
 import abc
+import time
 
 from . import _attr
 from . import _mlf
 from . import _ml
 from . import _exc
+from . import _dbg
 from . import utils
+
+_start_import_time = time.time()
 
 # There are some facilities that we need out of every possible value attributes may extract (e.g.: parse, str_of, etc.).
 # I don't want to wrap every such value in a "Value" class to provide those facitilites because that would mean making lots of small objects.
@@ -482,3 +486,5 @@ def easy_attribute[ET](params: EasyAttributeParams) -> typing.Callable[[Extracto
         setattr(SpecificAttribute, _extractor_names[params.findable_type], extractor)
         return SpecificAttribute(params)
     return inner
+
+_dbg.logger.info(f'Module import time: {time.time() - _start_import_time}s')

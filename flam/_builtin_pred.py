@@ -15,6 +15,7 @@
 
 import typing
 import dataclasses
+import time
 
 from . import _ctx
 from . import _filter
@@ -22,6 +23,9 @@ from . import _exc
 from . import _reg
 from . import _attr
 from . import _ml
+from . import _dbg
+
+_start_import_time = time.time()
 
 # -true : Always true.
 @_reg._register_builtin
@@ -189,3 +193,5 @@ def _test_compile(line: str, find: _ml.FindableType = _ml.FindableType.ROLES, ct
 # _test_compile('( ( -true | -true ) ) ! -false')
 # _test_compile('( -true " "')
 # _test_compile('true')
+
+_dbg.logger.info(f'Module import time: {time.time() - _start_import_time}s')

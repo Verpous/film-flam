@@ -48,6 +48,8 @@ from . import _ldef
 from . import _dbg
 from . import utils
 
+_start_import_time = time.time()
+
 _UID_FAMILY = 'imdb'
 _REQUEST_QUIT = 'quit'
 
@@ -839,3 +841,5 @@ def _export_lists_handler(requests_queue: multiprocessing.Queue, browser_type: _
                 print(e, file=sys.stderr)
 
 #endregion
+
+_dbg.logger.info(f'Module import time: {time.time() - _start_import_time}s')

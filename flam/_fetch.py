@@ -20,12 +20,15 @@ import typing
 import re
 import os
 import contextlib
+import time
 
 from . import _ldef
 from . import _mlf
 from . import _exc
 from . import _ctx
 from . import _dbg
+
+_start_import_time = time.time()
 
 class ListFetcher(abc.ABC):
     # These are READ ONLY. We would wrap them in a propety but classmethod-properties are not supported.
@@ -107,3 +110,5 @@ def _remove_unused_people(movie_list_file: _mlf.MovieListFile) -> None:
     )
     
     movie_list_file.people_by_uid = {uid: person for uid, person in movie_list_file.people_by_uid.items() if uid in used_person_uids}
+
+_dbg.logger.info(f'Module import time: {time.time() - _start_import_time}s')

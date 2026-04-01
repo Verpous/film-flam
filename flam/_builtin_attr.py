@@ -18,6 +18,7 @@
 import typing
 import datetime
 import collections
+import time
 
 from . import _reg
 from . import _ml
@@ -25,6 +26,9 @@ from . import _mlf
 from . import _exc
 from . import attrutils
 from . import utils
+from . import _dbg
+
+_start_import_time = time.time()
 
 _STR_LEN_LONG = 45
 _STR_LEN_SHORT = 30
@@ -628,3 +632,5 @@ def _role_chara_extractor(self: attrutils.EasyAttribute, role: _ml.Role, mlf_rol
     ]
 
 #endregion role attributes
+
+_dbg.logger.info(f'Module import time: {time.time() - _start_import_time}s')

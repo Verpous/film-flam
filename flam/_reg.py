@@ -16,12 +16,15 @@
 from __future__ import annotations
 
 import typing
+import time
 
 from . import _exc
 from . import _fetch
 from . import _filter
 from . import _attr
 from . import _dbg
+
+_start_import_time = time.time()
 
 class RegistryOf[T: (type[_fetch.ListFetcher], type[_filter.Predicate], _attr.Attribute)]:
     def __init__(self, reg: Registry) -> None:
@@ -160,6 +163,8 @@ def decompose_qualified_attr_or_pred_name(qualified_name: str) -> tuple[str, str
         raise _exc.InputError(f"Invalid qualified_name: '{qualified_name}'")
 
     return split[0], split[1]
+
+_dbg.logger.info(f'Module import time: {time.time() - _start_import_time}s')
 
 # Import builtin extensions only here to avoid cyclic dependency issues.
 from . import _imdb # pylint: disable=unused-import

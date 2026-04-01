@@ -15,7 +15,12 @@
 
 from __future__ import annotations
 
+import time
+
 from . import _file
+from . import _dbg
+
+_start_import_time = time.time()
 
 class CompositeListMetadata(_file._FlamSerializable):
     uid:                    str
@@ -24,3 +29,5 @@ class CompositeListMetadata(_file._FlamSerializable):
 class FlamMetadata(_file._FlamSerializable):
     version:                str
     composite_lists_by_uid: dict[str, CompositeListMetadata]
+
+_dbg.logger.info(f'Module import time: {time.time() - _start_import_time}s')

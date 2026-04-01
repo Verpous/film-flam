@@ -27,6 +27,7 @@ import weakref
 import itertools
 import difflib
 import contextlib
+import time
 
 from . import _cfg
 from . import _exc
@@ -42,6 +43,7 @@ from . import _attr
 from . import _gen_version
 from . import utils
 
+_start_import_time = time.time()
 DEFAULT_FLAM_DIR = _dbg.FlamEnv.CTX_DIR.get_or_default(os.path.join(os.path.expanduser('~'), '.film_flam'))
 
 # Utility for "inverting" registries: instead of first the registration level then the item type, it's first the item type then the levels.
@@ -640,3 +642,5 @@ class FlamContext:
         filter = _filter.Filter.eat(params)
         _dbg.logger.info(f"Compiled {tokens=}, {find=} into: {filter}")
         return filter
+
+_dbg.logger.info(f'Module import time: {time.time() - _start_import_time}s')

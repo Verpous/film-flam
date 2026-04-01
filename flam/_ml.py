@@ -21,6 +21,7 @@ import abc
 import copy
 import bisect
 import collections
+import time
 
 from . import _filter
 from . import _mlf
@@ -30,6 +31,8 @@ from . import _attr
 from . import _exc
 from . import _dbg
 from . import _ldef
+
+_start_import_time = time.time()
 
 class GroupMode(enum.StrEnum):
     DEFAULT             = 'default'
@@ -717,3 +720,5 @@ class MovieList:
     @classmethod
     def _findables_to_sorted_dict[T: Findable](cls, findables: typing.Iterable[T]) -> dict[str, T]:
         return {f.uid: f for f in sorted(findables, key=lambda fi: fi.uid)}
+
+_dbg.logger.info(f'Module import time: {time.time() - _start_import_time}s')

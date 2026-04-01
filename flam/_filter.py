@@ -19,12 +19,14 @@ import abc
 import typing
 import dataclasses
 import re
+import time
 
 from . import _ctx
 from . import _attr
 from . import _exc
 from . import _ml
 from . import _reg
+from . import _dbg
 
 # TODO: should filters be case insensitive??
 # FILTER    := PIPELINE | <epsilon>
@@ -42,6 +44,9 @@ from . import _reg
 # NOT       := -n | -not | !
 # (         := (  | [    | -lparen
 # )         := )  | ]    | -rparen
+
+
+_start_import_time = time.time()
 
 # This one's for you, mayer.
 _EinGafrurError = _exc.FilterSyntaxError
@@ -465,3 +470,5 @@ def looks_like_filter_token(token: str) -> bool:
         or token in Conjoined.CONJOIN
         or token in Pipeline.LPAREN
         or token in Pipeline.RPAREN)
+
+_dbg.logger.info(f'Module import time: {time.time() - _start_import_time}s')

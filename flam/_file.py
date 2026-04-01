@@ -19,10 +19,13 @@ import msgspec
 import typing
 import dataclasses
 import json
+import time
 
 from . import _exc
 from . import _dbg
 from . import _gen_version
+
+_start_import_time = time.time()
 
 @dataclasses.dataclass(frozen=True)
 class FieldMeta:
@@ -164,3 +167,5 @@ class _FlamSerializable(msgspec.Struct, forbid_unknown_fields=True, weakref=True
                     return annot
 
         return _default_meta
+
+_dbg.logger.info(f'Module import time: {time.time() - _start_import_time}s')

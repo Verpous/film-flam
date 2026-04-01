@@ -37,6 +37,8 @@ import time
 import flam
 from flam import utils
 
+_start_import_time = time.time()
+
 class Choice(enum.StrEnum):
     YES     = 'yes'
     NO      = 'no'
@@ -875,6 +877,8 @@ def main() -> None:
 
         # No ugly tracebacks for input errors. Only for internal errors.
         sys.exit(f'{parser.prog}: error: {e}')
+
+flam.logger.info(f'Module import time: {time.time() - _start_import_time}s')
 
 if __name__ == '__main__':
     main()

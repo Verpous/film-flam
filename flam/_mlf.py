@@ -16,10 +16,14 @@
 from __future__ import annotations
 
 import datetime
+import time
 
 from . import _file
 from . import _ldef
+from . import _dbg
 from . import _ml
+
+_start_import_time = time.time()
 
 # MovieListFile-related objects go here.
 class MLFRole(_file._FlamSerializable):
@@ -91,3 +95,5 @@ class MovieListFile(_file._FlamSerializable):
             # I verified this check works.
             if crew_types_set != movie.crew.keys():
                 raise self._validation_error(f'Found movie: {movie.uid} with bad crew types: {movie.crew.keys()}.')
+
+_dbg.logger.info(f'Module import time: {time.time() - _start_import_time}s')

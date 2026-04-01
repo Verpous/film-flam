@@ -15,8 +15,11 @@
 
 import typing
 import colorama
+import time
 
 from . import _dbg
+
+_start_import_time = time.time()
 
 class FlamError(Exception):
     def __init__(self, *args: object, log_trace: bool = True, stacklevel: int = 2) -> None:
@@ -67,3 +70,5 @@ class FetchInterrupt(FlamError):
 
 class FileValidationError(FlamError):
     pass
+
+_dbg.logger.info(f'Module import time: {time.time() - _start_import_time}s')

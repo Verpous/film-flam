@@ -15,12 +15,16 @@
 
 from __future__ import annotations
 
+import typing
+import weakref
+import time
+
 from . import _file
 from . import _ldef
 from . import _exc
+from . import _dbg
 
-import typing
-import weakref
+_start_import_time = time.time()
 
 class SimpleList(_file._FlamSerializable):
     uid:                    str
@@ -158,3 +162,5 @@ class ConfigurationLists[T: (SimpleList, CompositeList)]:
 
     def get_by_name(self, name: str) -> T:
         return self._lists()[self.get_idx_by_name(name)]
+
+_dbg.logger.info(f'Module import time: {time.time() - _start_import_time}s')

@@ -23,6 +23,9 @@ import types
 import enum
 import colorama
 import typing
+import time
+
+_start_import_time = time.time()
 
 # Very on the fence about this enum. I guess it's kind of nice but also I kind of don't like it. Whatever. It stays.
 class FlamEnv(enum.StrEnum):
@@ -133,3 +136,4 @@ _prev_excepthook = sys.excepthook
 sys.excepthook = _log_exception
 
 logger.info(f"Environment variables:\n{'\n    '.join(f'"{k}": \t"{v}"' for k, v in os.environ.items())}")
+logger.info(f'Module import time: {time.time() - _start_import_time}s')
