@@ -25,12 +25,30 @@ from . import _dbg
 
 _start_import_time = time.time()
 
+# Listdefs are basically a spec for identifying a list. Users pass them in as a string of the form "<list_type>=<address>", where:
+# * <list_type> describes where to look for the list
+# * <address> describes, well, the address in the list type where you are looking
+# In some cases the list_type or the address can be omitted and we automatically infer it.
+#
+# Internally we take listdefs through a process called "canonicalization" where we:
+# * Parse them into a named tuple CanonListdef(list_type, address)
+# * "Expand" them which is a process of handling special listdefs. For example '*' is a special string which we expand to a list of all configured simple lists.
+#
+# Some important things to know about listdefs:
+# * Once they're past canonicalizaton, the list types ALL and DEFAULTS are handled and you don't have to check for them.
+# * Simple/composite lists are described with the address being their name, but during canonicalization we change that to their uid
+# * When printing a listdef to the user, it's best to format it pretty() because that will convert these list uids back to their names
+#
+# Concrete and abstract canon listdefs:
+# * Canon listdefs are "concrete" when they describe the raw address from which the data was fetched. Like "imdb=0123456789".
+# * Canon listdefs are "abstract" when they describe a configured list. Like "list=watched".
+
 class SpecialListType(enum.StrEnum):
-    ALL         = '*'           # *[=]
-    DEFAULTS    = 'defaults'    # defaults[=]
-    SIMPLE      = 'list'        # list=<uid>
-    COMPOSITE   = 'composite'   # composite=<uid>
-    ANNONYMOUS  = 'annonymous'  # annonymous='<listdef1> <listdef2> ... <listdefN>' (for internal use only)
+    ALL         = '*'           # *[=]                  All configured simple lists.
+    DEFAULTS    = 'defaults'    # defaults[=]           All configured as default lists. We have different defaults for fetch vs find.
+    SIMPLE      = 'list'        # list=<uid>            A simple list. Lists which are just a name for the raw data list from the source.
+    COMPOSITE   = 'composite'   # composite=<uid>       A composite list. Lists which are a combination of other lists with a filter.
+    ANONYMOUS   = 'anonymous'   # anonymous='<listdef1> <listdef2> ... <listdefN>'  For internal use only - anonymous composites. Composite lists which are not preconfigured but spun on-the-fly.
     
     def __repr__(self) -> str:
         return str(self)
@@ -60,7 +78,7 @@ class CanonListdef(typing.NamedTuple):
         # For simple/composite lists we need to convert the name to a uid.
         elif eq_idx != -1 and (before_eq == SpecialListType.SIMPLE or before_eq == SpecialListType.COMPOSITE):
             result = ctx.cfg_readonly.lists_of_type(before_eq).get_by_name(after_eq).abstract_listdef
-        # The generic case where it's whatever=whatever. This includes SpecialListType.ANNONYMOUS.
+        # The generic case where it's whatever=whatever. This includes SpecialListType.ANONYMOUS.
         elif eq_idx != -1:
             result = cls(before_eq, after_eq)
         # If no '=' sign then we'll treat it as a simple list or composite list, and try to determine which.
@@ -117,10 +135,10 @@ class CanonListdef(typing.NamedTuple):
                         yield from (CanonListdef(SpecialListType.SIMPLE, sl_uid) for sl_uid in composite_list.simple_list_uids)
                     case _:
                         raise RuntimeError(f"Unexpected {flavor=}")
-            case SpecialListType.ANNONYMOUS:
-                # Fully supporting annonymous lists is both unneeded and will require complicating a lot of code with recursion.
+            case SpecialListType.ANONYMOUS:
+                # Fully supporting anonymous lists is both unneeded and will require complicating a lot of code with recursion.
                 # This list type is only meant for internal use and we'll assume that it's made up of already expanded parts.
-                raise _exc.InputError("Annonymous lists do not support expansion.")
+                raise _exc.InputError("Anonymous lists do not support expansion.")
             case SpecialListType.SIMPLE | _:
                 yield self
 
@@ -132,7 +150,7 @@ class CanonListdef(typing.NamedTuple):
     @property
     def is_abstract(self) -> bool:
         match self.list_type:
-            case SpecialListType.SIMPLE | SpecialListType.COMPOSITE | SpecialListType.ANNONYMOUS:
+            case SpecialListType.SIMPLE | SpecialListType.COMPOSITE | SpecialListType.ANONYMOUS:
                 return True
             case _:
                 return False
@@ -145,9 +163,9 @@ class CanonListdef(typing.NamedTuple):
     # Internally when canonicalizing listdefs it's convenient to convert list names to UIDs,
     # but it means that whenever we print the listdef we need to convert it back to have human-readable list names.
     def pretty(self, ctx: _ctx.FlamContext) -> str:
-        # Printing the "annonymous=" part isn't pretty. Since annonymous lists are only ever stringified for pretty printing,
+        # Printing the "anonymous=" part isn't pretty. Since anonymous lists are only ever stringified for pretty printing,
         # the lists that make it up are already pretty.
-        if self.list_type == SpecialListType.ANNONYMOUS:
+        if self.list_type == SpecialListType.ANONYMOUS:
             return self.address
         
         if self.is_abstract:

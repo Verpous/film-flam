@@ -28,7 +28,8 @@ from . import _ml
 from . import _reg
 from . import _dbg
 
-# TODO: should filters be case insensitive??
+# NOTE: filters are case-sensitive!
+
 # FILTER    := PIPELINE | <epsilon>
 # PIPELINE  := SINGLE JOINABLE*
 # SINGLE    := NEGATIVE | POSITIVE
@@ -44,7 +45,6 @@ from . import _dbg
 # NOT       := -n | -not | !
 # (         := (  | [    | -lparen
 # )         := )  | ]    | -rparen
-
 
 _start_import_time = time.time()
 

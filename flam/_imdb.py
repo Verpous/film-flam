@@ -62,7 +62,7 @@ class _CsvRow:
     uid:                str
     listing_date:       str
     modified:           str
-    description:        str
+    note:               str
     title:              str
     original_title:     str
     url:                str
@@ -82,16 +82,16 @@ class _CsvRow:
     def mlf_fields(self) -> dict[str, typing.Any]:
         # If any of the conversions fail we simply propagate the error.
         return dict(
-            list_index        = int(self.list_index),
-            description       = self.description,
-            rating            = float(self.rating) if self.rating != '' else None, # I've actually found shorts which have no rating.
-            runtime_minutes   = int(self.runtime_minutes),
-            genres            = self.genres.split(', '),
-            votes             = int(self.votes),
-            my_rating         = float(self.my_rating) if (self.my_rating is not None and self.my_rating != '') else None,
-            listing_date      = self._date(self.listing_date),
-            watch_date        = self._date(self.listing_date), # Treat the listing date as the date the movie was watched.
-            release_date      = self._date(self.release_date),
+            list_index          = int(self.list_index),
+            note                = self.note,
+            rating              = float(self.rating) if self.rating != '' else None, # I've actually found shorts which have no rating.
+            runtime_minutes     = int(self.runtime_minutes),
+            genres              = self.genres.split(', '),
+            votes               = int(self.votes),
+            my_rating           = float(self.my_rating) if (self.my_rating is not None and self.my_rating != '') else None,
+            listing_date        = self._date(self.listing_date),
+            watch_date          = self._date(self.listing_date), # Treat the listing date as the date the movie was watched.
+            release_date        = self._date(self.release_date),
         )
 
     @classmethod

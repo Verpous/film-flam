@@ -702,8 +702,8 @@ For people, it looks like 'cast-people', 'director-people:group', etc.''')
             if any(attr.qualified_name == 'movies-my-rating' for attr in sort_attrs):
                 smart_columns.append('movies-my-rating')
 
-            if any(attr.qualified_name == 'movies-description' for attr in sort_attrs):
-                smart_columns.append('movies-description')
+            if any(attr.qualified_name == 'movies-note' for attr in sort_attrs):
+                smart_columns.append('movies-note')
             
             if len(ct_gms) > 1:
                 smart_columns.append('people-crew-type')
@@ -716,7 +716,7 @@ For people, it looks like 'cast-people', 'director-people:group', etc.''')
                 smart_columns.append('roles-characters')
 
             # If we combined multiple lists, tag each element with the list(s) it came from.
-            # if movie_list.list_type == flam.SpecialListType.ANNONYMOUS:
+            # if movie_list.list_type == flam.SpecialListType.ANONYMOUS:
             #     smart_columns.append('origin')
 
             # Only use smart columns that aren't already in the attributes list.

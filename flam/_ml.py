@@ -565,8 +565,9 @@ class MovieList:
 
     def get_role_by_uid(self, uid: str) -> Role:
         # Break down the uid to determine the ct_gm and know which list to search in.
-        breakdown = People.decompose_uid(uid)
-        roles = self._generate_roles(breakdown.crew_type, breakdown.group_mode)
+        role_breakdown = Role.decompose_uid(uid)
+        people_breakdown = People.decompose_uid(role_breakdown.people_uid)
+        roles = self._generate_roles(people_breakdown.crew_type, people_breakdown.group_mode)
 
         try:
             return roles[uid]

@@ -100,7 +100,7 @@ def _movie_title_extractor(self: attrutils.EasyAttribute, movie: _ml.Movie, mlf_
 
 @_register_easy_attribute(attrutils.EasyAttributeParams(
     name_without_type = 'synopsis',
-    aliases_without_type = ['plot', 'summary'],
+    aliases_without_type = ['plot', 'summary', 'description', 'desc'],
     findable_type = _ml.FindableType.MOVIES,
     type_handler = attrutils.STR_HANDLER,
     is_ascending = True,
@@ -167,16 +167,16 @@ for handler in attrutils.DATE_HANDLERS:
         return None if mlf_movie.listing_date is None else typing.cast(attrutils.DateHandler, self._params.type_handler).strip(mlf_movie.listing_date)
 
 @_register_easy_attribute(attrutils.EasyAttributeParams(
-    name_without_type = 'description',
-    aliases_without_type = ['desc', 'comment'],
+    name_without_type = 'note',
+    aliases_without_type = ['comment'],
     findable_type = _ml.FindableType.MOVIES,
     type_handler = attrutils.STR_HANDLER,
     is_ascending = True,
     truncation_style = utils.TruncationStyle.TRIM_MIDDLE,
     default_max_len = _STR_LEN_LONG,
 ))
-def _movie_description_extractor(self: attrutils.EasyAttribute, movie: _ml.Movie, mlf_movie: _mlf.MLFMovie) -> None | str:
-    return mlf_movie.description
+def _movie_note_extractor(self: attrutils.EasyAttribute, movie: _ml.Movie, mlf_movie: _mlf.MLFMovie) -> None | str:
+    return mlf_movie.note
 
 # 'index' only as an alias because there's a predicate by the same name.
 @_register_easy_attribute(attrutils.EasyAttributeParams(
@@ -330,28 +330,29 @@ for crew_type in _ml.CrewType:
             for person in movie.associated_people(ct, _ml.GroupMode.SEPARATE)
         ]
 
-# TODO: uncomment and figure out exactly once we add roles' star attr.
-# @_register_easy_attribute(attrutils.EasyAttributeParams(
-#     name_without_type = 'stars',
-#     aliases_without_type = ['star-cast', 'leads', 'lead-actors', 'lead-cast'],
-#     findable_type = _ml.FindableType.MOVIES,
-#     type_handler = attrutils.STR_HANDLER,
-#     is_ascending = True,
-#     truncation_style = utils.TruncationStyle.TRIM_MIDDLE,
-#     default_max_len = _STR_LEN_SHORT,
-# ))
-# def _movie_stars_extractor(self: attrutils.EasyAttribute, movie: _ml.Movie, mlf_movie: _mlf.MLFMovie) -> list[None | str]:
-#     global _people_name_attr
-#     global _role_star_attr
+# Dictionary equivalent of l[0] when you know the list has only one element.
+def _get_only_value[TKey, TVal](d: dict[TKey, TVal]) -> TVal:
+    for k in d:
+        return d[k] # Donkey-Kong!
 
-#     # This implementation is inefficient. We could improve it by reading from the mlf_movie.crew directly,
-#     # but that would require sorting and will also be more complicated to support CrewType.ANY.
-#     # Here we rely on associated_people already guaranteeing a consistent ordering.
-#     return [
-#         typing.cast(list[None | str], role.extract(_people_name_attr))[0]
-#         for role in movie.associated_roles(CrewType.CAST, _ml.GroupMode.SEPARATE)
-#         if role.extract(_role_star_attr)[0] is True
-#     ]
+    raise RuntimeError('Unexpected non-empty dictionary')
+
+@_register_easy_attribute(attrutils.EasyAttributeParams(
+    name_without_type = 'stars',
+    aliases_without_type = ['star-cast', 'leads', 'lead-actors', 'lead-cast'],
+    findable_type = _ml.FindableType.MOVIES,
+    type_handler = attrutils.STR_HANDLER,
+    is_ascending = True,
+    truncation_style = utils.TruncationStyle.TRIM_MIDDLE,
+    default_max_len = _STR_LEN_LONG,
+))
+def _movie_stars_extractor(self: attrutils.EasyAttribute, movie: _ml.Movie, mlf_movie: _mlf.MLFMovie) -> list[None | str]:
+    # Consistent ordering guaranteed by associated_roles.
+    return [
+        role.people.underlying_file_people_readonly[0].name
+        for role in movie.associated_roles(_ml.CrewType.CAST, _ml.GroupMode.SEPARATE)
+        if _get_only_value(role.underlying_file_roles_readonly)[_ml.CrewType.CAST].is_star
+    ]
 
 #endregion movie attributes
 

@@ -21,6 +21,7 @@ from ._gen_version import __version__
 from ._reg import *
 
 # I don't want long lines and hate importing specific things with "from", so script names tend to be short.
+# We don't import non-hidden modules 'utils', 'attrutils' here. They are for importing specifically by the user if he wants them.
 from ._ml import *
 from ._dbg import *
 from ._exc import *

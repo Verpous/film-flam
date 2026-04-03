@@ -44,7 +44,7 @@ class MLFPerson(_file._FlamSerializable):
     countries:              list[str]
 
 # TODO: Separate properties of the movie from properties of its prescence in a list?
-# I.e., 'watch_date', 'description', 'list_index' are not the same as the rest, and when merging lists, we should keep them all.
+# I.e., 'listing_date', 'note', 'list_index' are not the same as the rest, and when merging lists, we should keep them all.
 class MLFMovie(_file._FlamSerializable):
     uid:                    str
     title:                  None | str
@@ -52,7 +52,7 @@ class MLFMovie(_file._FlamSerializable):
     watch_date:             None | datetime.date
     release_date:           None | datetime.date
     listing_date:           None | datetime.date
-    description:            None | str
+    note:                   None | str
     list_index:             None | int
     runtime_minutes:        None | int
     metascore_votes:        None | int
