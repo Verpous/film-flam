@@ -353,8 +353,7 @@ class FlamContext:
         merged_mlf = _mlf.MovieListFile(
             version = _gen_version.__version__,
             uid_family = dependency_mlfs[0].uid_family,
-            list_type = list_type,
-            address = address,
+            abstract_listdef = _ldef.CanonListdef(list_type, address),
             movies_by_uid = {},
             people_by_uid = {},
         )
@@ -362,19 +361,38 @@ class FlamContext:
         # When building the list, we use the same objects from the dependency lists. At the end we deepcopy the result.
         # In case of duplicates we arbitrarily choose which to keep. We don't allow non-uniqueness.
         # Canonicalization is preserved because the uid dicts are unordered anyway.
-        for mlf in dependency_mlfs:
-            if mlf.uid_family != merged_mlf.uid_family:
+        for dep_mlf in dependency_mlfs:
+            if dep_mlf.uid_family != merged_mlf.uid_family:
                 raise _exc.InputError(f"Cannot merge the lists '{' '.join(cldef.pretty(self) for cldef in abstract_listdefs)}' into a composite list "
-                    f"due to an ID family mismatch: {mlf.uid_family} != {merged_mlf.uid_family}.")
+                    f"due to an ID family mismatch: {dep_mlf.uid_family} != {merged_mlf.uid_family}.")
 
-            # TODO: preserve information about which list each movie/person came from? Or in how many it appeared?
-            merged_mlf.movies_by_uid.update(mlf.movies_by_uid)
-            merged_mlf.people_by_uid.update(mlf.people_by_uid)
+            merged_mlf.movies_by_uid.update(dep_mlf.movies_by_uid)
+            merged_mlf.people_by_uid.update(dep_mlf.people_by_uid)
 
-        if filter.is_empty:
-            # Deepcopy because we built it using some objects from other files.
-            merged_mlf = copy.deepcopy(merged_mlf)
-        else:
+        # Deepcopy because we built it using some objects from other files.
+        merged_mlf = copy.deepcopy(merged_mlf)
+
+        # Now we're going to handle per src datas. For every movie, we want its new per_src_data to be the merging of all the per_src_datas from every dependency list the movie came from.
+        # We also want to remove duplicates if the same source is listed twice. So anyway, go over each movie...
+        for mlf_movie in merged_mlf.movies_by_uid.values():
+            dep_src_datas = {}
+
+            # And each dependency list..
+            for dep_mlf in dependency_mlfs:
+                # If the movie didn't come from this list, we can skip it.
+                if mlf_movie.uid not in dep_mlf.movies_by_uid:
+                    continue
+
+                # If the movie did come from this list, we want to remember all its sources, in a data structure that will remove duplicates.
+                for per_src_data in dep_mlf.movies_by_uid[mlf_movie.uid].per_src_data:
+                    dep_src_datas[per_src_data.canon_listdef] = per_src_data
+
+            # Now we can store the result into the movie. This assignment is safe to do because we did the big deepcopy above.
+            # BUT that does mean that we have to deepcopy the per src datas specifically, here.
+            # We sort it to preserve canonicalization faster than going through canonicalize() - this is kind of a slimy optimization.
+            mlf_movie.per_src_data = sorted(copy.deepcopy(per_src_data) for per_src_data in dep_src_datas.values())
+
+        if not filter.is_empty:
             merged_mlf = _ml.MovieList(merged_mlf, self).export(filter)
             
         _dbg.logger.info(f"Generated '{merged_mlf.abstract_listdef}' with {len(merged_mlf.movies_by_uid)} movies, {len(merged_mlf.people_by_uid)} people")
@@ -505,7 +523,7 @@ class FlamContext:
             self._cfg = editable_copy
             self._write_cfg()
         except:
-            _dbg.logger.info("Caught exception while writing configuration change. Will rollback.")
+            _dbg.logger.warning("Caught exception while writing configuration change. Will rollback.")
             self._cfg = old_cfg
             raise
 
@@ -562,7 +580,6 @@ class FlamContext:
         
     def _write_cfg(self) -> None:
         _dbg.logger.info(f"Writing configuration: {self._cfg=}")
-        self._cfg.canonicalize()
         self._cfg.write(self._cfg_path)
         
     # Metadata
@@ -604,8 +621,7 @@ class FlamContext:
                 mlf = _mlf.MovieListFile(
                     version = _gen_version.__version__,
                     uid_family = fetcher.uid_family,
-                    list_type = fetcher.abstract_listdef.list_type,
-                    address = fetcher.abstract_listdef.address,
+                    abstract_listdef = fetcher.abstract_listdef,
                     movies_by_uid = {},
                     people_by_uid = {},
                 )
@@ -617,7 +633,7 @@ class FlamContext:
             new_mlf = copy.deepcopy(mlf)
             
             try:
-                fetcher.fetch(new_mlf, self, refetch_re, quiet)
+                fetcher.fetch(new_mlf, refetch_re, quiet)
             except _exc.FetchInterrupt:
                 _dbg.logger.info(f"Partially fetched {fetcher.abstract_listdef} due to an interrupt.")
                 self._close_fetch(mlf, new_mlf)
@@ -626,13 +642,13 @@ class FlamContext:
             self._close_fetch(mlf, new_mlf)
             _dbg.logger.info(f"Fetched {fetcher.abstract_listdef} with no interrupts")
 
-    def _close_fetch(self, mlf: _mlf.MovieListFile, new_mlf: _mlf.MovieListFile) -> None:
+    def _close_fetch(self, old_mlf: None | _mlf.MovieListFile, new_mlf: _mlf.MovieListFile) -> None:
         # Must canonicalize before comparing for equality.
         new_mlf.canonicalize()
 
         # We'll only write the new contents if they're different than before, and we'll return whether there was a diff or not.
         # This allows us to check the file mtime to know if it's dirty and dependent files need to be regenerated.
-        if mlf != new_mlf:
+        if old_mlf is None or old_mlf != new_mlf:
             self._write_mlf(new_mlf)
 
     def _get_fetcher(self, canon_listdef: _ldef.CanonListdef) -> _fetch.ListFetcher:
@@ -641,11 +657,12 @@ class FlamContext:
             abstract_listdef = canon_listdef
             concrete_listdef = self._cfg.simple_lists.get_by_uid(abstract_listdef.address).concrete_listdef
         else:
+            # If fetching a totally raw list, it's easiest to lie and call the concrete listdef also "abstract".
             abstract_listdef = concrete_listdef = canon_listdef
 
         fetcher_cls = self.fetchers[concrete_listdef.list_type]
         _dbg.logger.info(f"Created fetcher of type {fetcher_cls} for {concrete_listdef=}, {abstract_listdef=}")
-        return fetcher_cls(concrete_listdef, abstract_listdef)
+        return fetcher_cls(concrete_listdef, abstract_listdef, self)
 
     # Filtering.
     def compile_filter(self, tokens: list[str], find: _ml.FindableType) -> _filter.Filter:

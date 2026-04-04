@@ -77,6 +77,7 @@ def _make_logger() -> logging.Logger:
     logger_.setLevel(getattr(logging, FlamEnv.LOGLEVEL.get_or_default('DEBUG').upper()))
 
     # Timestamp is first because when catenating log with backups it's easy to sort.
+    # Example log: 2026-04-01 15:40:11,373 [INFO    ] [flam.exe:MainProcess:17996:21432] __main__.py:execute:618: Printing the table
     formatter = logging.Formatter(
         '%(asctime)s [%(levelcolor)s%(levelname)-8s%(resetcolor)s] [%(scriptName)s:%(processName)s:%(process)d:%(thread)d] %(filename)s:%(funcName)s:%(lineno)d: %(message)s')
 

@@ -26,6 +26,7 @@ class CompositeListMetadata(_file._FlamSerializable):
     uid:                    str
     dependency_mtime:       dict[str, float]
 
+# The MD file doesn't get canonicalized.
 class FlamMetadata(_file._FlamSerializable):
     version:                str
     composite_lists_by_uid: dict[str, CompositeListMetadata]

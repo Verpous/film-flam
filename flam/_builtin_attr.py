@@ -24,9 +24,9 @@ from . import _reg
 from . import _ml
 from . import _mlf
 from . import _exc
+from . import _dbg
 from . import attrutils
 from . import utils
-from . import _dbg
 
 _start_import_time = time.time()
 
@@ -99,6 +99,29 @@ def _movie_title_extractor(self: attrutils.EasyAttribute, movie: _ml.Movie, mlf_
     return mlf_movie.title
 
 @_register_easy_attribute(attrutils.EasyAttributeParams(
+    name_without_type = 'source',
+    aliases_without_type = ['sources', 'origin', 'origins', 'src', 'list', 'lists'],
+    findable_type = _ml.FindableType.MOVIES,
+    type_handler = attrutils.STR_HANDLER,
+    is_ascending = True,
+    truncation_style = utils.TruncationStyle.TRIM_MIDDLE,
+    default_max_len = _STR_LEN_SHORT,
+))
+def _movie_source_extractor(self: attrutils.EasyAttribute, movie: _ml.Movie, mlf_movie: _mlf.MLFMovie) -> list[str]:
+    sources = []
+
+    # Guaranteed consistent ordering by canonicalization of per_src_data.
+    for per_src_data in mlf_movie.per_src_data:
+        # The only kind of abstract listdef we expect to get here is simple lists. For them we will print return just the name without the type.
+        if per_src_data.canon_listdef.is_abstract:
+            sources.append(movie.movie_list.ctx.cfg_readonly.get_list_by_abstract_listdef(per_src_data.canon_listdef).name)
+        # For other kinds return type=address.
+        else:
+            sources.append(str(per_src_data.canon_listdef))
+
+    return sources
+
+@_register_easy_attribute(attrutils.EasyAttributeParams(
     name_without_type = 'synopsis',
     aliases_without_type = ['plot', 'summary', 'description', 'desc'],
     findable_type = _ml.FindableType.MOVIES,
@@ -135,8 +158,8 @@ for handler in attrutils.DATE_HANDLERS:
         truncation_style = utils.TruncationStyle.NO_TRIM,
         default_max_len = _STR_LEN_DONTCARE,
     ))
-    def _movie_watched_extractor(self: attrutils.EasyAttribute, movie: _ml.Movie, mlf_movie: _mlf.MLFMovie) -> None | datetime.date:
-        return None if mlf_movie.watch_date is None else typing.cast(attrutils.DateHandler, self._params.type_handler).strip(mlf_movie.watch_date)
+    def _movie_watch_date_extractor(self: attrutils.EasyAttribute, movie: _ml.Movie, mlf_movie: _mlf.MLFMovie) -> list[datetime.date]:
+        return [typing.cast(attrutils.DateHandler, self._params.type_handler).strip(watch_date) for watch_date in mlf_movie.watch_dates]
 
     name_without_type = 'release' + handler.name
 
@@ -149,7 +172,7 @@ for handler in attrutils.DATE_HANDLERS:
         truncation_style = utils.TruncationStyle.NO_TRIM,
         default_max_len = _STR_LEN_DONTCARE,
     ))
-    def _movie_released_extractor(self: attrutils.EasyAttribute, movie: _ml.Movie, mlf_movie: _mlf.MLFMovie) -> None | datetime.date:
+    def _movie_release_date_extractor(self: attrutils.EasyAttribute, movie: _ml.Movie, mlf_movie: _mlf.MLFMovie) -> None | datetime.date:
         return None if mlf_movie.release_date is None else typing.cast(attrutils.DateHandler, self._params.type_handler).strip(mlf_movie.release_date)
 
     name_without_type = 'listing' + handler.name
@@ -160,36 +183,39 @@ for handler in attrutils.DATE_HANDLERS:
         findable_type = _ml.FindableType.MOVIES,
         type_handler = handler, # pylint: disable=cell-var-from-loop
         is_ascending = handler.is_ascending, # pylint: disable=cell-var-from-loop
-        truncation_style = utils.TruncationStyle.NO_TRIM,
-        default_max_len = _STR_LEN_DONTCARE,
+        truncation_style = utils.TruncationStyle.TRIM_MIDDLE,
+        default_max_len = _STR_LEN_SHORT,
     ))
-    def _movie_listed_extractor(self: attrutils.EasyAttribute, movie: _ml.Movie, mlf_movie: _mlf.MLFMovie) -> None | datetime.date:
-        return None if mlf_movie.listing_date is None else typing.cast(attrutils.DateHandler, self._params.type_handler).strip(mlf_movie.listing_date)
+    def _movie_listing_date_extractor(self: attrutils.EasyAttribute, movie: _ml.Movie, mlf_movie: _mlf.MLFMovie) -> list[None | datetime.date]:
+        return [
+            None if per_src_data.listing_date is None else typing.cast(attrutils.DateHandler, self._params.type_handler).strip(per_src_data.listing_date)
+            for per_src_data in mlf_movie.per_src_data
+        ]
 
 @_register_easy_attribute(attrutils.EasyAttributeParams(
     name_without_type = 'note',
-    aliases_without_type = ['comment'],
+    aliases_without_type = ['comment', 'notes', 'comments'],
     findable_type = _ml.FindableType.MOVIES,
     type_handler = attrutils.STR_HANDLER,
     is_ascending = True,
     truncation_style = utils.TruncationStyle.TRIM_MIDDLE,
     default_max_len = _STR_LEN_LONG,
 ))
-def _movie_note_extractor(self: attrutils.EasyAttribute, movie: _ml.Movie, mlf_movie: _mlf.MLFMovie) -> None | str:
-    return mlf_movie.note
+def _movie_note_extractor(self: attrutils.EasyAttribute, movie: _ml.Movie, mlf_movie: _mlf.MLFMovie) -> list[None | str]:
+    return [per_src_data.note for per_src_data in mlf_movie.per_src_data]
 
 # 'index' only as an alias because there's a predicate by the same name.
 @_register_easy_attribute(attrutils.EasyAttributeParams(
     name_without_type = 'list-index',
-    aliases_without_type = ['index'],
+    aliases_without_type = ['index', 'list-indices', 'indices', 'list-indexes', 'indexes'],
     findable_type = _ml.FindableType.MOVIES,
     type_handler = attrutils.SMALL_INT_HANDLER,
     is_ascending = True,
-    truncation_style = utils.TruncationStyle.NO_TRIM,
-    default_max_len = _STR_LEN_DONTCARE,
+    truncation_style = utils.TruncationStyle.TRIM_MIDDLE,
+    default_max_len = _STR_LEN_SHORT,
 ))
-def _movie_index_extractor(self: attrutils.EasyAttribute, movie: _ml.Movie, mlf_movie: _mlf.MLFMovie) -> None | int:
-    return mlf_movie.list_index
+def _movie_index_extractor(self: attrutils.EasyAttribute, movie: _ml.Movie, mlf_movie: _mlf.MLFMovie) -> list[None | int]:
+    return [per_src_data.list_index for per_src_data in mlf_movie.per_src_data]
 
 @_register_easy_attribute(attrutils.EasyAttributeParams(
     name_without_type = 'runtime',

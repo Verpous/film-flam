@@ -475,14 +475,6 @@ class MovieList:
         return self._movie_list_file.abstract_listdef
 
     @property
-    def list_type(self) -> str:
-        return self._movie_list_file.list_type
-
-    @property
-    def address(self) -> str:
-        return self._movie_list_file.address
-
-    @property
     def uid_family(self) -> str:
         return self._movie_list_file.uid_family
 
@@ -540,8 +532,11 @@ class MovieList:
     def export(self, filter: _filter.Filter) -> _mlf.MovieListFile:
         _dbg.logger.info(f"Exporting '{self._movie_list_file.abstract_listdef}' with {filter=!s}")
         filtered_file = copy.deepcopy(self._movie_list_file)
+
+        # Canonicalization is preserved because we haven't messed with anything that was sorted.
         filtered_file.movies_by_uid = {movie._mlf_movie.uid: movie._mlf_movie for movie in self.find_movies(filter)}
         _fetch._remove_unused_people(filtered_file)
+        
         _dbg.logger.info(f"Resulting file has {len(filtered_file.movies_by_uid)} movies, {len(filtered_file.people_by_uid)} people")
         return filtered_file
 

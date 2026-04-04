@@ -21,6 +21,7 @@ import re
 import os
 import contextlib
 import time
+import copy
 
 from . import _ldef
 from . import _mlf
@@ -46,9 +47,10 @@ class ListFetcher(abc.ABC):
         cls.qualified_aliases = [] if qualified_aliases is None else qualified_aliases
         cls.uid_family = uid_family if uid_family is not None else list_type
 
-    def __init__(self, concrete_listdef: _ldef.CanonListdef, abstract_listdef: _ldef.CanonListdef) -> None:
+    def __init__(self, concrete_listdef: _ldef.CanonListdef, abstract_listdef: _ldef.CanonListdef, ctx: _ctx.FlamContext) -> None:
         self._concrete_listdef = concrete_listdef
         self._abstract_listdef = abstract_listdef
+        self._ctx = ctx
 
     @property
     def concrete_listdef(self) -> _ldef.CanonListdef:
@@ -58,7 +60,7 @@ class ListFetcher(abc.ABC):
     def abstract_listdef(self) -> _ldef.CanonListdef:
         return self._abstract_listdef
 
-    def fetch(self, movie_list_file: _mlf.MovieListFile, ctx: _ctx.FlamContext, refetch_re: None | re.Pattern, quiet: bool) -> None:
+    def fetch(self, movie_list_file: _mlf.MovieListFile, refetch_re: None | re.Pattern, quiet: bool) -> None:
         _dbg.logger.info(f"Running fetcher {type(self)=}, abstract={self.abstract_listdef}, concrete={self.concrete_listdef}")
 
         if refetch_re is not None:
@@ -75,26 +77,43 @@ class ListFetcher(abc.ABC):
             _dbg.logger.info(f"Refetch pattern removed {len(movie_list_file.movies_by_uid) - nmovies_before} movies, {len(movie_list_file.people_by_uid) - npeople_before} people")
 
         with open(os.devnull, 'w') as devnull, contextlib.redirect_stdout(devnull) if quiet else contextlib.nullcontext():
-            print(f"Fetching '{self.abstract_listdef.pretty(ctx)}'...")
+            print(f"Fetching '{self.abstract_listdef.pretty(self._ctx)}'...")
 
             try:
                 self.fetch_into_file(movie_list_file)
             except _exc.FetchInterrupt as e:
                 # Do this part even in case of FetchInterrupt because we intend to save the partial data.
-                self._close_fetch(movie_list_file)
-                raise _exc.FetchInterrupt(f"Fetching of '{self.abstract_listdef.pretty(ctx)}' got interrupted due to {e}. "
+                self._postprocess_fetched_file(movie_list_file)
+                raise _exc.FetchInterrupt(f"Fetching of '{self.abstract_listdef.pretty(self._ctx)}' got interrupted due to {e}. "
                     "You may retry to pick up where it left off.") from e
 
-        self._close_fetch(movie_list_file)
+        self._postprocess_fetched_file(movie_list_file)
 
-    def _close_fetch(self, movie_list_file: _mlf.MovieListFile) -> None:
+    def _postprocess_fetched_file(self, movie_list_file: _mlf.MovieListFile) -> None:
         # Fetcher may have removed some movies from the list. Over here we remove people who are orphaned because of that.
         _remove_unused_people(movie_list_file)
 
         # Set these in the end in case fetch_into_file wrote some bad data there.
         movie_list_file.uid_family = self.uid_family
-        movie_list_file.list_type = self.abstract_listdef.list_type
-        movie_list_file.address = self.abstract_listdef.address
+        movie_list_file.abstract_listdef = self.abstract_listdef
+
+        # Scan the per_src_data of movies for correctness and also assist the users a bit with the listdef field.
+        for mlf_movie in movie_list_file.movies_by_uid.values():
+            if len(mlf_movie.per_src_data) != 1:
+                # Not a FlamError because it shouldn't happen to users unless the developer of the fetcher wrote a bug.
+                raise RuntimeError(f"Movie {mlf_movie.uid} was fetched incorrectly with {len(mlf_movie.per_src_data)} movies (should be exactly 1).")
+
+            mlf_movie.per_src_data[0].canon_listdef = self.abstract_listdef
+
+    # Fetching can run for many hours and it's a bitch when bash crashes or something midrun. So fetchers can use this to save progress in the middle.
+    def checkpoint(self, movie_list_file: _mlf.MovieListFile) -> None:
+        _dbg.logger.info(f"Checkpointing file for fetcher {type(self)=}, abstract={self.abstract_listdef}, concrete={self.concrete_listdef}")
+
+        # Create a copy because we'll be modifying it a bit before we save and we don't want to modify the file the fetcher is operating on.
+        # I considered sweeping errors in checkpointing under the rug but I think it's better to enforce correct use of this function.
+        mlf_copy = copy.deepcopy(movie_list_file)
+        self._postprocess_fetched_file(mlf_copy)
+        self._ctx._close_fetch(None, mlf_copy)
 
     @abc.abstractmethod
     def fetch_into_file(self, movie_list_file: _mlf.MovieListFile) -> None:

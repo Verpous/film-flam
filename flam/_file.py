@@ -36,12 +36,25 @@ _default_meta = FieldMeta()
 _VERSION_KEY = 'version'
 
 # Parent class for all the kinds of files we have. We use msgspec for serialization, and this class adds some niceities on top.
-class _FlamSerializable(msgspec.Struct, forbid_unknown_fields=True, weakref=True, order=True, kw_only=True):
+# Note that file fields are limited in terms of their type. They can be:
+# * All kinds of primitive(ish) types: int, str, bool, datetime..
+# * _FlamSerializables
+# * lists or dicts of any of the above
+# In other words we don't support sets, or lists of lists, or whatever else data structure. The reason is depth_first_iter. It can be expanded to support more if needed.
+# File implementations also shouldn't change the order of fields because it has bearing on canonicalization.
+class _FlamSerializable(msgspec.Struct,
+        forbid_unknown_fields=True,     # Better to be strict and reject files which have been tampered with.
+        weakref=True,                   # Support referencing file objects by weakref. We use this for configuration files.
+        order=True,                     # Support order operators '<', '>=', etc. on file objects, so we can canonicalize even files with lists of serializables.
+        kw_only=True):                  # Only allow kw arguments in constructors. Helps avoid bugs.
     def replace(self, **changes: dict[str, typing.Any]) -> typing.Self:
         return msgspec.structs.replace(self, **changes)
 
     @classmethod
     def load(cls, path: str) -> typing.Self:
+        # Log at the start and end at least so we have an idea of how long it took.
+        _dbg.logger.info(f'Going to load a {cls} from: {path}')
+        
         with open(path, 'rb') as f:
             contents = f.read()
 
@@ -50,7 +63,7 @@ class _FlamSerializable(msgspec.Struct, forbid_unknown_fields=True, weakref=True
             obj = msgspec.json.decode(contents, type=cls)
         except msgspec.ValidationError as ve:
             # We are handed this structure in dict format, but really we want it as a sorted list.
-            version_upgrades = sorted(cls._version_upgrades().items(), key=lambda vf: vf[0])
+            version_upgrades = sorted(cls._version_upgrades().items(), key=lambda vupg: vupg[0])
 
             try:
                 # A lot of things can go wrong in this check since we did not verify a thing about this JSON.
@@ -68,6 +81,8 @@ class _FlamSerializable(msgspec.Struct, forbid_unknown_fields=True, weakref=True
                 _dbg.logger.info(f"Successfully upgraded version of {cls}.")
             else:
                 raise cls._validation_error(f'{ve}.') from ve
+
+        _after_decode_time = time.time()
 
         obj.sanity_checks()
         _dbg.logger.info(f'Successfully loaded a {cls} of size {len(contents)}B')
@@ -107,6 +122,9 @@ class _FlamSerializable(msgspec.Struct, forbid_unknown_fields=True, weakref=True
         return {}
 
     def write(self, path: str) -> None:
+        # Log at the start and end at least so we have an idea of how long it took.
+        _dbg.logger.info(f'Going to write a {type(self)} to: {path}')
+
         assert hasattr(self, _VERSION_KEY)
         self.version = _gen_version.__version__ # pylint: disable=attribute-defined-outside-init
 
@@ -130,6 +148,7 @@ class _FlamSerializable(msgspec.Struct, forbid_unknown_fields=True, weakref=True
 
     # Sorts all lists in the file recursively so that we can compare files for equality.
     def canonicalize(self) -> None:
+        # Log at the start and end at least so we have an idea of how long it took.
         _dbg.logger.info(f'Canonicalizing a {type(self)}')
 
         # Must be depth-first for this to work.
@@ -140,6 +159,8 @@ class _FlamSerializable(msgspec.Struct, forbid_unknown_fields=True, weakref=True
                 # For now only have one field we want to exclude from sorting so we hack it.
                 if isinstance(value, list) and not self._get_meta(field).order_matters:
                     value.sort()
+
+        _dbg.logger.info(f'Finished canonicalizing {type(self)}')
 
     def depth_first_iter(self) -> typing.Iterable[_FlamSerializable]:
         for field in msgspec.structs.fields(self):

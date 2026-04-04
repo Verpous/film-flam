@@ -29,8 +29,7 @@ _start_import_time = time.time()
 class SimpleList(_file._FlamSerializable):
     uid:                    str
     name:                   str
-    list_type:              str
-    address:                str
+    concrete_listdef:       _ldef.CanonListdef
     is_default_fetch:       bool
     is_default_find:        bool
 
@@ -38,14 +37,13 @@ class SimpleList(_file._FlamSerializable):
     def abstract_listdef(self) -> _ldef.CanonListdef:
         return _ldef.CanonListdef(_ldef.SpecialListType.SIMPLE, self.uid)
 
-    @property
-    def concrete_listdef(self) -> _ldef.CanonListdef:
-        return _ldef.CanonListdef(self.list_type, self.address)
-
 class CompositeList(_file._FlamSerializable):
     uid:                    str
     name:                   str
     simple_list_uids:       list[str]
+    
+    # This annotation is used by canonicalization. We used to canonicalize the configuration file but we don't anymore because there is no need.
+    # So this annotation is doing nothing but might as well keep it.
     filter_tokens:          typing.Annotated[list[str], _file.FieldMeta(order_matters=True)]
     is_default_fetch:       bool
     is_default_find:        bool
@@ -54,6 +52,7 @@ class CompositeList(_file._FlamSerializable):
     def abstract_listdef(self) -> _ldef.CanonListdef:
         return _ldef.CanonListdef(_ldef.SpecialListType.COMPOSITE, self.uid)
 
+# Configuration files are not canonicalized because there is no need.
 class Configuration(_file._FlamSerializable):
     version:                str
     simple_lists_raw:       list[SimpleList]

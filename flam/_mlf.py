@@ -43,23 +43,30 @@ class MLFPerson(_file._FlamSerializable):
     birthday:               None | datetime.date
     countries:              list[str]
 
-# TODO: Separate properties of the movie from properties of its prescence in a list?
-# I.e., 'listing_date', 'note', 'list_index' are not the same as the rest, and when merging lists, we should keep them all.
-class MLFMovie(_file._FlamSerializable):
-    uid:                    str
-    title:                  None | str
-    synopsis:               None | str
-    watch_date:             None | datetime.date
-    release_date:           None | datetime.date
+# When building a composite list, we'll retain data from all the composite's parts if that data is expected to be different for the same movie when coming from a different list.
+# In order to avoid chaos, when building a composite list on top of composite lists, each movie will not be listed as sourced from a composite list,
+# but instead as sourced from the concrete or simple list it originally came from. And we'll deduplicate them.
+# When fetching a list, the user is expected to create only one PerListData for each movie. And we'll take care of the listdef field in postprocess.
+class MLFMoviePerSourceData(_file._FlamSerializable):
+    canon_listdef:          _ldef.CanonListdef
+    list_index:             None | int
     listing_date:           None | datetime.date
     note:                   None | str
-    list_index:             None | int
+
+class MLFMovie(_file._FlamSerializable):
+    uid:                    str
+    per_src_data:           list[MLFMoviePerSourceData]
+
+    title:                  None | str
+    synopsis:               None | str
     runtime_minutes:        None | int
     metascore_votes:        None | int
     metascore:              None | int
     votes:                  None | int
     rating:                 None | float
     my_rating:              None | float
+    release_date:           None | datetime.date
+    watch_dates:            list[datetime.date]
     genres:                 list[str]
     languages:              list[str]
     countries:              list[str]
@@ -69,12 +76,13 @@ class MLFMovie(_file._FlamSerializable):
     # msgspec supports TypedDict, but it has problems with initializing a default.
     crew:                   dict[str, MLFCrew]
 
+# MLFs get canonicalized so users can expect all lists in this file to be sorted.
 class MovieListFile(_file._FlamSerializable):
     version:                str
     
-    # These two fields are redundant, they are essentially the filename so the user must already know them to reach them. but if I'll omit them I'll regret it.
-    list_type:              str
-    address:                str
+    # This field is redundant, since the user must've known it ahead-of-time to even know where to load this file. But if I'll omit it I'll regret it.
+    # The name is also kind a lie - if the list is named then this will be its abstract listdef. But if you fetched a raw list it will be concrete of course.
+    abstract_listdef:       _ldef.CanonListdef
 
     # Files are "compatible" if they have a matching uid_family. This is because I have no good way of identifying matching items between, say, IMDb and Letterboxd.
     # If a list originates from IMDb, all the uids in the file will be from IMDb, and so it will only be compatible with other IMDb-based lists.
@@ -82,10 +90,6 @@ class MovieListFile(_file._FlamSerializable):
 
     movies_by_uid:          dict[str, MLFMovie]
     people_by_uid:          dict[str, MLFPerson]
-
-    @property
-    def abstract_listdef(self) -> _ldef.CanonListdef:
-        return _ldef.CanonListdef(self.list_type, self.address)
 
     def sanity_checks(self) -> None:
         super().sanity_checks()

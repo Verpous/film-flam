@@ -174,7 +174,7 @@ class SubcommandConfigExtension:
     @classmethod
     def delete(cls, ctx: flam.FlamContext, args: argparse.Namespace) -> None:
         if args.IMPORT is None:
-            raise flam.InputError(f"Must specify a IMPORT to delete an extension.")
+            raise flam.InputError("Must specify a IMPORT to delete an extension.")
 
         with ctx.configure() as cfg:
             try:
@@ -183,7 +183,7 @@ class SubcommandConfigExtension:
                 raise flam.InputError(f"No extension named '{args.IMPORT}'.") from e
 
     @classmethod
-    def print(cls, ctx: flam.FlamContext, args: argparse.Namespace) -> None:
+    def print(cls, ctx: flam.FlamContext, args: argparse.Namespace) -> None: # pylint: disable=unused-argument
         table = [['module / script']]
         table.extend(sorted([e] for e in ctx.cfg_readonly.extensions))
         print_table(table)
@@ -191,7 +191,7 @@ class SubcommandConfigExtension:
     @classmethod
     def add(cls, ctx: flam.FlamContext, args: argparse.Namespace) -> None:
         if args.IMPORT is None:
-            raise flam.InputError(f"Must specify a IMPORT to add an extension.")
+            raise flam.InputError("Must specify a IMPORT to add an extension.")
 
         with ctx.configure() as cfg:
             cfg.extensions.append(args.IMPORT)
@@ -231,7 +231,7 @@ class SubcommandConfigList:
     @classmethod
     def delete(cls, ctx: flam.FlamContext, args: argparse.Namespace) -> None:
         if args.NAME is None:
-            raise flam.InputError(f"Must specify a NAME to delete a list.")
+            raise flam.InputError("Must specify a NAME to delete a list.")
 
         with ctx.configure() as cfg:
             del cfg.simple_lists_raw[cfg.simple_lists.get_idx_by_name(args.NAME)]
@@ -243,10 +243,10 @@ class SubcommandConfigList:
         table = [['uid', 'name', 'type', 'address', 'default-fetch?', 'default-find?']]
         table.extend(sorted(
             [
-                typing.cast(str, sl.uid).split('-')[0],
+                sl.uid.split('-')[0],
                 sl.name,
-                sl.list_type,
-                sl.address,
+                sl.concrete_listdef.list_type,
+                sl.concrete_listdef.address,
                 Choice.bool2yesno(sl.is_default_fetch),
                 Choice.bool2yesno(sl.is_default_find),
             ]
@@ -266,8 +266,7 @@ class SubcommandConfigList:
 
             if args.LISTDEF is not None:
                 cldef = flam.CanonListdef.parse(args.LISTDEF, ctx)
-                simple_list.list_type = cldef.list_type
-                simple_list.address = cldef.address
+                simple_list.concrete_listdef = cldef
 
             if args.default_fetch != Choice.AUTO:
                 simple_list.is_default_fetch = args.default_fetch == Choice.YES
@@ -278,7 +277,7 @@ class SubcommandConfigList:
     @classmethod
     def create(cls, ctx: flam.FlamContext, args: argparse.Namespace) -> None:
         if args.NAME is None:
-            raise flam.InputError(f"Must specify a NAME to create or edit a list.")
+            raise flam.InputError("Must specify a NAME to create or edit a list.")
 
         if args.LISTDEF is None:
             raise flam.InputError(f"List '{args.NAME}' doesn't exist, so LISTDEF is required.")
@@ -288,8 +287,7 @@ class SubcommandConfigList:
         simple_list = flam.SimpleList(
             uid = 'INITIALIZED LATER',
             name = args.NAME,
-            list_type = cldef.list_type,
-            address = cldef.address,
+            concrete_listdef = cldef,
             is_default_fetch = args.default_fetch != Choice.NO,
             is_default_find = args.default_find == Choice.YES,
         )
@@ -337,7 +335,7 @@ class SubcommandConfigComposite:
     @classmethod
     def delete(cls, ctx: flam.FlamContext, args: argparse.Namespace) -> None:
         if args.NAME is None:
-            raise flam.InputError(f"Must specify a NAME to delete a composite list.")
+            raise flam.InputError("Must specify a NAME to delete a composite list.")
 
         with ctx.configure() as cfg:
             del cfg.composite_lists_raw[cfg.composite_lists.get_idx_by_name(args.NAME)]
@@ -349,7 +347,7 @@ class SubcommandConfigComposite:
         table = [['uid', 'name', 'lists', 'filter', 'default-fetch?', 'default-find?']]
         table.extend(sorted(
             [
-                typing.cast(str, cl.uid).split('-')[0],
+                cl.uid.split('-')[0],
                 cl.name,
                 ', '.join(ctx.cfg_readonly.simple_lists.get_by_uid(sl_uid).name for sl_uid in cl.simple_list_uids),
                 ' '.join(cl.filter_tokens) if len(cl.filter_tokens) > 0 else '-',
@@ -388,7 +386,7 @@ class SubcommandConfigComposite:
     @classmethod
     def create(cls, ctx: flam.FlamContext, args: argparse.Namespace) -> None:
         if args.NAME is None:
-            raise flam.InputError(f"Must specify a NAME to create or edit a composite list.")
+            raise flam.InputError("Must specify a NAME to create or edit a composite list.")
 
         simple_list_names, filter_tokens = split_at_filter(args.LIST + args.FILTER)
 
@@ -437,26 +435,27 @@ If no %(dest)s provided, fetches all lists configured as defaults''')
     def execute(cls, ctx: flam.FlamContext, args: argparse.Namespace) -> None:
         if args.undo:
             cls.pop_undo(ctx)
-        else:
-            try:
-                cls.push_undo(ctx)
-            except Exception as e:
-                # Sweep this one silently.
-                flam.logger.warning(f"Failed to store state for later undoing with error: {e}")
+            return
 
-            listdefs = args.LISTDEF if len(args.LISTDEF) != 0 else [flam.SpecialListType.DEFAULTS]
-            ctx.fetch(listdefs, refetch_pattern=args.refetch, quiet=False)
+        try:
+            cls.push_undo(ctx)
+        except Exception as e: # pylint: disable=broad-exception-caught
+            # Sweep this one silently. Catch any exception type because we don't care too much if it fails.
+            flam.logger.error(f"Failed to store state for later undoing with error: {e}")
 
-            with utils.ProgressBar(list(ctx.cfg_readonly.composite_lists),
-                    desc='Regenerating composite lists',
-                    keyfunc=lambda cl: cl.name) as bar:
-                for cl in bar:
-                    # Easiest way to regenerate dependencies is to just get every composite list and do nothing with it.
-                    try:
-                        ctx.get_movie_list(f'{flam.SpecialListType.COMPOSITE}={cl.name}')
-                    except flam.FlamError:
-                        # Don't care if this fails, and it might fail because we haven't checked if the composite list has all its dependencies.
-                        pass
+        listdefs = args.LISTDEF if len(args.LISTDEF) != 0 else [flam.SpecialListType.DEFAULTS]
+        ctx.fetch(listdefs, refetch_pattern=args.refetch, quiet=False)
+
+        with utils.ProgressBar(list(ctx.cfg_readonly.composite_lists),
+                desc='Regenerating composite lists',
+                keyfunc=lambda cl: cl.name) as bar:
+            for cl in bar:
+                # Easiest way to regenerate dependencies is to just get every composite list and do nothing with it.
+                try:
+                    ctx.get_movie_list(f'{flam.SpecialListType.COMPOSITE}={cl.name}')
+                except flam.FlamError:
+                    # Don't care if this fails, and it might fail because we haven't checked if the composite list has all its dependencies.
+                    pass
 
     @classmethod
     def push_undo(cls, ctx: flam.FlamContext) -> None:
@@ -499,7 +498,7 @@ class SubcommandFind:
 
         # TODO: "--split" option to expand array attributes into a row for each one?
         parser.add_argument('-s', '--sort', metavar='ATTRIBUTES', default=None, action='store', help=
-            f'''Sort movies according to %(metavar)s, which is a comma-delimited list of keys to sort by, in decreasing priority. Defaults to 'leaving,runtime,alphabetical'.
+            '''Sort movies according to %(metavar)s, which is a comma-delimited list of keys to sort by, in decreasing priority. Defaults to 'leaving,runtime,alphabetical'.
             Valid sort keys: ...''')
         parser.add_argument('-C', '--color', choices=Choice.always_auto_never(), default=Choice.AUTO, action='store', help=
             'Set whether columns should be colored. Defaults to %(default)s')
@@ -507,7 +506,7 @@ class SubcommandFind:
             "Output in delimiter-separated values format (DSV).")
         parser.add_argument('-c', '--columns', metavar='ATTRIBUTES', default=None, action='store', help=
             'List of columns to print, delimited by commas. Defaults to \'title,leaving,runtime,released,rating,metascore,director\','
-            f''' with a few other "smart" columns which activate when a condition is met.
+            ''' with a few other "smart" columns which activate when a condition is met.
 This option overrides the defaults and smart columns. Only the columns you specify will be printed.
 Beginning this string with a '+' will cause the columns to be added to the default (and smart) columns instead of replacing them.
 If %(metavar)s is '*', will print all columns.
@@ -539,7 +538,7 @@ For people, it looks like 'cast-people', 'director-people:group', etc.''')
     @classmethod
     def parse_findable(cls, findable: str) -> tuple[flam.FindableType, list[tuple[flam.CrewType, flam.GroupMode]]]:
         if findable == '':
-            raise ValueError(f"Cannot be empty string.")
+            raise ValueError("Cannot be empty string.")
 
         if findable == flam.FindableType.MOVIES:
             # Need to return a list of size 1 for execute to work even if its contents are irrelevant.
@@ -598,7 +597,7 @@ For people, it looks like 'cast-people', 'director-people:group', etc.''')
         sort_attrs = cls.parse_sortkeys(args, findable_type, ctx)
         column_attrs = cls.parse_columns(args, findable_type, ct_gms, sort_attrs, movie_list, ctx)
 
-        flam.logger.info(f"Building findables list")
+        flam.logger.info("Building findables list")
 
         findables = [
             findable
@@ -609,13 +608,13 @@ For people, it looks like 'cast-people', 'director-people:group', etc.''')
         flam.logger.info(f"Sorting findables list of {len(findables)} items")
         cls.sort_findables(sort_attrs, findables, args)
 
-        flam.logger.info(f"Extracting columns from findables")
+        flam.logger.info("Extracting columns from findables")
         values_table = [[findable.extract(attr) for attr, _ in column_attrs] for findable in findables]
 
-        flam.logger.info(f"Stringifying the table")
+        flam.logger.info("Stringifying the table")
         strs_table = list(cls.build_strs_table(column_attrs, values_table, args))
 
-        flam.logger.info(f"Printing the table")
+        flam.logger.info("Printing the table")
         print_table(strs_table, args.color, args.paginate, args.spacious, args.no_titles, args.dsv)
 
     # Can't do this at argparse time because it depends on the context.
@@ -682,7 +681,7 @@ For people, it looks like 'cast-people', 'director-people:group', etc.''')
             default_columns = {
                 flam.FindableType.MOVIES: ['movies-title', 'movies-runtime', 'movies-release-year', 'movies-rating', 'movies-metascore', 'movies-director'],
                 flam.FindableType.PEOPLE: ['people-name', 'people-birth-year', 'people-height-cm', 'people-num-movies', 'people-avg-rating', 'people-avg-metascore'],
-                flam.FindableType.ROLES: ['people-name', 'people-num-movies', 'people-avg-rating', 'people-avg-metascore', 'movies-title', 'movies-runtime', 'movies-release-year'],
+                flam.FindableType.ROLES: ['people-name', 'movies-title', 'people-num-movies', 'people-avg-rating', 'people-avg-metascore', 'movies-runtime', 'movies-release-year'],
             }
 
             # Use default columns even if the same attribute is also in the custom columns from the user.
@@ -712,12 +711,13 @@ For people, it looks like 'cast-people', 'director-people:group', etc.''')
             if len(ct_gms) > 1 and any(group_mode != crew_type.default_group_mode for crew_type, group_mode in ct_gms):
                 smart_columns.append('people-group-mode')
 
-            if findable_type == flam.FindableType.ROLES and any(crew_type == flam.CrewType.CAST for crew_type, _ in ct_gms):
+            if flam.FindableType.ROLES.is_applicable_to(findable_type) and any(crew_type == flam.CrewType.CAST for crew_type, _ in ct_gms):
                 smart_columns.append('roles-characters')
 
             # If we combined multiple lists, tag each element with the list(s) it came from.
-            # if movie_list.list_type == flam.SpecialListType.ANONYMOUS:
-            #     smart_columns.append('origin')
+            # Note that anonymous lists could also mean the list is filtered, but in the CLI case we apply the filter only later.
+            if flam.FindableType.MOVIES.is_applicable_to(findable_type) and movie_list.abstract_listdef.list_type == flam.SpecialListType.ANONYMOUS:
+                smart_columns.append('movies-source')
 
             # Only use smart columns that aren't already in the attributes list.
             for c in smart_columns:
@@ -760,36 +760,36 @@ For people, it looks like 'cast-people', 'director-people:group', etc.''')
         for record in values_table:
             yield [attributes[i][0].str_of_value(record[i], abbreviate=not args.verbose) for i in range(len(attributes))]
 
-class SubcommandChart:
-    @classmethod
-    def configure_parser(cls, parser: argparse.ArgumentParser) -> None:
-        parser.set_defaults(function=cls.execute)
+# class SubcommandChart:
+#     @classmethod
+#     def configure_parser(cls, parser: argparse.ArgumentParser) -> None:
+#         parser.set_defaults(function=cls.execute)
 
-        parser.add_argument('-o', '--omit-zeroes', choices=Choice.always_auto_never(), default=Choice.AUTO, action='store', help=
-            'Choose whether to omit buckets with 0 movies. Defaults to %(default)s, which uses a mode that depends on DISTRIBUTION')
-        parser.add_argument('-v', '--value-sort', default=False, action='store_true', help='Sort based on the table values, not the keys')
-        parser.add_argument('-n', '--no-number', default=False, action='store_true', help="Don't append the numerical value to each bar.")
-        parser.add_argument('-S', '--spacious', default=False, action='store_true', help='Space out the table')
-        parser.add_argument('-t', '--no-title', default=False, action='store_true', help="Don't print a title.")
-        parser.add_argument('-k', '--no-prefix-key', default=False, action='store_true', help="Don't write the key at the start of each bar.")
-        parser.add_argument('-K', '--suffix-key', default=False, action='store_true', help='Append the key to the end of each bar')
+#         parser.add_argument('-o', '--omit-zeroes', choices=Choice.always_auto_never(), default=Choice.AUTO, action='store', help=
+#             'Choose whether to omit buckets with 0 movies. Defaults to %(default)s, which uses a mode that depends on DISTRIBUTION')
+#         parser.add_argument('-v', '--value-sort', default=False, action='store_true', help='Sort based on the table values, not the keys')
+#         parser.add_argument('-n', '--no-number', default=False, action='store_true', help="Don't append the numerical value to each bar.")
+#         parser.add_argument('-S', '--spacious', default=False, action='store_true', help='Space out the table')
+#         parser.add_argument('-t', '--no-title', default=False, action='store_true', help="Don't print a title.")
+#         parser.add_argument('-k', '--no-prefix-key', default=False, action='store_true', help="Don't write the key at the start of each bar.")
+#         parser.add_argument('-K', '--suffix-key', default=False, action='store_true', help='Append the key to the end of each bar')
         
-        # TODO: Not sure about these options yet:
-        # '-c', '--crew-types',  CREWS      Comma-delimited list of crew types to count in crew-size distribution. Defaults to '*', which means all crew types.
-    #     parser.add_argument('-f', '--factor', metavar='FACTOR', type=int, action='store', default=0, help=
-    #         '''Define custom scaling factor to apply to the table. Defaults to %(default)s, which means a value will be computed to make the table fit in the terminal width.
-    # Positive numbers stretch, negatives squish.''')
+#         # TODO: Not sure about these options yet:
+#         # '-c', '--crew-types',  CREWS      Comma-delimited list of crew types to count in crew-size distribution. Defaults to '*', which means all crew types.
+#     #     parser.add_argument('-f', '--factor', metavar='FACTOR', type=int, action='store', default=0, help=
+#     #         '''Define custom scaling factor to apply to the table. Defaults to %(default)s, which means a value will be computed to make the table fit in the terminal width.
+#     # Positive numbers stretch, negatives squish.''')
 
-        parser.add_argument('DISTRIBUTION', action='store', help=
-            '''Which distribution to view (also option for custom distribution based on a field?)''')
-        parser.add_argument('LISTDEF', nargs='+', action='store', help=
-            '''Like find''')
-        parser.add_argument('FILTER', nargs='*', action='store', help=
-            '''find-like expression featuring predicates like -crew, -cast, -release...''')
+#         parser.add_argument('DISTRIBUTION', action='store', help=
+#             '''Which distribution to view (also option for custom distribution based on a field?)''')
+#         parser.add_argument('LISTDEF', nargs='+', action='store', help=
+#             '''Like find''')
+#         parser.add_argument('FILTER', nargs='*', action='store', help=
+#             '''find-like expression featuring predicates like -crew, -cast, -release...''')
 
-    @classmethod
-    def execute(cls, ctx: flam.FlamContext, args: argparse.Namespace) -> None:
-        print('chart')
+#     @classmethod
+#     def execute(cls, ctx: flam.FlamContext, args: argparse.Namespace) -> None:
+#         print('chart')
 
 def make_main_parser(add_subparsers: bool) -> tuple[argparse.ArgumentParser, argparse.ArgumentParser]:
     parser = argparse.ArgumentParser(
@@ -828,7 +828,7 @@ def main() -> None:
     try:
         sys.stdout.reconfigure(encoding='utf-8', newline='\n') # type: ignore
     except:
-        flam.logger.error(f"Failed to reconfigure stdout. Proceeding anyway.", exc_info=True)
+        flam.logger.error("Failed to reconfigure stdout. Proceeding anyway.", exc_info=True)
 
     flam.logger.info(f"Executed with: {sys.argv=}")
 
