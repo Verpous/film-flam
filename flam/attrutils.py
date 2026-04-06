@@ -172,7 +172,7 @@ class DateHandler(TypeHandler):
         try:
             return self._strptime(primitive_str)
         except ValueError:
-            return self.strip(dateutil.parser.parse(primitive_str, default=datetime.datetime.min))
+            return self.strip(dateutil.parser.parse(primitive_str, default=datetime.datetime.min).date())
 
     # This function is to take date objects which have more than the datefmt cares about and zero out the parts we want to ignore in the date.
     def strip(self, date: datetime.date) -> datetime.date:

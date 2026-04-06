@@ -591,10 +591,11 @@ class FlamContext:
     def fetch(self, listdefs: typing.Iterable[str], refetch_pattern: None | str = None, quiet: bool = True) -> None:
         _dbg.logger.info(f"Requested to fetch {listdefs=}, {refetch_pattern=}, {quiet=}")
 
-        # Use a list not a generator so that if one of the listdefs doesn't parse good we will raise an error now and not before fetching a few.
+        # Get all fetchers before using any so that if one of the listdefs doesn't parse good we will raise an error now and not before fetching a few.
+        # We use stable_dedup to not fetch the same thing twice but in a way which preserves the requested fetch order.
         fetchers = [
             self._get_fetcher(cldef)
-            for cldef in set(_ldef.CanonListdef.parse_and_expand(listdefs, self, _ldef.ExpandFlavor.FETCH))
+            for cldef in utils.stable_dedup((_ldef.CanonListdef.parse_and_expand(listdefs, self, _ldef.ExpandFlavor.FETCH)))
         ]
 
         try:

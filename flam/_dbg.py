@@ -24,6 +24,7 @@ import enum
 import colorama
 import typing
 import time
+import concurrent_log_handler
 
 _start_import_time = time.time()
 
@@ -84,16 +85,10 @@ def _make_logger() -> logging.Logger:
     logs_path = get_log_file_path()
     os.makedirs(os.path.dirname(logs_path), exist_ok=True)
 
-    # TODO: This isn't good for multiple processes. Not just because logs may get garbled,
-    # but also because we hit an error if file rotation takes place while two processes are using it.
-    # Storing logs in the flam dir ain't good neither though,
-    # because logger initialization must precede context creation and because of volatile mode.
-    # There's an easy solution and a hard solution:
-    # Easy: name the file something unique each time. Avoid conflicts but logs will be a bitch to open and read.
-    # Hard: log to a SocketHandler and implement server which listens on the socket and writes incoming logs to a file.
-    #       The server will be single-instance, probably implement using multiprocessing and make it so only once instance can catch the "lock"
-    #       and the others spin until the current master server dies and one of the others takes its place.
-    fh = logging.handlers.RotatingFileHandler(logs_path, maxBytes=1 << 24, backupCount=1, encoding='utf-8')
+    # I hate to bring in a dependency, but we need ConcurrentRotatingFileHandler. It solves two problems:
+    # 1. Prevents logs from being garbled if multiple flam instances are running in parallel. In the future if we support context parallelism, this will be especially important.
+    # 2. On windows if the logs need to get rotated while they are opened in another process (say tail -f for following the logs), you get a crash.
+    fh = concurrent_log_handler.ConcurrentRotatingFileHandler(logs_path, maxBytes=1 << 24, backupCount=1, encoding='utf-8')
     fh.setLevel(logging.DEBUG)
     fh.setFormatter(formatter)
     logger_.addHandler(fh)

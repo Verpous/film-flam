@@ -132,7 +132,10 @@ _gen_requirements() {
     # 3. pipreqs fails at identifying packages locally, instead resolving them from the PyPI server where it gets the version wrong,
     #    so we actually use pipreqs to get the names of packages, then grep them with the correct versions from pip freeze.
     _mktemp req_patterns
-    pipreqs --mode no-pin --ignore .mypy_cache,.venv --print | sed -E 's/IMDbPY/cinemagoer/g; s/python_dateutil/python-dateutil/g; s/.*/^\0==/g' > "$req_patterns"
+
+    # Don't pipe pipreqs to sed, instead write file with pipreqs and edit it inplace with sed. This is to not sweep pipreq failure under the rug. We won't enable pipefail.
+    pipreqs --mode no-pin --ignore .mypy_cache,.venv --print > "$req_patterns"
+    sed -iE 's/IMDbPY/cinemagoer/g; s/python_dateutil/python-dateutil/g; s/.*/^\0==/g' "$req_patterns"
     grep -E --file="$req_patterns" <(pip freeze) | sed -E 's/==/>=/g' | tee _gen_requirements.txt
 
     # Sanity check that we didn't miss any packages.

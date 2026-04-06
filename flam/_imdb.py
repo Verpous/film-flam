@@ -419,12 +419,15 @@ class _IMDbApiDev:
             for crew_type in _ml.CrewType.iterate_except_any()
         }
 
+        # Some movies (for example Waltz with Bashir) don't have a stars key.
+        star_uids = {star['id'].removeprefix('nm') for star in movie_json.get('stars', [])}
         people_to_add = []
 
         # Ex: https://api.imdbapi.dev/titles/tt0054331/credits?pageSize=50
         for credits_json in cls._paginated_rest_call(f'titles/tt{movie_csv.uid}/credits'):
-            for person_json in credits_json['credits']:
-                person_uid = person_json['name']['id'][2:]
+            # Actually had an instance of receiving no credits key in the response, for the Netflix movie Troll.
+            for person_json in credits_json.get('credits', []):
+                person_uid = person_json['name']['id'].removeprefix('nm')
                 characters: list[str] = []
                 is_star = None
                 gender = None
@@ -437,7 +440,7 @@ class _IMDbApiDev:
                     case 'actor' | 'actress':
                         crew_type = _ml.CrewType.CAST
                         characters.extend(person_json.get('characters', []))
-                        is_star = any(star['id'][2:] == person_uid for star in movie_json['stars'])
+                        is_star = person_uid in star_uids
                         gender = 'male' if person_json['category'] == 'actor' else 'female'
                     case _:
                         raise RuntimeError(f'Unexpected {person_json["category"]=}')
@@ -557,7 +560,7 @@ class _IMDbApiDev:
             response = requests.get(f'https://api.imdbapi.dev/{endpoint}', timeout=30, params=kwargs)
             _dbg.logger.info(f"Requested: {response.url} with res: {response.status_code}")
 
-            # We actually get this a lot and it reaaaally slows us down. I tried to space out requests by like a second to preempt this warning,
+            # We actually get this a lot when doing names:batchGet and it reaaaally slows us down. I tried to space out requests by like a second to preempt this warning,
             # but nothing seems as fast as just firing requests at our maximum pace and then sleeping when the API complains.
             # For the record, guy on telegram says that the counter is per endpoint, and limited to 5 requests per second for most endpoints,
             # but 20 requests per 10 seconds for batch endpoints.
@@ -572,14 +575,37 @@ class _IMDbApiDev:
         raise _exc.FlamError('imdbapi.dev is refusing our requests due to sending too many. Try again later.')
 
     @classmethod
-    def _paginated_rest_call(cls, endpoint: str, **kwargs: typing.Any) -> typing.Iterable[dict]:
+    def _paginated_rest_call(cls, endpoint: str, **kwargs: typing.Any) -> list[dict]:
         PAGE_SIZE = 50
-        response = cls._rest_call(endpoint, pageSize=PAGE_SIZE, **kwargs)
-        yield response
+        NUM_RETRIES = 2
 
-        while 'nextPageToken' in response:
-            response = cls._rest_call(endpoint, pageSize=PAGE_SIZE, pageToken=response['nextPageToken'], **kwargs)
-            yield response
+        for i in range(NUM_RETRIES):
+            try:
+                all_responses = []
+                page_token = None
+                response = cls._rest_call(endpoint, pageSize=PAGE_SIZE, **kwargs)
+                all_responses.append(response)
+
+                while 'nextPageToken' in response:
+                    # This is some bizarre thing I got once when querying Troll (2022). It looped 1600 times before breaking out of it.
+                    # I don't know if this will reproduce or what should we do if we get it again.
+                    # Let it break out naturally after some time? Sweep it under the rug? FetchInterrupt it?
+                    # For now give it a retry but if it persists raise an error that will crash us non-gracefully.
+                    if page_token is not None and page_token == response['nextPageToken']:
+                        raise RuntimeError(f"Got same page token: '{page_token}' twice in a row for endpoint: {endpoint}")
+
+                    page_token = response['nextPageToken']
+                    response = cls._rest_call(endpoint, pageSize=PAGE_SIZE, pageToken=page_token, **kwargs)
+                    all_responses.append(response)
+
+                return all_responses
+            except RuntimeError as e:
+                if i == NUM_RETRIES - 1:
+                    raise
+
+                _dbg.logger.error(str(e))
+
+        raise RuntimeError("Shouldn't get here!")
 
 def _fetch_movies_in_csv(movies_csv: list[_CsvRow], mlf: _mlf.MovieListFile, fetcher: _fetch.ListFetcher,
         fetch_from_api_func: typing.Callable[[list[_CsvRow], _mlf.MovieListFile, _fetch.ListFetcher], None]) -> None:
@@ -612,7 +638,7 @@ def _read_csv(movies_csv_file: typing.Iterable[str]) -> list[_CsvRow]:
     
     # The first 2 characters of the uid are a prefix that we wish to discard.
     for movie in movies_csv:
-        movie.uid = movie.uid[2:]
+        movie.uid = movie.uid.removeprefix('tt')
 
     _dbg.logger.info(f"Read CSV with {len(movies_csv)} rows (excluding the titles row)")
     return movies_csv

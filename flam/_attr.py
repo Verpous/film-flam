@@ -45,13 +45,14 @@ type AttributeValue = AttributePrimitive | list[AttributePrimitive]
 class ComparisonOp(enum.Enum):
     # IMPORTANT:
     # * Signs must be prefix-free! Hence the weird signs like '.+'
-    # * Signs should avoid using characters that have special meaning in bash. Hence '=~' instead of just '~'
+    # * Signs should avoid using characters that have special meaning in bash. Hence '+' instead of '>'
+    # * Yes '~' is a special character but the alternative was '==', '=~' and that's too horrible.
     LE = ('-', operator.le)
     GE = ('+', operator.ge)
-    EQ = ('==', operator.eq)
+    EQ = ('=', operator.eq)
     LT = ('.-', operator.lt)
     GT = ('.+', operator.gt)
-    RX = ('=~', lambda v, pattern: bool(pattern.search(v)))
+    RX = ('~', lambda v, pattern: bool(pattern.search(v)))
 
     def __init__(self, sign: str, compare: typing.Callable[[AttributePrimitive, AttributePrimitive | re.Pattern], bool]) -> None:
         self.sign = sign
@@ -69,24 +70,20 @@ class CmpTo:
         self._op = op
         self._const_primitive = const_primitive
 
-        match op:
-            case ComparisonOp.RX:
-                self._const_sort_key = None
-            case _:
-                # By wrapping the primitive as a sort key, we get a type that supports operators like '>', '<=', etc. even when comparing Nones to not-Nones.
-                assert not isinstance(const_primitive, re.Pattern)
-                self._const_sort_key = attribute._sort_key_primitive(const_primitive)
-
     def __call__(self, primitive: AttributePrimitive) -> bool:
         # This is really bizarre but if you just use self._op directly mypy complains it isn't callable.
         op = self._op
 
         match self._op:
             case ComparisonOp.RX:
-                # Order is important.
+                # No threat of Nones for regexes. And order is important.
                 return op(self._attribute.str_of_value(primitive), self._const_primitive)
             case _:
-                return op(self._attribute._sort_key_primitive(primitive), self._const_sort_key)
+                # If one but not both are None then they are incomparable - return false.
+                if (primitive is None) ^ (self._const_primitive is None):
+                    return False
+
+                return op(primitive, self._const_primitive)
 
     def __str__(self) -> str:
         match self._op:

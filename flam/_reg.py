@@ -83,6 +83,7 @@ class RegistryOf[T: (type[_fetch.ListFetcher], type[_filter.Predicate], _attr.At
 class RegistryOfAttributes(RegistryOf[_attr.Attribute]):
     def register(self, item: _attr.Attribute, as_none: bool = False) -> None:
         super().register(item)
+        _dbg.logger.info(f"Registering attribute {item.qualified_name=} also as a predicate")
 
         # This completely violates type-safety but we hacky boys.
         self._parent_reg.predicates.register(item, as_none=True) # type: ignore

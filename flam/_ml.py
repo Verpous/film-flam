@@ -20,7 +20,6 @@ import enum
 import abc
 import copy
 import bisect
-import collections
 import time
 
 from . import _filter
@@ -133,8 +132,13 @@ class Findable(abc.ABC):
     def uid(self) -> str:
         pass
 
+    # NOTE: I considered doing __getitem__ as a shorthand for this but I think I don't like it.
     @abc.abstractmethod
     def extract(self, attribute: _attr.Attribute) -> _attr.AttributeValue:
+        pass
+
+    @abc.abstractmethod
+    def excrete(self, predicate: _filter.Predicate) -> bool:
         pass
 
 class Movie(Findable):
@@ -157,6 +161,9 @@ class Movie(Findable):
 
     def extract(self, attribute: _attr.Attribute) -> _attr.AttributeValue:
         return attribute._extract_from_movie(self, self._mlf_movie) # type: ignore
+
+    def excrete(self, predicate: _filter.Predicate) -> bool:
+        return predicate._excrete_from_movie(self, self._mlf_movie) # type: ignore
 
     def associated_people(self, crew_type: CrewType, group_mode: GroupMode) -> typing.Iterable[People]:
         if group_mode == GroupMode.DEFAULT:
@@ -213,8 +220,7 @@ class PeopleUidParts(typing.NamedTuple):
     group_mode: GroupMode
 
 class People(Findable):
-    def __init__(self, movie_list: MovieList, mlf_people: typing.Iterable[_mlf.MLFPerson], crew_type: CrewType, group_mode: GroupMode,
-            associated_movie_uids_hint: None | typing.Iterable[str] = None) -> None:
+    def __init__(self, movie_list: MovieList, mlf_people: typing.Iterable[_mlf.MLFPerson], crew_type: CrewType, group_mode: GroupMode) -> None:
         super().__init__(movie_list)
 
         # Keep people sorted by uid.
@@ -222,9 +228,7 @@ class People(Findable):
         self._crew_type = crew_type
         self._group_mode = group_mode
         self._uid = self.compose_uid((mlf_person.uid for mlf_person in self._mlf_people), crew_type, group_mode)
-
-        # In some cases we are able to optimize finding associated movies. Otherwise we'll compute it ourselves when needed.
-        self._associated_movies_cache = None if associated_movie_uids_hint is None else list(movie_list.get_movie_by_uid(uid) for uid in associated_movie_uids_hint)
+        self._associated_movies_cache: None | list[Movie] = None
 
     @property
     def type_(self) -> FindableType:
@@ -248,6 +252,9 @@ class People(Findable):
     
     def extract(self, attribute: _attr.Attribute) -> _attr.AttributeValue:
         return attribute._extract_from_people(self, self._mlf_people) # type: ignore
+
+    def excrete(self, predicate: _filter.Predicate) -> bool:
+        return predicate._excrete_from_people(self, self._mlf_people) # type: ignore
 
     def associated_movies(self) -> typing.Iterable[Movie]:
         # Guaranteed consisted ordering because find() has consistent ordering.
@@ -435,6 +442,20 @@ class Role(Findable):
         
         raise RuntimeError(f"Unexpected {attribute.findable_type=}")
 
+    def excrete(self, predicate: _filter.Predicate) -> bool:
+        # Support optionally implementing _excrete_from_role on any type of predicate, for custom behavior on how to extract them from roles.
+        # It's best not to abuse this power but we will allow it.
+        if predicate.findable_type == FindableType.ROLES or hasattr(predicate, '_excrete_from_role'):
+            return predicate._excrete_from_role(self, self._mlf_roles, self._movie._mlf_movie, self._people._mlf_people) # type: ignore
+        
+        if predicate.findable_type == FindableType.MOVIES:
+            return self.movie.excrete(predicate)
+        
+        if predicate.findable_type == FindableType.PEOPLE:
+            return self.people.excrete(predicate)
+        
+        raise RuntimeError(f"Unexpected {predicate.findable_type=}")
+
     @classmethod
     def compose_uid(cls, movie: Movie, people: People) -> str:
         return f'{movie.uid}::{people.uid}'
@@ -516,7 +537,7 @@ class MovieList:
             yield from findables.values()
         else:
             for f in findables.values():
-                if filter.excrete(f, self._ctx):
+                if filter.excrete(f):
                     yield f
 
     def find_movies(self, filter: None | _filter.Filter = None) -> typing.Iterable[Movie]:
@@ -636,26 +657,24 @@ class MovieList:
 
         mlf = self._movie_list_file
 
-        # Groups is built as a defaultdict of frozenset(uids of people in the group) -> set(uids of movies the group was in).
-        # The frozenset is because regular sets aren't hashable. It lets us dedup if the same group of people appear multiple times.
-        # While grouping is the most efficient time to remember their movie credits, which is useful for speeding up other algorithms later.
-        groups = collections.defaultdict(set)
-
-        # groups will in the end include all relevant crew sets. We know that at minimum, it should have every crew that any movie has.
+        # groups will in the end include all relevant people groups, each as a frozenset. We know that at minimum, it should have every crew that any movie has.
         # This set also allows us to only iterate over every unique movie crew pair, instead of every movie pair.
+        # We use frozenset because regular sets aren't hashable.
         if crew_type == CrewType.ANY:
-            for mlf_movie in mlf.movies_by_uid.values():
-                # If covering all crew types, we need to union the people who worked on the movie in any capacity.
-                group = frozenset(uid for mlf_crew in mlf_movie.crew.values() for uid in mlf_crew.roles_by_uid)
-                groups[group].add(mlf_movie.uid)
+            # If covering all crew types, we need to union the people who worked on the movie in any capacity.
+            groups = {
+                frozenset(uid for mlf_crew in mlf_movie.crew.values() for uid in mlf_crew.roles_by_uid)
+                for mlf_movie in mlf.movies_by_uid.values()
+            }
         else:
-            # Easier when we have a specific crew_type because the set of crew of that type is directly accessible in the MLF.
-            for mlf_movie in mlf.movies_by_uid.values():
-                group = frozenset(mlf_movie.crew[crew_type].roles_by_uid)
-                groups[group].add(mlf_movie.uid)
+            groups = {
+                frozenset(mlf_movie.crew[crew_type].roles_by_uid)
+                for mlf_movie in mlf.movies_by_uid.values()
+                if len(mlf_movie.crew[crew_type].roles_by_uid) > 0
+            }
 
         # Some crews may have been empty. In that case they should all be equal to this empty set and we can easily remove it.
-        groups.pop(frozenset(), None)
+        groups.discard(frozenset())
 
         # Optimization: we only need to only iterate over each *unordered* crew pair once. For that we need groups to be ordered.
         ordered_base_groups = list(groups)
@@ -668,28 +687,27 @@ class MovieList:
         start_multiple = bisect.bisect_right(ordered_base_groups, 1, key=len)
 
         # Now we iterate over every unordered pair of crews that both have len > 1.
+        # NOTE: in the past I had it as part of this algorithm to remember each group's credits. I thought that when merging two groups, we can merge their credits too.
+        # But in the end that proved to be incorrect. I can't entirely explain it but I think it's better to just not complicate things with that anymore.
         for i, g1 in enumerate(ordered_base_groups[start_multiple:]):
 
             # We skip the pair of any crew with itself because we started off groups with all of those.
             for g2 in ordered_base_groups[i + 1:]:
                 intersection = g1 & g2
+                len_intersection = len(intersection)
 
                 # Empty intersections are skipped.
-                # Non-empty intersections are added - this may create a new group or find that the group already exists.
-                # Either way we want to add the movies of both g1 and g2 to this group.
-                if len(intersection) != 0:
-                    intersection_movies = groups[intersection]
+                # If the intersection is equal to g1 or g2, it's already in groups so we will not re-add it.
+                # If we did re-add it the set will block it anyway but doing it this way is more optimal.
+                # For extra optimization juice, we don't even compare the sets, comparing lengths is enough.
+                if len_intersection != 0 and len_intersection != len(g1) and len_intersection != len(g2):
+                    groups.add(intersection)
 
-                    # Theoretically we could tuple g1, g2 with their movies set so we won't have to do the lookup here, but it might actually end up slower.
-                    intersection_movies.update(groups[g1])
-                    intersection_movies.update(groups[g2])
-
-        for group, credits in groups.items():
+        for group in groups:
             yield People(
                 self,
                 (mlf.people_by_uid[uid] for uid in group),
                 crew_type, GroupMode.GROUP,
-                associated_movie_uids_hint=credits,
             )
 
     def _generate_roles(self, crew_type: CrewType, group_mode: GroupMode) -> dict[str, Role]:

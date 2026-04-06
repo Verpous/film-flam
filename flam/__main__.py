@@ -31,6 +31,7 @@ import shutil
 import functools
 import re
 import glob
+import fnmatch
 import time
 
 # Unlike all other modules in this package, this one pretends it's from outside the package and simply "imports flam".
@@ -132,6 +133,7 @@ def print_table(table: list[list[str]],
             )))
             out.write('\n')
         
+        # NOTE: considered once the file is written to also write it to the logs. But I don't think there's a need - if users have an issue they will show me what was printed.
         out.flush()
 
         if paginate:
@@ -595,7 +597,7 @@ For people, it looks like 'cast-people', 'director-people:group', etc.''')
         movie_list = ctx.get_movie_list(listdefs if len(listdefs) > 0 else flam.SpecialListType.DEFAULTS)
 
         sort_attrs = cls.parse_sortkeys(args, findable_type, ctx)
-        column_attrs = cls.parse_columns(args, findable_type, ct_gms, sort_attrs, movie_list, ctx)
+        column_attrs = cls.parse_columns(args, findable_type, ct_gms, sort_attrs, movie_list, filter, ctx)
 
         flam.logger.info("Building findables list")
 
@@ -619,123 +621,184 @@ For people, it looks like 'cast-people', 'director-people:group', etc.''')
 
     # Can't do this at argparse time because it depends on the context.
     @classmethod
-    def parse_sortkeys(cls, args: argparse.Namespace, findable_type: flam.FindableType, ctx: flam.FlamContext) -> list[flam.Attribute]:
+    def parse_sortkeys(cls, args: argparse.Namespace, findable_type: flam.FindableType, ctx: flam.FlamContext) -> list[tuple[flam.Attribute, None | str]]:
+        attributes: list[tuple[flam.Attribute, None | str]]
+
         if args.sort is None:
+            # Use qualified names for performance and to avoid ambiguity.
             default_attribute_names = {
-                flam.FindableType.MOVIES: ['movies-release-year', 'movies-title'],
+                flam.FindableType.MOVIES: ['movies-release-year', 'movies-title', 'movies-runtime'],
                 flam.FindableType.PEOPLE: ['people-crew-type', 'people-group-mode', 'people-num-movies', 'people-name'],
-                flam.FindableType.ROLES: ['people-crew-type', 'people-group-mode', 'people-num-movies', 'people-name', 'movies-release-year', 'movies-title'],
+
+                # We think of roles as being a people search more than a movie search, so it's sort first by people, then by movie.
+                flam.FindableType.ROLES: ['people-crew-type', 'people-group-mode', 'people-num-movies', 'people-name', 'movies-release-year', 'movies-title', 'movies-runtime'],
             }
 
-            attribute_names = default_attribute_names[findable_type]
+            attributes = [(ctx.attributes[a], None) for a in default_attribute_names[findable_type]]
         else:
+            # Return a tuple with the attribute and also a hint of which string to use to print it to the user,
+            # so that if this sort attribute is added as a smart column the user will see it by the same alias he used.
             attribute_names = args.sort.split(',') if args.sort != '' else []
+            attributes = [(ctx.attributes.get(a, type_hint=findable_type), a) for a in attribute_names]
 
-        attributes = [ctx.attributes.get(a, type_hint=findable_type) for a in attribute_names]
+            for attr, alias_hint in attributes:
+                if not attr.findable_type.is_applicable_to(findable_type):
+                    display_str = alias_hint if alias_hint is not None else attr.qualified_name
+                    raise flam.InputError(f"ATTRIBUTE '{display_str}' is a {attr.findable_type} attribute, so it is not found on {findable_type}.")
 
-        for i, attr in enumerate(attributes):
-            if not attr.findable_type.is_applicable_to(findable_type):
-                raise flam.InputError(f"ATTRIBUTE '{attribute_names[i]}' is a {attr.findable_type} attribute, so it is not found on {findable_type}.")
-        
-        flam.logger.info(f"Got sort keys: {', '.join(attr.qualified_name for attr in attributes)}")
+        flam.logger.info(f"Got sort keys: {', '.join(attr.qualified_name for attr, _ in attributes)}")
         return attributes
+
+    # Helper func for parse_columns.
+    @classmethod
+    def parse_user_column(cls, column_str: str, findable_type: flam.FindableType, ctx: flam.FlamContext) -> typing.Iterable[tuple[flam.Attribute, None | str, bool]]:
+        # Only support globbing if it includes '*'. Otherwise we expect to just find a single match for this column name.
+        if '*' not in column_str:
+            attr = ctx.attributes.get(column_str, type_hint=findable_type)
+            
+            if not attr.findable_type.is_applicable_to(findable_type):
+                raise flam.InputError(f"ATTRIBUTE '{attr.qualified_name}' is a {attr.findable_type} attribute, so it is not found on {findable_type}.")
+
+            # We'll return a list of (attr, name, must_keep) tuple:
+            # * name is a hint so that the table printer will user the user-provided name if it's an alias
+            # * must_keep is a hint that this user is specifically requested by the user so we won't drop it even if it has duplicates
+            yield attr, column_str, True
+        else:
+            # We'll glob for matches.
+            matches = []
+
+            for alias in ctx.attributes:
+                attr = ctx.attributes[alias]
+
+                # Only glob attributes that are applicable to this findable type.
+                if not ctx.attributes[alias].findable_type.is_applicable_to(findable_type):
+                    continue
+
+                # Check if globs match without the type too so you can glob like 'avg-*' and not 'movies-avg-*'.
+                _, alias_without_type = flam.decompose_qualified_attr_or_pred_name(alias)
+
+                # I think there's no such thing as an "invalid fnmatch pattern" so no error handling needed here.
+                if fnmatch.fnmatch(alias, column_str) or fnmatch.fnmatch(alias_without_type, column_str):
+                    matches.append((attr, alias, False))
+
+            # We want them sorted so that the output is nice and consistent.
+            matches.sort(key=lambda tup: tup[1])
+            yield from matches
+    
+    # Helper func for parse_columns.
+    @classmethod
+    def should_add_source_column(cls, findable_type: flam.FindableType, movie_list: flam.MovieList, ctx: flam.FlamContext) -> bool:
+        # Easily skip if not applicable.
+        if not flam.FindableType.MOVIES.is_applicable_to(findable_type):
+            return False
+        
+        # Always add for anonymous lists. Note that anonymous lists could also just mean the list is filtered, but in the CLI case we apply the filter only later.
+        if movie_list.abstract_listdef.list_type == flam.SpecialListType.ANONYMOUS:
+            return True
+
+        # For configured composite lists we can check in the configuration if it's made up of multiple sublists.
+        # This is much faster than going movie by movie in the list and checking if we can spot more than one sources.
+        if movie_list.abstract_listdef.list_type == flam.SpecialListType.COMPOSITE:
+            composite_list = ctx.cfg_readonly.composite_lists.get_by_uid(movie_list.abstract_listdef.address)
+            return len(composite_list.simple_list_uids) > 1
+
+        return False
 
     # Can't do this at argparse time because it depends on the context and sortkeys.
     @classmethod
     def parse_columns(cls, args: argparse.Namespace, findable_type: flam.FindableType, ct_gms: list[tuple[flam.CrewType, flam.GroupMode]],
-            sort_attrs: list[flam.Attribute], movie_list: flam.MovieList, ctx: flam.FlamContext) -> list[tuple[flam.Attribute, None | str]]:
+            sort_attrs: list[tuple[flam.Attribute, None | str]], movie_list: flam.MovieList, filter: flam.Filter, ctx: flam.FlamContext) -> list[tuple[flam.Attribute, None | str]]:
+        # First we'll parse user columns. It's kind of ugly and tricky.
+        user_columns = [] if args.columns is None else args.columns.removeprefix('+').split(',')
 
-        attributes: list[tuple[flam.Attribute, None | str]]
+        # Start with just getting the attribute of each column which includes expanding globs so each column might expand to multiple attributes.
+        user_attrs = [
+            tup
+            for col in user_columns
+                for tup in cls.parse_user_column(col, findable_type, ctx)
+        ]
+
+        # Now we need a deduping step - some attributes may have been globbed multiple times by different aliases,
+        # or because the user has shadowed some builtin attribute with their custom one.
+        # We want to always keep attributes that were added specifically and not by a glob, too. So have to be careful.
+        # Iterate over indices in reverse because we'll be removing elements as we go.
+        for i in reversed(range(len(user_attrs))):
+            attr, _, must_keep = user_attrs[i]
+
+            # Attribute was specifically requested by the user - keep it always.
+            if must_keep:
+                continue
+
+            # Globbed attribute and there are others like it to the right, remove this one.
+            if any(a.qualified_name == attr.qualified_name for a, _, _ in user_attrs[i + 1:]):
+                del user_attrs[i]
+            # Globbed attribute and there are others like it to the left which are must_keep, also remove this one.
+            elif any(a_must_keep and a.qualified_name == attr.qualified_name for a, _, a_must_keep in user_attrs[:i]):
+                del user_attrs[i]
+
+        # Now we're done with must_keep. We'll build the final attributes list into this object.
+        attributes = [(attr, alias_hint) for attr, alias_hint, _ in user_attrs]
         
-        # Support the entire string just being '*' and then we expand to every applicable attribute. Good for debugging mainly.
-        if args.columns == '*':
-            # We need to solve some issues here:
-            # 1. If the user shadowed an attribute we don't wait it to be repeated twice - so use a set.
-            # 2. If the attribute has aliases we don't want it to be repeated per alias - so put only qualified names in the set.
-            # 3. We want to have some kind of consistent sort order - so sort it.
-            # It might've been nice to mind the registry level when sorting, but meh.
-            attr_names_once = sorted(set(
-                ctx.attributes[alias].qualified_name
-                for alias in ctx.attributes
-            ))
+        # Helper function - insert to attributes but only if it's not already there.
+        # We need this because we'll be avoiding adding default/smart columns if it will cause duplication with the user's columns.
+        def uniq_insert(attr: flam.Attribute, alias_hint: None | str, index: int) -> None:
+            if any(attr.qualified_name == a.qualified_name for a, _ in attributes):
+                return
 
-            attributes = []
+            attributes.insert(index, (attr, alias_hint))
 
-            for qualified_name in attr_names_once:
-                attr = ctx.attributes[qualified_name]
-
-                if attr.findable_type.is_applicable_to(findable_type):
-                    attributes.append((attr, None))
-
-            return attributes
-
-        # Now handle the usual case of no '*'. If the string starts with '+' we'll treat it as additive mode and add all the requested columns on top of the default ones.
+        # If the string starts with a '+' then we are in additive mode - combine both user-added columns and the default columns.
         is_additive = args.columns is None or args.columns.startswith('+')
-        columns = [] if args.columns is None else args.columns.removeprefix('+').split(',')
-
-        # We'll return a list of (attr, name) tuples where name is just a hint so that the table printer will user the user-provided name if it's an alias.
-        attributes = [(ctx.attributes.get(c, type_hint=findable_type), c) for c in columns]
 
         if is_additive:
-            # TODO: Decide on default columns for PEOPLE, ROLES
+            # Default and smart columns should all be specified by their qualified names,
+            # Both because it's efficient and because it allows us to use `attributes[...]` and not `attributes.get(...)` without fear of ambiguity.
+            # They are displayed by abbreviated names anyway in the printing step.
             default_columns = {
                 flam.FindableType.MOVIES: ['movies-title', 'movies-runtime', 'movies-release-year', 'movies-rating', 'movies-metascore', 'movies-director'],
                 flam.FindableType.PEOPLE: ['people-name', 'people-birth-year', 'people-height-cm', 'people-num-movies', 'people-avg-rating', 'people-avg-metascore'],
-                flam.FindableType.ROLES: ['people-name', 'movies-title', 'people-num-movies', 'people-avg-rating', 'people-avg-metascore', 'movies-runtime', 'movies-release-year'],
+                flam.FindableType.ROLES: ['people-name', 'movies-title', 'people-num-movies', 'movies-release-year'],
             }
 
-            # Use default columns even if the same attribute is also in the custom columns from the user.
-            # Print the default columns before the additions, and additions before smart columns.
-            attributes = [(ctx.attributes.get(c, type_hint=findable_type), None) for c in default_columns[findable_type]] + attributes
-            smart_columns = []
+            # Add defaults to the left of the user columns. In reverse because all are inserted to 0 so that actually results in keeping the original order.
+            for col in reversed(default_columns[findable_type]):
+                uniq_insert(ctx.attributes[col], None, 0)
 
-            # "Smart" columns that aren't default unless conditions are met.
-            # TODO: maybe we should generalize and just say that any sort key also becomes a column key,
-            # and maybe we should consider not just sort keys but also attributes referenced in the filter?
-            if any(attr.qualified_name == 'movies-watched' for attr in sort_attrs):
-                smart_columns.append('movies-watched')
-
-            if any(attr.qualified_name == 'movies-votes' for attr in sort_attrs):
-                smart_columns.append('movies-votes')
-
-            if any(attr.qualified_name == 'movies-my-rating' for attr in sort_attrs):
-                smart_columns.append('movies-my-rating')
-
-            if any(attr.qualified_name == 'movies-note' for attr in sort_attrs):
-                smart_columns.append('movies-note')
-            
+            # Add a column for the crew type at the leftmost if we're searching for multiple crew types.
+            # We won't also add a column for the group mode. The user knows what he did.
             if len(ct_gms) > 1:
-                smart_columns.append('people-crew-type')
+                uniq_insert(ctx.attributes['people-crew-type'], None, 0)
 
-            # If more than one CTGM and one of them isn't the default group mode, show the group mode.
-            if len(ct_gms) > 1 and any(group_mode != crew_type.default_group_mode for crew_type, group_mode in ct_gms):
-                smart_columns.append('people-group-mode')
-
+            # Add a column for the characters at the end if searching for actors.
             if flam.FindableType.ROLES.is_applicable_to(findable_type) and any(crew_type == flam.CrewType.CAST for crew_type, _ in ct_gms):
-                smart_columns.append('roles-characters')
+                uniq_insert(ctx.attributes['roles-characters'], None, len(attributes))
 
-            # If we combined multiple lists, tag each element with the list(s) it came from.
-            # Note that anonymous lists could also mean the list is filtered, but in the CLI case we apply the filter only later.
-            if flam.FindableType.MOVIES.is_applicable_to(findable_type) and movie_list.abstract_listdef.list_type == flam.SpecialListType.ANONYMOUS:
-                smart_columns.append('movies-source')
+            # Add a column for the origin list at the end if we combined multiple lists. The way to check it is a little complicated.
+            if cls.should_add_source_column(findable_type, movie_list, ctx):
+                uniq_insert(ctx.attributes['movies-source'], None, len(attributes))
 
-            # Only use smart columns that aren't already in the attributes list.
-            for c in smart_columns:
-                smart_attr = ctx.attributes.get(c, type_hint=findable_type)
+            # Add a column for every sort key in the end if they are not the default sort keys.
+            if args.sort is not None:
+                for attr, alias_hint in sort_attrs:
+                    uniq_insert(attr, alias_hint, len(attributes))
 
-                if all(a.qualified_name != smart_attr.qualified_name for a, _ in attributes):
-                    attributes.append((smart_attr, None))
-
-        for attr, _ in attributes:
-            if not attr.findable_type.is_applicable_to(findable_type):
-                raise flam.InputError(f"ATTRIBUTE '{attr.qualified_name}' is a {attr.findable_type} attribute, so it is not found on {findable_type}.")
+            # Add a column for every attribute referenced in the filter.
+            for filter_member in filter.colonoscopy():
+                # TODO: improve after adding some predicates.
+                # Implementation is hacky here because we don't want colonoscopy to descend into the children of predicates.
+                # Those could be of a completely different type. And we also don't have a solid way to get the attributes referenced by a predicate.
+                # Don't really want to have to implement that for every predicate I add. So we use this hack. But we should at least improve it to cover -has predicates and such..
+                # Also colonoscopy could be improved to be some auxiliary on top of a walk() function meant for recursive walking?
+                # AND we should consider not just the filter we are about to apply but also the one used to compose the composite list??
+                if isinstance(filter_member, flam.Predicate) and hasattr(type(filter_member), 'ATTRIBUTE'):
+                    uniq_insert(type(filter_member).ATTRIBUTE, None, len(attributes)) # type: ignore
 
         flam.logger.info(f"Got columns: {', '.join(attr.qualified_name for attr, _ in attributes)}")
         return attributes
 
     @classmethod
-    def sort_findables(cls, sort_attrs: list[flam.Attribute], findables: list[flam.Findable], args: argparse.Namespace) -> None:
-        for attr in reversed(sort_attrs):
+    def sort_findables(cls, sort_attrs: list[tuple[flam.Attribute, None | str]], findables: list[flam.Findable], args: argparse.Namespace) -> None:
+        for attr, _ in reversed(sort_attrs):
             # Use functools.partial to silence "cell-var-from-loop" warning by pylint.
             key = functools.partial(lambda a, f: a.sort_key(f.extract(a)), attr)
             findables.sort(key=key, reverse=(not attr.is_ascending) ^ args.reverse)
@@ -745,10 +808,10 @@ For people, it looks like 'cast-people', 'director-people:group', etc.''')
         if not args.no_titles:
             titles = []
 
-            for attr, name_hint in attributes:
+            for attr, alias_hint in attributes:
                 # If the user specified the attribute with an alias or a qualified name we want to also print it with that header.
-                if name_hint is not None:
-                    titles.append(name_hint)
+                if alias_hint is not None:
+                    titles.append(alias_hint)
                 # Use name_without_type unless that would lead to ambiguity.
                 elif all(a == attr or a.name_without_type != attr.name_without_type for a, _ in attributes):
                     titles.append(attr.name_without_type)

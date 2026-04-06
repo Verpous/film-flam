@@ -311,3 +311,8 @@ def parse_num_pretty(num_str: str) -> int:
 
 def clamp(num: _typeshed.SupportsRichComparisonT, lower_bound: _typeshed.SupportsRichComparisonT, upper_bound: _typeshed.SupportsRichComparisonT) -> _typeshed.SupportsRichComparisonT:
     return min(upper_bound, max(lower_bound, num))
+
+def stable_dedup[T](elements: typing.Iterable[T]) -> typing.Iterable[T]:
+    # Dictionaries preseve insertion order, but dedup if two elements are equal.
+    d = {e: None for e in elements}
+    yield from d.keys()

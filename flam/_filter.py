@@ -61,12 +61,17 @@ class EatParams:
 class FilterMember(abc.ABC):
     # Takes in a found item (movie, person, or role) and returns true if it passes the filter.
     @abc.abstractmethod
-    def excrete(self, findable: _ml.Findable, ctx: _ctx.FlamContext) -> bool:
+    def excrete(self, findable: _ml.Findable) -> bool:
         pass
 
     # Decompiles the filter into a list of tokens.
     @abc.abstractmethod
     def regurgitate(self) -> typing.Iterable[str]:
+        pass
+
+    # Walk the syntax tree. Does not descend into children of predicates. Members should be returned from left to right.
+    @abc.abstractmethod
+    def colonoscopy(self) -> typing.Iterable[FilterMember]:
         pass
 
     def __str__(self) -> str:
@@ -81,6 +86,8 @@ class FilterMember(abc.ABC):
         return params.tokens[at]
 
     # eatfunc is assumed to only consume 1.
+    # I would've liked to like, type eatfunc as [EatParams, int, **eatfunc_params] and receive in this function **eatfunc_params.
+    # But can't do that nicely, so users should just wrap their func in a lambda.
     @classmethod
     def eat_listof[T](cls, eatfunc: typing.Callable[[EatParams, int], T], params: EatParams, at: int, at_least_one: bool) -> tuple[list[T], int]:
         if at < len(params.tokens) and params.tokens[at] in Pipeline.LPAREN:
@@ -142,6 +149,15 @@ class FilterMember(abc.ABC):
         return _attr.CmpTo(op, primitive, attribute)
 
     @classmethod
+    def eat_type[T](cls, params: EatParams, at: int, description: str, type_: typing.Callable[[str], T]) -> T:
+        s = cls.eat_str(params, at, description)
+
+        try:
+            return type_(s)
+        except ValueError as e:
+            raise _EinGafrurError(f"Failed to parse {description} '{s}': {e}", tokens=params.tokens, error_indices=at) from e
+
+    @classmethod
     def split_cmpto_str(cls, cmpto: str, default_op: _attr.ComparisonOp) -> tuple[_attr.ComparisonOp, str]:
         for op in _attr.ComparisonOp:
             if cmpto.startswith(op.sign):
@@ -155,7 +171,7 @@ class FilterMember(abc.ABC):
 
     @classmethod
     def eat_movie_list(cls, params: EatParams, at: int) -> tuple[_ml.MovieList, int]:
-        listdefs, until = cls.eat_listof(lambda p, a: cls.eat_str(p, a, 'a LISTDEF'), params, at, True)
+        listdefs, until = cls.eat_listof(lambda p, a: cls.eat_str(p, a, 'a LISTDEF'), params, at, at_least_one=True)
 
         try:
             return params.ctx.get_movie_list(listdefs), until
@@ -170,6 +186,16 @@ class FilterMember(abc.ABC):
             return _ml.parse_ct_gm(ct_gm_str)
         except _exc.InputError as e:
             raise _EinGafrurError(f"Expected a valid crew type[:group mode], but got error: {e}", tokens=params.tokens, error_indices=at) from e
+
+    # Some predicates take a Single as an argument. But this Single should be wrapped in a Filter so that we can treat it as a complete expression of its own.
+    @classmethod
+    def eat_single(cls, params: EatParams, at: int) -> tuple[Filter, int]:
+        # Allow a way to indicate "empty" because we require tokens to have something in it to eat.
+        if at < len(params.tokens) and params.tokens[at] in ('', '-'):
+            return Filter(None, params.find, params.ctx), at + 1
+        
+        single, until = Single.eat(params, at)        
+        return Filter(single, params.find, params.ctx), until
 
 class Filter(FilterMember):
     def __init__(self, filter: None | Predicate | Negative | Pipeline, find: _ml.FindableType, ctx: _ctx.FlamContext) -> None:
@@ -204,18 +230,8 @@ class Filter(FilterMember):
         pipeline, _ = Pipeline.eat(params, 0, True)
         return cls(pipeline, params.find, params.ctx)
 
-    # Some predicates take a Single as an argument. But this Single should be wrapped in a Filter so that we can treat it as a complete expression of its own.
-    @classmethod
-    def eat_single(cls, params: EatParams, at: int) -> tuple[Filter, int]:
-        # Allow a way to indicate "empty" because we require tokens to have something in it to eat.
-        if at < len(params.tokens) and params.tokens[at] in ('', '-'):
-            return cls(None, params.find, params.ctx), at + 1
-        
-        single, until = Single.eat(params, at)
-        return cls(single, params.find, params.ctx), until
-
-    def excrete(self, findable: _ml.Findable, ctx: _ctx.FlamContext) -> bool:
-        return self._filter is None or self._filter.excrete(findable, ctx)
+    def excrete(self, findable: _ml.Findable) -> bool:
+        return self._filter is None or self._filter.excrete(findable)
 
     def regurgitate(self) -> typing.Iterable[str]:
         # Cache it since due to logging it's pretty much guaranteed we will want this multiple times.
@@ -223,6 +239,10 @@ class Filter(FilterMember):
             self._regurgitation = [] if self._filter is None else list(self._filter.regurgitate())
 
         return iter(self._regurgitation)
+
+    def colonoscopy(self) -> typing.Iterable[FilterMember]:
+        if self._filter is not None:
+            yield from self._filter.colonoscopy()
 
 class Pipeline(FilterMember):
     LPAREN = {'(', '[', '-lparen'}
@@ -264,15 +284,15 @@ class Pipeline(FilterMember):
 
         return cls(single, joinables, is_entire_filter), until
 
-    def excrete(self, findable: _ml.Findable, ctx: _ctx.FlamContext) -> bool:
-        accept = self._single.excrete(findable, ctx)
+    def excrete(self, findable: _ml.Findable) -> bool:
+        accept = self._single.excrete(findable)
         
         for joinable in self._joinables:
             # Conjunction is the default, so only disjunction must be specified.
             if isinstance(joinable, Negative | Predicate | Pipeline):
-                accept = accept and joinable.excrete(findable, ctx)
+                accept = accept and joinable.excrete(findable)
             elif isinstance(joinable, Disjoined):
-                accept = accept or joinable.excrete(findable, ctx)
+                accept = accept or joinable.excrete(findable)
             else:
                 raise RuntimeError(f"Pipeline ate a joinable of type: {type(joinable)}. This shouldn't happen.")
 
@@ -290,6 +310,12 @@ class Pipeline(FilterMember):
 
         if not self._is_entire_filter:
             yield min(Pipeline.RPAREN)
+
+    def colonoscopy(self) -> typing.Iterable[FilterMember]:
+        yield from self._single.colonoscopy()
+
+        for jable in self._joinables:
+            yield from jable.colonoscopy()
 
 # Some "FilterMembers" (as defined in the BNF) don't need to be instantiated. Eating a "Single" directly returns what its "child" would be.
 class Single:
@@ -330,12 +356,15 @@ class Negative(FilterMember):
         positive, until = Positive.eat(params, at + 1)
         return cls(positive), until
 
-    def excrete(self, findable: _ml.Findable, ctx: _ctx.FlamContext) -> bool:
-        return not self._positive.excrete(findable, ctx)
+    def excrete(self, findable: _ml.Findable) -> bool:
+        return not self._positive.excrete(findable)
 
     def regurgitate(self) -> typing.Iterable[str]:
         yield min(self.NEGATE)
         yield from self._positive.regurgitate()
+
+    def colonoscopy(self) -> typing.Iterable[FilterMember]:
+        yield from self._positive.colonoscopy()
 
 class Joinable(FilterMember):
     @classmethod
@@ -379,12 +408,15 @@ class Disjoined(FilterMember):
         single, until = Single.eat(params, at + 1)
         return cls(single), until
 
-    def excrete(self, findable: _ml.Findable, ctx: _ctx.FlamContext) -> bool:
-        return self._single.excrete(findable, ctx)
+    def excrete(self, findable: _ml.Findable) -> bool:
+        return self._single.excrete(findable)
 
     def regurgitate(self) -> typing.Iterable[str]:
         yield min(self.DISJOIN)
         yield from self._single.regurgitate()
+
+    def colonoscopy(self) -> typing.Iterable[FilterMember]:
+        yield from self._single.colonoscopy()
 
 class Predicate(FilterMember):
     PREFIX = '-'
@@ -430,9 +462,18 @@ class Predicate(FilterMember):
 
         # Mypy wouldn't like this line if we annotated with typing.Self.
         return predicate.eat(params, at + 1)
-        
+
+    def excrete(self, findable: _ml.Findable) -> bool:
+        if self.findable_type is None:
+            raise RuntimeError(f'Predicate {type(self)} is generic so it must implement excrete().')
+
+        return findable.excrete(self)
+
     def regurgitate(self) -> typing.Iterable[str]:
         yield self.PREFIX + self.qualified_name
+
+    def colonoscopy(self) -> typing.Iterable[FilterMember]:
+        yield self
 
 def _make_attribute_predicate(attribute: _attr.Attribute) -> type[Predicate]:
     class AttributePredicate(Predicate, name_without_type=attribute.name_without_type, aliases_without_type=list(attribute.aliases_without_type), findable_type=attribute.findable_type):
@@ -447,7 +488,7 @@ def _make_attribute_predicate(attribute: _attr.Attribute) -> type[Predicate]:
             cmpto = cls.eat_cmpto(params, at, cls.ATTRIBUTE)
             return cls(cmpto), at + 1
 
-        def excrete(self, findable: _ml.Findable, ctx: _ctx.FlamContext) -> bool:
+        def excrete(self, findable: _ml.Findable) -> bool:
             actual = findable.extract(self.ATTRIBUTE)
 
             # For lists we do "contains". There is an "-all" predicate for those who want that behavior.

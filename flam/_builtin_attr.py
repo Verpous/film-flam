@@ -382,7 +382,7 @@ def _movie_stars_extractor(self: attrutils.EasyAttribute, movie: _ml.Movie, mlf_
 
 #endregion movie attributes
 
-#region person attributes
+#region people attributes
 
 @_register_easy_attribute(attrutils.EasyAttributeParams(
     name_without_type = 'uid',
@@ -647,7 +647,7 @@ def _role_characters_extractor(self: attrutils.EasyAttribute, role: _ml.Role, ml
     truncation_style = utils.TruncationStyle.TRIM_MIDDLE,
     default_max_len = _STR_LEN_SHORT,
 ))
-def _role_chara_extractor(self: attrutils.EasyAttribute, role: _ml.Role, mlf_roles: _ml.MLFRolesDict, mlf_movie: _mlf.MLFMovie, mlf_people: list[_mlf.MLFPerson]) -> list[None | bool]:
+def _role_star_extractor(self: attrutils.EasyAttribute, role: _ml.Role, mlf_roles: _ml.MLFRolesDict, mlf_movie: _mlf.MLFMovie, mlf_people: list[_mlf.MLFPerson]) -> list[None | bool]:
     # Guaranteed consistent ordering because:
     # * mlf_people is sorted by uids
     # * python preserves dictionary order and crew types were added to mlf_roles[mlf_people] in the same order everytime
