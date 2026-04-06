@@ -384,7 +384,7 @@ class AverageAttribute(EasyAttribute):
     def _extract_from_people(self, people: _ml.People, mlf_people: list[_mlf.MLFPerson]) -> None | float: # pylint: disable=unused-argument
         # For people attributes, -as-X means the average over all the movies those people did while earing the hat of X, default to their current crew type.
         try:
-            people_as = people if self._as_crew_type is None else people.minimal_superset_people(self._as_crew_type)
+            people_as = people if self._as_crew_type is None else people.minimal_superset_people_in_other_crew_type(self._as_crew_type)
         except _exc.InputError:
             return None
 
@@ -444,7 +444,7 @@ class SumAttribute(EasyAttribute):
     def _extract_from_people[TAttr: (int, float)](self, people: _ml.People, mlf_people: list[_mlf.MLFPerson]) -> None | TAttr: # pylint: disable=unused-argument
         # For people attributes, -as-X means the average over all the movies those people did while earing the hat of X, default to their current crew type.
         try:
-            people_as = people if self._as_crew_type is None else people.minimal_superset_people(self._as_crew_type)
+            people_as = people if self._as_crew_type is None else people.minimal_superset_people_in_other_crew_type(self._as_crew_type)
         except _exc.InputError:
             return None
 

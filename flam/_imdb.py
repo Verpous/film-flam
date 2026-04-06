@@ -569,7 +569,17 @@ class _IMDbApiDev:
                 _dbg.logger.warning(f"Request failed because of too many requests. Will try again in {SLEEP_BETWEEN_RETRIES} seconds (retry {i}/{NUM_RETRIES})")
                 continue
 
-            response.raise_for_status()
+            # Retries are only for too_many_requests - not for other errors.
+            try:
+                response.raise_for_status()
+            except requests.HTTPError as e:
+                # Server errors are fetch-interrupts.
+                if 500 <= response.status_code < 600:
+                    raise _exc.FetchInterrupt(f"{type(e).__name__}: {e}") from e
+
+                # Everything else is a crash.
+                raise
+
             return response.json()
 
         raise _exc.FlamError('imdbapi.dev is refusing our requests due to sending too many. Try again later.')
@@ -589,21 +599,19 @@ class _IMDbApiDev:
                 while 'nextPageToken' in response:
                     # This is some bizarre thing I got once when querying Troll (2022). It looped 1600 times before breaking out of it.
                     # I don't know if this will reproduce or what should we do if we get it again.
-                    # Let it break out naturally after some time? Sweep it under the rug? FetchInterrupt it?
-                    # For now give it a retry but if it persists raise an error that will crash us non-gracefully.
+                    # Let it break out naturally after some time? Sweep it under the rug? FetchInterrupt? Crash?
+                    # For now we raise FetchInterrupt.
                     if page_token is not None and page_token == response['nextPageToken']:
-                        raise RuntimeError(f"Got same page token: '{page_token}' twice in a row for endpoint: {endpoint}")
+                        raise _exc.FetchInterrupt(f"Got same page token: '{page_token}' twice in a row for endpoint: {endpoint}")
 
                     page_token = response['nextPageToken']
                     response = cls._rest_call(endpoint, pageSize=PAGE_SIZE, pageToken=page_token, **kwargs)
                     all_responses.append(response)
 
                 return all_responses
-            except RuntimeError as e:
+            except _exc.FetchInterrupt:
                 if i == NUM_RETRIES - 1:
                     raise
-
-                _dbg.logger.error(str(e))
 
         raise RuntimeError("Shouldn't get here!")
 

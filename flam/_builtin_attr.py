@@ -520,7 +520,7 @@ for crew_type in _ml.CrewType:
 
         # Find the smallest group in another crew type which has at least the same people as this one, if one exists, and return their movies.
         try:
-            minimal_superset_people = people.minimal_superset_people(ct)
+            minimal_superset_people = people.minimal_superset_people_in_other_crew_type(ct)
         except _exc.InputError:
             return []
 
@@ -551,7 +551,7 @@ def _people_professions_extractor(self: attrutils.EasyAttribute, people: _ml.Peo
 
         # For other crew types we will check if there is a group in that crew type which is a superset of the people in this group.
         try:
-            minimal_superset_people = people.minimal_superset_people(ct)
+            minimal_superset_people = people.minimal_superset_people_in_other_crew_type(ct)
             professions.append(str(minimal_superset_people.crew_type))
         except _exc.InputError:
             pass

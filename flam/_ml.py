@@ -279,28 +279,38 @@ class People(Findable):
     # Find the smallest group of people in another crew type who contain every person in this group.
     # I think by nature of our grouping algorithm, there is guaranteed to be either no such group, or exactly 1 unique group like this.
     # Assume our group is P1,P2 and in another crew type there's the groups P1,P2,P3 and P1,P2,P4. So then the grouping algorithm would've created P1,P2 as well.
-    def minimal_superset_people(self, crew_type: CrewType) -> People:
-        # First some optimizations - same crew type, same people.
+    def minimal_superset_people_in_other_crew_type(self, crew_type: CrewType) -> People:
+        # Optimization - same crew type, same people.
         if crew_type == self.crew_type:
             return self
 
+        return self._minimal_superset_people_internal(self.movie_list, crew_type)
+
+    # Find the smallest group of people in another movie list and optionally different crew type who contain every person in this group.
+    def minimal_superset_people_in_other_list(self, other_list: MovieList, crew_type: None | CrewType = None) -> People:
+        if crew_type is None:
+            crew_type = self.crew_type
+
+        return self._minimal_superset_people_internal(other_list, crew_type)
+
+    def _minimal_superset_people_internal(self, movie_list: MovieList, crew_type: CrewType) -> People:
         # SEPARATE group mode, so it's much easier to check if this person is in another crew type.
         if self.group_mode == GroupMode.SEPARATE:
             uid = self.compose_uid([self._mlf_people[0].uid], crew_type, self.group_mode)
-            return self.movie_list.get_people_by_uid(uid)
+            return movie_list.get_people_by_uid(uid)
 
         # We'll try our luck at searching if this group appears exactly the same in another crew type.
         uid = self.compose_uid((mlf_person.uid for mlf_person in self._mlf_people), crew_type, self.group_mode)
 
         try:
-            return self.movie_list.get_people_by_uid(uid)
+            return movie_list.get_people_by_uid(uid)
         except _exc.InputError:
             pass
 
         # Now in the general case we must see if there's a strict superset in this other crew type.
         min_superset = None
         
-        for people in self.movie_list.find_people(crew_type, self.group_mode):
+        for people in movie_list.find_people(crew_type, self.group_mode):
             # We know we're searching for a group that has strictly more people than self.
             if len(people._mlf_people) <= len(self._mlf_people):
                 continue
@@ -326,7 +336,10 @@ class People(Findable):
             if i_self == len(self._mlf_people):
                 return people
 
-        raise _exc.InputError(f'The People {self.uid} did not collaborate as the crew type {crew_type}.')
+        if movie_list is self.movie_list:
+            raise _exc.InputError(f'The People {self.uid} did not collaborate as the crew type {crew_type}.')
+
+        raise _exc.InputError(f'The People {self.uid} did not collaborate as the crew type {crew_type} in the list {movie_list.abstract_listdef.pretty(movie_list.ctx)}.')
 
     def are_in_movie(self, movie: Movie) -> bool:
         # The hell with python one-liners using `any`, `all`, etc. This is more optimal and readable and modifiable.

@@ -33,6 +33,7 @@ import re
 import glob
 import fnmatch
 import time
+import itertools
 
 # Unlike all other modules in this package, this one pretends it's from outside the package and simply "imports flam".
 import flam
@@ -783,15 +784,33 @@ For people, it looks like 'cast-people', 'director-people:group', etc.''')
                     uniq_insert(attr, alias_hint, len(attributes))
 
             # Add a column for every attribute referenced in the filter.
-            for filter_member in filter.colonoscopy():
-                # TODO: improve after adding some predicates.
-                # Implementation is hacky here because we don't want colonoscopy to descend into the children of predicates.
-                # Those could be of a completely different type. And we also don't have a solid way to get the attributes referenced by a predicate.
-                # Don't really want to have to implement that for every predicate I add. So we use this hack. But we should at least improve it to cover -has predicates and such..
-                # Also colonoscopy could be improved to be some auxiliary on top of a walk() function meant for recursive walking?
-                # AND we should consider not just the filter we are about to apply but also the one used to compose the composite list??
-                if isinstance(filter_member, flam.Predicate) and hasattr(type(filter_member), 'ATTRIBUTE'):
-                    uniq_insert(type(filter_member).ATTRIBUTE, None, len(attributes)) # type: ignore
+            # Anonymous composites are not a worry here because at the CLI level those are never filtered (filter is applied at a later phase).
+            # First we need to get the composite list filter since we'll want to search both there and in the filter we'll apply later.
+            if movie_list.abstract_listdef.list_type == flam.SpecialListType.COMPOSITE:
+                composite_list = ctx.cfg_readonly.composite_lists.get_by_uid(movie_list.abstract_listdef.address)
+                composite_list_filter = ctx.compile_filter(composite_list.filter_tokens, findable_type)
+            else:
+                composite_list_filter = ctx.compile_filter([], findable_type)
+
+            # Now search for attributes in both filters.
+            for filter_member in itertools.chain(filter.colonoscopy(), composite_list_filter.colonoscopy()):
+                if not isinstance(filter_member, flam.Predicate):
+                    continue
+
+                # Implementation is hacky because we don't really want to add an interface for "get_referenced_attributes" in each predicate.
+                # So we just check for common ways that perdicates reference their attributes.
+                # AttributePredicate has 'ATTRIBUTE' as a classvar.
+                if hasattr(type(filter_member), 'ATTRIBUTE'):
+                    attr = type(filter_member).ATTRIBUTE # type: ignore
+                # Other builtins have '_attribute' as a field.
+                elif hasattr(filter_member, '_attribute'):
+                    attr = filter_member._attribute # type: ignore
+                else:
+                    attr = None
+
+                # Filters can have subfilters of different types. So only add applicable attributes.
+                if attr is not None and attr.findable_type.is_applicable_to(findable_type):
+                    uniq_insert(attr, None, len(attributes))
 
         flam.logger.info(f"Got columns: {', '.join(attr.qualified_name for attr, _ in attributes)}")
         return attributes

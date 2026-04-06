@@ -185,11 +185,11 @@ class SupersetPredicate(_filter.Predicate, name_without_type='superset'):
     @classmethod
     def eat(cls, params: _filter.EatParams, at: int) -> tuple[_filter.Predicate, int]:
         attribute = cls.eat_attribute(params, at)
-        cmptos, until = cls.eat_listof(lambda p, a: cls.eat_cmpto(p, a, attribute), params, at + 1, at_least_one=True)
+        cmptos, until = cls.eat_listof(lambda p, a: cls.eat_cmpto(p, a, attribute), params, at + 1, at_least_one=False)
         return cls(attribute, cmptos), until
 
     @classmethod
-    def is_superset(cls, value: _attr.AttributeValue, cmptos: list[_attr.CmpTo]) -> bool:
+    def is_superset(cls, cmptos: list[_attr.CmpTo], value: _attr.AttributeValue) -> bool:
         if isinstance(value, list):
             for primitive in value:
                 if all(not cmpto(primitive) for cmpto in cmptos):
@@ -201,7 +201,7 @@ class SupersetPredicate(_filter.Predicate, name_without_type='superset'):
 
     def excrete(self, findable: _ml.Findable) -> bool:
         value = findable.extract(self._attribute)
-        return self.is_superset(value, self._cmptos)
+        return self.is_superset(self._cmptos, value)
 
     def regurgitate(self) -> typing.Iterable[str]:
         yield from super().regurgitate()
@@ -220,11 +220,11 @@ class SubsetPredicate(_filter.Predicate, name_without_type='subset'):
     @classmethod
     def eat(cls, params: _filter.EatParams, at: int) -> tuple[_filter.Predicate, int]:
         attribute = cls.eat_attribute(params, at)
-        cmptos, until = cls.eat_listof(lambda p, a: cls.eat_cmpto(p, a, attribute), params, at + 1, at_least_one=True)
+        cmptos, until = cls.eat_listof(lambda p, a: cls.eat_cmpto(p, a, attribute), params, at + 1, at_least_one=False)
         return cls(attribute, cmptos), until
 
     @classmethod
-    def is_subset(cls, value: _attr.AttributeValue, cmptos: list[_attr.CmpTo]) -> bool:
+    def is_subset(cls, cmptos: list[_attr.CmpTo], value: _attr.AttributeValue) -> bool:
         if isinstance(value, list):
             for cmpto in cmptos:
                 if all(not cmpto(primitive) for primitive in value):
@@ -236,7 +236,7 @@ class SubsetPredicate(_filter.Predicate, name_without_type='subset'):
     
     def excrete(self, findable: _ml.Findable) -> bool:
         value = findable.extract(self._attribute)
-        return self.is_subset(value, self._cmptos)
+        return self.is_subset(self._cmptos, value)
 
     def regurgitate(self) -> typing.Iterable[str]:
         yield from super().regurgitate()
@@ -255,12 +255,12 @@ class SamesetPredicate(_filter.Predicate, name_without_type='sameset'):
     @classmethod
     def eat(cls, params: _filter.EatParams, at: int) -> tuple[_filter.Predicate, int]:
         attribute = cls.eat_attribute(params, at)
-        cmptos, until = cls.eat_listof(lambda p, a: cls.eat_cmpto(p, a, attribute), params, at + 1, at_least_one=True)
+        cmptos, until = cls.eat_listof(lambda p, a: cls.eat_cmpto(p, a, attribute), params, at + 1, at_least_one=False)
         return cls(attribute, cmptos), until
 
     def excrete(self, findable: _ml.Findable) -> bool:
         value = findable.extract(self._attribute)
-        return SubsetPredicate.is_subset(value, self._cmptos) and SupersetPredicate.is_superset(value, self._cmptos)
+        return SubsetPredicate.is_subset(self._cmptos, value) and SupersetPredicate.is_superset(self._cmptos, value)
 
     def regurgitate(self) -> typing.Iterable[str]:
         yield from super().regurgitate()
@@ -280,22 +280,35 @@ class InListPredicate(_filter.Predicate, name_without_type='in-list'):
         movie_list, until = cls.eat_movie_list(params, at)
         return cls(movie_list), until
 
-    def excrete(self, findable: _ml.Findable) -> bool:
-        # NOTE: for grouped people/roles we'd maybe have liked to also check for a minimal_superset_people. But it's a little complicted and maybe let's not.
-        # Also note that we don't check for uid family mismatch. It will just fail to find the element.
+    # Split implementations per findable type because this is more complicated than you think.
+    # For movies, it's the easiest. Just try to get a movie with that uid.
+    def _excrete_from_movie(self, movie: _ml.Movie, mlf_movie: _mlf.MLFMovie) -> bool:
         try:
-            self._movie_list.get_by_uid(findable.type_, findable.uid)
+            self._movie_list.get_movie_by_uid(movie.uid)
             return True
         except _exc.InputError:
             return False
 
+    # For people it's complicated. We want to return true even if the same People is not exactly in the other list, but a superset People is.
+    def _excrete_from_people(self, people: _ml.People, mlf_people: list[_mlf.MLFPerson]) -> bool:
+        try:
+            people.minimal_superset_people_in_other_list(self._movie_list)
+            return True
+        except _exc.InputError:
+            return False
+
+    # For roles, we could get the superset people and see if they were also in this movie. But just checking if the movie is in the other list is enough.
+    # It's clearly a necessary condition. But it is also sufficient because if the movie is in this other list then necessarily that list has a superset people.
+    # This is because at minimum there is always a group of the entire crew for each movie in the list.
+    def _excrete_from_role(self, role: _ml.Role, mlf_roles: _ml.MLFRolesDict, mlf_movie: _mlf.MLFMovie, mlf_people: list[_mlf.MLFPerson]) -> bool:
+        return self._excrete_from_movie(role.movie, mlf_movie)
+
     def regurgitate(self) -> typing.Iterable[str]:
         yield from super().regurgitate()
-        yield min(_filter.Pipeline.LPAREN)
 
         # We handle multiple listdefs as best we can but it's not great.
+        yield min(_filter.Pipeline.LPAREN)
         yield from self._movie_list.abstract_listdef.pretty(self._movie_list.ctx).split(' ')
-
         yield min(_filter.Pipeline.RPAREN)
 
 #endregion
@@ -313,8 +326,12 @@ class AnyRolePredicate(_filter.Predicate, name_without_type='any-role', findable
     
     @classmethod
     def eat(cls, params: _filter.EatParams, at: int) -> tuple[_filter.Predicate, int]:
-        # Note I would kind of like to support 'role' as a shorthand for all crew types except any but eat_ct_gm doesn't make that simple.
-        ct_gms, filter_idx = cls.eat_listof(cls.eat_ct_gm, params, at, at_least_one=True)
+        ct_gms, filter_idx = cls.eat_listof(cls.eat_ct_gm, params, at, at_least_one=False)
+
+        # As a secret feature, if ct_gms list is empty we'll consider it to mean every crew type except any.
+        if len(ct_gms) == 0:
+            ct_gms = [(crew_type, _ml.GroupMode.DEFAULT) for crew_type in _ml.CrewType.iterate_except_any()]
+
         sub_params = dataclasses.replace(params, find=_ml.FindableType.ROLES)
         filter, until = cls.eat_single(sub_params, filter_idx)
         return cls(ct_gms, filter), until
@@ -334,6 +351,10 @@ class AnyRolePredicate(_filter.Predicate, name_without_type='any-role', findable
         yield min(_filter.Pipeline.RPAREN)
         yield from self._filter.regurgitate()
 
+    def colonoscopy(self) -> typing.Iterable[_filter.FilterMember]:
+        yield self
+        yield from self._filter.colonoscopy()
+
 # -every-role CT_GM... ROLES_SINGLE : scan the movie's crew according to CT_GMs to see if every group passes the filter ROLES_SINGLE.
 @_reg._register_builtin
 class EveryRolePredicate(_filter.Predicate, name_without_type='every-role', findable_type=_ml.FindableType.MOVIES):
@@ -343,7 +364,12 @@ class EveryRolePredicate(_filter.Predicate, name_without_type='every-role', find
     
     @classmethod
     def eat(cls, params: _filter.EatParams, at: int) -> tuple[_filter.Predicate, int]:
-        ct_gms, filter_idx = cls.eat_listof(cls.eat_ct_gm, params, at, at_least_one=True)
+        ct_gms, filter_idx = cls.eat_listof(cls.eat_ct_gm, params, at, at_least_one=False)
+
+        # As a secret feature, if ct_gms list is empty we'll consider it to mean every crew type except any.
+        if len(ct_gms) == 0:
+            ct_gms = [(crew_type, _ml.GroupMode.DEFAULT) for crew_type in _ml.CrewType.iterate_except_any()]
+
         sub_params = dataclasses.replace(params, find=_ml.FindableType.ROLES)
         filter, until = cls.eat_single(sub_params, filter_idx)
         return cls(ct_gms, filter), until
@@ -362,6 +388,10 @@ class EveryRolePredicate(_filter.Predicate, name_without_type='every-role', find
         yield from (_ml.ct_gm_to_str(*ct_gm) for ct_gm in self._ct_gms)
         yield min(_filter.Pipeline.RPAREN)
         yield from self._filter.regurgitate()
+
+    def colonoscopy(self) -> typing.Iterable[_filter.FilterMember]:
+        yield self
+        yield from self._filter.colonoscopy()
 
 #endregion
 
@@ -391,6 +421,10 @@ class AnyMoviePredicate(_filter.Predicate, name_without_type='any-movie', findab
         yield from super().regurgitate()
         yield from self._filter.regurgitate()
 
+    def colonoscopy(self) -> typing.Iterable[_filter.FilterMember]:
+        yield self
+        yield from self._filter.colonoscopy()
+
 # -every-movie MOVIES_SINGLE : scan the people's associated movies to see if they all pass the filter MOVIES_SINGLE.
 @_reg._register_builtin
 class EveryMoviePredicate(_filter.Predicate, name_without_type='every-movie', findable_type=_ml.FindableType.PEOPLE):
@@ -415,6 +449,10 @@ class EveryMoviePredicate(_filter.Predicate, name_without_type='every-movie', fi
         yield from super().regurgitate()
         yield from self._filter.regurgitate()
 
+    def colonoscopy(self) -> typing.Iterable[_filter.FilterMember]:
+        yield self
+        yield from self._filter.colonoscopy()
+
 # -as CREW_TYPE PEOPLE_SINGLE : check if the people pass the filter PEOPLE_SINGLE when they are another crew type.
 @_reg._register_builtin
 class AsPredicate(_filter.Predicate, name_without_type='as', findable_type=_ml.FindableType.PEOPLE):
@@ -430,7 +468,7 @@ class AsPredicate(_filter.Predicate, name_without_type='as', findable_type=_ml.F
 
     def _excrete_from_people(self, people: _ml.People, mlf_people: list[_mlf.MLFPerson]) -> bool:
         try:
-            minimal_superset_people = people.minimal_superset_people(self._crew_type)
+            minimal_superset_people = people.minimal_superset_people_in_other_crew_type(self._crew_type)
         except _exc.InputError:
             return False
 
@@ -440,6 +478,10 @@ class AsPredicate(_filter.Predicate, name_without_type='as', findable_type=_ml.F
         yield from super().regurgitate()
         yield str(self._crew_type)
         yield from self._filter.regurgitate()
+
+    def colonoscopy(self) -> typing.Iterable[_filter.FilterMember]:
+        yield self
+        yield from self._filter.colonoscopy()
 
 # -any-person PEOPLE_SINGLE : Separate the people if they are grouped and check if any of the split people pass the filter PEOPLE_SINGLE.
 @_reg._register_builtin
@@ -473,6 +515,10 @@ class AnyPersonPredicate(_filter.Predicate, name_without_type='any-person', find
         yield from super().regurgitate()
         yield from self._filter.regurgitate()
 
+    def colonoscopy(self) -> typing.Iterable[_filter.FilterMember]:
+        yield self
+        yield from self._filter.colonoscopy()
+
 # -every-person PEOPLE_SINGLE : Separate the people if they are grouped and check if every split person passes the filter PEOPLE_SINGLE.
 @_reg._register_builtin
 class EveryPersonPredicate(_filter.Predicate, name_without_type='every-person', findable_type=_ml.FindableType.PEOPLE):
@@ -504,6 +550,10 @@ class EveryPersonPredicate(_filter.Predicate, name_without_type='every-person', 
     def regurgitate(self) -> typing.Iterable[str]:
         yield from super().regurgitate()
         yield from self._filter.regurgitate()
+
+    def colonoscopy(self) -> typing.Iterable[_filter.FilterMember]:
+        yield self
+        yield from self._filter.colonoscopy()
 
 #endregion
 

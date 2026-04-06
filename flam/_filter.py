@@ -69,7 +69,7 @@ class FilterMember(abc.ABC):
     def regurgitate(self) -> typing.Iterable[str]:
         pass
 
-    # Walk the syntax tree. Does not descend into children of predicates. Members should be returned from left to right.
+    # Walk the syntax tree. Members should be returned from left to right.
     @abc.abstractmethod
     def colonoscopy(self) -> typing.Iterable[FilterMember]:
         pass
@@ -90,7 +90,9 @@ class FilterMember(abc.ABC):
     # But can't do that nicely, so users should just wrap their func in a lambda.
     @classmethod
     def eat_listof[T](cls, eatfunc: typing.Callable[[EatParams, int], T], params: EatParams, at: int, at_least_one: bool) -> tuple[list[T], int]:
+        # Eat the opening parenthesis if you can.
         if at < len(params.tokens) and params.tokens[at] in Pipeline.LPAREN:
+            # Seek the closing parenthesis and eat all the way there.
             try:
                 rparen_idx = next(i for i in range(at + 1, len(params.tokens)) if params.tokens[i] in Pipeline.RPAREN)
             except StopIteration as e:
@@ -100,7 +102,11 @@ class FilterMember(abc.ABC):
                 raise _EinGafrurError("Expected non empty list.", tokens=params.tokens, error_indices=[at, rparen_idx])
 
             return [eatfunc(params, i) for i in range(at + 1, rparen_idx)], rparen_idx + 1
+        # Support open-close without as a single token if not at_least_one.
+        elif at < len(params.tokens) and params.tokens[at] in Pipeline.BOTHPAREN and not at_least_one:
+            return [], at + 1
 
+        # Singleton list case where no parentheses are required. Also get here if there are no tokens to eat at all, we'd like to raise the error from eatfunc.
         return [eatfunc(params, at)], at + 1
 
     @classmethod
@@ -241,12 +247,16 @@ class Filter(FilterMember):
         return iter(self._regurgitation)
 
     def colonoscopy(self) -> typing.Iterable[FilterMember]:
+        yield self
+
         if self._filter is not None:
             yield from self._filter.colonoscopy()
 
 class Pipeline(FilterMember):
     LPAREN = {'(', '[', '-lparen'}
     RPAREN = {')', ']', '-rparen'}
+    BOTHPAREN = {'[]', '()'}
+
     _LPAREN_DESC = 'left parenthesis'
     _RPAREN_DESC = 'matching right parenthesis'
 
@@ -312,6 +322,7 @@ class Pipeline(FilterMember):
             yield min(Pipeline.RPAREN)
 
     def colonoscopy(self) -> typing.Iterable[FilterMember]:
+        yield self
         yield from self._single.colonoscopy()
 
         for jable in self._joinables:
@@ -364,6 +375,7 @@ class Negative(FilterMember):
         yield from self._positive.regurgitate()
 
     def colonoscopy(self) -> typing.Iterable[FilterMember]:
+        yield self
         yield from self._positive.colonoscopy()
 
 class Joinable(FilterMember):
@@ -416,6 +428,7 @@ class Disjoined(FilterMember):
         yield from self._single.regurgitate()
 
     def colonoscopy(self) -> typing.Iterable[FilterMember]:
+        yield self
         yield from self._single.colonoscopy()
 
 class Predicate(FilterMember):
@@ -464,8 +477,8 @@ class Predicate(FilterMember):
         return predicate.eat(params, at + 1)
 
     def excrete(self, findable: _ml.Findable) -> bool:
-        if self.findable_type is None:
-            raise RuntimeError(f'Predicate {type(self)} is generic so it must implement excrete().')
+        if self.findable_type is None and not (hasattr(self, '_excrete_from_movie') and hasattr(self, '_excrete_from_people') and hasattr(self, '_excrete_from_role')):
+            raise RuntimeError(f'Predicate {type(self)} is generic so it must implement excrete() or all 3 _excrete_from_X() functions.')
 
         return findable.excrete(self)
 
@@ -510,6 +523,7 @@ def looks_like_filter_token(token: str) -> bool:
         or token in Disjoined.DISJOIN
         or token in Conjoined.CONJOIN
         or token in Pipeline.LPAREN
-        or token in Pipeline.RPAREN)
+        or token in Pipeline.RPAREN
+        or token in Pipeline.BOTHPAREN)
 
 _dbg.logger.info(f'Module import time: {time.time() - _start_import_time}s')
