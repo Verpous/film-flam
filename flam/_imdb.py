@@ -112,7 +112,7 @@ class _CsvRow:
         raise ValueError(f'Invalid date: {date}')
 
 @_reg._register_builtin
-class SeleniumCinemagoerListFetcher(_fetch.ListFetcher, list_type='imdb-selenium-cinemagoer-listid', uid_family=_UID_FAMILY):
+class SeleniumCinemagoerListFetcher(_fetch.ListFetcher, list_type='imdb-browser-cinemagoer-listid', uid_family=_UID_FAMILY):
     exports_server: None | multiprocessing.Process = None
     requests_queue: multiprocessing.Queue = multiprocessing.Queue()
 
@@ -133,13 +133,16 @@ class SeleniumCinemagoerListFetcher(_fetch.ListFetcher, list_type='imdb-selenium
 
         _dbg.logger.info(f"CSV should be downloaded into {downloads_dir=}")
 
+        # Support optional 'ls' prefix.
+        list_id = concrete_listdef.address.removeprefix('ls')
+
         # We do retries because of a particularly horrible issue that makes the download sometimes fail.
         for i in range(NUM_RETRIES):
             cls._spin_server_if_needed()
 
             try:
                 latest_csv = utils.download_file_using_browser(
-                    download_cmd=lambda: cls.requests_queue.put_nowait(concrete_listdef.address),
+                    download_cmd=lambda: cls.requests_queue.put_nowait(list_id),
                     file_extension='csv',
                     downloads_dir=downloads_dir,
                     timeout_secs=CSV_DOWNLOAD_TIMEOUT_SECS)
@@ -222,7 +225,7 @@ class CsvCinemagoerListFetcher(_fetch.ListFetcher, list_type='imdb-csv-cinemagoe
             return _read_csv(movies_csv_file)
 
 @_reg._register_builtin
-class SeleniumApiDevListFetcher(_fetch.ListFetcher, list_type='imdb-selenium-apidev-listid', uid_family=_UID_FAMILY):
+class SeleniumApiDevListFetcher(_fetch.ListFetcher, list_type='imdb-browser-apidev-listid', uid_family=_UID_FAMILY):
     def fetch_into_file(self, movie_list_file: _mlf.MovieListFile) -> None:
         _dbg.logger.info(f"IMDbApiDev: Going to download the CSV for IMDb list id: {self.concrete_listdef.address}")
         movies_csv = SeleniumCinemagoerListFetcher.download_csv(self.concrete_listdef)

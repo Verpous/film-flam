@@ -56,6 +56,7 @@ class FalsePredicatePredicate(_filter.Predicate, name_without_type='false'):
 @_reg._register_builtin
 class EveryPredicate(_filter.Predicate, name_without_type='every'):
     def __init__(self, attribute: _attr.Attribute, cmpto: _attr.CmpTo) -> None:
+        # This and all other predicates here should name their fields referencing attributes by this name '_attribute', because parse_columns expects it.
         self._attribute = attribute
         self._cmpto = cmpto
     

@@ -199,16 +199,16 @@ clean-ctx() {
 
 # Reconfigures the dev flam dir with some test lists.
 cfg() {
-    $cli config list --default-fetch=no     testlist    imdb-selenium-apidev-listid=540302193
-    $cli config list --default-fetch=yes    movies      imdb-selenium-apidev-listid=083886771
-    $cli config list --default-fetch=yes    shows       imdb-selenium-apidev-listid=560024227
-    $cli config list --default-fetch=yes    specials    imdb-selenium-apidev-listid=560318295
-    $cli config list --default-fetch=no     mubi        imdb-selenium-apidev-listid=571616524
-    $cli config list --default-fetch=no     netflix     imdb-selenium-apidev-listid=560256455
-    $cli config list --default-fetch=no     disney      imdb-selenium-apidev-listid=565212657
-    $cli config list --default-fetch=no     blurays     imdb-selenium-apidev-listid=539518913
-    $cli config list --default-fetch=no     dvds        imdb-selenium-apidev-listid=537497285
-    $cli config list --default-fetch=no     elsewhere   imdb-selenium-apidev-listid=566138441
+    $cli config list --default-fetch=no     testlist    imdb-browser-apidev-listid=540302193
+    $cli config list --default-fetch=yes    movies      imdb-browser-apidev-listid=083886771
+    $cli config list --default-fetch=yes    shows       imdb-browser-apidev-listid=560024227
+    $cli config list --default-fetch=yes    specials    imdb-browser-apidev-listid=560318295
+    $cli config list --default-fetch=no     mubi        imdb-browser-apidev-listid=571616524
+    $cli config list --default-fetch=no     netflix     imdb-browser-apidev-listid=560256455
+    $cli config list --default-fetch=no     disney      imdb-browser-apidev-listid=565212657
+    $cli config list --default-fetch=no     blurays     imdb-browser-apidev-listid=539518913
+    $cli config list --default-fetch=no     dvds        imdb-browser-apidev-listid=537497285
+    $cli config list --default-fetch=no     elsewhere   imdb-browser-apidev-listid=566138441
 
     $cli config composite --default-find=yes    all         movies shows
     $cli config composite --default-find=no     rated       movies shows    -has my-rating

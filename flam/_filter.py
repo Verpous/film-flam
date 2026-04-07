@@ -480,7 +480,7 @@ class Predicate(FilterMember):
         if self.findable_type is None and not (hasattr(self, '_excrete_from_movie') and hasattr(self, '_excrete_from_people') and hasattr(self, '_excrete_from_role')):
             raise RuntimeError(f'Predicate {type(self)} is generic so it must implement excrete() or all 3 _excrete_from_X() functions.')
 
-        return findable.excrete(self)
+        return findable._excrete(self)
 
     def regurgitate(self) -> typing.Iterable[str]:
         yield self.PREFIX + self.qualified_name
@@ -490,6 +490,7 @@ class Predicate(FilterMember):
 
 def _make_attribute_predicate(attribute: _attr.Attribute) -> type[Predicate]:
     class AttributePredicate(Predicate, name_without_type=attribute.name_without_type, aliases_without_type=list(attribute.aliases_without_type), findable_type=attribute.findable_type):
+        # Don't change this variable's name because parse_columns depends on it.
         ATTRIBUTE: _attr.Attribute = attribute
 
         def __init__(self, cmpto: _attr.CmpTo) -> None:

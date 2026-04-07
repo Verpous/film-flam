@@ -145,23 +145,61 @@ def print_table(table: list[list[str]],
 
 class SubcommandConfig:
     @classmethod
-    def configure_parser(cls, parser: argparse.ArgumentParser) -> None:
+    def add_subparser(cls, subparsers: argparse._SubParsersAction) -> argparse.ArgumentParser:
+        parser = subparsers.add_parser(
+            'config',
+            formatter_class=argparse.RawTextHelpFormatter,
+            description = (
+'''View and modify the flam configuration. There are a few subcommands:
+
+    list        Configure "simple" lists which are fetched from the web.
+    composite   Configure "composite" lists which are remixes of your existing lists
+    extension   Configure files to be imported containing your own custom attributes, predicates, and fetch sources
+'''),
+        )
+
         config_subparsers = parser.add_subparsers(required=True)
-        SubcommandConfigList.configure_parser(config_subparsers.add_parser('list', formatter_class=argparse.RawTextHelpFormatter))
-        SubcommandConfigComposite.configure_parser(config_subparsers.add_parser('composite', formatter_class=argparse.RawTextHelpFormatter))
-        SubcommandConfigExtension.configure_parser(config_subparsers.add_parser('extension', formatter_class=argparse.RawTextHelpFormatter))
+        SubcommandConfigList.add_subparser(config_subparsers)
+        SubcommandConfigComposite.add_subparser(config_subparsers)
+        SubcommandConfigExtension.add_subparser(config_subparsers)
+        return parser
 
 class SubcommandConfigExtension:
     @classmethod
-    def configure_parser(cls, parser: argparse.ArgumentParser) -> None:
+    def add_subparser(cls, subparsers: argparse._SubParsersAction) -> argparse.ArgumentParser:
+        parser = subparsers.add_parser(
+            'extension',
+            formatter_class=argparse.RawTextHelpFormatter,
+            description = (
+'''View, add, or remove custom extension files. There are various things you can extend:
+
+    Attributes      Values belonging to movies, people, or roles
+    Predicates      Tests which can be used to filter movies, people, or roles
+    Fetchers        Support for downloading movie lists from some specific website or API
+
+Extensions are simply python scripts which implement and register these custom things.
+See the full documentation for how to implement extensions.
+'''),
+            epilog = (
+'''Examples:
+    %(prog)s ~/my_extension.py
+        (Register the extensions file ~/my_extension.py)
+    %(prog)s
+        (Print all extensions)
+    %(prog)s --delete ~/my_extension.py
+        (Delete the extension file ~/my_extension.py)
+'''),
+        )
+
         parser.set_defaults(function=cls.execute)
 
         action_group = parser.add_mutually_exclusive_group(required=False)
-        action_group.add_argument('-A', '--add', action='store_true', help='Add an extension. The default if IMPORT is provided')
-        action_group.add_argument('-D', '--delete', action='store_true', help='Delete an extension')
-        action_group.add_argument('-P', '--print', action='store_true', help='Print all extensions. The default if IMPORT is not provided')
+        action_group.add_argument('-A', '--add', action='store_true', help='Add IMPORT as an extension. The default if IMPORT is provided.')
+        action_group.add_argument('-D', '--delete', action='store_true', help='Delete IMPORT from extensions.')
+        action_group.add_argument('-P', '--print', action='store_true', help='Print all extensions. The default if IMPORT is not provided.')
 
-        parser.add_argument('IMPORT', action='store', nargs='?', help='Specify which module or file to import')
+        parser.add_argument('IMPORT', action='store', nargs='?', help='Specify which module or file to import. This can be a full path to a script or a module name if it is in PATH.')
+        return parser
 
     @classmethod
     def execute(cls, ctx: flam.FlamContext, args: argparse.Namespace) -> None:
@@ -201,19 +239,47 @@ class SubcommandConfigExtension:
 
 class SubcommandConfigList:
     @classmethod
-    def configure_parser(cls, parser: argparse.ArgumentParser) -> None:
+    def add_subparser(cls, subparsers: argparse._SubParsersAction) -> argparse.ArgumentParser:
+        parser = subparsers.add_parser(
+            'list',
+            formatter_class=argparse.RawTextHelpFormatter,
+            description = (
+'''View, add, edit, or remove "simple" lists. These are lists which are directly copied from some external source like an IMDb list.
+Once configured, lists can be easily used by their name in other commands like `flam fetch`, `flam find`.
+'''),
+            epilog = (
+'''Examples:
+    %(prog)s mylist imdb-browser-apidev-listid=083886771
+        (Create a list 'mylist'. It's a local copy of the IMDb list '083886771' - https://www.imdb.com/list/ls083886771/. It's downloaded via the browser+imdbapi.dev)
+    %(prog)s mylist --default-fetch=yes --default-find=yes
+        (Modify 'mylist' to be default for fetch and find, so if you run `flam fetch` or `flam find` with no arguments they will use this list)
+    %(prog)s
+        (Print all lists)
+    %(prog)s --rename ourlist mylist
+        (Rename 'mylist' to 'ourlist')
+    %(prog)s --delete ourlist
+        (Delete 'ourlist')
+'''),
+        )
+
         parser.set_defaults(function=cls.execute)
 
         action_group = parser.add_mutually_exclusive_group(required=False)
-        action_group.add_argument('-E', '--edit', action='store_true', help='edit or create a list. The default if NAME is provided')
-        action_group.add_argument('-D', '--delete', action='store_true', help='delete the list')
-        action_group.add_argument('-P', '--print', action='store_true', help='print the list, or if NAME not provided, print all lists. The default if NAME is not provided')
+        action_group.add_argument('-E', '--edit', action='store_true', help='Edit or create the list NAME. The default if NAME is provided.')
+        action_group.add_argument('-D', '--delete', action='store_true', help='Delete the list named NAME.')
+        action_group.add_argument('-P', '--print', action='store_true', help='Print the list NAME, or if NAME not provided, print all lists. The default if NAME is not provided.')
 
-        parser.add_argument('-n', '--rename', metavar='NAME', default=None, action='store', help='in edit mode, rename the list to %(metavar)s')
-        parser.add_argument('-i', '--default-find', choices=Choice.yes_no_auto(), default=Choice.AUTO, action='store', help='decide if this list should be default for flam find')
-        parser.add_argument('-e', '--default-fetch', choices=Choice.yes_no_auto(), default=Choice.AUTO, action='store', help='decide if this list should be fetched by default')
-        parser.add_argument('NAME', action='store', nargs='?', default=None, help='Operate on the list named %(dest)s')
-        parser.add_argument('LISTDEF', action='store', nargs='?', default=None, help='set the list type and address to %(dest)s')
+        parser.add_argument('-n', '--rename', metavar='NEW_NAME', default=None, action='store', help='In --edit, rename the list to %(metavar)s.')
+        parser.add_argument('-i', '--default-find', choices=Choice.yes_no_auto(), default=Choice.AUTO, action='store', help='In --edit, decide if the list should be default for `flam find`.')
+        parser.add_argument('-e', '--default-fetch', choices=Choice.yes_no_auto(), default=Choice.AUTO, action='store', help='In --edit, decide if the list should be default for `flam fetch`.')
+        parser.add_argument('NAME', action='store', nargs='?', default=None, help='Operate on the list named %(dest)s.')
+        parser.add_argument('LISTDEF', action='store', nargs='?', default=None, help=
+'''In --edit, set the list type and address to %(dest)s.
+%(dest)ss have the form <list type>=<address>, where the list type is some supported way of downloading list information, and the address indicates the exact list to download.
+See the full documentation for a list of supported list types. Below is one recommended example for IMDb lists:
+    imdb-browser-apidev-listid      Takes an IMDb list ID and downloads it by opening the list in the browser and exporting to CSV, then filling in information with https://imdbapi.dev
+''')
+        return parser
 
     @classmethod
     def execute(cls, ctx: flam.FlamContext, args: argparse.Namespace) -> None:
@@ -300,24 +366,47 @@ class SubcommandConfigList:
 
 class SubcommandConfigComposite:
     @classmethod
-    def configure_parser(cls, parser: argparse.ArgumentParser) -> None:
+    def add_subparser(cls, subparsers: argparse._SubParsersAction) -> argparse.ArgumentParser:
+        parser = subparsers.add_parser(
+            'composite',
+            formatter_class=argparse.RawTextHelpFormatter,
+            description = (
+'''View, add, edit, or remove "composite" lists. These are remixes of your simple lists which can combine multiple lists together and also filter them.
+Once configured, composite lists can be easily used by their name in other commands like `flam fetch`, `flam find`.
+'''),
+            epilog = (
+'''Examples:
+    %(prog)s rated mylist -has my-rating
+        (Create a composite list 'rated'. It's got every movie in the simple list 'mylist' which has been rated by you)
+    %(prog)s owned dvds blurays
+        (Create a composite list 'owned'. It's got every movie from both simple lists 'dvds' and 'blurays')
+    %(prog)s
+        (Print all composite lists)
+    %(prog)s --delete rated
+        (Delete 'rated')
+'''),
+        )
+
         parser.set_defaults(function=cls.execute)
 
         action_group = parser.add_mutually_exclusive_group(required=False)
-        action_group.add_argument('-E', '--edit', action='store_true', help='edit or create a composite list. The default if NAME is provided')
-        action_group.add_argument('-D', '--delete', action='store_true', help='delete the list')
-        action_group.add_argument('-P', '--print', action='store_true', help='print the list, or if NAME not provided, print all lists. The default if NAME is not provided')
+        action_group.add_argument('-E', '--edit', action='store_true', help='Edit or create the composite list NAME. The default if NAME is provided.')
+        action_group.add_argument('-D', '--delete', action='store_true', help='Delete the composite list named NAME.')
+        action_group.add_argument('-P', '--print', action='store_true', help='Print the composite list NAME, or if NAME not provided, print all lists. The default if NAME is not provided.')
 
-        parser.add_argument('-n', '--rename', metavar='NAME', default=None, action='store', help='in edit mode, rename the list to %(metavar)s')
-        parser.add_argument('-i', '--default-find', choices=Choice.yes_no_auto(), default=Choice.AUTO, action='store', help='decide if this list should be default for flam find')
-        parser.add_argument('-e', '--default-fetch', choices=Choice.yes_no_auto(), default=Choice.AUTO, action='store', help='decide if this list should be fetched by default')
-        parser.add_argument('NAME', nargs='?', action='store', default=None, help='Operate on the list named %(dest)s')
-        parser.add_argument('LIST', nargs='*', action='store', help='Set the list names to %(dest)s')
-        parser.add_argument('FILTER', nargs='*', action='store', help='Set the FILTER to %(dest)s')
+        parser.add_argument('-n', '--rename', metavar='NEW_NAME', default=None, action='store', help='In --edit, rename the list to %(metavar)s.')
+        parser.add_argument('-i', '--default-find', choices=Choice.yes_no_auto(), default=Choice.AUTO, action='store', help='In --edit, decide if the list should be default for `flam find`.')
+        parser.add_argument('-e', '--default-fetch', choices=Choice.yes_no_auto(), default=Choice.AUTO, action='store', help='In --edit, decide if the list should be default for `flam fetch`.')
+        parser.add_argument('NAME', nargs='?', action='store', default=None, help='Operate on the composite list named %(dest)s.')
+        parser.add_argument('SIMPLE_LIST', nargs='*', action='store', help='In --edit, merge %(dest)ss to form this composite list.')
+        parser.add_argument('MOVIE_FILTER', nargs='*', action='store', help=
+'''In --edit, apply %(dest)s on the merged SIMPLE_LISTs to form this composite list.
+See the full documentation for filter syntax.''')
 
         # argparse.REMAINDER is an undocumented but very important feature.
         # Basically it's the only way to make positional arguments that start with dashes not be treated as bad options.
         parser.add_argument('REMAINDER', nargs=argparse.REMAINDER, action='store', help=argparse.SUPPRESS)
+        return parser
 
     @classmethod
     def execute(cls, ctx: flam.FlamContext, args: argparse.Namespace) -> None:
@@ -406,33 +495,52 @@ class SubcommandConfigComposite:
             cfg.composite_lists_raw.append(composite_list)
 
 class SubcommandFetch:
+    UNDO_HISTORY = 3
+
     @classmethod
-    def configure_parser(cls, parser: argparse.ArgumentParser) -> None:
+    def add_subparser(cls, subparsers: argparse._SubParsersAction) -> argparse.ArgumentParser:
+        parser = subparsers.add_parser(
+            'fetch',
+            formatter_class=argparse.RawTextHelpFormatter,
+            description = (
+'''Download information about the movies in your movie lists. Lists must have been fetched at least once upon a time before you can use them.
+You should rerun this once in a while if you've made changes in your movie lists to sync them locally.
+'''),
+            epilog = (
+'''Examples:
+    %(prog)s
+        (Fetch all lists configured with --default-fetch)
+    %(prog)s dvds blurays
+        (Fetch the configured list "dvds" and "blurays")
+    %(prog)s --undo
+        (Undo the last fetch operation)
+    %(prog)s --refetch 'bojack' shows
+        (Refetch Bojack Horseman from the list "shows")
+'''),
+        )
+
         parser.set_defaults(function=cls.execute)
         
-        parser.add_argument('-u', '--undo', action='store_true', help="Undo the previous fetch operation in its entirety. Note this will also restore configuration to the old state. "
-            "Fetch can be expensive so if something goes wrong and files get messed up this is good to have.")
+        parser.add_argument('-u', '--undo', action='store_true', help=
+f'''Undo the previous fetch operation in its entirety. Note this will also restore configuration to the old state.
+Fetch can be expensive so if something goes wrong and files get messed up this is good to have.
+You can rerun this to undo up to the last {cls.UNDO_HISTORY} fetches.''')
         parser.add_argument('-r', '--refetch', metavar='PATTERN', default=None, action='store', help=
-            '''Forces titles that match %(metavar)s (case-insensitive) to be redownloaded even if they are already locally stored.
+'''Forces titles that match %(metavar)s (case-insensitive regular expression) to be redownloaded even if they are already locally stored.
 It's enough for %(metavar)s to match any part of the title, not necessarily the whole title.
-%(metavar)s uses regex syntax from python's re library, which is identical to egrep unless you use very advanced features.
-This feature is intended for redownloading shows after a new season has come out''')
+This feature is intended for redownloading shows after a new season has come out.''')
 
         parser.add_argument('LISTDEF', nargs='*', action='store', help=
-            '''Each %(dest)s describes a list to fetch. Supports, in order of priority:
-1. Configured list name (type: list)
-2. Configured composite list name (will fetch all lists under it) (type: composite)
-3. Address to fetch the list from (IMDb list id for instance). But for these the type is not inferred, you must specify it.
+'''Which lists to fetch. There are a few supported forms (in order of priority):
+1. "*" for fetching all configured lists
+2. A configured list name (simple or composite) e.g. "mylist"
+3. An explicit "abstract" %(dest)s: "list=<list name>" for simple lists, and "composite=<list name>" for composite lists.
+4. An explicit "concrete" %(dest)s: "<list type>=<address>". See the full documentation for a list of supported types.
 
-To avoid ambiguity and for downloading addresses directly, you can specify the %(dest)s type by writing <type>=%(dest)s. Supported types are:
-* 'list'
-* 'composite'
-* 'imdb-id'
-* 'imdb-private-id'
-* 'imdb-csv'
-* Any custom types you define...
+In the case of a composite list, will actually fetch the simple lists which it's composited from.
+By default fetches all lists configured with --default-fetch.''')
 
-If no %(dest)s provided, fetches all lists configured as defaults''')
+        return parser
 
     @classmethod
     def execute(cls, ctx: flam.FlamContext, args: argparse.Namespace) -> None:
@@ -470,7 +578,7 @@ If no %(dest)s provided, fetches all lists configured as defaults''')
         backups = glob.glob(os.path.join(tempfile.gettempdir(), f'*_{slug}'))
         backups.sort(key=lambda d: os.path.basename(d).split('_')[0])
 
-        while len(backups) >= 3:
+        while len(backups) >= cls.UNDO_HISTORY:
             flam.logger.info(f"Deleting old backup: {backups[0]}")
             shutil.rmtree(backups[0])
             del backups[0]
@@ -495,48 +603,115 @@ If no %(dest)s provided, fetches all lists configured as defaults''')
         flam.logger.info(f"Restored backup: {backups[-1]} to: {flam_dir=}")
 
 class SubcommandFind:
+    # Use qualified names for performance and to avoid ambiguity.
+    DEFAULT_SORT_KEYS = {
+        flam.FindableType.MOVIES: ['movies-release-year', 'movies-title', 'movies-runtime'],
+        flam.FindableType.PEOPLE: ['people-crew-type', 'people-group-mode', 'people-num-movies', 'people-name'],
+
+        # We think of roles as being a people search more than a movie search, so it's sort first by people, then by movie.
+        flam.FindableType.ROLES: ['people-crew-type', 'people-group-mode', 'people-num-movies', 'people-name', 'movies-release-year', 'movies-title', 'movies-runtime'],
+    }
+
+    # The printed name will be abbreviated anyway so it's ok to use the qualified name.
+    DEFAULT_COLUMN_KEYS = {
+        flam.FindableType.MOVIES: ['movies-title', 'movies-runtime', 'movies-release-year', 'movies-rating', 'movies-metascore', 'movies-director'],
+        flam.FindableType.PEOPLE: ['people-name', 'people-birth-year', 'people-height-cm', 'people-num-movies', 'people-avg-rating', 'people-avg-metascore'],
+        flam.FindableType.ROLES: ['people-name', 'movies-title', 'people-num-movies', 'movies-release-year'],
+    }
+
     @classmethod
-    def configure_parser(cls, parser: argparse.ArgumentParser) -> None:
+    def add_subparser(cls, subparsers: None | argparse._SubParsersAction, main_parser: None | argparse.ArgumentParser) -> argparse.ArgumentParser:
+        # Either add find as its own subparser or support its arguments in the main parser.
+        if main_parser is not None:
+            parser = main_parser
+        else:
+            assert subparsers is not None
+            parser = subparsers.add_parser(
+                'find',
+                formatter_class=argparse.RawTextHelpFormatter,
+                description = (
+'''Explore "findables" (movies, people, or roles) in your movie lists, and query for specific ones which answer to some filter.
+Found objects are printed in a nice table format, and you can customize what is printed and how it's sorted.'''),
+                epilog = (
+'''Examples:
+    %(prog)s movies
+        (Find movies in the default lists)
+    %(prog)s cast shows -is-star true
+        (Find starring roles in the list 'shows')
+    %(prog)s --sort height director-people:separate,writer-people:separate -height +160 -height -180
+        (Find directors and writers whose height is between 160 and 180 centimeters and sort them by their height)
+    %(prog)s --columns +watch-date movies -metascore +70 -o -every-role [ writer director ] -gender female
+        (Find movies with a metascore above 70 or which were written and directed by women, and print their watch date alongside default columns)
+'''),
+            )
+
         parser.set_defaults(function=cls.execute)
 
         # TODO: "--split" option to expand array attributes into a row for each one?
         parser.add_argument('-s', '--sort', metavar='ATTRIBUTES', default=None, action='store', help=
-            '''Sort movies according to %(metavar)s, which is a comma-delimited list of keys to sort by, in decreasing priority. Defaults to 'leaving,runtime,alphabetical'.
-            Valid sort keys: ...''')
-        parser.add_argument('-C', '--color', choices=Choice.always_auto_never(), default=Choice.AUTO, action='store', help=
-            'Set whether columns should be colored. Defaults to %(default)s')
-        parser.add_argument('-d', '--dsv', metavar='DELIM', default=None, action='store', help=
-            "Output in delimiter-separated values format (DSV).")
+f'''Sort FINDABLEs according to %(metavar)s, which is a comma-delimited list of attributes to sort by, in decreasing priority.
+Each findable type has its own default:
+    movies      {','.join(k[k.find('-') + 1:] for k in cls.DEFAULT_SORT_KEYS[flam.FindableType.MOVIES])}
+    people      {','.join(k[k.find('-') + 1:] for k in cls.DEFAULT_SORT_KEYS[flam.FindableType.PEOPLE])}
+    roles       {','.join(k[k.find('-') + 1:] for k in cls.DEFAULT_SORT_KEYS[flam.FindableType.ROLES])}
+See the full documentation for a list of supported attributes.''')
+        
         parser.add_argument('-c', '--columns', metavar='ATTRIBUTES', default=None, action='store', help=
-            'List of columns to print, delimited by commas. Defaults to \'title,leaving,runtime,released,rating,metascore,director\','
-            ''' with a few other "smart" columns which activate when a condition is met.
-This option overrides the defaults and smart columns. Only the columns you specify will be printed.
-Beginning this string with a '+' will cause the columns to be added to the default (and smart) columns instead of replacing them.
-If %(metavar)s is '*', will print all columns.
-Valid column names: ...''')
+f'''Comma-delimited list of attributes of FINDABLE to print.
+Each findable type has its own defaults. There are also "smart" defaults which are printed only if certain conditions are met.
+If %(metavar)s starts with a '+' then they will be printed in addition to the defaults instead of instead.
+Supports globbing (e.g. '*-date' for all date attributes).
+See the full documentation for a list of supported attributes.''')
+
+        parser.add_argument('-C', '--color', choices=Choice.always_auto_never(), default=Choice.AUTO, action='store', help=
+            'Set whether columns should be colored. Defaults to %(default)s.')
+        parser.add_argument('-d', '--dsv', metavar='DELIM', default=None, action='store', help=
+            "Output in delimiter-separated values format (DSV). I.e. if DELIM is ',' then that is CSV format.")
         parser.add_argument('-v', '--verbose', default=False, action='store_true', help=
-            'Use verbose output, like writing the full release date instead of just the year, and not chopping long strings')
+            'Use verbose output, where long strings are not truncated and some attributes may be printed in longer format.')
         parser.add_argument('-r', '--reverse', default=False, action='store_true', help=
-            'Reverse the sort order. By default some sort keys are ascending and some descending based on what makes sense to me. This reverses those defaults')
+            'Reverse the sort order. By default some sort keys are ascending and some descending based on what makes sense. This reverses those defaults.')
         parser.add_argument('-S', '--spacious', default=False, action='store_true', help=
-            'Add an empty line between entries')
+            'Add an empty line between entries.')
         parser.add_argument('-P', '--paginate', choices=Choice.always_auto_never(), default=Choice.AUTO, action='store', help=
-            'Choose whether to paginate with less. Defaults to %(default)s, which depends on the size of the output')
-        parser.add_argument('-f', '--date-format', metavar='FORMAT', default=None, action='store', help=
-            'Override format for date columns. Default depends on verbosity and which column. See python datetime.strftime documentation for format syntax')
+            'Choose whether to paginate with `less`. Defaults to %(default)s, which depends on the size of the output.')
         parser.add_argument('-t', '--no-titles', default=False, action='store_true', help=
-            'Don\'t print a row with the column titles')
+            "Don't print a row with the column titles.")
 
         parser.add_argument('FINDABLE', type=cls.parse_findable, action='store', help=
-            '''Choose what to find: movies, people, or roles.
-For people and roles, supports limiting the search to a specific crew type and group mode, and supports comma-delimited several types. Use 'crew' to catenate all types.
+f'''Choose what to find: movies, people, or roles.
+Movies are simply the movies in the list.
+
+People are the people were in the movies in the list. They can be searched per crew type (i.e. 'director', 'cast') or as 'any' crew type.
+
+Roles are an appearance of a specific people in a specific film. Think "Cristoph Waltz in Inglorious Basterds". They can also be searched per crew type.
+So when searching for roles, you will see an entry per person per movie.
+Since roles combine a people and a movie, they accept any movie attribute, people attribute, and also their own role attributes.
+
+Supported crew types: {', '.join(flam.CrewType)}
+
+People and roles can be "grouped". Grouping simply combines some people together if they are known collaborators.
+For example, if grouping is enabled then the Coen brothers will become a single "people" entry.
+Each crew type has its own default grouping mode according to what makes sense, but you can override it
+
+People and roles support limiting the search to a specific crew type and optionally also group mode, and support comma-delimited several types. Use 'crew' to catenate all types.
 For roles, it looks like: 'cast', 'director:group', 'composer:separate,stuntcast', 'crew', etc.
-For people, it looks like 'cast-people', 'director-people:group', etc.''')
+For people, it looks like 'cast-people', 'director-people:group', etc.
+
+''') # Empty trailing line because this is a lot of text and we gotta space it out.
+
         parser.add_argument('LISTDEF', nargs='*', action='store', help=
-            '''Like fetch but with different defaults, and if the LISTDEFs aren't already fetched, it fails with a nice error message''')
+'''Which lists to search in. They must've been previously fetched. See `flam fetch --help` for information about supported forms.
+By default searches in all lists configured with --default-find.
+
+''')
         parser.add_argument('FILTER', nargs='*', action='store', help=
-            '''find-like expression featuring predicates like -crew, -cast, -release...''')
+'''Search only for findables which pass %(metavar)s.
+Filters can check the values of attributes and more. They support standard constructs like '-and', '-or', '-not' operators and parenthesized expressions.
+See the full documentation for filter syntax.''')
+
         parser.add_argument('REMAINDER', nargs=argparse.REMAINDER, action='store', help=argparse.SUPPRESS)
+        return parser
 
     @classmethod
     def parse_findable(cls, findable: str) -> tuple[flam.FindableType, list[tuple[flam.CrewType, flam.GroupMode]]]:
@@ -626,16 +801,7 @@ For people, it looks like 'cast-people', 'director-people:group', etc.''')
         attributes: list[tuple[flam.Attribute, None | str]]
 
         if args.sort is None:
-            # Use qualified names for performance and to avoid ambiguity.
-            default_attribute_names = {
-                flam.FindableType.MOVIES: ['movies-release-year', 'movies-title', 'movies-runtime'],
-                flam.FindableType.PEOPLE: ['people-crew-type', 'people-group-mode', 'people-num-movies', 'people-name'],
-
-                # We think of roles as being a people search more than a movie search, so it's sort first by people, then by movie.
-                flam.FindableType.ROLES: ['people-crew-type', 'people-group-mode', 'people-num-movies', 'people-name', 'movies-release-year', 'movies-title', 'movies-runtime'],
-            }
-
-            attributes = [(ctx.attributes[a], None) for a in default_attribute_names[findable_type]]
+            attributes = [(ctx.attributes[a], None) for a in cls.DEFAULT_SORT_KEYS[findable_type]]
         else:
             # Return a tuple with the attribute and also a hint of which string to use to print it to the user,
             # so that if this sort attribute is added as a smart column the user will see it by the same alias he used.
@@ -752,17 +918,8 @@ For people, it looks like 'cast-people', 'director-people:group', etc.''')
         is_additive = args.columns is None or args.columns.startswith('+')
 
         if is_additive:
-            # Default and smart columns should all be specified by their qualified names,
-            # Both because it's efficient and because it allows us to use `attributes[...]` and not `attributes.get(...)` without fear of ambiguity.
-            # They are displayed by abbreviated names anyway in the printing step.
-            default_columns = {
-                flam.FindableType.MOVIES: ['movies-title', 'movies-runtime', 'movies-release-year', 'movies-rating', 'movies-metascore', 'movies-director'],
-                flam.FindableType.PEOPLE: ['people-name', 'people-birth-year', 'people-height-cm', 'people-num-movies', 'people-avg-rating', 'people-avg-metascore'],
-                flam.FindableType.ROLES: ['people-name', 'movies-title', 'people-num-movies', 'movies-release-year'],
-            }
-
             # Add defaults to the left of the user columns. In reverse because all are inserted to 0 so that actually results in keeping the original order.
-            for col in reversed(default_columns[findable_type]):
+            for col in reversed(cls.DEFAULT_COLUMN_KEYS[findable_type]):
                 uniq_insert(ctx.attributes[col], None, 0)
 
             # Add a column for the crew type at the leftmost if we're searching for multiple crew types.
@@ -801,16 +958,16 @@ For people, it looks like 'cast-people', 'director-people:group', etc.''')
                 # So we just check for common ways that perdicates reference their attributes.
                 # AttributePredicate has 'ATTRIBUTE' as a classvar.
                 if hasattr(type(filter_member), 'ATTRIBUTE'):
-                    attr = type(filter_member).ATTRIBUTE # type: ignore
+                    filter_attr = type(filter_member).ATTRIBUTE # type: ignore
                 # Other builtins have '_attribute' as a field.
                 elif hasattr(filter_member, '_attribute'):
-                    attr = filter_member._attribute # type: ignore
+                    filter_attr = filter_member._attribute # type: ignore
                 else:
-                    attr = None
+                    filter_attr = None
 
                 # Filters can have subfilters of different types. So only add applicable attributes.
-                if attr is not None and attr.findable_type.is_applicable_to(findable_type):
-                    uniq_insert(attr, None, len(attributes))
+                if filter_attr is not None and filter_attr.findable_type.is_applicable_to(findable_type):
+                    uniq_insert(filter_attr, None, len(attributes))
 
         flam.logger.info(f"Got columns: {', '.join(attr.qualified_name for attr, _ in attributes)}")
         return attributes
@@ -844,7 +1001,8 @@ For people, it looks like 'cast-people', 'director-people:group', etc.''')
 
 # class SubcommandChart:
 #     @classmethod
-#     def configure_parser(cls, parser: argparse.ArgumentParser) -> None:
+#     def add_subparser(cls, subparsers: argparse._SubParsersAction) -> argparse.ArgumentParser:
+#         parser = subparsers.add_parser('chart', formatter_class=argparse.RawTextHelpFormatter)
 #         parser.set_defaults(function=cls.execute)
 
 #         parser.add_argument('-o', '--omit-zeroes', choices=Choice.always_auto_never(), default=Choice.AUTO, action='store', help=
@@ -868,6 +1026,7 @@ For people, it looks like 'cast-people', 'director-people:group', etc.''')
 #             '''Like find''')
 #         parser.add_argument('FILTER', nargs='*', action='store', help=
 #             '''find-like expression featuring predicates like -crew, -cast, -release...''')
+#         return parser
 
 #     @classmethod
 #     def execute(cls, ctx: flam.FlamContext, args: argparse.Namespace) -> None:
@@ -876,30 +1035,57 @@ For people, it looks like 'cast-people', 'director-people:group', etc.''')
 def make_main_parser(add_subparsers: bool) -> tuple[argparse.ArgumentParser, argparse.ArgumentParser]:
     parser = argparse.ArgumentParser(
         formatter_class = argparse.RawTextHelpFormatter,
-        description = 'I dunno lol',
+        description = (
+'''Gain insights on your movie lists. Quickly answer questions like "Where have I seen this actor?", or "Which director have I seen the most movies from?", and so much more.
+
+1. Create movie lists on IMDb, Letterboxd, or your website of choice
+2. Configure %(prog)s with how to download those lists with `%(prog)s config list`
+3. Download all the information about the movies in those lists with `%(prog)s fetch`
+4. Gain insights on the movies in those lists with `%(prog)s find` and `%(prog)s chart`
+
+A bit of information on each subcommand:
+
+    config      View or change the configuration - configure lists, custom extensions, etc.
+    fetch       Download movie lists locally so they can be used
+    find        Query for movies, people, or roles in your movie lists
+
+The default subcommand is `find`. See `%(prog)s find --help` to know which arguments it accepts. There is a help option for all subcommands.
+'''),
+        epilog = (
+'''Examples:
+    %(prog)s config list --default-fetch=yes --default-find=yes mylist imdb-browser-apidev-listid=083886771
+        (Create a list 'mylist' with the IMDb list address)
+    %(prog)s fetch
+        (Fetch all lists configured with --default-fetch)
+    %(prog)s find movies
+        (View all movies in lists configured with --default-find)
+    %(prog)s director mylist -name tarantino
+        (Uses find as the default subcommand. View information about directors in 'mylist' named 'tarantino' and all the movies they've directed from the list)
+'''),
         exit_on_error = False,
         prog = 'flam', # Needed for when running the script using python -m.
         add_help = add_subparsers, # Don't conflict helps.
     )
 
     # Main parser option letters mustn't conflict with find's option letters (or: I wish -F could be -C).
+    # NOTE: we are strict about proper punctuation, including capital letters at the beginning of each help string and a period at the end.
+    # This conflicts with the format that argparse uses for --help, and I hate the inconsistency, but argparse is wrong.
     parser.add_argument('-F', '--flam-dir', metavar='PATH', default=flam.DEFAULT_FLAM_DIR, action='store', help=
-        f'Use %(metavar)s as the flam directory. Uses {flam.FlamEnv.CTX_DIR} environment variable by default, or ~/.film_flam if it is not defined')
+        f'Use %(metavar)s as the flam directory - where %(prog)s stores all your data. Uses {flam.FlamEnv.CTX_DIR} environment variable by default, or ~/.film_flam if it is not defined.')
     parser.add_argument('-E', '--no-extensions', action='store_true', help=
-        "Don't import configured extensions")
+        "Don't import configured extensions. Importing extensions executes arbitrary code so use this if you don't trust them.")
     parser.add_argument('-V', '--version', action='version', version=f'%(prog)s version {flam.__version__}')
 
     if add_subparsers:
         # Subparsers are organized into "static" classes. This is only for code organization reasons, not OOP reasons.
         # The classes are designed to enforce as little "model" as possible so we can be flexible with how we use them.
         subparsers = parser.add_subparsers(required=True)
-        SubcommandConfig.configure_parser(subparsers.add_parser('config', formatter_class=argparse.RawTextHelpFormatter))
-        SubcommandFetch.configure_parser(subparsers.add_parser('fetch', formatter_class=argparse.RawTextHelpFormatter))
-        SubcommandFind.configure_parser(find_subparser := subparsers.add_parser('find', formatter_class=argparse.RawTextHelpFormatter))
-        # SubcommandChart.configure_parser(subparsers.add_parser('chart', formatter_class=argparse.RawTextHelpFormatter))
+        SubcommandConfig.add_subparser(subparsers)
+        SubcommandFetch.add_subparser(subparsers)
+        find_subparser = SubcommandFind.add_subparser(subparsers, None)
+        # SubcommandChart.add_subparser(subparsers)
     else:
-        find_subparser = parser
-        SubcommandFind.configure_parser(parser)
+        find_subparser = SubcommandFind.add_subparser(None, parser)
 
     return parser, find_subparser
 

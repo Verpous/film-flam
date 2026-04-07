@@ -132,14 +132,24 @@ class Findable(abc.ABC):
     def uid(self) -> str:
         pass
 
-    # NOTE: I considered doing __getitem__ as a shorthand for this but I think I don't like it.
     @abc.abstractmethod
-    def extract(self, attribute: _attr.Attribute) -> _attr.AttributeValue:
+    def _extract_internal(self, attribute: _attr.Attribute) -> _attr.AttributeValue:
+        pass
+        
+    @abc.abstractmethod
+    def _excrete(self, predicate: _filter.Predicate) -> bool:
         pass
 
-    @abc.abstractmethod
-    def excrete(self, predicate: _filter.Predicate) -> bool:
-        pass
+    def extract(self, attribute: _attr.Attribute) -> _attr.AttributeValue:
+        if not attribute.findable_type.is_applicable_to(self.type_):
+            raise _exc.InputError(f"Attribute '{attribute.qualified_name}' is a {attribute.findable_type} attribute, so it is not found on {self.type_}.")
+
+        return self._extract_internal(attribute)
+
+    # __getitem__ for also encapsulating the attribute lookup, the ultimate quick & dirty way. extract() for more efficient and clean code.
+    def __getitem__(self, attribute_name: str) -> _attr.AttributeValue:
+        attr = self._movie_list.ctx.attributes.get(attribute_name, type_hint=self.type_)
+        return self.extract(attr)
 
 class Movie(Findable):
     def __init__(self, movie_list: MovieList, mlf_movie: _mlf.MLFMovie) -> None:
@@ -159,10 +169,10 @@ class Movie(Findable):
     def underlying_file_movie_readonly(self) -> _mlf.MLFMovie:
         return self._mlf_movie
 
-    def extract(self, attribute: _attr.Attribute) -> _attr.AttributeValue:
+    def _extract_internal(self, attribute: _attr.Attribute) -> _attr.AttributeValue:
         return attribute._extract_from_movie(self, self._mlf_movie) # type: ignore
 
-    def excrete(self, predicate: _filter.Predicate) -> bool:
+    def _excrete(self, predicate: _filter.Predicate) -> bool:
         return predicate._excrete_from_movie(self, self._mlf_movie) # type: ignore
 
     def associated_people(self, crew_type: CrewType, group_mode: GroupMode) -> typing.Iterable[People]:
@@ -250,10 +260,10 @@ class People(Findable):
     def underlying_file_people_readonly(self) -> list[_mlf.MLFPerson]:
         return self._mlf_people
     
-    def extract(self, attribute: _attr.Attribute) -> _attr.AttributeValue:
+    def _extract_internal(self, attribute: _attr.Attribute) -> _attr.AttributeValue:
         return attribute._extract_from_people(self, self._mlf_people) # type: ignore
 
-    def excrete(self, predicate: _filter.Predicate) -> bool:
+    def _excrete(self, predicate: _filter.Predicate) -> bool:
         return predicate._excrete_from_people(self, self._mlf_people) # type: ignore
 
     def associated_movies(self) -> typing.Iterable[Movie]:
@@ -441,31 +451,31 @@ class Role(Findable):
     def underlying_file_roles_readonly(self) -> MLFRolesDict:
         return self._mlf_roles
 
-    def extract(self, attribute: _attr.Attribute) -> _attr.AttributeValue:
+    def _extract_internal(self, attribute: _attr.Attribute) -> _attr.AttributeValue:
         # Support optionally implementing _extract_from_role on any type of attribute, for custom behavior on how to extract them from roles.
         # It's best not to abuse this power but we will allow it.
         if attribute.findable_type == FindableType.ROLES or hasattr(attribute, '_extract_from_role'):
             return attribute._extract_from_role(self, self._mlf_roles, self._movie._mlf_movie, self._people._mlf_people) # type: ignore
         
         if attribute.findable_type == FindableType.MOVIES:
-            return self.movie.extract(attribute)
+            return self.movie._extract_internal(attribute)
         
         if attribute.findable_type == FindableType.PEOPLE:
-            return self.people.extract(attribute)
+            return self.people._extract_internal(attribute)
         
         raise RuntimeError(f"Unexpected {attribute.findable_type=}")
 
-    def excrete(self, predicate: _filter.Predicate) -> bool:
+    def _excrete(self, predicate: _filter.Predicate) -> bool:
         # Support optionally implementing _excrete_from_role on any type of predicate, for custom behavior on how to extract them from roles.
         # It's best not to abuse this power but we will allow it.
         if predicate.findable_type == FindableType.ROLES or hasattr(predicate, '_excrete_from_role'):
             return predicate._excrete_from_role(self, self._mlf_roles, self._movie._mlf_movie, self._people._mlf_people) # type: ignore
         
         if predicate.findable_type == FindableType.MOVIES:
-            return self.movie.excrete(predicate)
+            return self.movie._excrete(predicate)
         
         if predicate.findable_type == FindableType.PEOPLE:
-            return self.people.excrete(predicate)
+            return self.people._excrete(predicate)
         
         raise RuntimeError(f"Unexpected {predicate.findable_type=}")
 
