@@ -128,14 +128,19 @@ release() {
 _gen_requirements() {
     # I refuse to manually keep track of dependencies, so we use pipreqs. But pipreqs SUCKS:
     # 1. Some folders confuse pipreqs so we --ignore them.
-    # 2. pipreqs identifies cinemagoer by its old name, IMDbPY, so we rename it.
+    # 2. pipreqs identifies some packages by the wrong name, like cinemagoer is recognized by its old name, IMDbPY, so we rename them.
     # 3. pipreqs fails at identifying packages locally, instead resolving them from the PyPI server where it gets the version wrong,
     #    so we actually use pipreqs to get the names of packages, then grep them with the correct versions from pip freeze.
     _mktemp req_patterns
 
     # Don't pipe pipreqs to sed, instead write file with pipreqs and edit it inplace with sed. This is to not sweep pipreq failure under the rug. We won't enable pipefail.
     pipreqs --mode no-pin --ignore .mypy_cache,.venv --print > "$req_patterns"
-    sed -iE 's/IMDbPY/cinemagoer/g; s/python_dateutil/python-dateutil/g; s/.*/^\0==/g' "$req_patterns"
+    sed -iE '
+s/IMDbPY/cinemagoer/g
+s/python_dateutil/python-dateutil/g
+s/concurrent_log_handler/concurrent-log-handler/g
+s/Requests/requests/g
+s/.*/^\0==/g' "$req_patterns" # Add a "==" so that the next step will grep these packages exactly and not count substrings.
     grep -E --file="$req_patterns" <(pip freeze) | sed -E 's/==/>=/g' | tee _gen_requirements.txt
 
     # Sanity check that we didn't miss any packages.

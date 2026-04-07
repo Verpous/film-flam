@@ -4,13 +4,14 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "film-flam"
-description = "Tools for extracting insights out of your movie lists"
+description = "Tools for extracting insights from your movie lists"
 readme = "README.md"
 requires-python = ">=3.12.3"
 authors = [ { name="Aviv Edery", email="ederyaviv2@gmail.com" } ]
+license = "GPL-3.0"
+license-files = ["LICENSE"]
 classifiers = [
     "Programming Language :: Python :: 3",
-    "License :: OSI Approved :: GNU General Public License v3 (GPLv3)",
     "Operating System :: OS Independent",
 ]
 

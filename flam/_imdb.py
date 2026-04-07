@@ -798,7 +798,7 @@ def _do_with_retries[T](action: typing.Callable[[], T], num_retries: int = 10, s
 
             time.sleep(sleep_between_retries)
 
-    raise RuntimeError('This should never be reached!')
+    raise RuntimeError("Shouldn't get here!")
 
 def _is_browser_alive(driver: WebDriver) -> bool:
     try:

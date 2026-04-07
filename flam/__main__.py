@@ -459,7 +459,7 @@ See the full documentation for filter syntax.''')
             if args.rename is not None:
                 composite_list.name = args.rename
 
-            simple_list_names, filter_tokens = split_at_filter(args.LIST + args.FILTER)
+            simple_list_names, filter_tokens = split_at_filter(args.SIMPLE_LIST + args.MOVIE_FILTER)
 
             if len(simple_list_names) > 0:
                 composite_list.simple_list_uids = [ctx.cfg_readonly.simple_lists.get_by_name(sl_name).uid for sl_name in simple_list_names]
@@ -480,7 +480,7 @@ See the full documentation for filter syntax.''')
         if args.NAME is None:
             raise flam.InputError("Must specify a NAME to create or edit a composite list.")
 
-        simple_list_names, filter_tokens = split_at_filter(args.LIST + args.FILTER)
+        simple_list_names, filter_tokens = split_at_filter(args.SIMPLE_LIST + args.MOVIE_FILTER)
 
         composite_list = flam.CompositeList(
             uid = 'INITIALIZED LATER',
@@ -1134,8 +1134,13 @@ def main() -> None:
         flam.logger.info(f"Parsed args into: {args=}")
 
         # We use the FILTER, REMAINDER trick a lot so we take care of it generically.
-        if hasattr(args, 'FILTER') and hasattr(args, 'REMAINDER'):
-            args.FILTER += args.REMAINDER
+        if hasattr(args, 'REMAINDER'):
+            if hasattr(args, 'FILTER'):
+                args.FILTER += args.REMAINDER
+            elif hasattr(args, 'MOVIE_FILTER'):
+                args.MOVIE_FILTER += args.REMAINDER
+            else:
+                raise RuntimeError("Shouldn't get here!")
 
         ctx = flam.FlamContext(args.flam_dir, import_extensions=not args.no_extensions)
         args.function(ctx, args)
