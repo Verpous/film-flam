@@ -17,19 +17,11 @@ from __future__ import annotations
 
 import msgspec
 import typing
-import dataclasses
 import json
-import time
 
 from . import _exc
 from . import _dbg
 from . import _gen_version
-
-@dataclasses.dataclass(frozen=True)
-class FieldMeta:
-    order_matters: bool = False
-
-_default_meta = FieldMeta()
 
 _VERSION_KEY = 'version'
 
@@ -76,8 +68,6 @@ class _FlamSerializable(msgspec.Struct,
                 _dbg.logger.info(f"Successfully upgraded version of {cls}.")
             else:
                 raise cls._validation_error(f'{ve}.') from ve
-
-        _after_decode_time = time.time()
 
         obj.sanity_checks()
         _dbg.logger.info(f'Successfully loaded a {cls} of size {len(contents)}B')
@@ -144,16 +134,17 @@ class _FlamSerializable(msgspec.Struct,
 
         # Must be depth-first for this to work.
         for node in self.depth_first_iter():
-            for field in msgspec.structs.fields(node):
-                value = getattr(node, field.name)
+            # This is a *significantly* faster way to get the field names than msgspec.structs.fields(node).
+            for field in node.__struct_fields__:
+                value = getattr(node, field)
 
-                # For now only have one field we want to exclude from sorting so we hack it.
-                if isinstance(value, list) and not self._get_meta(field).order_matters:
+                if isinstance(value, list):
                     value.sort()
 
     def depth_first_iter(self) -> typing.Iterable[_FlamSerializable]:
-        for field in msgspec.structs.fields(self):
-            value = getattr(self, field.name)
+        # This is a *significantly* faster way to get the field names than msgspec.structs.fields(node).
+        for field in self.__struct_fields__:
+            value = getattr(self, field)
 
             # If a data structure isn't here we don't support it.
             if isinstance(value, _FlamSerializable):
@@ -165,15 +156,11 @@ class _FlamSerializable(msgspec.Struct,
 
         yield self
 
+    # This is *significantly* faster than copy.deepcopy.
+    def deepcopy(self) -> typing.Self:
+        encoded = msgspec.json.encode(self)
+        return msgspec.json.decode(encoded, type=type(self))
+
     @classmethod
     def _validation_error(cls, message: str) -> _exc.FileValidationError:
         return _exc.FileValidationError(f'Invalid {cls.__name__}: {message}')
-
-    @classmethod
-    def _get_meta(cls, field: msgspec.structs.FieldInfo) -> FieldMeta:
-        if typing.get_origin(field.type) is typing.Annotated:
-            for annot in field.type.__metadata__:
-                if isinstance(annot, FieldMeta):
-                    return annot
-
-        return _default_meta

@@ -236,6 +236,12 @@ See the full documentation for how to implement extensions.
         if args.IMPORT is None:
             raise flam.InputError("Must specify a IMPORT to add an extension.")
 
+        # This is technically allowed at the API level but will probably cause an error when trying to register attributes/predicates/fetchers that are already registered.
+        # When it happens it's problematic to delete the extension; you have to run flam with --no-extensions so it won't crash before you can remove it.
+        # So we'll protect the user from potentially shooting themselves in the foot.
+        if args.IMPORT in ctx.cfg_readonly.extensions:
+            raise flam.InputError(f"IMPORT '{args.IMPORT}' is already a configured extension.")
+
         with ctx.configure() as cfg:
             cfg.extensions.append(args.IMPORT)
 

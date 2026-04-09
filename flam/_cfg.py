@@ -38,9 +38,9 @@ class CompositeList(_file._FlamSerializable):
     name:                   str
     simple_list_uids:       list[str]
     
-    # This annotation is used by canonicalization. We used to canonicalize the configuration file but we don't anymore because there is no need.
-    # So this annotation is doing nothing but might as well keep it.
-    filter_tokens:          typing.Annotated[list[str], _file.FieldMeta(order_matters=True)]
+    # This field cares about the the order of tokens. Because of this we must never canonicalize configuration files
+    # We used to have a way to annotate that a field shouldn't be sorted by canonicalize() but it was very expensive and no one was using it so it's gone.
+    filter_tokens:          list[str]
     is_default_fetch:       bool
     is_default_find:        bool
 

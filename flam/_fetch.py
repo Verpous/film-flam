@@ -20,7 +20,6 @@ import typing
 import re
 import os
 import contextlib
-import copy
 
 from . import _ldef
 from . import _mlf
@@ -108,7 +107,7 @@ class ListFetcher(abc.ABC):
 
         # Create a copy because we'll be modifying it a bit before we save and we don't want to modify the file the fetcher is operating on.
         # I considered sweeping errors in checkpointing under the rug but I think it's better to enforce correct use of this function.
-        mlf_copy = copy.deepcopy(movie_list_file)
+        mlf_copy = movie_list_file.deepcopy()
         self._postprocess_fetched_file(mlf_copy)
         self._ctx._close_fetch(None, mlf_copy)
 

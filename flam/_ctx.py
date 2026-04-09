@@ -20,7 +20,6 @@ import os
 import typing
 import uuid
 import re
-import copy
 import importlib
 import tempfile
 import weakref
@@ -168,9 +167,9 @@ class FlamContext:
             self._write_cfg()
 
         try:
-            self._metadata = _md.FlamMetadata.load(self._metadata_path)
+            self._metadata = _md._FlamMetadata.load(self._metadata_path)
         except FileNotFoundError:
-            self._metadata = _md.FlamMetadata(
+            self._metadata = _md._FlamMetadata(
                 version = _gen_version.__version__,
                 composite_lists_by_uid = {},
             )
@@ -182,6 +181,8 @@ class FlamContext:
         _dbg.logger.info(f'Loaded configuration: {self._cfg=}')
         _dbg.logger.info(f'Loaded metadata: {self._metadata=}')
 
+        # import_extensions does 2 things: import all configured extensions, and subscribe to any globally registered extensions.
+        # It's good to make this an option with default false for security, and I prefer to keep the two options as one for simplicity.
         self._should_import_extensions = import_extensions
 
         ctx_extensions = _reg.Registry(f'context ({self.flam_dir})')
@@ -189,8 +190,8 @@ class FlamContext:
         self._predicates = RegistriesOf(lambda reg: reg.predicates, ctx_extensions, import_extensions)
         self._attributes = RegistriesOf(lambda reg: reg.attributes, ctx_extensions, import_extensions)
 
-        # import_extensions does 2 things: import all configured extensions, and subscribe to any globally registered extensions.
-        # It's good to make this an option with default false for security, and I prefer to keep the two options as one for simplicity.
+        # If one of the extensions is bad it can be annoying to delete it from the configuration because flam will fail to load.
+        # I don't want to sweep bad extensions under the rug though, so I think the solution of `flam --no-extensions config extension --delete` will just have to do.
         if import_extensions:
             for extension in self._cfg.extensions:
                 self._import_extension(extension)
@@ -286,7 +287,7 @@ class FlamContext:
                 mlf = self._generate_composite_mlf(dependencies, filter, abstract_listdef.address)
 
                 # Update metadata. Even if the uid is already in the file just replace it with a new object, because why not.
-                self._metadata.composite_lists_by_uid[abstract_listdef.address] = _md.CompositeListMetadata(
+                self._metadata.composite_lists_by_uid[abstract_listdef.address] = _md._CompositeListMetadata(
                     uid = abstract_listdef.address,
 
                     # Assume os.path won't throw an error because it would've been caught by _should_regenerate_composite_list.
@@ -366,7 +367,7 @@ class FlamContext:
             merged_mlf.people_by_uid.update(dep_mlf.people_by_uid)
 
         # Deepcopy because we built it using some objects from other files.
-        merged_mlf = copy.deepcopy(merged_mlf)
+        merged_mlf = merged_mlf.deepcopy()
 
         # Now we're going to handle per src datas. For every movie, we want its new per_src_data to be the merging of all the per_src_datas from every dependency list the movie came from.
         # We also want to remove duplicates if the same source is listed twice. So anyway, go over each movie...
@@ -386,7 +387,7 @@ class FlamContext:
             # Now we can store the result into the movie. This assignment is safe to do because we did the big deepcopy above.
             # BUT that does mean that we have to deepcopy the per src datas specifically, here.
             # We sort it to preserve canonicalization faster than going through canonicalize() - this is kind of a slimy optimization.
-            mlf_movie.per_src_data = sorted(copy.deepcopy(per_src_data) for per_src_data in dep_src_datas.values())
+            mlf_movie.per_src_data = sorted(per_src_data.deepcopy() for per_src_data in dep_src_datas.values())
 
         if not filter.is_empty:
             merged_mlf = _ml.MovieList(merged_mlf, self).export(filter)
@@ -438,7 +439,7 @@ class FlamContext:
     # * Users may shoot themselves in the foot, if you make an invalid edit you will only know it when you close the context (hopefully we catch every case).
     @contextlib.contextmanager
     def configure(self) -> typing.Iterator[_cfg.Configuration]:
-        editable_copy = copy.deepcopy(self._cfg)
+        editable_copy = self._cfg.deepcopy()
         error_occured = False
 
         _dbg.logger.info(f"Begin configuring of: {self._cfg=}")
@@ -561,8 +562,10 @@ class FlamContext:
 
             if old_list is None:
                 added_lists.append(cfg_list)
-            # Note: would be better if we first canonicalized the file, but that may throw errors, and we can tolerate false positives on this check.
-            # Anyway if the lists compare unequal, it does mean the list was "touched", just maybe touched with the same data in a different order.
+            # NOTE: we can get false positives due to not canonicalizing but file first, but:
+            # * File must not be canonicalized because CompositeList.filter_tokens order matters.
+            # * Canonicalizing may throw errors, and we can tolerate false positives on this check.
+            # * If the lists compare unequal, it does mean the list was "touched", just maybe touched with the same data in a different order.
             elif cfg_list != old_list:
                 modified_lists.append(cfg_list)
 
@@ -627,7 +630,7 @@ class FlamContext:
                 
             # We need both the old and new versions to compare at the end. But it's important that the new one is the deepcopy,
             # so that anyone currently holding on to a list handle won't have the underlying list file changed.
-            new_mlf = copy.deepcopy(mlf)
+            new_mlf = mlf.deepcopy()
             
             try:
                 fetcher.fetch(new_mlf, refetch_re, quiet)

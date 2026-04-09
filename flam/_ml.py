@@ -18,7 +18,6 @@ from __future__ import annotations
 import typing
 import enum
 import abc
-import copy
 import bisect
 
 from . import _filter
@@ -194,12 +193,12 @@ class Movie(Findable):
                 crew_uids_any = set(uid for mlf_crew in self._mlf_movie.crew.values() for uid in mlf_crew.roles_by_uid)
 
                 for mlf_person_uid in crew_uids_any:
-                    people = ml.get_people_by_uid(People.compose_uid([mlf_person_uid], crew_type, group_mode))
+                    people = ml.get_people_by_uid(People.compose_uid([mlf_person_uid], crew_type, group_mode), ct_gm_hint=ct_gm)
                     assert people is not None
                     yield people
             case (_, GroupMode.SEPARATE):
                 for mlf_role in self._mlf_movie.crew[crew_type].roles_by_uid.values():
-                    people = ml.get_people_by_uid(People.compose_uid([mlf_role.person_uid], crew_type, group_mode))
+                    people = ml.get_people_by_uid(People.compose_uid([mlf_role.person_uid], crew_type, group_mode), ct_gm_hint=ct_gm)
                     assert people is not None
                     yield people
             case (_, GroupMode.GROUP):
@@ -220,7 +219,7 @@ class Movie(Findable):
         # Guaranteed consisted ordering because associated_people() has consistent ordering.
         for people in self.associated_people(crew_type, group_mode):
             role_uid = Role.compose_uid(self, people)
-            role = ml.get_role_by_uid(role_uid)
+            role = ml.get_role_by_uid(role_uid, ct_gm_hint=(people.crew_type, people.group_mode))
             assert role is not None
             yield role
 
@@ -284,7 +283,7 @@ class People(Findable):
         # Guaranteed consisted ordering because associated_movies() has consistent ordering.
         for movie in self.associated_movies():
             role_uid = Role.compose_uid(movie, self)
-            role = ml.get_role_by_uid(role_uid)
+            role = ml.get_role_by_uid(role_uid, ct_gm_hint=(self.crew_type, self.group_mode))
             assert role is not None
             yield role
 
@@ -307,14 +306,18 @@ class People(Findable):
 
     # Returns None when it fails instead of raising an exception because this can happen a lot and raising a log each time is expensive.
     def _minimal_superset_people_internal(self, movie_list: MovieList, crew_type: CrewType) -> None | People:
+        ct_gm = (crew_type, self.group_mode)
+
         # SEPARATE group mode, so it's much easier to check if this person is in another crew type.
         if self.group_mode == GroupMode.SEPARATE:
-            uid = self.compose_uid([self._mlf_people[0].uid], crew_type, self.group_mode)
-            return movie_list.get_people_by_uid(uid)
+            # If it's the same crew type too then we really don't have to compose a uid, we already know it.
+            uid = self.compose_uid([self._mlf_people[0].uid], crew_type, self.group_mode) if crew_type != self.crew_type else self.uid
+            return movie_list.get_people_by_uid(uid, ct_gm_hint=ct_gm)
 
         # We'll try our luck at searching if this group appears exactly the same in another crew type.
-        uid = self.compose_uid((mlf_person.uid for mlf_person in self._mlf_people), crew_type, self.group_mode)
-        min_superset = movie_list.get_people_by_uid(uid)
+        # If it's the same crew type too then we really don't have to compose a uid, we already know it.
+        uid = self.compose_uid((mlf_person.uid for mlf_person in self._mlf_people), crew_type, self.group_mode) if crew_type != self.crew_type else self.uid
+        min_superset = movie_list.get_people_by_uid(uid, ct_gm_hint=ct_gm)
 
         if min_superset is not None:
             return min_superset
@@ -356,7 +359,7 @@ class People(Findable):
         return min_superset
 
     def are_in_movie(self, movie: Movie) -> bool:
-        # The hell with python one-liners using `any`, `all`, etc. This is more optimal and readable and modifiable.
+        # The hell with python one-liners using `any`, `all`, etc. This is more readable and modifiable.
         if self._crew_type == CrewType.ANY:
             for mlf_person in self._mlf_people:
                 found = False
@@ -578,7 +581,7 @@ class MovieList:
 
     def export(self, filter: _filter.Filter) -> _mlf.MovieListFile:
         _dbg.logger.info(f"Exporting '{self._movie_list_file.abstract_listdef}' with {filter=!s}")
-        filtered_file = copy.deepcopy(self._movie_list_file)
+        filtered_file = self._movie_list_file.deepcopy()
 
         # Canonicalization is preserved because we haven't messed with anything that was sorted.
         filtered_file.movies_by_uid = {movie._mlf_movie.uid: movie._mlf_movie for movie in self.find_movies(filter)}
@@ -593,17 +596,29 @@ class MovieList:
         movies = self._generate_movies()
         return movies.get(uid, None)
 
-    def get_people_by_uid(self, uid: str) -> None | People:
-        # Break down the uid to determine the ct_gm and know which list to search in.
-        breakdown = People.decompose_uid(uid)
-        peoples = self._generate_peoples(breakdown.crew_type, breakdown.group_mode)
+    # The ct_gm can be deduced from the uid but from profiling we know it's a little expensive.
+    # The caller almost always knows the ct_gm beforehand so we can ask them to help us be efficient. On large workloads this optimization is significant.
+    def get_people_by_uid(self, uid: str, ct_gm_hint: None | tuple[CrewType, GroupMode] = None) -> None | People:
+        if ct_gm_hint is None:
+            # Break down the uid to determine the ct_gm and know which list to search in.
+            breakdown = People.decompose_uid(uid)
+            ct_gm = (breakdown.crew_type, breakdown.group_mode)
+        else:
+            ct_gm = ct_gm_hint if ct_gm_hint[1] != GroupMode.DEFAULT else (ct_gm_hint[0], ct_gm_hint[0].default_group_mode)
+
+        peoples = self._generate_peoples(*ct_gm)
         return peoples.get(uid, None)
 
-    def get_role_by_uid(self, uid: str) -> None | Role:
-        # Break down the uid to determine the ct_gm and know which list to search in.
-        role_breakdown = Role.decompose_uid(uid)
-        people_breakdown = People.decompose_uid(role_breakdown.people_uid)
-        roles = self._generate_roles(people_breakdown.crew_type, people_breakdown.group_mode)
+    def get_role_by_uid(self, uid: str, ct_gm_hint: None | tuple[CrewType, GroupMode] = None) -> None | Role:
+        if ct_gm_hint is None:
+            # Break down the uid to determine the ct_gm and know which list to search in.
+            role_breakdown = Role.decompose_uid(uid)
+            people_breakdown = People.decompose_uid(role_breakdown.people_uid)
+            ct_gm = (people_breakdown.crew_type, people_breakdown.group_mode)
+        else:
+            ct_gm = ct_gm_hint if ct_gm_hint[1] != GroupMode.DEFAULT else (ct_gm_hint[0], ct_gm_hint[0].default_group_mode)
+            
+        roles = self._generate_roles(*ct_gm)
         return roles.get(uid, None)
 
     def get_by_uid(self, findable_type: FindableType, uid: str) -> None | Findable:

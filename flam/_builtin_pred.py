@@ -486,10 +486,12 @@ class AnyPersonPredicate(_filter.Predicate, name_without_type='any-person', find
             case _ml.GroupMode.SEPARATE:
                 return self._filter.excrete(people)
             case _ml.GroupMode.GROUP:
+                ct_gm_separate = (people.crew_type, _ml.GroupMode.SEPARATE)
+
                 for mlf_person in people.underlying_file_people_readonly:
                     # get_by_uid should always succeed.
-                    uid_as_separate = _ml.People.compose_uid([mlf_person.uid], people.crew_type, _ml.GroupMode.SEPARATE)
-                    person = people.movie_list.get_people_by_uid(uid_as_separate)
+                    uid_as_separate = _ml.People.compose_uid([mlf_person.uid], *ct_gm_separate)
+                    person = people.movie_list.get_people_by_uid(uid_as_separate, ct_gm_hint=ct_gm_separate)
                     assert person is not None
                     
                     if self._filter.excrete(person):
@@ -523,10 +525,12 @@ class EveryPersonPredicate(_filter.Predicate, name_without_type='every-person', 
             case _ml.GroupMode.SEPARATE:
                 return self._filter.excrete(people)
             case _ml.GroupMode.GROUP:
+                ct_gm_separate = (people.crew_type, _ml.GroupMode.SEPARATE)
+
                 for mlf_person in people.underlying_file_people_readonly:
                     # get_by_uid should always succeed.
-                    uid_as_separate = _ml.People.compose_uid([mlf_person.uid], people.crew_type, _ml.GroupMode.SEPARATE)
-                    person = people.movie_list.get_people_by_uid(uid_as_separate)
+                    uid_as_separate = _ml.People.compose_uid([mlf_person.uid], *ct_gm_separate)
+                    person = people.movie_list.get_people_by_uid(uid_as_separate, ct_gm_hint=ct_gm_separate)
                     assert person is not None
                     
                     if not self._filter.excrete(person):

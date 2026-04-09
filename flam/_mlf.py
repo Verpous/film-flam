@@ -68,7 +68,7 @@ class MLFMovie(_file._FlamSerializable):
     countries:              list[str]
 
     # crew type -> crew object. It makes things much nicer when you can reference the crew type you want with this indirection,
-    # but the downside (as opposed to having a field for each crew type), is that we have to check dynamically that no crew types were added or are missing.
+    # but the downside (as opposed to having a field for each crew type), is that we have to check dynamically that no crew types were added or are missing in sanity_checks.
     # msgspec supports TypedDict, but it has problems with initializing a default.
     crew:                   dict[str, MLFCrew]
 
@@ -89,6 +89,8 @@ class MovieListFile(_file._FlamSerializable):
 
     def sanity_checks(self) -> None:
         super().sanity_checks()
+
+        # Check if every movie has a key for every crew type. This looks expensive for big lists but it has a profiler stamp of approval.
         crew_types_set = set(str(ct) for ct in _ml.CrewType.iterate_except_any())
 
         for movie in self.movies_by_uid.values():

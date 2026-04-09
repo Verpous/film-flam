@@ -17,11 +17,11 @@ from __future__ import annotations
 
 from . import _file
 
-class CompositeListMetadata(_file._FlamSerializable):
+class _CompositeListMetadata(_file._FlamSerializable):
     uid:                    str
     dependency_mtime:       dict[str, float]
 
 # The MD file doesn't get canonicalized.
-class FlamMetadata(_file._FlamSerializable):
+class _FlamMetadata(_file._FlamSerializable):
     version:                str
-    composite_lists_by_uid: dict[str, CompositeListMetadata]
+    composite_lists_by_uid: dict[str, _CompositeListMetadata]

@@ -137,7 +137,7 @@ _gen_requirements() {
     #    so we actually use pipreqs to get the names of packages, then grep them with the correct versions from pip freeze.
     _mktemp req_patterns
 
-    # Don't pipe pipreqs to sed, instead write file with pipreqs and edit it inplace with sed. This is to not sweep pipreq failure under the rug. We won't enable pipefail.
+    # Don't pipe pipreqs to sed, instead write file with pipreqs and edit it inplace with sed. This is to not sweep pipreq failure under the rug.
     pipreqs --mode no-pin --ignore .mypy_cache,.venv --print > "$req_patterns"
     sed -iE '
 s/IMDbPY/cinemagoer/g
@@ -288,41 +288,58 @@ pstats() {
     # If no arguments, default to the latest profile.
     if (( $# == 0 )); then
         # Globbing expands alphabetically and we name files by date so the latest file should be the last in the array.
-        local file=($profiles/*)
-        file="${file[-1]}"
+        local files=($profiles/*)
+        files=("${files[-1]}")
     else
-        local file="$1"
+        local files=("$@")
     fi
 
-    # It's cumtime!
-    # Dump stderr because it keeps bitching about non-issues.
-    printf '%s\n' "sort cumtime" stats EOF | python -m pstats "$file" 2> /dev/null | less
+    local file
+
+    for file in "${files[@]}"; do
+        # It's cumtime!
+        # Dump stderr because it keeps bitching about non-issues.
+        printf '%s\n' "sort cumtime" stats EOF | { python -m pstats "$file" || true; } 2> /dev/null | less
+    done
 }
 
 coverage() {
-    $cli config extension ./test_extensions.py
-    $cli config extension
-    $cli config extension -D ./test_extensions.py
+    # Support `coverage profile` for coverage with profiling.
+    local cmd="${1:-$cli}"
 
-    $cli config list cov imdb-browser-apidev-listid=540302193
-    $cli config list --rename coverage cov imdb-browser-apidev-listid=083886771
-    $cli config list
-    $cli config list -D coverage
+    # TODO: in case of failure need to run cleanup so that the next run won't fail.
+    # Run everything in a scope that's redirected to devnull. If profiling, it will break us out of pstats. If not profiling, it will dump the output of flam.
+    {
+        time "$cmd" config extension "$PWD"/test_extensions.py
+        time "$cmd" config extension
+        time "$cmd" config extension -D "$PWD"/test_extensions.py
 
-    $cli config composite cov dvds blurays -name the
-    $cli config composite --rename coverage cov movies shows -rating +8
-    $cli config composite
-    $cli config composite -D coverage
+        time "$cmd" config list cov imdb-browser-apidev-listid=540302193
+        time "$cmd" config list --rename coverage cov imdb-browser-apidev-listid=083886771
+        time "$cmd" config list
+        time "$cmd" config list -D coverage
 
-    $cli fetch specials
+        time "$cmd" config composite cov dvds blurays -name the
+        time "$cmd" config composite --rename coverage cov movies shows -rating +8
+        time "$cmd" config composite
+        time "$cmd" config composite -D coverage
 
-    $cli find -c\* movies specials [ -true -o -false ] -every director '.*' -has title -has-index countries 0 -index countries 0 '.*' \
-        -superset cast [ a e o i e ] -subset cast [ a e o i e ] -sameset cast [ a e o i e ] -in-list movies -any-role [] -true -every-role [] -true
+        # For now I don't want fetch here because it's so slow.
+        # time "$cmd" fetch specials
 
-    $cli find -c\* any-people:group specials -any-movie -true -every-movie -true -as cast -true -any-person -true -every-person -true
-    $cli find -c\* any-people:separate specials -any-movie -true -every-movie -true -as cast -true -any-person -true -every-person -true
-    $cli find -c\* cast-people:group specials -any-movie -true -every-movie -true -as director -true -any-person -true -every-person -true
-    $cli find -c\* cast-people:separate specials -any-movie -true -every-movie -true -as director -true -any-person -true -every-person -true
+        time "$cmd" find -c\* movies specials [ -true -o -false ] -every director '.*' -has title -has-index countries 0 -index countries 0 '.*' \
+            -superset cast [ a e o i e ] -subset cast [ a e o i e ] -sameset cast [ a e o i e ] -in-list movies -any-role [] -true -every-role [] -true
+
+        time "$cmd" find -c\* any-people:group specials -any-movie -true -every-movie -true -as cast -true -any-person -true -every-person -true
+        time "$cmd" find -c\* any-people:separate specials -any-movie -true -every-movie -true -as cast -true -any-person -true -every-person -true
+        time "$cmd" find -c\* cast-people:group specials -any-movie -true -every-movie -true -as director -true -any-person -true -every-person -true
+        time "$cmd" find -c\* cast-people:separate specials -any-movie -true -every-movie -true -as director -true -any-person -true -every-person -true
+
+        time "$cmd" find -croles-\* any:group specials -any-movie -true -every-movie -true -as cast -true -any-person -true -every-person -true
+        time "$cmd" find -croles-\* any:separate specials -any-movie -true -every-movie -true -as cast -true -any-person -true -every-person -true
+        time "$cmd" find -croles-\* cast:group specials -any-movie -true -every-movie -true -as director -true -any-person -true -every-person -true
+        time "$cmd" find -croles-\* cast:separate specials -any-movie -true -every-movie -true -as director -true -any-person -true -every-person -true
+    } > /dev/null
 }
 
 # Prints which commands this "makefile" has.
