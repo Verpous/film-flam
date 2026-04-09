@@ -378,10 +378,10 @@ class AverageAttribute(EasyAttribute):
         return self._compute_average(people.extract(self._wrapped_attr)[0] for people in movie.associated_people(ct, _ml.GroupMode.SEPARATE)) # type: ignore
     
     def _extract_from_people(self, people: _ml.People, mlf_people: list[_mlf.MLFPerson]) -> None | float: # pylint: disable=unused-argument
-        # For people attributes, -as-X means the average over all the movies those people did while earing the hat of X, default to their current crew type.
-        try:
-            people_as = people if self._as_crew_type is None else people.minimal_superset_people_in_other_crew_type(self._as_crew_type)
-        except _exc.InputError:
+        # For people attributes, -as-X means the average over all the movies those people did while wearing the hat of X, default to their current crew type.
+        people_as = people if self._as_crew_type is None else people.minimal_superset_people_in_other_crew_type(self._as_crew_type)
+
+        if people_as is None:
             return None
 
         return self._compute_average(movie.extract(self._wrapped_attr) for movie in people_as.associated_movies()) # type: ignore
@@ -438,10 +438,10 @@ class SumAttribute(EasyAttribute):
         return self._compute_sum(people.extract(self._wrapped_attr)[0] for people in movie.associated_people(ct, _ml.GroupMode.SEPARATE)) # type: ignore
     
     def _extract_from_people[TAttr: (int, float)](self, people: _ml.People, mlf_people: list[_mlf.MLFPerson]) -> None | TAttr: # pylint: disable=unused-argument
-        # For people attributes, -as-X means the average over all the movies those people did while earing the hat of X, default to their current crew type.
-        try:
-            people_as = people if self._as_crew_type is None else people.minimal_superset_people_in_other_crew_type(self._as_crew_type)
-        except _exc.InputError:
+        # For people attributes, -as-X means the average over all the movies those people did while wearing the hat of X, default to their current crew type.
+        people_as = people if self._as_crew_type is None else people.minimal_superset_people_in_other_crew_type(self._as_crew_type)
+
+        if people_as is None:
             return None
 
         return self._compute_sum(movie.extract(self._wrapped_attr) for movie in people_as.associated_movies()) # type: ignore

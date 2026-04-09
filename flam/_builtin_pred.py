@@ -268,6 +268,7 @@ class SamesetPredicate(_filter.Predicate, name_without_type='sameset'):
         yield min(_filter.Pipeline.RPAREN)
 
 # -in-list LISTDEF... : true if the findable is also in the list defined by LISTDEFs.
+# NOTE: this predicate doesn't check for uid family mismatch. If there is a mismatch then it will simply not find the uid and return false.
 @_reg._register_builtin
 class InListPredicate(_filter.Predicate, name_without_type='in-list'):
     def __init__(self, movie_list: _ml.MovieList) -> None:
@@ -281,19 +282,11 @@ class InListPredicate(_filter.Predicate, name_without_type='in-list'):
     # Split implementations per findable type because this is more complicated than you think.
     # For movies, it's the easiest. Just try to get a movie with that uid.
     def _excrete_from_movie(self, movie: _ml.Movie, mlf_movie: _mlf.MLFMovie) -> bool:
-        try:
-            self._movie_list.get_movie_by_uid(movie.uid)
-            return True
-        except _exc.InputError:
-            return False
+        return self._movie_list.get_movie_by_uid(movie.uid) is not None
 
     # For people it's complicated. We want to return true even if the same People is not exactly in the other list, but a superset People is.
     def _excrete_from_people(self, people: _ml.People, mlf_people: list[_mlf.MLFPerson]) -> bool:
-        try:
-            people.minimal_superset_people_in_other_list(self._movie_list)
-            return True
-        except _exc.InputError:
-            return False
+        return people.minimal_superset_people_in_other_list(self._movie_list) is not None
 
     # For roles, we could get the superset people and see if they were also in this movie. But just checking if the movie is in the other list is enough.
     # It's clearly a necessary condition. But it is also sufficient because if the movie is in this other list then necessarily that list has a superset people.
@@ -465,12 +458,8 @@ class AsPredicate(_filter.Predicate, name_without_type='as', findable_type=_ml.F
         return cls(crew_type, filter), until
 
     def _excrete_from_people(self, people: _ml.People, mlf_people: list[_mlf.MLFPerson]) -> bool:
-        try:
-            minimal_superset_people = people.minimal_superset_people_in_other_crew_type(self._crew_type)
-        except _exc.InputError:
-            return False
-
-        return self._filter.excrete(minimal_superset_people)
+        minimal_superset_people = people.minimal_superset_people_in_other_crew_type(self._crew_type)
+        return minimal_superset_people is not None and self._filter.excrete(minimal_superset_people)
 
     def regurgitate(self) -> typing.Iterable[str]:
         yield from super().regurgitate()
@@ -501,6 +490,7 @@ class AnyPersonPredicate(_filter.Predicate, name_without_type='any-person', find
                     # get_by_uid should always succeed.
                     uid_as_separate = _ml.People.compose_uid([mlf_person.uid], people.crew_type, _ml.GroupMode.SEPARATE)
                     person = people.movie_list.get_people_by_uid(uid_as_separate)
+                    assert person is not None
                     
                     if self._filter.excrete(person):
                         return True
@@ -537,6 +527,7 @@ class EveryPersonPredicate(_filter.Predicate, name_without_type='every-person', 
                     # get_by_uid should always succeed.
                     uid_as_separate = _ml.People.compose_uid([mlf_person.uid], people.crew_type, _ml.GroupMode.SEPARATE)
                     person = people.movie_list.get_people_by_uid(uid_as_separate)
+                    assert person is not None
                     
                     if not self._filter.excrete(person):
                         return False

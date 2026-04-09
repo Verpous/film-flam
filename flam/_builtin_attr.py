@@ -22,7 +22,6 @@ import collections
 from . import _reg
 from . import _ml
 from . import _mlf
-from . import _exc
 from . import attrutils
 from . import utils
 
@@ -515,9 +514,9 @@ for crew_type in _ml.CrewType:
         ct = _ml.CrewType(self.name_without_type.removeprefix('movies-as-'))
 
         # Find the smallest group in another crew type which has at least the same people as this one, if one exists, and return their movies.
-        try:
-            minimal_superset_people = people.minimal_superset_people_in_other_crew_type(ct)
-        except _exc.InputError:
+        minimal_superset_people = people.minimal_superset_people_in_other_crew_type(ct)
+
+        if minimal_superset_people is None:
             return []
 
         # Guaranteed ordering by associated_movies().
@@ -540,17 +539,12 @@ def _people_professions_extractor(self: attrutils.EasyAttribute, people: _ml.Peo
     
     # Iterate over crew types and check if this group of people also collaborated on that crew type.
     for ct in _ml.CrewType.iterate_except_any():
-        # If same crew type that we group is already known to be doing together - the answer is easy.
-        if ct == people.crew_type:
-            professions.append(str(ct))
-            continue
+        # Check if there is a group in that crew type which is a superset of the people in this group.
+        # This is efficient when ct == people.crew_type.
+        minimal_superset_people = people.minimal_superset_people_in_other_crew_type(ct)
 
-        # For other crew types we will check if there is a group in that crew type which is a superset of the people in this group.
-        try:
-            minimal_superset_people = people.minimal_superset_people_in_other_crew_type(ct)
+        if minimal_superset_people is not None:
             professions.append(str(minimal_superset_people.crew_type))
-        except _exc.InputError:
-            pass
 
     return professions
 

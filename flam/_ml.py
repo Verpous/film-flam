@@ -194,10 +194,14 @@ class Movie(Findable):
                 crew_uids_any = set(uid for mlf_crew in self._mlf_movie.crew.values() for uid in mlf_crew.roles_by_uid)
 
                 for mlf_person_uid in crew_uids_any:
-                    yield ml.get_people_by_uid(People.compose_uid([mlf_person_uid], crew_type, group_mode))
+                    people = ml.get_people_by_uid(People.compose_uid([mlf_person_uid], crew_type, group_mode))
+                    assert people is not None
+                    yield people
             case (_, GroupMode.SEPARATE):
                 for mlf_role in self._mlf_movie.crew[crew_type].roles_by_uid.values():
-                    yield ml.get_people_by_uid(People.compose_uid([mlf_role.person_uid], crew_type, group_mode))
+                    people = ml.get_people_by_uid(People.compose_uid([mlf_role.person_uid], crew_type, group_mode))
+                    assert people is not None
+                    yield people
             case (_, GroupMode.GROUP):
                 # It's not optimal to go over all people just to find the ones in this movie but we have no better way right now.
                 for people in ml.find_people(crew_type, group_mode):
@@ -216,7 +220,9 @@ class Movie(Findable):
         # Guaranteed consisted ordering because associated_people() has consistent ordering.
         for people in self.associated_people(crew_type, group_mode):
             role_uid = Role.compose_uid(self, people)
-            yield ml.get_role_by_uid(role_uid)
+            role = ml.get_role_by_uid(role_uid)
+            assert role is not None
+            yield role
 
 class PeopleUidParts(typing.NamedTuple):
     mlf_people_uids: typing.Iterable[str]
@@ -278,12 +284,14 @@ class People(Findable):
         # Guaranteed consisted ordering because associated_movies() has consistent ordering.
         for movie in self.associated_movies():
             role_uid = Role.compose_uid(movie, self)
-            yield ml.get_role_by_uid(role_uid)
+            role = ml.get_role_by_uid(role_uid)
+            assert role is not None
+            yield role
 
     # Find the smallest group of people in another crew type who contain every person in this group.
     # I think by nature of our grouping algorithm, there is guaranteed to be either no such group, or exactly 1 unique group like this.
     # Assume our group is P1,P2 and in another crew type there's the groups P1,P2,P3 and P1,P2,P4. So then the grouping algorithm would've created P1,P2 as well.
-    def minimal_superset_people_in_other_crew_type(self, crew_type: CrewType) -> People:
+    def minimal_superset_people_in_other_crew_type(self, crew_type: CrewType) -> None | People:
         # Optimization - same crew type, same people.
         if crew_type == self.crew_type:
             return self
@@ -291,13 +299,14 @@ class People(Findable):
         return self._minimal_superset_people_internal(self.movie_list, crew_type)
 
     # Find the smallest group of people in another movie list and optionally different crew type who contain every person in this group.
-    def minimal_superset_people_in_other_list(self, other_list: MovieList, crew_type: None | CrewType = None) -> People:
+    def minimal_superset_people_in_other_list(self, other_list: MovieList, crew_type: None | CrewType = None) -> None | People:
         if crew_type is None:
             crew_type = self.crew_type
 
         return self._minimal_superset_people_internal(other_list, crew_type)
 
-    def _minimal_superset_people_internal(self, movie_list: MovieList, crew_type: CrewType) -> People:
+    # Returns None when it fails instead of raising an exception because this can happen a lot and raising a log each time is expensive.
+    def _minimal_superset_people_internal(self, movie_list: MovieList, crew_type: CrewType) -> None | People:
         # SEPARATE group mode, so it's much easier to check if this person is in another crew type.
         if self.group_mode == GroupMode.SEPARATE:
             uid = self.compose_uid([self._mlf_people[0].uid], crew_type, self.group_mode)
@@ -305,15 +314,12 @@ class People(Findable):
 
         # We'll try our luck at searching if this group appears exactly the same in another crew type.
         uid = self.compose_uid((mlf_person.uid for mlf_person in self._mlf_people), crew_type, self.group_mode)
+        min_superset = movie_list.get_people_by_uid(uid)
 
-        try:
-            return movie_list.get_people_by_uid(uid)
-        except _exc.InputError:
-            pass
+        if min_superset is not None:
+            return min_superset
 
         # Now in the general case we must see if there's a strict superset in this other crew type.
-        min_superset = None
-        
         for people in movie_list.find_people(crew_type, self.group_mode):
             # We know we're searching for a group that has strictly more people than self.
             if len(people._mlf_people) <= len(self._mlf_people):
@@ -337,13 +343,17 @@ class People(Findable):
                     i_other += 1
                     i_self += 1
             
+            # If we broke out of the above loop having reached the end of self._mlf_people then we found a match for each person there and people is a superset.
             if i_self == len(self._mlf_people):
-                return people
+                # Optimization: we know that there is no exactly equal set, only a strict superset.
+                # So if a superset of just 1 additional person exists, it must be the minimal superset and we can return it.
+                if len(people._mlf_people) <= len(self._mlf_people) + 1:
+                    return people
 
-        if movie_list is self.movie_list:
-            raise _exc.InputError(f'The People {self.uid} did not collaborate as the crew type {crew_type}.')
+                # The general case where we want to remember the minimum so far and keep searching for more minimal supersets.
+                min_superset = people
 
-        raise _exc.InputError(f'The People {self.uid} did not collaborate as the crew type {crew_type} in the list {movie_list.abstract_listdef.pretty(movie_list.ctx)}.')
+        return min_superset
 
     def are_in_movie(self, movie: Movie) -> bool:
         # The hell with python one-liners using `any`, `all`, etc. This is more optimal and readable and modifiable.
@@ -577,36 +587,26 @@ class MovieList:
         _dbg.logger.info(f"Resulting file has {len(filtered_file.movies_by_uid)} movies, {len(filtered_file.people_by_uid)} people")
         return filtered_file
 
-    def get_movie_by_uid(self, uid: str) -> Movie:
+    def get_movie_by_uid(self, uid: str) -> None | Movie:
+        # These getters return None instead of raising an exception because FlamErrors create a log,
+        # and it's too expensive for the amount of times we expect this to be called and fail.
         movies = self._generate_movies()
-        
-        try:
-            return movies[uid]
-        except KeyError as e:
-            raise _exc.InputError(f"No movie with the uid: '{uid}'") from e
+        return movies.get(uid, None)
 
-    def get_people_by_uid(self, uid: str) -> People:
+    def get_people_by_uid(self, uid: str) -> None | People:
         # Break down the uid to determine the ct_gm and know which list to search in.
         breakdown = People.decompose_uid(uid)
         peoples = self._generate_peoples(breakdown.crew_type, breakdown.group_mode)
+        return peoples.get(uid, None)
 
-        try:
-            return peoples[uid]
-        except KeyError as e:
-            raise _exc.InputError(f"No people with the uid: '{uid}'") from e
-
-    def get_role_by_uid(self, uid: str) -> Role:
+    def get_role_by_uid(self, uid: str) -> None | Role:
         # Break down the uid to determine the ct_gm and know which list to search in.
         role_breakdown = Role.decompose_uid(uid)
         people_breakdown = People.decompose_uid(role_breakdown.people_uid)
         roles = self._generate_roles(people_breakdown.crew_type, people_breakdown.group_mode)
+        return roles.get(uid, None)
 
-        try:
-            return roles[uid]
-        except KeyError as e:
-            raise _exc.InputError(f"No role with the uid: '{uid}'") from e
-
-    def get_by_uid(self, findable_type: FindableType, uid: str) -> Findable:
+    def get_by_uid(self, findable_type: FindableType, uid: str) -> None | Findable:
         match findable_type:
             case FindableType.MOVIES:
                 return self.get_movie_by_uid(uid)
