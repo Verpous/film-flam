@@ -1,4 +1,4 @@
-# Copyright (C) 2024 Aviv Edery.
+# Copyright (C) 2026 Aviv Edery.
 
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -23,10 +23,7 @@ import types
 import enum
 import colorama
 import typing
-import time
 import concurrent_log_handler
-
-_start_import_time = time.time()
 
 # Very on the fence about this enum. I guess it's kind of nice but also I kind of don't like it. Whatever. It stays.
 class FlamEnv(enum.StrEnum):
@@ -131,5 +128,4 @@ logger = _make_logger()
 _prev_excepthook = sys.excepthook
 sys.excepthook = _log_exception
 
-logger.info(f"Environment variables:\n{'\n    '.join(f'"{k}": \t"{v}"' for k, v in os.environ.items())}")
-logger.info(f'Module import time: {time.time() - _start_import_time}s')
+logger.info(f"Environment variables:\n    {'\n    '.join(f'"{k}": \t"{v}"' for k, v in os.environ.items())}")

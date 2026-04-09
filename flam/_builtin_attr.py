@@ -1,4 +1,4 @@
-# Copyright (C) 2024 Aviv Edery.
+# Copyright (C) 2026 Aviv Edery.
 
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -18,17 +18,13 @@
 import typing
 import datetime
 import collections
-import time
 
 from . import _reg
 from . import _ml
 from . import _mlf
 from . import _exc
-from . import _dbg
 from . import attrutils
 from . import utils
-
-_start_import_time = time.time()
 
 _STR_LEN_LONG = 45
 _STR_LEN_SHORT = 30
@@ -659,5 +655,3 @@ def _role_star_extractor(self: attrutils.EasyAttribute, role: _ml.Role, mlf_role
     ]
 
 #endregion role attributes
-
-_dbg.logger.info(f'Module import time: {time.time() - _start_import_time}s')

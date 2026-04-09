@@ -1,4 +1,4 @@
-# Copyright (C) 2024 Aviv Edery.
+# Copyright (C) 2026 Aviv Edery.
 
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -20,7 +20,6 @@ import enum
 import abc
 import copy
 import bisect
-import time
 
 from . import _filter
 from . import _mlf
@@ -30,8 +29,6 @@ from . import _attr
 from . import _exc
 from . import _dbg
 from . import _ldef
-
-_start_import_time = time.time()
 
 class GroupMode(enum.StrEnum):
     DEFAULT             = 'default'
@@ -155,7 +152,7 @@ class Movie(Findable):
     def __init__(self, movie_list: MovieList, mlf_movie: _mlf.MLFMovie) -> None:
         super().__init__(movie_list)
         self._mlf_movie = mlf_movie
-        self._associated_people_cache: None | dict[tuple[CrewType, GroupMode], list[People]] = None
+        self._associated_people_cache: dict[tuple[CrewType, GroupMode], list[People]] = {}
 
     @property
     def type_(self) -> FindableType:
@@ -178,9 +175,6 @@ class Movie(Findable):
     def associated_people(self, crew_type: CrewType, group_mode: GroupMode) -> typing.Iterable[People]:
         if group_mode == GroupMode.DEFAULT:
             group_mode = crew_type.default_group_mode
-
-        if self._associated_people_cache is None:
-            self._associated_people_cache = {}
 
         ct_gm = (crew_type, group_mode)
         
@@ -500,8 +494,8 @@ class MovieList:
         self._movie_list_file = movie_list_file
 
         self._movies: None | dict[str, Movie] = None
-        self._peoples: None | dict[tuple[CrewType, GroupMode], dict[str, People]] = None
-        self._roles: None | dict[tuple[CrewType, GroupMode], dict[str, Role]] = None
+        self._peoples: dict[tuple[CrewType, GroupMode], dict[str, People]] = {}
+        self._roles: dict[tuple[CrewType, GroupMode], dict[str, Role]] = {}
 
     # I permit access to this and entrust users to only read from it because some attributes need it,
     # and I don't believe in going so crazy about the API being "clean" and bulletproof that I sacrifice its efficiency.
@@ -523,10 +517,9 @@ class MovieList:
         return self._movie_list_file.uid_family
 
     # Don't default to CrewType.ANY, I would rather users be explicit.
+    # I want to log when this function is called but that could flood the logs too much.
     def find(self, what: FindableType, crew_type: None | CrewType = None, group_mode: GroupMode = GroupMode.DEFAULT,
             filter: None | _filter.Filter = None) -> typing.Iterable[Findable]:
-        _dbg.logger.info(f"Going to find {what} with {crew_type=}, {group_mode=} in '{self._movie_list_file.abstract_listdef}' with {filter=!s}")
-
         if filter is not None and filter.findable_type != what:
             raise _exc.InputError(f"Requested to find {what} but filter is of type {filter.findable_type}.")
 
@@ -632,9 +625,6 @@ class MovieList:
         return self._movies
 
     def _generate_peoples(self, crew_type: CrewType, group_mode: GroupMode) -> dict[str, People]:
-        if self._peoples is None:
-            self._peoples = {}
-
         ct_gm = (crew_type, group_mode)
 
         if ct_gm not in self._peoples:
@@ -652,12 +642,11 @@ class MovieList:
                     yield People(self, [mlf_person], crew_type, group_mode)
             case (_, GroupMode.SEPARATE):
                 # Could be optimized if we cached associated movies of a person by crew type.
-                # But at least for now iterating "for person for movie" is faster than "for movie for crew",
-                # because in "for person for movie" we can break early once we find a movie the person was in under this crew type.
-                for mlf_person in self._movie_list_file.people_by_uid.values():
-                    # Check if this person has that crew type for any movie.
-                    if any(mlf_person.uid in mlf_movie.crew[crew_type].roles_by_uid for mlf_movie in self._movie_list_file.movies_by_uid.values()):
-                        yield People(self, [mlf_person], crew_type, group_mode)
+                # The way it's currently written will yield the same people multiple times if they are in multiple movies. That is deduplicated by _findables_to_sorted_dict.
+                # For reasons I can't explain the profiler finds this implementation monumentally faster than iterating "for person for movie".
+                for mlf_movie in self._movie_list_file.movies_by_uid.values():
+                    for mlf_person_uid in mlf_movie.crew[crew_type].roles_by_uid:
+                        yield People(self, [self._movie_list_file.people_by_uid[mlf_person_uid]], crew_type, group_mode)
             case (_, GroupMode.GROUP):
                 yield from self._group_people(crew_type)
             case _:
@@ -734,9 +723,6 @@ class MovieList:
             )
 
     def _generate_roles(self, crew_type: CrewType, group_mode: GroupMode) -> dict[str, Role]:
-        if self._roles is None:
-            self._roles = {}
-
         ct_gm = (crew_type, group_mode)
 
         if ct_gm not in self._roles:
@@ -757,5 +743,3 @@ class MovieList:
     @classmethod
     def _findables_to_sorted_dict[T: Findable](cls, findables: typing.Iterable[T]) -> dict[str, T]:
         return {f.uid: f for f in sorted(findables, key=lambda fi: fi.uid)}
-
-_dbg.logger.info(f'Module import time: {time.time() - _start_import_time}s')

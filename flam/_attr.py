@@ -1,4 +1,4 @@
-# Copyright (C) 2024 Aviv Edery.
+# Copyright (C) 2026 Aviv Edery.
 
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -20,16 +20,12 @@ import enum
 import abc
 import re
 import operator
-import time
 
 from . import _ml
 from . import _reg
-from . import _dbg
 
 if typing.TYPE_CHECKING:
     import _typeshed
-
-_start_import_time = time.time()
 
 # Attributes may return any "primitive" type, or a list of primitive types.
 # Primitives must be sortable. Other than that they are rather unconstrained, but conceptually we regard them as NOT collections.
@@ -152,7 +148,7 @@ class Attribute(abc.ABC):
 
     def _sort_key_primitive(self, primitive: AttributePrimitive) -> _typeshed.SupportsRichComparison:
         # We xor with the ascending preference so that Nones always end up at the bottom of the sort whether ascending or descending.
-        return ((primitive is None) ^ self.is_ascending, primitive)
+        return ((primitive is not None) ^ self.is_ascending, primitive)
 
     # parse_primitive and _str_of_primitive are expected to be inverses of each other, as long as the str isn't abbreviated!
     # Parsing abbreviated strs too is allowed, just not required.
@@ -170,5 +166,3 @@ class Attribute(abc.ABC):
             return ', '.join(self._str_of_primitive(elem, abbreviate, extras) for elem in value)
 
         return self._str_of_primitive(value, abbreviate, extras)
-
-_dbg.logger.info(f'Module import time: {time.time() - _start_import_time}s')

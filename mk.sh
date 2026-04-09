@@ -1,6 +1,6 @@
 #! /bin/bash
 
-# Copyright (C) 2024 Aviv Edery.
+# Copyright (C) 2026 Aviv Edery.
 
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -30,6 +30,7 @@ build=dist
 
 flam_dir=.film_flam_dev
 srcfiles=($mdl/*.py)
+profiles=profiles
 
 pylint_ignore+=C0103, # invalid-name
 pylint_ignore+=C0104, # disallowed-name
@@ -62,6 +63,7 @@ pylint_ignore+=W0124, # confusing-with-statement
 pylint_ignore+=W0212, # protected-access
 pylint_ignore+=W0511, # fixme
 pylint_ignore+=W0602, # global-variable-not-assigned
+pylint_ignore+=W0603, # global-statement
 pylint_ignore+=W0622, # redefined-builtin
 pylint_ignore+=W0702, # bare-except
 pylint_ignore+=W1514, # unspecified-encoding
@@ -119,6 +121,8 @@ release() {
 
     rm -rf $build
     python -m build --outdir $build
+
+    # Twine can fail with HTTP 403 if the API token is bad. There should be a ~/.pypirc with the API token, and it's also saved in my Bitwarden.
     twine upload $twineargs $build/*
     sanity $flavor
     echo "Successfully created a release with flavor: $flavor."
@@ -178,6 +182,7 @@ sanity() {
     esac
 
     # Spin a venv and run cfg in it mainly to see if we hit import errors.
+    # This can fail with access denied, I think because vscode is holding onto the files it wants to delete. Should be safe to `rm -rf .venv` if that happens.
     python -m venv --clear .venv
     source .venv/Scripts/activate
     install $flavor
@@ -239,14 +244,85 @@ wc() {
 
 # Opens the logs, with tail -f by default but you can pass a different command to use.
 log() {
+    local cmd
+
+    # Default to tail -f for TTYs and cat otherwise.
+    if (( $# == 0 )); then
+        [[ -t 1 ]] && cmd="tail -f" || cmd=cat
+    else
+        cmd="$*"
+    fi
+
     # Use LOGLEVEL=critical so that this very action doesn't create new logs.
-    ${@:-tail -f} "$(echo "import $mdl; print($mdl.get_log_file_path())" | FLAM_LOGLEVEL=critical python)"
+    $cmd "$(echo "import $mdl; print($mdl.get_log_file_path())" | FLAM_LOGLEVEL=critical python)"
 }
 
 # Just a wrapper around running the flam CLI in a debug environment.
 flam() {
     _gen_version
-    FLAM_DEBUG="${FLAM_DEBUG:-1}" FLAM_DIR="$flam_dir" command flam "$@"
+
+    if [[ "${FLAM_PROFILE:-0}" != 0 ]]; then
+        mkdir -p "$profiles"
+
+        # Delete 2 day old profiles.
+        find -- $profiles -name '*.prof' -cmin +$(( 60 * 24 * 2 )) -delete
+
+        # Create a filename from the date and command. Replace or delete special characters in the command so it's a valid filename.
+        local profile_path="$profiles/$(date +%Y-%m-%d_%H_%M_%S)_$(printf %s "${mdl}_$*" | tr [:space:] _ | tr -cd [:alnum:]_).prof"
+
+        # Write profile output to a file, and drop the output of flam itself.
+        FLAM_DEBUG="${FLAM_DEBUG:-1}" FLAM_DIR="$flam_dir" python -m cProfile -o "$profile_path" -m $mdl "$@" > /dev/null
+
+        # Open the profile results. It will also be available to reinspect later.
+        pstats "$profile_path"
+    else
+        FLAM_DEBUG="${FLAM_DEBUG:-1}" FLAM_DIR="$flam_dir" command $cli "$@"
+    fi
+}
+
+profile() {
+    FLAM_PROFILE=1 $cli "$@"
+}
+
+pstats() {
+    # If no arguments, default to the latest profile.
+    if (( $# == 0 )); then
+        # Globbing expands alphabetically and we name files by date so the latest file should be the last in the array.
+        local file=($profiles/*)
+        file="${file[-1]}"
+    else
+        local file="$1"
+    fi
+
+    # It's cumtime!
+    # Dump stderr because it keeps bitching about non-issues.
+    printf '%s\n' "sort cumtime" stats EOF | python -m pstats "$file" 2> /dev/null | less
+}
+
+coverage() {
+    $cli config extension ./test_extensions.py
+    $cli config extension
+    $cli config extension -D ./test_extensions.py
+
+    $cli config list cov imdb-browser-apidev-listid=540302193
+    $cli config list --rename coverage cov imdb-browser-apidev-listid=083886771
+    $cli config list
+    $cli config list -D coverage
+
+    $cli config composite cov dvds blurays -name the
+    $cli config composite --rename coverage cov movies shows -rating +8
+    $cli config composite
+    $cli config composite -D coverage
+
+    $cli fetch specials
+
+    $cli find -c\* movies specials [ -true -o -false ] -every director '.*' -has title -has-index countries 0 -index countries 0 '.*' \
+        -superset cast [ a e o i e ] -subset cast [ a e o i e ] -sameset cast [ a e o i e ] -in-list movies -any-role [] -true -every-role [] -true
+
+    $cli find -c\* any-people:group specials -any-movie -true -every-movie -true -as cast -true -any-person -true -every-person -true
+    $cli find -c\* any-people:separate specials -any-movie -true -every-movie -true -as cast -true -any-person -true -every-person -true
+    $cli find -c\* cast-people:group specials -any-movie -true -every-movie -true -as director -true -any-person -true -every-person -true
+    $cli find -c\* cast-people:separate specials -any-movie -true -every-movie -true -as director -true -any-person -true -every-person -true
 }
 
 # Prints which commands this "makefile" has.
@@ -259,11 +335,6 @@ help() {
         type -- "$@"
     fi
 }
-
-# Not polished yet, just want to put this line somewhere
-# profile() {
-#     python -m cProfile $(BIN)/flam.py fetch imdb-id=540302193
-# }
 
 # Little system which lets us make tempfiles without worrying about cleanup.
 tmpfiles=()

@@ -1,4 +1,4 @@
-# Copyright (C) 2024 Aviv Edery.
+# Copyright (C) 2026 Aviv Edery.
 
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -29,15 +29,6 @@ import abc
 import atexit
 import enum
 import sys
-import requests
-
-from selenium import webdriver
-from selenium.common.exceptions import NoSuchElementException
-from selenium.common.exceptions import ElementClickInterceptedException
-from selenium.webdriver.common.by import By
-from selenium.webdriver.remote.webdriver import WebDriver
-from selenium.webdriver.remote.webelement import WebElement
-from selenium.webdriver.chromium.options import ChromiumOptions
 
 from . import _reg
 from . import _fetch
@@ -47,8 +38,6 @@ from . import _ml
 from . import _ldef
 from . import _dbg
 from . import utils
-
-_start_import_time = time.time()
 
 _UID_FAMILY = 'imdb'
 _REQUEST_QUIT = 'quit'
@@ -556,6 +545,9 @@ class _IMDbApiDev:
 
     @classmethod
     def _rest_call(cls, endpoint: str, **kwargs: typing.Any) -> dict:
+        # Import requests only here because it's actually a very expensive import so we don't wanna pay that price for every import of flam when most of them don't need it.
+        import requests
+
         NUM_RETRIES = 10
         SLEEP_BETWEEN_RETRIES = 2
 
@@ -731,133 +723,146 @@ class _BrowserType(enum.StrEnum):
         _dbg.logger.warning("Failed to detect default browser. Going with edge (sorry linux users)")
         return cls.EDGE
 
-class _BrowserController(abc.ABC):
-    @abc.abstractmethod
-    def set_profile(self, profile: str) -> None:
-        pass
-
-    @abc.abstractmethod
-    def launch(self) -> WebDriver:
-        pass
-
-class _ChromeController(_BrowserController):
-    # Since Edge is also chromium-based, it shares a lot of code with Chrome.
-    @classmethod
-    def set_chromium_basic_options(cls, options: ChromiumOptions) -> None:
-        options.add_argument('--no-sandbox') # Otherwise get an error.
-        options.add_experimental_option('excludeSwitches', ['enable-logging']) # Suppress annoying startup message.
-
-    @classmethod
-    def set_chromium_profile(cls, options: ChromiumOptions, profile: str) -> None:
-        # When you set user-data-dir to a dir that is already in use, this doesn't work. There's no solution but to create a copy of the profile which I don't want to do.
-        # Instead users should be suggested to either use Firefox, or create a new profile exclusively for this.
-        user_data_dir = os.path.dirname(profile)
-        profile_directory = os.path.basename(profile)
-        options.add_argument(f'--user-data-dir={user_data_dir}')
-        options.add_argument(f'--profile-directory={profile_directory}')
-
-    def __init__(self) -> None:
-        self.options = webdriver.ChromeOptions()
-        _ChromeController.set_chromium_basic_options(self.options)
-
-    def set_profile(self, profile: str) -> None:
-        _ChromeController.set_chromium_profile(self.options, profile)
-
-    def launch(self) -> WebDriver:
-        return webdriver.Chrome(options=self.options)
-        
-class _EdgeController(_BrowserController):
-    def __init__(self) -> None:
-        self.options = webdriver.EdgeOptions()
-        _ChromeController.set_chromium_basic_options(self.options)
-
-    def set_profile(self, profile: str) -> None:
-        _ChromeController.set_chromium_profile(self.options, profile)
-
-    def launch(self) -> WebDriver:
-        return webdriver.Edge(options=self.options)
-
-class _FirefoxController(_BrowserController):
-    def __init__(self) -> None:
-        self.options = webdriver.FirefoxOptions()
-
-    def set_profile(self, profile: str) -> None:
-        # Takes a super long time to load fat profiles, and there's no way around it. Users are advised to create a lean profile just for this.
-        self.options.profile = profile # type: ignore
-
-    def launch(self) -> WebDriver:
-        return webdriver.Firefox(options=self.options)
-
-def _do_with_retries[T](action: typing.Callable[[], T], num_retries: int = 10, sleep_between_retries: float = 1.0) -> T:
-    for i in range(num_retries):
-        try:
-            return action()
-        except:
-            if i == num_retries - 1:
-                raise
-
-            time.sleep(sleep_between_retries)
-
-    raise RuntimeError("Shouldn't get here!")
-
-def _is_browser_alive(driver: WebDriver) -> bool:
-    try:
-        driver.title # pylint: disable=pointless-statement
-        return True
-    except:
-        return False
-
-def _click_export_button(driver: WebDriver, export_button: WebElement) -> None:
-    # Annoying popup that asks you to sign in hides the export button sometimes.
-    try:
-        export_button.click()
-    except ElementClickInterceptedException:
-        close_popup_button = driver.find_element(By.XPATH, "//button[@aria-label='Close']")
-        close_popup_button.click()
-        raise
-
-def _get_download_button(driver: WebDriver) -> WebElement:
-    # Try obtain the "in progress" text from the page. If it's there, that means the list isn't ready yet so we raise an exception.
-    try:
-        driver.find_element(By.XPATH, "//span[text()='In progress']")
-        raise RuntimeError('List export status is still in progress.')
-    # If there's no more "in progress" element in the page, we return the topmost download button.
-    except NoSuchElementException:
-        return driver.find_element(By.XPATH, "//button[contains(@aria-label, 'Start download for')]")
-    # If still in progress or failed to find it due to an unexpected exception type, refresh the page and propagate the exception so we'll retry.
-    except:
-        driver.refresh()
-        raise
-
-def _export_list(driver: WebDriver, list_id: str) -> None:
-    _dbg.logger.info(f"Exporting {list_id=}. Stage: open list page")
-    driver.get(f'https://www.imdb.com/list/ls{list_id}')
-
-    _dbg.logger.info("Stage: click export button")
-    export_button = _do_with_retries(
-        lambda: driver.find_element(By.XPATH, "//button[@aria-label='Export']"))
-    _do_with_retries(lambda: _click_export_button(driver, export_button))
-
-    # Opening the link like this instead of below stage might be better but also might not confirm that the export actually started first. Needs more investigation.
-    # _dbg.logger.info("Stage: open exports page")
-    # driver.get(f'https://www.imdb.com/exports/')
-
-    _dbg.logger.info("Stage: wait for exports page popup")
-    exports_page_link = _do_with_retries(
-        lambda: driver.find_element(By.XPATH, "//a[@aria-label='Open exports page']"))
-
-    _dbg.logger.info("Stage: click exports page link")
-    _do_with_retries(exports_page_link.click)
-
-    _dbg.logger.info("Stage: get download button")
-    download_button = _do_with_retries(lambda: _get_download_button(driver))
-
-    _dbg.logger.info("Stage: click download button")
-    _do_with_retries(download_button.click)
-
-    _dbg.logger.info("Successful export")
-
+# This function is "the server". It looks like a huge function but do not be alarmed!
+# Selenium is an expensive import, so we only want to import it if it's going to be used. This means that selenium is only imported inside this function,
+# and that means that all functions using selenium also need to only be defined inside this function.
+# So the first half of this function is a bunch of helper definitions. The function code only begins at the end.
 def _export_lists_handler(requests_queue: multiprocessing.Queue, browser_type: _BrowserType = _BrowserType.AUTO, browser_profile_path: str = '') -> None:
+    from selenium import webdriver
+    from selenium.common.exceptions import NoSuchElementException
+    from selenium.common.exceptions import ElementClickInterceptedException
+    from selenium.webdriver.common.by import By
+    from selenium.webdriver.remote.webdriver import WebDriver
+    from selenium.webdriver.remote.webelement import WebElement
+    from selenium.webdriver.chromium.options import ChromiumOptions
+
+    class _BrowserController(abc.ABC):
+        @abc.abstractmethod
+        def set_profile(self, profile: str) -> None:
+            pass
+
+        @abc.abstractmethod
+        def launch(self) -> WebDriver:
+            pass
+
+    class _ChromeController(_BrowserController):
+        # Since Edge is also chromium-based, it shares a lot of code with Chrome.
+        @classmethod
+        def set_chromium_basic_options(cls, options: ChromiumOptions) -> None:
+            options.add_argument('--no-sandbox') # Otherwise get an error.
+            options.add_experimental_option('excludeSwitches', ['enable-logging']) # Suppress annoying startup message.
+
+        @classmethod
+        def set_chromium_profile(cls, options: ChromiumOptions, profile: str) -> None:
+            # When you set user-data-dir to a dir that is already in use, this doesn't work. There's no solution but to create a copy of the profile which I don't want to do.
+            # Instead users should be suggested to either use Firefox, or create a new profile exclusively for this.
+            user_data_dir = os.path.dirname(profile)
+            profile_directory = os.path.basename(profile)
+            options.add_argument(f'--user-data-dir={user_data_dir}')
+            options.add_argument(f'--profile-directory={profile_directory}')
+
+        def __init__(self) -> None:
+            self.options = webdriver.ChromeOptions()
+            _ChromeController.set_chromium_basic_options(self.options)
+
+        def set_profile(self, profile: str) -> None:
+            _ChromeController.set_chromium_profile(self.options, profile)
+
+        def launch(self) -> WebDriver:
+            return webdriver.Chrome(options=self.options)
+            
+    class _EdgeController(_BrowserController):
+        def __init__(self) -> None:
+            self.options = webdriver.EdgeOptions()
+            _ChromeController.set_chromium_basic_options(self.options)
+
+        def set_profile(self, profile: str) -> None:
+            _ChromeController.set_chromium_profile(self.options, profile)
+
+        def launch(self) -> WebDriver:
+            return webdriver.Edge(options=self.options)
+
+    class _FirefoxController(_BrowserController):
+        def __init__(self) -> None:
+            self.options = webdriver.FirefoxOptions()
+
+        def set_profile(self, profile: str) -> None:
+            # Takes a super long time to load fat profiles, and there's no way around it. Users are advised to create a lean profile just for this.
+            self.options.profile = profile # type: ignore
+
+        def launch(self) -> WebDriver:
+            return webdriver.Firefox(options=self.options)
+
+    def _do_with_retries[T](action: typing.Callable[[], T], num_retries: int = 10, sleep_between_retries: float = 1.0) -> T:
+        for i in range(num_retries):
+            try:
+                return action()
+            except:
+                if i == num_retries - 1:
+                    raise
+
+                time.sleep(sleep_between_retries)
+
+        raise RuntimeError("Shouldn't get here!")
+
+    def _is_browser_alive(driver: WebDriver) -> bool:
+        try:
+            driver.title # pylint: disable=pointless-statement
+            return True
+        except:
+            return False
+
+    def _click_export_button(driver: WebDriver, export_button: WebElement) -> None:
+        # Annoying popup that asks you to sign in hides the export button sometimes.
+        try:
+            export_button.click()
+        except ElementClickInterceptedException:
+            close_popup_button = driver.find_element(By.XPATH, "//button[@aria-label='Close']")
+            close_popup_button.click()
+            raise
+
+    def _get_download_button(driver: WebDriver) -> WebElement:
+        # Try obtain the "in progress" text from the page. If it's there, that means the list isn't ready yet so we raise an exception.
+        try:
+            driver.find_element(By.XPATH, "//span[text()='In progress']")
+            raise RuntimeError('List export status is still in progress.')
+        # If there's no more "in progress" element in the page, we return the topmost download button.
+        except NoSuchElementException:
+            return driver.find_element(By.XPATH, "//button[contains(@aria-label, 'Start download for')]")
+        # If still in progress or failed to find it due to an unexpected exception type, refresh the page and propagate the exception so we'll retry.
+        except:
+            driver.refresh()
+            raise
+
+    def _export_list(driver: WebDriver, list_id: str) -> None:
+        _dbg.logger.info(f"Exporting {list_id=}. Stage: open list page")
+        driver.get(f'https://www.imdb.com/list/ls{list_id}')
+
+        _dbg.logger.info("Stage: click export button")
+        export_button = _do_with_retries(
+            lambda: driver.find_element(By.XPATH, "//button[@aria-label='Export']"))
+        _do_with_retries(lambda: _click_export_button(driver, export_button))
+
+        # Opening the link like this instead of below stage might be better but also might not confirm that the export actually started first. Needs more investigation.
+        # _dbg.logger.info("Stage: open exports page")
+        # driver.get(f'https://www.imdb.com/exports/')
+
+        _dbg.logger.info("Stage: wait for exports page popup")
+        exports_page_link = _do_with_retries(
+            lambda: driver.find_element(By.XPATH, "//a[@aria-label='Open exports page']"))
+
+        _dbg.logger.info("Stage: click exports page link")
+        _do_with_retries(exports_page_link.click)
+
+        _dbg.logger.info("Stage: get download button")
+        download_button = _do_with_retries(lambda: _get_download_button(driver))
+
+        _dbg.logger.info("Stage: click download button")
+        _do_with_retries(download_button.click)
+
+        _dbg.logger.info("Successful export")
+
+    # Above was all definitions that will help us later and are only defined inside this function for performance reasons. Actual server code starts here.
     if browser_type == _BrowserType.AUTO:
         browser_type = _BrowserType.get_system_default()
 
@@ -911,5 +916,3 @@ def _export_lists_handler(requests_queue: multiprocessing.Queue, browser_type: _
                 print(e, file=sys.stderr)
 
 #endregion
-
-_dbg.logger.info(f'Module import time: {time.time() - _start_import_time}s')

@@ -1,4 +1,4 @@
-# Copyright (C) 2024 Aviv Edery.
+# Copyright (C) 2026 Aviv Edery.
 
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -17,7 +17,6 @@
 
 import typing
 import dataclasses
-import time
 
 from . import _ctx
 from . import _filter
@@ -27,8 +26,6 @@ from . import _attr
 from . import _ml
 from . import _dbg
 from . import _mlf
-
-_start_import_time = time.time()
 
 #region generic predicates
 
@@ -173,7 +170,7 @@ class HasIndexPredicate(_filter.Predicate, name_without_type='has-index'):
 # flam find movies -subset director [ coen tarantino spielberg ] - must be directed by coen, tarantino, and spielberg at least. Same as `-director coen -director tarantino -director spielberg`
 # flam find movies -sameset director [ coen tarantino spielberg ] - must be directed by a coen, tarantino, and spielberg exactly
 
-# -superset ATTRIBUTE CMPTO... : true if every array element in the attribute matches at least of CMPTOs.
+# -superset ATTRIBUTE CMPTO... : true if every array element in the attribute matches at least one of CMPTOs.
 @_reg._register_builtin
 class SupersetPredicate(_filter.Predicate, name_without_type='superset'):
     # There is no nice way to remove the code repetition that all XSetPredicate classes have the same functions except excrete.
@@ -580,5 +577,3 @@ def _test_compile(line: str, find: _ml.FindableType = _ml.FindableType.ROLES, ct
 # _test_compile('( ( -true | -true ) ) ! -false')
 # _test_compile('( -true " "')
 # _test_compile('true')
-
-_dbg.logger.info(f'Module import time: {time.time() - _start_import_time}s')

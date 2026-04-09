@@ -1,4 +1,4 @@
-# Copyright (C) 2024 Aviv Edery.
+# Copyright (C) 2026 Aviv Edery.
 
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -16,7 +16,6 @@
 from __future__ import annotations
 
 import typing
-import time
 
 from . import _exc
 from . import _fetch
@@ -24,12 +23,14 @@ from . import _filter
 from . import _attr
 from . import _dbg
 
-_start_import_time = time.time()
+_BUILTIN_NAME = 'builtin'
+_GLOBAL_NAME = 'global'
 
 class RegistryOf[T: (type[_fetch.ListFetcher], type[_filter.Predicate], _attr.Attribute)]:
-    def __init__(self, reg: Registry) -> None:
+    def __init__(self, reg: Registry, name: str) -> None:
         self._registered_items: dict[str, None | T] = {}
         self._parent_reg = reg
+        self._name = name
 
     # as_none flag is used for a hack related to lazy creation of AttributePredicates. It's ok because this function is only ever meant to be called internally.
     def register(self, item: T, as_none: bool = False) -> None:
@@ -62,7 +63,10 @@ class RegistryOf[T: (type[_fetch.ListFetcher], type[_filter.Predicate], _attr.At
             # I tested, this is safe even though we had other exceptions inside this scope.
             raise
             
-        _dbg.logger.info(f"Registered {item=}, {item.qualified_name=}")
+        # Don't log for builtins because it will cause us to log a lot during import time and make flam very expensive to import.
+        # Because of this we also want this to be the ONLY log that gets logged when registering something. All the other functions in the call chain shouldn't log.
+        if self._parent_reg._name != _BUILTIN_NAME:
+            _dbg.logger.info(f"Registered a {self._parent_reg._name} {self._name}: {item=}, {item.qualified_name=}")
 
     # Important that due to lazy creation of AttributePredicates, this is the only function that may return registered items.
     def __getitem__(self, qualified_name: str) -> T:
@@ -80,10 +84,10 @@ class RegistryOf[T: (type[_fetch.ListFetcher], type[_filter.Predicate], _attr.At
 # Attributes are technically also predicates, but there can be hundreds of attributes and I don't want to create an AttributePredicate for each one.
 # So we do it lazy. When an attribute is registered, it's also registered as a predicate with item = None.
 # When we __getitem__ that predicate, we create the actual AttributePredicate class.
+# In hindsight this optimization is kind of dumb and not really needed, but I'm keeping it.
 class RegistryOfAttributes(RegistryOf[_attr.Attribute]):
     def register(self, item: _attr.Attribute, as_none: bool = False) -> None:
         super().register(item)
-        _dbg.logger.info(f"Registering attribute {item.qualified_name=} also as a predicate")
 
         # This completely violates type-safety but we hacky boys.
         self._parent_reg.predicates.register(item, as_none=True) # type: ignore
@@ -111,10 +115,11 @@ class RegistryOfPredicates(RegistryOf[type[_filter.Predicate]]):
         return predicate
 
 class Registry:
-    def __init__(self) -> None:
-        self._fetchers: RegistryOf[type[_fetch.ListFetcher]] = RegistryOf(self)
-        self._predicates: RegistryOf[type[_filter.Predicate]] = RegistryOfPredicates(self)
-        self._attributes: RegistryOf[_attr.Attribute] = RegistryOfAttributes(self)
+    def __init__(self, name: str) -> None:
+        self._name = name
+        self._fetchers: RegistryOf[type[_fetch.ListFetcher]] = RegistryOf(self, 'fetcher')
+        self._predicates: RegistryOf[type[_filter.Predicate]] = RegistryOfPredicates(self, 'predicate')
+        self._attributes: RegistryOf[_attr.Attribute] = RegistryOfAttributes(self, 'attribute')
 
     @property
     def fetchers(self) -> RegistryOf[type[_fetch.ListFetcher]]:
@@ -130,27 +135,22 @@ class Registry:
 
     def register(self, obj: typing.Any) -> None:
         if isinstance(obj, type) and issubclass(obj, _fetch.ListFetcher):
-            _dbg.logger.info("Registering as a fetcher")
             self.fetchers.register(obj)
         elif isinstance(obj, type) and issubclass(obj, _filter.Predicate):
-            _dbg.logger.info("Registering as a predicate")
             self.predicates.register(obj)
         elif isinstance(obj, _attr.Attribute):
-            _dbg.logger.info("Registering as an attribute")
             self.attributes.register(obj)
         else:
             raise _exc.InputError(f"Invalid object for registration: {obj}.")
 
-_builtins = Registry()
-_global_extensions = Registry()
+_builtins = Registry(_BUILTIN_NAME)
+_global_extensions = Registry(_GLOBAL_NAME)
 
 def _register_builtin[T](obj: T) -> T:
-    _dbg.logger.info("Registering a builtin")
     _builtins.register(obj)
     return obj
 
 def register[T](obj: T) -> T:
-    _dbg.logger.info("Registering a global extension")
     _global_extensions.register(obj)
     return obj
 
@@ -165,9 +165,12 @@ def decompose_qualified_attr_or_pred_name(qualified_name: str) -> tuple[str, str
 
     return split[0], split[1]
 
-_dbg.logger.info(f'Module import time: {time.time() - _start_import_time}s')
-
 # Import builtin extensions only here to avoid cyclic dependency issues.
 from . import _imdb # pylint: disable=unused-import
 from . import _builtin_attr # pylint: disable=unused-import
 from . import _builtin_pred # pylint: disable=unused-import
+
+# Logging per registered builtin is very expensive and causes our import time to go way up. So instead we log them all in a big batch at the end.
+_dbg.logger.info(f"Registered builtin fetchers:\n    {'\n    '.join(_builtins.fetchers)}")
+_dbg.logger.info(f"Registered builtin attributes:\n    {'\n    '.join(_builtins.attributes)}")
+_dbg.logger.info(f"Registered builtin predicates:\n    {'\n    '.join(_builtins.predicates)}")

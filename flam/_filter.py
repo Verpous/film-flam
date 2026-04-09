@@ -1,4 +1,4 @@
-# Copyright (C) 2024 Aviv Edery.
+# Copyright (C) 2026 Aviv Edery.
 
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -19,14 +19,12 @@ import abc
 import typing
 import dataclasses
 import re
-import time
 
 from . import _ctx
 from . import _attr
 from . import _exc
 from . import _ml
 from . import _reg
-from . import _dbg
 
 # NOTE: filters are case-sensitive!
 
@@ -45,8 +43,6 @@ from . import _dbg
 # NOT       := -n | -not | !
 # (         := (  | [    | -lparen
 # )         := )  | ]    | -rparen
-
-_start_import_time = time.time()
 
 # This one's for you, mayer.
 _EinGafrurError = _exc.FilterSyntaxError
@@ -102,8 +98,9 @@ class FilterMember(abc.ABC):
                 raise _EinGafrurError("Expected non empty list.", tokens=params.tokens, error_indices=[at, rparen_idx])
 
             return [eatfunc(params, i) for i in range(at + 1, rparen_idx)], rparen_idx + 1
+        
         # Support open-close without as a single token if not at_least_one.
-        elif at < len(params.tokens) and params.tokens[at] in Pipeline.BOTHPAREN and not at_least_one:
+        if at < len(params.tokens) and params.tokens[at] in Pipeline.BOTHPAREN and not at_least_one:
             return [], at + 1
 
         # Singleton list case where no parentheses are required. Also get here if there are no tokens to eat at all, we'd like to raise the error from eatfunc.
@@ -526,5 +523,3 @@ def looks_like_filter_token(token: str) -> bool:
         or token in Pipeline.LPAREN
         or token in Pipeline.RPAREN
         or token in Pipeline.BOTHPAREN)
-
-_dbg.logger.info(f'Module import time: {time.time() - _start_import_time}s')

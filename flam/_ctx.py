@@ -1,4 +1,4 @@
-# Copyright (C) 2024 Aviv Edery.
+# Copyright (C) 2026 Aviv Edery.
 
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -27,7 +27,6 @@ import weakref
 import itertools
 import difflib
 import contextlib
-import time
 
 from . import _cfg
 from . import _exc
@@ -43,7 +42,6 @@ from . import _attr
 from . import _gen_version
 from . import utils
 
-_start_import_time = time.time()
 DEFAULT_FLAM_DIR = _dbg.FlamEnv.CTX_DIR.get_or_default(os.path.join(os.path.expanduser('~'), '.film_flam'))
 
 # Utility for "inverting" registries: instead of first the registration level then the item type, it's first the item type then the levels.
@@ -74,8 +72,6 @@ class RegistriesOf[T: (type[_fetch.ListFetcher], type[_filter.Predicate], _attr.
             yield from self._type_selector(reg)
 
     def register(self, item: T) -> None:
-        _dbg.logger.info("Registering a context extension")
-
         # Last registry is the context extensions.
         self._type_selector(self._registries_to_try[-1]).register(item)
 
@@ -188,7 +184,7 @@ class FlamContext:
 
         self._should_import_extensions = import_extensions
 
-        ctx_extensions = _reg.Registry()
+        ctx_extensions = _reg.Registry(f'context ({self.flam_dir})')
         self._fetchers = RegistriesOf(lambda reg: reg.fetchers, ctx_extensions, import_extensions)
         self._predicates = RegistriesOf(lambda reg: reg.predicates, ctx_extensions, import_extensions)
         self._attributes = RegistriesOf(lambda reg: reg.attributes, ctx_extensions, import_extensions)
@@ -671,5 +667,3 @@ class FlamContext:
         filter = _filter.Filter.eat(params)
         _dbg.logger.info(f"Compiled {tokens=}, {find=} into: {filter}")
         return filter
-
-_dbg.logger.info(f'Module import time: {time.time() - _start_import_time}s')

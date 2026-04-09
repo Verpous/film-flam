@@ -1,4 +1,4 @@
-# Copyright (C) 2024 Aviv Edery.
+# Copyright (C) 2026 Aviv Edery.
 
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -25,8 +25,6 @@ from . import _exc
 from . import _dbg
 from . import _gen_version
 
-_start_import_time = time.time()
-
 @dataclasses.dataclass(frozen=True)
 class FieldMeta:
     order_matters: bool = False
@@ -52,9 +50,6 @@ class _FlamSerializable(msgspec.Struct,
 
     @classmethod
     def load(cls, path: str) -> typing.Self:
-        # Log at the start and end at least so we have an idea of how long it took.
-        _dbg.logger.info(f'Going to load a {cls} from: {path}')
-        
         with open(path, 'rb') as f:
             contents = f.read()
 
@@ -122,9 +117,6 @@ class _FlamSerializable(msgspec.Struct,
         return {}
 
     def write(self, path: str) -> None:
-        # Log at the start and end at least so we have an idea of how long it took.
-        _dbg.logger.info(f'Going to write a {type(self)} to: {path}')
-
         assert hasattr(self, _VERSION_KEY)
         self.version = _gen_version.__version__ # pylint: disable=attribute-defined-outside-init
 
@@ -148,7 +140,6 @@ class _FlamSerializable(msgspec.Struct,
 
     # Sorts all lists in the file recursively so that we can compare files for equality.
     def canonicalize(self) -> None:
-        # Log at the start and end at least so we have an idea of how long it took.
         _dbg.logger.info(f'Canonicalizing a {type(self)}')
 
         # Must be depth-first for this to work.
@@ -159,8 +150,6 @@ class _FlamSerializable(msgspec.Struct,
                 # For now only have one field we want to exclude from sorting so we hack it.
                 if isinstance(value, list) and not self._get_meta(field).order_matters:
                     value.sort()
-
-        _dbg.logger.info(f'Finished canonicalizing {type(self)}')
 
     def depth_first_iter(self) -> typing.Iterable[_FlamSerializable]:
         for field in msgspec.structs.fields(self):
@@ -188,5 +177,3 @@ class _FlamSerializable(msgspec.Struct,
                     return annot
 
         return _default_meta
-
-_dbg.logger.info(f'Module import time: {time.time() - _start_import_time}s')

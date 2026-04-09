@@ -1,6 +1,6 @@
 #! python
 
-# Copyright (C) 2024 Aviv Edery.
+# Copyright (C) 2026 Aviv Edery.
 
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -39,7 +39,7 @@ import itertools
 import flam
 from flam import utils
 
-_start_import_time = time.time()
+isatty = False
 
 class Choice(enum.StrEnum):
     YES     = 'yes'
@@ -78,9 +78,11 @@ def print_table(table: list[list[str]],
         spacious: bool = False,
         no_titles: bool = False,
         dsv: None | str = None) -> None:
+    global isatty
+
     match color_choice:
         case Choice.AUTO:
-            use_color = sys.stdout.isatty()
+            use_color = isatty
         case Choice.ALWAYS:
             use_color = True
         case Choice.NEVER:
@@ -100,7 +102,7 @@ def print_table(table: list[list[str]],
             # It's too complicated to compute exactly the length of the longest row before we generate the table, but we can't generate the table until we decide about pagination.
             # So instead we go with a heuristical approach of estimating the longest row to be the sum of its parts + some encouragement for each cell.
             paginate = (
-                sys.stdout.isatty()
+                isatty
                 and shutil.which('less') is not None
                 and (
                     terminal_lines <= len(table) + VERTICAL_PAGINATION_ENCOURAGEMENT
@@ -657,7 +659,7 @@ Each findable type has its own default:
 See the full documentation for a list of supported attributes.''')
         
         parser.add_argument('-c', '--columns', metavar='ATTRIBUTES', default=None, action='store', help=
-f'''Comma-delimited list of attributes of FINDABLE to print.
+'''Comma-delimited list of attributes of FINDABLE to print.
 Each findable type has its own defaults. There are also "smart" defaults which are printed only if certain conditions are met.
 If %(metavar)s starts with a '+' then they will be printed in addition to the defaults instead of instead.
 Supports globbing (e.g. '*-date' for all date attributes).
@@ -1090,15 +1092,24 @@ The default subcommand is `find`. See `%(prog)s find --help` to know which argum
     return parser, find_subparser
 
 def main() -> None:
-    colorama.just_fix_windows_console()
-
-    # This is needed. Trust me.
+    flam.logger.info(f"Executed with: {sys.argv=}")
+    
+    # This is needed otherwise we get an encoding error when trying to write our output.
     try:
         sys.stdout.reconfigure(encoding='utf-8', newline='\n') # type: ignore
     except:
-        flam.logger.error("Failed to reconfigure stdout. Proceeding anyway.", exc_info=True)
+        flam.logger.error("Failed to reconfigure stdout. Proceeding anyway", exc_info=True)
 
-    flam.logger.info(f"Executed with: {sys.argv=}")
+    global isatty
+    
+    try:
+        isatty = sys.stdout.isatty()
+    except:
+        flam.logger.error("Failed to check isatty. Default to false", exc_info=True)
+        isatty = False
+
+    # Do this only after the reconfigure, isatty checks above because it may wrap stdout in an AnsiToWin32 object which doesn't support those functions.
+    colorama.just_fix_windows_console()
 
     # We want to support 'find' as the default subparser. This has a few limitations:
     # * argparse sucks at supporting it.
@@ -1150,8 +1161,6 @@ def main() -> None:
 
         # No ugly tracebacks for input errors. Only for internal errors.
         sys.exit(f'{parser.prog}: error: {e}')
-
-flam.logger.info(f'Module import time: {time.time() - _start_import_time}s')
 
 if __name__ == '__main__':
     main()

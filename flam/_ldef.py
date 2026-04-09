@@ -1,4 +1,4 @@
-# Copyright (C) 2024 Aviv Edery.
+# Copyright (C) 2026 Aviv Edery.
 
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -17,13 +17,10 @@ from __future__ import annotations
 
 import typing
 import enum
-import time
 
 from . import _ctx
 from . import _exc
 from . import _dbg
-
-_start_import_time = time.time()
 
 # Listdefs are basically a spec for identifying a list. Users pass them in as a string of the form "<list_type>=<address>", where:
 # * <list_type> describes where to look for the list
@@ -177,5 +174,3 @@ class CanonListdef(typing.NamedTuple):
 
     def __str__(self) -> str:
         return f'{self.list_type}={self.address}'
-
-_dbg.logger.info(f'Module import time: {time.time() - _start_import_time}s')
