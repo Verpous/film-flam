@@ -158,7 +158,7 @@ class SeleniumCinemagoerListFetcher(_fetch.ListFetcher, list_type='imdb-browser-
     @classmethod
     def _spin_server_if_needed(cls) -> None:
         if cls.exports_server is not None and cls.exports_server.is_alive():
-            _dbg.logger.info("CSV server is alive, no need to spin it.")
+            _dbg.logger.info("CSV server is alive, no need to spin it")
             return
 
         profile = _dbg.FlamEnv.BROWSER_PROFILE.get_or_default()
@@ -285,7 +285,7 @@ class _Cinemagoer:
             # 2. Sometimes you get the same person twice. Also discarded.
             crew_imdb_by_uid = {p.getID(): p for p in _safe_get(movie_imdb, imdb_crew_type, default=[]) if p}
 
-            crew[str(crew_type)] = _mlf.MLFCrew(
+            crew[crew_type] = _mlf.MLFCrew(
                 crew_type = crew_type,
                 roles_by_uid = {r.person_uid: r for r in cls._build_roles(crew_imdb_by_uid)},
             )
@@ -407,7 +407,7 @@ class _IMDbApiDev:
 
         # Build crews dictionary and also people.
         crew = {
-            str(crew_type): _mlf.MLFCrew(crew_type=crew_type, roles_by_uid={})
+            crew_type: _mlf.MLFCrew(crew_type=crew_type, roles_by_uid={})
             for crew_type in _ml.CrewType.iterate_except_any()
         }
 
@@ -769,7 +769,7 @@ def _export_lists_handler(requests_queue: multiprocessing.Queue, browser_type: _
             _ChromeController.set_chromium_profile(self.options, profile)
 
         def launch(self) -> WebDriver:
-            return webdriver.Chrome(options=self.options)
+            return webdriver.Chrome(options=self.options) # pylint: disable=not-callable
             
     class _EdgeController(_BrowserController):
         def __init__(self) -> None:
@@ -780,18 +780,19 @@ def _export_lists_handler(requests_queue: multiprocessing.Queue, browser_type: _
             _ChromeController.set_chromium_profile(self.options, profile)
 
         def launch(self) -> WebDriver:
-            return webdriver.Edge(options=self.options)
+            return webdriver.Edge(options=self.options) # pylint: disable=not-callable
 
     class _FirefoxController(_BrowserController):
         def __init__(self) -> None:
             self.options = webdriver.FirefoxOptions()
 
         def set_profile(self, profile: str) -> None:
-            # Takes a super long time to load fat profiles, and there's no way around it. Users are advised to create a lean profile just for this.
+            # Takes a super long time to load fat profiles, and there's no way around it. I've looked and looked. Users are advised to create a lean profile just for this.
+            # The good news is nobody uses Firefox but me and the other browsers seem to be faster.
             self.options.profile = profile # type: ignore
 
         def launch(self) -> WebDriver:
-            return webdriver.Firefox(options=self.options)
+            return webdriver.Firefox(options=self.options) # pylint: disable=not-callable
 
     def _do_with_retries[T](action: typing.Callable[[], T], num_retries: int = 10, sleep_between_retries: float = 1.0) -> T:
         for i in range(num_retries):

@@ -26,7 +26,7 @@ from . import _dbg
 _BUILTIN_NAME = 'builtin'
 _GLOBAL_NAME = 'global'
 
-class RegistryOf[T: (type[_fetch.ListFetcher], type[_filter.Predicate], _attr.Attribute)]:
+class _RegistryOf[T: (type[_fetch.ListFetcher], type[_filter.Predicate], _attr.Attribute)]:
     def __init__(self, reg: Registry, name: str) -> None:
         self._registered_items: dict[str, None | T] = {}
         self._parent_reg = reg
@@ -85,14 +85,14 @@ class RegistryOf[T: (type[_fetch.ListFetcher], type[_filter.Predicate], _attr.At
 # So we do it lazy. When an attribute is registered, it's also registered as a predicate with item = None.
 # When we __getitem__ that predicate, we create the actual AttributePredicate class.
 # In hindsight this optimization is kind of dumb and not really needed, but I'm keeping it.
-class RegistryOfAttributes(RegistryOf[_attr.Attribute]):
+class _RegistryOfAttributes(_RegistryOf[_attr.Attribute]):
     def register(self, item: _attr.Attribute, as_none: bool = False) -> None:
         super().register(item)
 
         # This completely violates type-safety but we hacky boys.
         self._parent_reg.predicates.register(item, as_none=True) # type: ignore
 
-class RegistryOfPredicates(RegistryOf[type[_filter.Predicate]]):
+class _RegistryOfPredicates(_RegistryOf[type[_filter.Predicate]]):
     def __getitem__(self, qualified_name: str) -> type[_filter.Predicate]:
         predicate = self._registered_items[qualified_name]
         
@@ -117,20 +117,20 @@ class RegistryOfPredicates(RegistryOf[type[_filter.Predicate]]):
 class Registry:
     def __init__(self, name: str) -> None:
         self._name = name
-        self._fetchers: RegistryOf[type[_fetch.ListFetcher]] = RegistryOf(self, 'fetcher')
-        self._predicates: RegistryOf[type[_filter.Predicate]] = RegistryOfPredicates(self, 'predicate')
-        self._attributes: RegistryOf[_attr.Attribute] = RegistryOfAttributes(self, 'attribute')
+        self._fetchers: _RegistryOf[type[_fetch.ListFetcher]] = _RegistryOf(self, 'fetcher')
+        self._predicates: _RegistryOf[type[_filter.Predicate]] = _RegistryOfPredicates(self, 'predicate')
+        self._attributes: _RegistryOf[_attr.Attribute] = _RegistryOfAttributes(self, 'attribute')
 
     @property
-    def fetchers(self) -> RegistryOf[type[_fetch.ListFetcher]]:
+    def fetchers(self) -> _RegistryOf[type[_fetch.ListFetcher]]:
         return self._fetchers
 
     @property
-    def predicates(self) -> RegistryOf[type[_filter.Predicate]]:
+    def predicates(self) -> _RegistryOf[type[_filter.Predicate]]:
         return self._predicates
 
     @property
-    def attributes(self) -> RegistryOf[_attr.Attribute]:
+    def attributes(self) -> _RegistryOf[_attr.Attribute]:
         return self._attributes
 
     def register(self, obj: typing.Any) -> None:

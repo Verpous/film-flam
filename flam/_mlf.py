@@ -28,7 +28,7 @@ class MLFRole(_file._FlamSerializable):
     is_star:                None | bool
 
 class MLFCrew(_file._FlamSerializable):
-    crew_type:              str
+    crew_type:              _ml.CrewType
     roles_by_uid:           dict[str, MLFRole]
 
 class MLFPerson(_file._FlamSerializable):
@@ -70,7 +70,7 @@ class MLFMovie(_file._FlamSerializable):
     # crew type -> crew object. It makes things much nicer when you can reference the crew type you want with this indirection,
     # but the downside (as opposed to having a field for each crew type), is that we have to check dynamically that no crew types were added or are missing in sanity_checks.
     # msgspec supports TypedDict, but it has problems with initializing a default.
-    crew:                   dict[str, MLFCrew]
+    crew:                   dict[_ml.CrewType, MLFCrew]
 
 # MLFs get canonicalized so users can expect all lists in this file to be sorted.
 class MovieListFile(_file._FlamSerializable):
@@ -90,10 +90,10 @@ class MovieListFile(_file._FlamSerializable):
     def sanity_checks(self) -> None:
         super().sanity_checks()
 
-        # Check if every movie has a key for every crew type. This looks expensive for big lists but it has a profiler stamp of approval.
-        crew_types_set = set(str(ct) for ct in _ml.CrewType.iterate_except_any())
+        # Check if every movie has a key for every crew type. This sounds expensive for big lists but it has a profiler stamp of approval.
+        num_crew_types_except_any = sum(1 for _ in _ml.CrewType.iterate_except_any())
 
         for movie in self.movies_by_uid.values():
-            # I verified this check works.
-            if crew_types_set != movie.crew.keys():
+            # Efficient check if movie.crew.keys() has every crew type except ANY.
+            if len(movie.crew) != num_crew_types_except_any or _ml.CrewType.ANY in movie.crew:
                 raise self._validation_error(f'Found movie: {movie.uid} with bad crew types: {movie.crew.keys()}.')

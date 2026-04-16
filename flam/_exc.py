@@ -18,6 +18,7 @@ import colorama
 
 from . import _dbg
 
+# As a rule, flam exceptions should start with a capital letter and end with a period!
 class FlamError(Exception):
     def __init__(self, *args: object, log_trace: bool = True, stacklevel: int = 2) -> None:
         super().__init__(*args)

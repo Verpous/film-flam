@@ -271,15 +271,15 @@ def truncate(s: str, max_len: int, ellipsis: str = '...', truncation_style: Trun
         case TruncationStyle.NO_TRIM:
             return s
         case TruncationStyle.TRIM_END:
-            return s[:max_len - len(ellipsis)] + ellipsis
+            return f"{s[:max_len - len(ellipsis)]}{ellipsis}"
         case TruncationStyle.TRIM_START:
             # Technically there's a nifty syntax s[-X:] to take X characters from the end. BUT it breaks if X is 0, so don't use it.
-            return ellipsis + s[len(s) - (max_len - len(ellipsis)):]
+            return f"{ellipsis}{s[len(s) - (max_len - len(ellipsis)):]}"
         case TruncationStyle.TRIM_MIDDLE:
             # Try to take about the same chars from the start and the end, but if they don't split even, prefer the start.
             take_from_end = (max_len - len(ellipsis)) // 2
             take_from_start = max_len - len(ellipsis) - take_from_end
-            return s[:take_from_start] + ellipsis + s[len(s) - take_from_end:]
+            return f"{s[:take_from_start]}{ellipsis}{s[len(s) - take_from_end:]}"
         case _:
             raise RuntimeError(f'Unexpected {truncation_style=}')
 
@@ -312,7 +312,10 @@ def parse_num_pretty(num_str: str) -> int:
 def clamp(num: _typeshed.SupportsRichComparisonT, lower_bound: _typeshed.SupportsRichComparisonT, upper_bound: _typeshed.SupportsRichComparisonT) -> _typeshed.SupportsRichComparisonT:
     return min(upper_bound, max(lower_bound, num))
 
-def stable_dedup[T](elements: typing.Iterable[T]) -> typing.Iterable[T]:
+def stable_dedup[TElem, TKey](elements: typing.Iterable[TElem], key: None | typing.Callable[[TElem], TKey] = None) -> typing.Iterable[TElem]:
+    if key is None:
+        key = lambda e: e
+    
     # Dictionaries preseve insertion order, but dedup if two elements are equal.
-    d = {e: None for e in elements}
-    yield from d.keys()
+    d = {key(e): e for e in elements}
+    yield from d.values()

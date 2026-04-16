@@ -458,8 +458,8 @@ class AsPredicate(_filter.Predicate, name_without_type='as', findable_type=_ml.F
         return cls(crew_type, filter), until
 
     def _excrete_from_people(self, people: _ml.People, mlf_people: list[_mlf.MLFPerson]) -> bool:
-        minimal_superset_people = people.minimal_superset_people_in_other_crew_type(self._crew_type)
-        return minimal_superset_people is not None and self._filter.excrete(minimal_superset_people)
+        minsuper = people.minimal_superset_people_in_other_crew_type(self._crew_type)
+        return minsuper is not None and self._filter.excrete(minsuper)
 
     def regurgitate(self) -> typing.Iterable[str]:
         yield from super().regurgitate()

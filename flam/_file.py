@@ -65,7 +65,7 @@ class _FlamSerializable(msgspec.Struct,
             if is_version_upgrade_needed:
                 obj = cls._get_upgraded(obj_json, version_upgrades)
                 obj.write(path)
-                _dbg.logger.info(f"Successfully upgraded version of {cls}.")
+                _dbg.logger.info(f"Successfully upgraded version of {cls}")
             else:
                 raise cls._validation_error(f'{ve}.') from ve
 
@@ -75,7 +75,7 @@ class _FlamSerializable(msgspec.Struct,
 
     @classmethod
     def _get_upgraded(cls, obj_json: dict[str, typing.Any], version_upgrades: list[tuple[str, typing.Callable[[dict[str, typing.Any]], None]]]) -> typing.Self:
-        _dbg.logger.info(f"Version upgrade of {cls} needed! {obj_json[_VERSION_KEY]=}, {version_upgrades=}.")
+        _dbg.logger.info(f"Version upgrade of {cls} needed! {obj_json[_VERSION_KEY]=}, {version_upgrades=}")
 
         # Find the earliest relevant version upgrade.
         # Note that we can assume version_upgrades isn't empty, and that the highest version in the array is >= obj[_VERSION_KEY].

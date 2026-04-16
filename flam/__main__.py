@@ -404,7 +404,6 @@ Once configured, composite lists can be easily used by their name in other comma
 
         parser.add_argument('-n', '--rename', metavar='NEW_NAME', default=None, action='store', help='In --edit, rename the list to %(metavar)s.')
         parser.add_argument('-i', '--default-find', choices=Choice.yes_no_auto(), default=Choice.AUTO, action='store', help='In --edit, decide if the list should be default for `flam find`.')
-        parser.add_argument('-e', '--default-fetch', choices=Choice.yes_no_auto(), default=Choice.AUTO, action='store', help='In --edit, decide if the list should be default for `flam fetch`.')
         parser.add_argument('NAME', nargs='?', action='store', default=None, help='Operate on the composite list named %(dest)s.')
         parser.add_argument('SIMPLE_LIST', nargs='*', action='store', help='In --edit, merge %(dest)ss to form this composite list.')
         parser.add_argument('MOVIE_FILTER', nargs='*', action='store', help=
@@ -444,14 +443,13 @@ See the full documentation for filter syntax.''')
     def print(cls, ctx: flam.FlamContext, args: argparse.Namespace) -> None:
         composite_lists = list(ctx.cfg_readonly.composite_lists) if args.NAME is None else [ctx.cfg_readonly.composite_lists.get_by_name(args.NAME)]
 
-        table = [['uid', 'name', 'lists', 'filter', 'default-fetch?', 'default-find?']]
+        table = [['uid', 'name', 'lists', 'filter', 'default-find?']]
         table.extend(sorted(
             [
                 cl.uid.split('-')[0],
                 cl.name,
                 ', '.join(ctx.cfg_readonly.simple_lists.get_by_uid(sl_uid).name for sl_uid in cl.simple_list_uids),
                 ' '.join(cl.filter_tokens) if len(cl.filter_tokens) > 0 else '-',
-                Choice.bool2yesno(cl.is_default_fetch),
                 Choice.bool2yesno(cl.is_default_find),
             ]
             for cl in composite_lists
@@ -477,9 +475,6 @@ See the full documentation for filter syntax.''')
                 ctx.compile_filter(filter_tokens, flam.FindableType.MOVIES)
                 composite_list.filter_tokens = filter_tokens
 
-            if args.default_fetch != Choice.AUTO:
-                composite_list.is_default_fetch = args.default_fetch == Choice.YES
-
             if args.default_find != Choice.AUTO:
                 composite_list.is_default_find = args.default_find == Choice.YES
 
@@ -495,7 +490,6 @@ See the full documentation for filter syntax.''')
             name = args.NAME,
             simple_list_uids = [ctx.cfg_readonly.simple_lists.get_by_name(sl_name).uid for sl_name in simple_list_names],
             filter_tokens = filter_tokens,
-            is_default_fetch = args.default_fetch == Choice.YES,
             is_default_find = args.default_find == Choice.YES,
         )
 
@@ -563,18 +557,14 @@ By default fetches all lists configured with --default-fetch.''')
             flam.logger.error(f"Failed to store state for later undoing with error: {e}")
 
         listdefs = args.LISTDEF if len(args.LISTDEF) != 0 else [flam.SpecialListType.DEFAULTS]
-        ctx.fetch(listdefs, refetch_pattern=args.refetch, quiet=False)
+        
+        try:
+            ctx.fetch(listdefs, refetch_pattern=args.refetch, quiet=False)
+        except flam.FetchInterrupt:
+            ctx.precache(quiet=False)
+            raise
 
-        with utils.ProgressBar(list(ctx.cfg_readonly.composite_lists),
-                desc='Regenerating composite lists',
-                keyfunc=lambda cl: cl.name) as bar:
-            for cl in bar:
-                # Easiest way to regenerate dependencies is to just get every composite list and do nothing with it.
-                try:
-                    ctx.get_movie_list(f'{flam.SpecialListType.COMPOSITE}={cl.name}')
-                except flam.FlamError:
-                    # Don't care if this fails, and it might fail because we haven't checked if the composite list has all its dependencies.
-                    pass
+        ctx.precache(quiet=False)
 
     @classmethod
     def push_undo(cls, ctx: flam.FlamContext) -> None:
@@ -785,6 +775,10 @@ See the full documentation for filter syntax.''')
 
         flam.logger.info("Building findables list")
 
+        # It's very important that we apply the filter here and not at get_movie_list.
+        # 1. Unless the filter is a movie filter, it's not even possible to apply it anywhere else
+        # 2. Even in the case of movie filters, applying it at get_movie_list would've changed program behavior - attributes like people-num-movies will not count filtered films
+        # 3. For performance it's much much better to rely on an existing list with precached data than spin an anonymous list
         findables = [
             findable
             for crew_type, group_mode in ct_gms
@@ -984,6 +978,7 @@ See the full documentation for filter syntax.''')
     def sort_findables(cls, sort_attrs: list[tuple[flam.Attribute, None | str]], findables: list[flam.Findable], args: argparse.Namespace) -> None:
         for attr, _ in reversed(sort_attrs):
             # Use functools.partial to silence "cell-var-from-loop" warning by pylint.
+            # NOTE: python guarantees that the key func is applied only once per obj so we won't be extracting the attribute multiple times.
             key = functools.partial(lambda a, f: a.sort_key(f.extract(a)), attr)
             findables.sort(key=key, reverse=(not attr.is_ascending) ^ args.reverse)
 

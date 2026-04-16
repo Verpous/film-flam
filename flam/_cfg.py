@@ -41,7 +41,6 @@ class CompositeList(_file._FlamSerializable):
     # This field cares about the the order of tokens. Because of this we must never canonicalize configuration files
     # We used to have a way to annotate that a field shouldn't be sorted by canonicalize() but it was very expensive and no one was using it so it's gone.
     filter_tokens:          list[str]
-    is_default_fetch:       bool
     is_default_find:        bool
 
     @property

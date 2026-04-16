@@ -50,7 +50,7 @@ class SpecialListType(enum.StrEnum):
     def __repr__(self) -> str:
         return str(self)
 
-class ExpandFlavor(enum.Enum):
+class _ExpandFlavor(enum.Enum):
     FIND        = enum.auto()
     FETCH       = enum.auto()
 
@@ -90,11 +90,11 @@ class CanonListdef(typing.NamedTuple):
         if result is None:
             raise _exc.InputError(f"Invalid LISTDEF: '{listdef}'.")
 
-        _dbg.logger.info(f"Parsed {listdef=}, split into: {before_eq=}, {after_eq=}. {result=}.")
+        _dbg.logger.info(f"Parsed {listdef=}, split into: {before_eq=}, {after_eq=}. {result=}")
         return result
 
     @classmethod
-    def parse_and_expand(cls, listdefs: typing.Iterable[str], ctx: _ctx.FlamContext, flavor: ExpandFlavor) -> typing.Iterable[CanonListdef]:
+    def parse_and_expand(cls, listdefs: typing.Iterable[str], ctx: _ctx.FlamContext, flavor: _ExpandFlavor) -> typing.Iterable[CanonListdef]:
         for ldef in listdefs:
             cldef = cls.parse(ldef, ctx)
             
@@ -102,31 +102,25 @@ class CanonListdef(typing.NamedTuple):
                 _dbg.logger.info(f"Expansion of {cldef} includes {expanded}")
                 yield expanded
 
-    def expand(self, ctx: _ctx.FlamContext, flavor: ExpandFlavor) -> typing.Iterable[CanonListdef]:
+    def expand(self, ctx: _ctx.FlamContext, flavor: _ExpandFlavor) -> typing.Iterable[CanonListdef]:
         match self.list_type:
             case SpecialListType.ALL:
                 yield from (sl.abstract_listdef for sl in ctx.cfg_readonly.simple_lists)
             case SpecialListType.DEFAULTS:
                 match flavor:
-                    case ExpandFlavor.FIND:
+                    case _ExpandFlavor.FIND:
                         yield from (sl.abstract_listdef for sl in ctx.cfg_readonly.simple_lists if sl.is_default_find)
                         yield from (cl.abstract_listdef for cl in ctx.cfg_readonly.composite_lists if cl.is_default_find)
-                    case ExpandFlavor.FETCH:
+                    case _ExpandFlavor.FETCH:
+                        # Only simple lists support default_fetch because it makes no sense for composites.
                         yield from (sl.abstract_listdef for sl in ctx.cfg_readonly.simple_lists if sl.is_default_fetch)
-
-                        # Composite lists are not atomic for fetch, so after expanding to the defaults, we must double expand them.
-                        yield from (
-                            dbl_expanded
-                            for cl in ctx.cfg_readonly.composite_lists if cl.is_default_fetch
-                                for dbl_expanded in cl.abstract_listdef.expand(ctx, flavor)
-                        )
                     case _:
                         raise RuntimeError(f"Unexpected {flavor=}")
             case SpecialListType.COMPOSITE:
                 match flavor:
-                    case ExpandFlavor.FIND:
+                    case _ExpandFlavor.FIND:
                         yield self
-                    case ExpandFlavor.FETCH:
+                    case _ExpandFlavor.FETCH:
                         # Can't fetch composite lists, they must be expanded into simple lists.
                         composite_list = ctx.cfg_readonly.composite_lists.get_by_uid(self.address)
                         yield from (CanonListdef(SpecialListType.SIMPLE, sl_uid) for sl_uid in composite_list.simple_list_uids)

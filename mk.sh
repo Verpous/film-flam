@@ -41,6 +41,7 @@ pylint_ignore+=C0200, # consider-using-enumerate
 pylint_ignore+=C0301, # line-too-long
 pylint_ignore+=C0302, # too-many-lines
 pylint_ignore+=C0303, # trailing-whitespace
+pylint_ignore+=C0325, # superfluous-parens
 pylint_ignore+=C0411, # wrong-import-order
 pylint_ignore+=C0413, # wrong-import-position
 pylint_ignore+=C0415, # import-outside-toplevel
@@ -207,6 +208,10 @@ clean-ctx() {
     rm -rf "$flam_dir"
 }
 
+rmcache() {
+    rm -rf "$flam_dir"/cache
+}
+
 # Reconfigures the dev flam dir with some test lists.
 cfg() {
     $cli config list --default-fetch=no     testlist    imdb-browser-apidev-listid=540302193
@@ -280,6 +285,8 @@ flam() {
     fi
 }
 
+# NOTE: this only does CPU profiling. I am really curious to use a memory profiler, but sadly python seems to be lacking in good ones.
+# The best one is memray but it doesn't support Windows. The others look like crap, so I think I'll pass.
 profile() {
     FLAM_PROFILE=1 $cli "$@"
 }
@@ -309,7 +316,7 @@ coverage() {
 
     # TODO: in case of failure need to run cleanup so that the next run won't fail.
     # Run everything in a scope that's redirected to devnull. If profiling, it will break us out of pstats. If not profiling, it will dump the output of flam.
-    {
+    time {
         time "$cmd" config extension "$PWD"/test_extensions.py
         time "$cmd" config extension
         time "$cmd" config extension -D "$PWD"/test_extensions.py

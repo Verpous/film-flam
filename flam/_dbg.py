@@ -128,4 +128,5 @@ logger = _make_logger()
 _prev_excepthook = sys.excepthook
 sys.excepthook = _log_exception
 
+# As a rule, flam logs should start with a capital letter and not end with a period!
 logger.info(f"Environment variables:\n    {'\n    '.join(f'"{k}": \t"{v}"' for k, v in os.environ.items())}")

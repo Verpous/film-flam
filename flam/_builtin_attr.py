@@ -514,15 +514,15 @@ for crew_type in _ml.CrewType:
         ct = _ml.CrewType(self.name_without_type.removeprefix('movies-as-'))
 
         # Find the smallest group in another crew type which has at least the same people as this one, if one exists, and return their movies.
-        minimal_superset_people = people.minimal_superset_people_in_other_crew_type(ct)
+        minsuper = people.minimal_superset_people_in_other_crew_type(ct)
 
-        if minimal_superset_people is None:
+        if minsuper is None:
             return []
 
         # Guaranteed ordering by associated_movies().
         return [
             movie.underlying_file_movie_readonly.title
-            for movie in minimal_superset_people.associated_movies()
+            for movie in minsuper.associated_movies()
         ]
 
 @_register_easy_attribute(attrutils.EasyAttributeParams(
@@ -541,10 +541,10 @@ def _people_professions_extractor(self: attrutils.EasyAttribute, people: _ml.Peo
     for ct in _ml.CrewType.iterate_except_any():
         # Check if there is a group in that crew type which is a superset of the people in this group.
         # This is efficient when ct == people.crew_type.
-        minimal_superset_people = people.minimal_superset_people_in_other_crew_type(ct)
+        minsuper = people.minimal_superset_people_in_other_crew_type(ct)
 
-        if minimal_superset_people is not None:
-            professions.append(str(minimal_superset_people.crew_type))
+        if minsuper is not None:
+            professions.append(str(minsuper.crew_type))
 
     return professions
 

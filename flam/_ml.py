@@ -19,9 +19,11 @@ import typing
 import enum
 import abc
 import bisect
+import collections
 
 from . import _filter
 from . import _mlf
+from . import _mlv
 from . import _ctx
 from . import _fetch
 from . import _attr
@@ -33,9 +35,13 @@ class GroupMode(enum.StrEnum):
     DEFAULT             = 'default'
     GROUP               = 'group'
     SEPARATE            = 'separate'
-    
+
     def __repr__(self) -> str:
         return str(self)
+
+    @classmethod
+    def iterate_except_default(cls) -> typing.Iterable[GroupMode]:
+        yield from _group_modes_except_default
 
 class CrewType(enum.StrEnum):
     CAST                = 'cast'
@@ -95,6 +101,428 @@ _default_group_modes = {
 }
 
 _crew_types_except_any = [ct for ct in CrewType if ct != CrewType.ANY]
+_group_modes_except_default = [gm for gm in GroupMode if gm != GroupMode.DEFAULT]
+
+# We want to guarantee a consistent ordering on find(), and associated_X() functions because it spares attribute implementations from worrying about ordering on their end.
+# Python dictionaries guarantee to preserve the order keys were added so we can have both efficient lookups and ordering in one data structure if we build it right.
+# NOTE: cProfile thinks this function is very expensive but it's only because it uses an iterable so it counts the time of the generator that's yielding us all this stuff.
+def _build_findables_dict[T: Findable](findables: typing.Iterable[T], assume_sorted: bool = False) -> dict[str, T]:
+    return {f.uid: f for f in (findables if assume_sorted else sorted(findables, key=lambda fi: fi.uid))}
+
+# Hate this function but we just have a lot of list comprehensions which can either use this, or an ugly cast, or ugly generators.
+def _assert_not_none[T](value: None | T) -> T:
+    assert value is not None
+    return value
+
+# Some terminology: a computation can be loaded, and it can be vaulted. These are not mutually exclusive!
+# * Loaded means it's computed and cached in a volatile way in the MovieList or Movie/People/Role objects, ex: Movie._associated_people_cache.
+# * Vaulted means it's computed and stored in the MovieListVault, so that if the user wants it in memory he can load it instead of compute it
+# 
+# Not all loaded computations are vaulted - we may not have vaulted it yet, or it may be a trivial result we'd rather just recompute next run.
+# Not all vaulted computations are loaded - it may be vaulted from a previous run, and we have not found a need to load it in this run.
+# There is no generic way to check if a computation is loaded, but there is a way to check if it's vaulted.
+# The reason there is no generic way to check that is because it's not possible to do in a performant enough way.
+# Each computation is expected to implement its own ad hoc way to check if it's loaded.
+class _MLVComputation(abc.ABC):
+    # This description is presented to users in the progressbar but it is also used to check if two computations are equal so it must be unique!
+    @property
+    @abc.abstractmethod
+    def description(self) -> str:
+        pass
+
+    # Unconditionally does the math and assigns the results to ML objects, so in the end the computation is *loaded*.
+    @abc.abstractmethod
+    def compute(self, movie_list: MovieList) -> None:
+        pass
+
+    # Attempts to copy the results from vault to the ML objects, so in the end the computation is also *loaded*.
+    # Returns false if the computation wasn't vaulted.
+    @abc.abstractmethod
+    def load_if_vaulted(self, movie_list: MovieList, vault: _mlv._MovieListVault) -> bool:
+        pass
+
+    # Assumes the computation is *loaded* and *not vaulted*, and copies the loaded results to the MLV, so in the end the computation is also *vaulted*.
+    # For the record, I am fully aware that we could've ditched this function if we changed compute to store the result in the vault and not the ML objects.
+    # However that would make us lose the ability to have computations that we exclude from vaulting, and will make it very hard if we ever want to disable vaulting.
+    @abc.abstractmethod
+    def vault(self, movie_list: MovieList, vault: _mlv._MovieListVault) -> None:
+        pass
+
+class _PeopleComputation(_MLVComputation):
+    def __init__(self, crew_type: CrewType, group_mode: GroupMode):
+        self._crew_type = crew_type
+        self._group_mode = group_mode
+
+    @property
+    def description(self) -> str:
+        return f'people - {ct_gm_to_str(self._crew_type, self._group_mode)}'
+
+    def compute(self, movie_list: MovieList) -> None:
+        ct_gm = (self._crew_type, self._group_mode)
+        movie_list._peoples[ct_gm] = _build_findables_dict(self._generate_peoples_no_cache(movie_list))
+        _dbg.logger.info(f"Computed people list for {ct_gm=}, {len(movie_list._peoples[ct_gm])=}")
+
+    def load_if_vaulted(self, movie_list: MovieList, vault: _mlv._MovieListVault) -> bool:
+        ct_gm = (self._crew_type, self._group_mode)
+
+        for mlv_people in vault.peoples:
+            if ct_gm != (mlv_people.crew_type, mlv_people.group_mode):
+                continue
+            
+            mlf = movie_list._movie_list_file
+            movie_list._peoples[ct_gm] = _build_findables_dict(
+                (
+                    People(
+                        movie_list,
+                        (mlf.people_by_uid[uid] for uid in group),
+                        *ct_gm
+                    )
+                    for group in mlv_people.groups
+                ),
+                assume_sorted=True
+            )
+
+            _dbg.logger.info(f"Loaded people list from vault for {ct_gm=}, {len(movie_list._peoples[ct_gm])=}")
+            return True
+
+        return False
+
+    def vault(self, movie_list: MovieList, vault: _mlv._MovieListVault) -> None:
+        ct_gm = (self._crew_type, self._group_mode)
+
+        groups = [
+            [mlf_person.uid for mlf_person in people._mlf_people]
+            for people in movie_list._peoples[ct_gm].values()
+        ]
+
+        mlv_people = _mlv._MLVPeoples(
+            crew_type = self._crew_type,
+            group_mode = self._group_mode,
+            groups = groups,
+        )
+
+        vault.peoples.append(mlv_people)
+        _dbg.logger.info(f"Vaulted people list for {ct_gm=}, {len(movie_list._peoples[ct_gm])=}")
+
+    def _generate_peoples_no_cache(self, movie_list: MovieList) -> typing.Iterable[People]:
+        ct_gm = (self._crew_type, self._group_mode)
+        mlf = movie_list._movie_list_file
+
+        match ct_gm:
+            case (CrewType.ANY, GroupMode.SEPARATE):
+                for mlf_person in mlf.people_by_uid.values():
+                    yield People(movie_list, [mlf_person], *ct_gm)
+            case (_, GroupMode.SEPARATE):
+                # Could be optimized if we cached associated movies of a person by crew type and ran "for mlf_person for associated_movies",
+                # however that posits a problem - for _AssocMoviesComputation is dependent on this computation.
+                # We tried instead to implement this as "for mlf_person for movie if person did crew type in movie", but the profiler *really* didn't like that.
+                # The way it's currently written will yield the same People multiple times if he is in multiple movies. That is deduplicated by _build_findables_dict.
+                for mlf_movie in mlf.movies_by_uid.values():
+                    for mlf_person_uid in mlf_movie.crew[self._crew_type].roles_by_uid:
+                        yield People(movie_list, [mlf.people_by_uid[mlf_person_uid]], *ct_gm)
+            case (_, GroupMode.GROUP):
+                yield from self._group_people(movie_list)
+            case _:
+                raise RuntimeError(f"Unexpected {ct_gm=}")
+
+    def _group_people(self, movie_list: MovieList) -> typing.Iterable[People]:
+        # High level, the algorithm is as follows:
+        #
+        # foreach movie:
+        #     intersect movie's crew set with every other movie's
+        #     if the intersection with a movie (including self) is not empty, add that intersection to a set of sets
+        #
+        # Later for constructing Role objects where you need to know the credits of each collaborating group:
+        # 
+        # foreach crew set in the set of sets we built:
+        #     find all movies whose crew is a superset of this set
+        #
+        # In the end you have for every relevant person set, all movies that are accredited to it.
+        # In reality the algorithm barely resembles this because of various optimizations.
+
+        mlf = movie_list._movie_list_file
+
+        # groups will in the end include all relevant people groups, each as a frozenset. We know that at minimum, it should have every crew that any movie has.
+        # This set also allows us to only iterate over every unique movie crew pair, instead of every movie pair.
+        # We use frozenset because regular sets aren't hashable.
+        if self._crew_type == CrewType.ANY:
+            # If covering all crew types, we need to union the people who worked on the movie in any capacity.
+            groups = {
+                frozenset(uid for mlf_crew in mlf_movie.crew.values() for uid in mlf_crew.roles_by_uid)
+                for mlf_movie in mlf.movies_by_uid.values()
+            }
+        else:
+            groups = {
+                frozenset(mlf_movie.crew[self._crew_type].roles_by_uid)
+                for mlf_movie in mlf.movies_by_uid.values()
+                if len(mlf_movie.crew[self._crew_type].roles_by_uid) > 0
+            }
+
+        # Some crews may have been empty. In that case they should all be equal to this empty set and we can easily remove it.
+        groups.discard(frozenset())
+
+        # Optimization: we only need to only iterate over each *unordered* crew pair once. For that we need groups to be ordered.
+        ordered_base_groups = list(groups)
+
+        # Optimization: 1-man crews are not interesting. Any intersection they have is either empty or equal to themselves.
+        # So we will sort by crew length, and get the first index where crews have a greater length than 1.
+        ordered_base_groups.sort(key=len)
+
+        # If no elements in the list with len > 1, it returns len(ordered_base_groups), which is exactly what we want.
+        start_multiple = bisect.bisect_right(ordered_base_groups, 1, key=len)
+
+        # Now we iterate over every unordered pair of crews that both have len > 1.
+        # NOTE: in the past I had it as part of this algorithm to remember each group's credits. I thought that when merging two groups, we can merge their credits too.
+        # But in the end that proved to be incorrect. I can't entirely explain it but I think it's better to just not complicate things with that anymore.
+        for i, g1 in enumerate(ordered_base_groups[start_multiple:]):
+
+            # We skip the pair of any crew with itself because we started off groups with all of those.
+            for g2 in ordered_base_groups[i + 1:]:
+                intersection = g1 & g2
+                len_intersection = len(intersection)
+
+                # Empty intersections are skipped.
+                # If the intersection is equal to g1 or g2, it's already in groups so we will not re-add it.
+                # If we did re-add it the set will block it anyway but doing it this way is more optimal.
+                # For extra optimization juice, we don't even compare the sets, comparing lengths is enough.
+                if len_intersection != 0 and len_intersection != len(g1) and len_intersection != len(g2):
+                    groups.add(intersection)
+
+        for group in groups:
+            yield People(
+                movie_list,
+                (mlf.people_by_uid[uid] for uid in group),
+                self._crew_type, GroupMode.GROUP,
+            )
+
+# We don't do small computations of like, a single movie's associated_people. This will compute every movie's associated_people. This is because:
+# 1. There may be more efficient algorithms we can use if we compute for all movies at once.
+# 2. After each computation we want to vault & write to disk. Doing a 1000 small computations and writing to disk after each one would be horrible.
+class _AssocPeopleComputation(_MLVComputation):
+    def __init__(self, crew_type: CrewType, group_mode: GroupMode):
+        self._crew_type = crew_type
+        self._group_mode = group_mode
+
+    @property
+    def description(self) -> str:
+        # Short descriptions so they fit in the progress bar, even if it means they'll be a bit cryptic to users I think it's ok.
+        return f'assoc people - {ct_gm_to_str(self._crew_type, self._group_mode)}'
+
+    def compute(self, movie_list: MovieList) -> None:
+        ct_gm = (self._crew_type, self._group_mode)
+
+        for movie in movie_list.find_movies():
+            # Must guarantee consistent ordering.
+            movie._associated_people_cache[ct_gm] = sorted(self._associated_people_no_cache(movie), key=lambda people: people.uid)
+
+        _dbg.logger.info(f"Computed associated people for {ct_gm=}")
+
+    def load_if_vaulted(self, movie_list: MovieList, vault: _mlv._MovieListVault) -> bool:
+        ct_gm = (self._crew_type, self._group_mode)
+
+        for mlv_assoc_people in vault.assoc_peoples:
+            if ct_gm != (mlv_assoc_people.crew_type, mlv_assoc_people.group_mode):
+                continue
+            
+            # find_movies guarantees a consistent ordering, and it's important that we vault mlv_assoc_people.assoc_peoples with the same order.
+            # assoc_people_uids should also be sorted, which is also important.
+            for movie, assoc_people_uids in zip(movie_list.find_movies(), mlv_assoc_people.assoc_peoples, strict=True):
+                movie._associated_people_cache[ct_gm] = [
+                    _assert_not_none(movie_list.get_people_by_uid(uid, ct_gm_hint=ct_gm)) for uid in assoc_people_uids
+                ]
+
+            _dbg.logger.info(f"Loaded associated people from vault for {ct_gm=}")
+            return True
+
+        return False
+
+    def vault(self, movie_list: MovieList, vault: _mlv._MovieListVault) -> None:
+        ct_gm = (self._crew_type, self._group_mode)
+
+        # The order of the movies and the order of the people for each movie is very important.
+        assoc_peoples = [
+            [people.uid for people in movie._associated_people_cache[ct_gm]]
+            for movie in movie_list.find_movies()
+        ]
+
+        mlv_assoc_people = _mlv._MLVAssocPeoples(
+            crew_type = self._crew_type,
+            group_mode = self._group_mode,
+            assoc_peoples = assoc_peoples,
+        )
+
+        vault.assoc_peoples.append(mlv_assoc_people)
+        _dbg.logger.info(f"Vaulted associated people for {ct_gm=}")
+
+    def _associated_people_no_cache(self, movie: Movie) -> typing.Iterable[People]:
+        ct_gm = (self._crew_type, self._group_mode)
+        ml = movie.movie_list
+
+        match ct_gm:
+            case (CrewType.ANY, GroupMode.SEPARATE):
+                # Put all the uids in a set to deduplicate them.
+                crew_uids_any = set(uid for mlf_crew in movie._mlf_movie.crew.values() for uid in mlf_crew.roles_by_uid)
+
+                for mlf_person_uid in crew_uids_any:
+                    people = ml.get_people_by_uid(People.compose_uid([mlf_person_uid], *ct_gm), ct_gm_hint=ct_gm)
+                    assert people is not None
+                    yield people
+            case (_, GroupMode.SEPARATE):
+                for mlf_role in movie._mlf_movie.crew[self._crew_type].roles_by_uid.values():
+                    people = ml.get_people_by_uid(People.compose_uid([mlf_role.person_uid], *ct_gm), ct_gm_hint=ct_gm)
+                    assert people is not None
+                    yield people
+            case (_, GroupMode.GROUP):
+                # It's not optimal to go over all people just to find the ones in this movie but we have no better way right now.
+                # We did our best to speed it up by optimizing are_in_movie. As a consequence, this whole computation is dependent on AssocMoviesComputation.
+                for people in ml.find_people(*ct_gm):
+                    if people.are_in_movie(movie):
+                        yield people
+            case _:
+                raise RuntimeError(f"Unexpected {ct_gm=}")
+
+class _AssocMoviesComputation(_MLVComputation):
+    def __init__(self, crew_type: CrewType, group_mode: GroupMode):
+        self._crew_type = crew_type
+        self._group_mode = group_mode
+
+    @property
+    def description(self) -> str:
+        return f'assoc movies - {ct_gm_to_str(self._crew_type, self._group_mode)}'
+
+    def compute(self, movie_list: MovieList) -> None:
+        ct_gm = (self._crew_type, self._group_mode)
+
+        # First we'll build this dictionary where for each MLF person uid, you have a set of all the MLF movie uids that person was in.
+        # In the past we had a different algorithm, to run foreach people foreach movie and ask "are these people in this movie". It was *significantly* slower.
+        # With this algorithm, it runs so fast we've even made it a dependency of AssocPeopleComputation, and we use this result to speed that other computation up.
+        assoc_movies = collections.defaultdict(set)
+
+        if self._crew_type == CrewType.ANY:
+            relevant_crew_types = list(CrewType.iterate_except_any())
+        else:
+            relevant_crew_types = [self._crew_type]
+
+        for mlf_movie in movie_list.underlying_file_readonly.movies_by_uid.values():
+            for ct in relevant_crew_types:
+                for mlf_person_uid in mlf_movie.crew[ct].roles_by_uid:
+                    assoc_movies[mlf_person_uid].add(mlf_movie.uid)
+
+        # Now we have assoc_movies built we'll go over each People object and set its associated movies using this helper data structure we built.
+        for people in movie_list.find_people(*ct_gm):
+            mlf_people = people.underlying_file_people_readonly
+
+            # The GroupMode.SEPARATE case (or in GROUP case when the group has only 1 dude) is easy since the associated movies is exactly what we built in assoc_movies.
+            if len(mlf_people) == 1:
+                assoc_movies_all_group = assoc_movies[people.underlying_file_people_readonly[0].uid]
+            else:
+                # In the GROUP case we need to actually intersect the associated movies of all the people in the group. For that we need to start with a copy of the set.
+                assoc_movies_all_group = set(assoc_movies[people.underlying_file_people_readonly[0].uid])
+                
+                for mlf_person in people.underlying_file_people_readonly[1:]:
+                    assoc_movies_all_group.intersection_update(assoc_movies[mlf_person.uid])
+
+            # This line is kind of a hack, we rely on the trick that for movies the MLF uid is the same as the ML uid.
+            people._associated_movies_cache = _build_findables_dict(
+                _assert_not_none(movie_list.get_movie_by_uid(movie_uid)) for movie_uid in assoc_movies_all_group
+            )
+
+        _dbg.logger.info(f"Computed associated movies for {ct_gm=}")
+
+    def load_if_vaulted(self, movie_list: MovieList, vault: _mlv._MovieListVault) -> bool:
+        ct_gm = (self._crew_type, self._group_mode)
+
+        for mlv_assoc_movie in vault.assoc_movies:
+            if ct_gm != (mlv_assoc_movie.crew_type, mlv_assoc_movie.group_mode):
+                continue
+            
+            # find_people guarantees a consistent ordering, and it's important that we vault mlv_assoc_movie.assoc_movies with the same order.
+            # assoc_movie_uids should also be sorted, which is also important.
+            for people, assoc_movie_uids in zip(movie_list.find_people(*ct_gm), mlv_assoc_movie.assoc_movies, strict=True):
+                people._associated_movies_cache = _build_findables_dict(
+                    (_assert_not_none(movie_list.get_movie_by_uid(uid)) for uid in assoc_movie_uids),
+                    assume_sorted=True
+                )
+
+            _dbg.logger.info(f"Loaded associated movies from vault for {ct_gm=}")
+            return True
+
+        return False
+
+    def vault(self, movie_list: MovieList, vault: _mlv._MovieListVault) -> None:
+        ct_gm = (self._crew_type, self._group_mode)
+
+        # The order of the people and the order of the movies for each people is very important.
+        assoc_movies = [
+            list(_assert_not_none(people._associated_movies_cache).keys())
+            for people in movie_list.find_people(*ct_gm)
+        ]
+
+        mlv_assoc_movie = _mlv._MLVAssocMovies(
+            crew_type = self._crew_type,
+            group_mode = self._group_mode,
+            assoc_movies = assoc_movies,
+        )
+
+        vault.assoc_movies.append(mlv_assoc_movie)
+        _dbg.logger.info(f"Vaulted associated movies for {ct_gm=}")
+
+class _MinSupersetPeopleComputation(_MLVComputation):
+    def __init__(self, self_crew_type: CrewType, other_crew_type: CrewType, group_mode: GroupMode):
+        self._self_crew_type = self_crew_type
+        self._other_crew_type = other_crew_type
+        self._group_mode = group_mode
+
+    @property
+    def description(self) -> str:
+        # Despite the short description it's still too long sometimes, but it's good enough..
+        return f'minsupers - {ct_gm_to_str(self._self_crew_type, self._group_mode)}->{self._other_crew_type}'
+
+    def compute(self, movie_list: MovieList) -> None:
+        self_ct_gm = (self._self_crew_type, self._group_mode)
+
+        for people in movie_list.find_people(*self_ct_gm):
+            people._minimal_superset_people_cache[self._other_crew_type] = people._minimal_superset_people_internal(movie_list, self._other_crew_type)
+
+        _dbg.logger.info(f"Computed minimal superset people for {self_ct_gm=}, {self._other_crew_type=}")
+
+    def load_if_vaulted(self, movie_list: MovieList, vault: _mlv._MovieListVault) -> bool:
+        self_ct_gm = (self._self_crew_type, self._group_mode)
+        other_ct_gm = (self._other_crew_type, self._group_mode)
+
+        for mlv_minsuper in vault.minsupers:
+            if self_ct_gm != (mlv_minsuper.self_crew_type, mlv_minsuper.group_mode) or self._other_crew_type != mlv_minsuper.other_crew_type:
+                continue
+            
+            # find_people guarantees a consistent ordering, and it's important that we vault mlv_minsuper.minsupers with the same order.
+            for people, minsuper_uid in zip(movie_list.find_people(*self_ct_gm), mlv_minsuper.minsupers, strict=True):
+                other_people = movie_list.get_people_by_uid(minsuper_uid, ct_gm_hint=other_ct_gm) if minsuper_uid is not None else None
+                people._minimal_superset_people_cache[self._other_crew_type] = other_people
+
+            _dbg.logger.info(f"Loaded minimal superset people from vault for {self_ct_gm=}, {self._other_crew_type=}")
+            return True
+
+        return False
+
+    def vault(self, movie_list: MovieList, vault: _mlv._MovieListVault) -> None:
+        self_ct_gm = (self._self_crew_type, self._group_mode)
+
+        # The order of the people is very important.
+        minsupers = []
+
+        for people in movie_list.find_people(*self_ct_gm):
+            minsuper = people._minimal_superset_people_cache[self._other_crew_type]
+            minsupers.append(minsuper.uid if minsuper is not None else None)
+
+        mlv_minsuper = _mlv._MLVMinSupersets(
+            self_crew_type = self._self_crew_type,
+            other_crew_type = self._other_crew_type,
+            group_mode = self._group_mode,
+            minsupers = minsupers,
+        )
+
+        vault.minsupers.append(mlv_minsuper)
+        _dbg.logger.info(f"Vaulted minimal superset people for {self_ct_gm=}, {self._other_crew_type=}")
 
 class FindableType(enum.StrEnum):
     MOVIES              = 'movies'
@@ -178,36 +606,13 @@ class Movie(Findable):
         ct_gm = (crew_type, group_mode)
         
         if ct_gm not in self._associated_people_cache:
-            # Must guarantee consistent ordering.
-            self._associated_people_cache[ct_gm] = sorted(self._associated_people_no_cache(crew_type, group_mode), key=lambda people: people.uid)
+            # NOTE: we encounter the need to compute this from a specific Movie instance, but the computation will actually compute it *for every* Movie with this CTGM.
+            # Only vault in case of GROUP because otherwise it's cheap to recompute.
+            computation = _AssocPeopleComputation(crew_type, group_mode)
+            self.movie_list._compute_or_load(computation, should_vault=(group_mode == GroupMode.GROUP))
+            assert ct_gm in self._associated_people_cache
         
         yield from self._associated_people_cache[ct_gm]
-
-    def _associated_people_no_cache(self, crew_type: CrewType, group_mode: GroupMode) -> typing.Iterable[People]:
-        ct_gm = (crew_type, group_mode)
-        ml = self.movie_list
-
-        match ct_gm:
-            case (CrewType.ANY, GroupMode.SEPARATE):
-                # Put all the uids in a set to deduplicate them.
-                crew_uids_any = set(uid for mlf_crew in self._mlf_movie.crew.values() for uid in mlf_crew.roles_by_uid)
-
-                for mlf_person_uid in crew_uids_any:
-                    people = ml.get_people_by_uid(People.compose_uid([mlf_person_uid], crew_type, group_mode), ct_gm_hint=ct_gm)
-                    assert people is not None
-                    yield people
-            case (_, GroupMode.SEPARATE):
-                for mlf_role in self._mlf_movie.crew[crew_type].roles_by_uid.values():
-                    people = ml.get_people_by_uid(People.compose_uid([mlf_role.person_uid], crew_type, group_mode), ct_gm_hint=ct_gm)
-                    assert people is not None
-                    yield people
-            case (_, GroupMode.GROUP):
-                # It's not optimal to go over all people just to find the ones in this movie but we have no better way right now.
-                for people in ml.find_people(crew_type, group_mode):
-                    if people.are_in_movie(self):
-                        yield people
-            case _:
-                raise RuntimeError(f"Unexpected {ct_gm=}")
 
     def associated_roles(self, crew_type: CrewType, group_mode: GroupMode) -> typing.Iterable[Role]:
         ml = self.movie_list
@@ -237,7 +642,8 @@ class People(Findable):
         self._crew_type = crew_type
         self._group_mode = group_mode
         self._uid = self.compose_uid((mlf_person.uid for mlf_person in self._mlf_people), crew_type, group_mode)
-        self._associated_movies_cache: None | list[Movie] = None
+        self._associated_movies_cache: None | dict[str, Movie] = None
+        self._minimal_superset_people_cache: dict[CrewType, None | People] = {}
 
     @property
     def type_(self) -> FindableType:
@@ -268,13 +674,12 @@ class People(Findable):
     def associated_movies(self) -> typing.Iterable[Movie]:
         # Guaranteed consisted ordering because find() has consistent ordering.
         if self._associated_movies_cache is None:
-            self._associated_movies_cache = [
-                movie
-                for movie in self.movie_list.find_movies()
-                if self.are_in_movie(movie)
-            ]
+            # NOTE: we encounter the need to compute this from a specific People instance, but the computation will actually compute it *for every* People with this CTGM.
+            computation = _AssocMoviesComputation(self.crew_type, self.group_mode)
+            self.movie_list._compute_or_load(computation)
+            assert self._associated_movies_cache is not None
 
-        yield from self._associated_movies_cache
+        yield from self._associated_movies_cache.values()
 
     def associated_roles(self) -> typing.Iterable[Role]:
         ml = self.movie_list
@@ -295,13 +700,20 @@ class People(Findable):
         if crew_type == self.crew_type:
             return self
 
-        return self._minimal_superset_people_internal(self.movie_list, crew_type)
+        if crew_type not in self._minimal_superset_people_cache:
+            # Only vault in case of GROUP because otherwise it's cheap to recompute.
+            computation = _MinSupersetPeopleComputation(self.crew_type, crew_type, self.group_mode)
+            self.movie_list._compute_or_load(computation, should_vault=(self.group_mode == GroupMode.GROUP))
+            assert crew_type in self._minimal_superset_people_cache
+
+        return self._minimal_superset_people_cache[crew_type]
 
     # Find the smallest group of people in another movie list and optionally different crew type who contain every person in this group.
     def minimal_superset_people_in_other_list(self, other_list: MovieList, crew_type: None | CrewType = None) -> None | People:
         if crew_type is None:
             crew_type = self.crew_type
 
+        # No vaulting for the in_other_list case because that's just crazy.
         return self._minimal_superset_people_internal(other_list, crew_type)
 
     # Returns None when it fails instead of raising an exception because this can happen a lot and raising a log each time is expensive.
@@ -317,10 +729,10 @@ class People(Findable):
         # We'll try our luck at searching if this group appears exactly the same in another crew type.
         # If it's the same crew type too then we really don't have to compose a uid, we already know it.
         uid = self.compose_uid((mlf_person.uid for mlf_person in self._mlf_people), crew_type, self.group_mode) if crew_type != self.crew_type else self.uid
-        min_superset = movie_list.get_people_by_uid(uid, ct_gm_hint=ct_gm)
+        minsuper = movie_list.get_people_by_uid(uid, ct_gm_hint=ct_gm)
 
-        if min_superset is not None:
-            return min_superset
+        if minsuper is not None:
+            return minsuper
 
         # Now in the general case we must see if there's a strict superset in this other crew type.
         for people in movie_list.find_people(crew_type, self.group_mode):
@@ -329,7 +741,7 @@ class People(Findable):
                 continue
 
             # We also know we're searching for a group that has fewer people than the current smallest one we've found.
-            if min_superset is not None and len(min_superset._mlf_people) <= len(people._mlf_people):
+            if minsuper is not None and len(minsuper._mlf_people) <= len(people._mlf_people):
                 continue
 
             # Efficient subset check assuming both are sorted by uid.
@@ -354,29 +766,19 @@ class People(Findable):
                     return people
 
                 # The general case where we want to remember the minimum so far and keep searching for more minimal supersets.
-                min_superset = people
+                minsuper = people
 
-        return min_superset
+        return minsuper
 
     def are_in_movie(self, movie: Movie) -> bool:
-        # The hell with python one-liners using `any`, `all`, etc. This is more readable and modifiable.
-        if self._crew_type == CrewType.ANY:
-            for mlf_person in self._mlf_people:
-                found = False
+        # Naively checking if these people are in the movie by inspecting the MLF sounds like a fast algorithm,
+        # but we call this function so many times it was actually a major slowdown. So we've made _associated_movies_cache a dict and use it instead.
+        if self._associated_movies_cache is None:
+            computation = _AssocMoviesComputation(self.crew_type, self.group_mode)
+            self.movie_list._compute_or_load(computation)
+            assert self._associated_movies_cache is not None
 
-                for crew in movie._mlf_movie.crew.values():
-                    if mlf_person.uid in crew.roles_by_uid:
-                        found = True
-                        break
-
-                if not found:
-                    return False
-        else:
-            for mlf_person in self._mlf_people:
-                if not mlf_person.uid in movie._mlf_movie.crew[self._crew_type].roles_by_uid:
-                    return False
-
-        return True
+        return movie.uid in self._associated_movies_cache
 
     @classmethod
     def compose_uid(cls, mlf_people_uids: typing.Iterable[str], crew_type: CrewType, group_mode: GroupMode) -> str:
@@ -506,6 +908,11 @@ class MovieList:
         self._ctx = ctx
         self._movie_list_file = movie_list_file
 
+        # Important to get the MLV only after the MLF is loaded.
+        vault, gen_mtime = ctx._get_mlv(self._movie_list_file.abstract_listdef)
+        self._vault = vault
+        self._vault_gen_mtime = gen_mtime
+
         self._movies: None | dict[str, Movie] = None
         self._peoples: dict[tuple[CrewType, GroupMode], dict[str, People]] = {}
         self._roles: dict[tuple[CrewType, GroupMode], dict[str, Role]] = {}
@@ -632,9 +1039,25 @@ class MovieList:
             case _:
                 raise RuntimeError(f"Unexpected {findable_type=}")
 
+    def _compute_or_load(self, computation: _MLVComputation, should_vault: bool = True, should_write: bool = True) -> None:
+        if computation.load_if_vaulted(self, self._vault):
+            return
+
+        computation.compute(self)
+        
+        # Some computations should not be vaulted even if computed - usually because they're trivial and fast to recompute.
+        if should_vault:
+            computation.vault(self, self._vault)
+
+            if should_write:
+                self._write_vault()
+
+    def _write_vault(self) -> None:
+        self._ctx._write_mlv(self._vault, self._vault_gen_mtime)
+
     def _generate_movies(self) -> dict[str, Movie]:
         if self._movies is None:
-            self._movies = self._findables_to_sorted_dict(Movie(self, mlf_movie) for mlf_movie in self._movie_list_file.movies_by_uid.values())
+            self._movies = _build_findables_dict(Movie(self, mlf_movie) for mlf_movie in self._movie_list_file.movies_by_uid.values())
             _dbg.logger.info(f"Generated movie list, {len(self._movies)=}")
 
         return self._movies
@@ -643,105 +1066,18 @@ class MovieList:
         ct_gm = (crew_type, group_mode)
 
         if ct_gm not in self._peoples:
-            self._peoples[ct_gm] = self._findables_to_sorted_dict(self._generate_peoples_no_cache(crew_type, group_mode))
-            _dbg.logger.info(f"Generated people list, {ct_gm=}, {len(self._peoples[ct_gm])=}")
+            # Don't vault if any:separate because it's efficient to compute on the fly.
+            computation = _PeopleComputation(*ct_gm)
+            self._compute_or_load(computation, should_vault=(ct_gm != (CrewType.ANY, GroupMode.SEPARATE)))
+            assert ct_gm in self._peoples
 
         return self._peoples[ct_gm]
-
-    def _generate_peoples_no_cache(self, crew_type: CrewType, group_mode: GroupMode) -> typing.Iterable[People]:
-        ct_gm = (crew_type, group_mode)
-
-        match ct_gm:
-            case (CrewType.ANY, GroupMode.SEPARATE):
-                for mlf_person in self._movie_list_file.people_by_uid.values():
-                    yield People(self, [mlf_person], crew_type, group_mode)
-            case (_, GroupMode.SEPARATE):
-                # Could be optimized if we cached associated movies of a person by crew type.
-                # The way it's currently written will yield the same people multiple times if they are in multiple movies. That is deduplicated by _findables_to_sorted_dict.
-                # For reasons I can't explain the profiler finds this implementation monumentally faster than iterating "for person for movie".
-                for mlf_movie in self._movie_list_file.movies_by_uid.values():
-                    for mlf_person_uid in mlf_movie.crew[crew_type].roles_by_uid:
-                        yield People(self, [self._movie_list_file.people_by_uid[mlf_person_uid]], crew_type, group_mode)
-            case (_, GroupMode.GROUP):
-                yield from self._group_people(crew_type)
-            case _:
-                raise RuntimeError(f"Unexpected {ct_gm=}")
-
-    def _group_people(self, crew_type: CrewType) -> typing.Iterable[People]:
-        # High level, the algorithm is as follows:
-        #
-        # foreach movie:
-        #     intersect movie's crew set with every other movie's
-        #     if the intersection with a movie (including self) is not empty, add that intersection to a set of sets
-        #
-        # Later for constructing Role objects where you need to know the credits of each collaborating group:
-        # 
-        # foreach crew set in the set of sets we built:
-        #     find all movies whose crew is a superset of this set
-        #
-        # In the end you have for every relevant person set, all movies that are accredited to it.
-        # In reality the algorithm barely resembles this because of various optimizations.
-
-        mlf = self._movie_list_file
-
-        # groups will in the end include all relevant people groups, each as a frozenset. We know that at minimum, it should have every crew that any movie has.
-        # This set also allows us to only iterate over every unique movie crew pair, instead of every movie pair.
-        # We use frozenset because regular sets aren't hashable.
-        if crew_type == CrewType.ANY:
-            # If covering all crew types, we need to union the people who worked on the movie in any capacity.
-            groups = {
-                frozenset(uid for mlf_crew in mlf_movie.crew.values() for uid in mlf_crew.roles_by_uid)
-                for mlf_movie in mlf.movies_by_uid.values()
-            }
-        else:
-            groups = {
-                frozenset(mlf_movie.crew[crew_type].roles_by_uid)
-                for mlf_movie in mlf.movies_by_uid.values()
-                if len(mlf_movie.crew[crew_type].roles_by_uid) > 0
-            }
-
-        # Some crews may have been empty. In that case they should all be equal to this empty set and we can easily remove it.
-        groups.discard(frozenset())
-
-        # Optimization: we only need to only iterate over each *unordered* crew pair once. For that we need groups to be ordered.
-        ordered_base_groups = list(groups)
-
-        # Optimization: 1-man crews are not interesting. Any intersection they have is either empty or equal to themselves.
-        # So we will sort by crew length, and get the first index where crews have a greater length than 1.
-        ordered_base_groups.sort(key=len)
-
-        # If no elements in the list with len > 1, it returns len(ordered_base_groups), which is exactly what we want.
-        start_multiple = bisect.bisect_right(ordered_base_groups, 1, key=len)
-
-        # Now we iterate over every unordered pair of crews that both have len > 1.
-        # NOTE: in the past I had it as part of this algorithm to remember each group's credits. I thought that when merging two groups, we can merge their credits too.
-        # But in the end that proved to be incorrect. I can't entirely explain it but I think it's better to just not complicate things with that anymore.
-        for i, g1 in enumerate(ordered_base_groups[start_multiple:]):
-
-            # We skip the pair of any crew with itself because we started off groups with all of those.
-            for g2 in ordered_base_groups[i + 1:]:
-                intersection = g1 & g2
-                len_intersection = len(intersection)
-
-                # Empty intersections are skipped.
-                # If the intersection is equal to g1 or g2, it's already in groups so we will not re-add it.
-                # If we did re-add it the set will block it anyway but doing it this way is more optimal.
-                # For extra optimization juice, we don't even compare the sets, comparing lengths is enough.
-                if len_intersection != 0 and len_intersection != len(g1) and len_intersection != len(g2):
-                    groups.add(intersection)
-
-        for group in groups:
-            yield People(
-                self,
-                (mlf.people_by_uid[uid] for uid in group),
-                crew_type, GroupMode.GROUP,
-            )
 
     def _generate_roles(self, crew_type: CrewType, group_mode: GroupMode) -> dict[str, Role]:
         ct_gm = (crew_type, group_mode)
 
         if ct_gm not in self._roles:
-            self._roles[ct_gm] = self._findables_to_sorted_dict(self._generate_roles_no_cache(crew_type, group_mode))
+            self._roles[ct_gm] = _build_findables_dict(self._generate_roles_no_cache(crew_type, group_mode))
             _dbg.logger.info(f"Generated roles list, {ct_gm=}, {len(self._roles[ct_gm])=}")
 
         return self._roles[ct_gm]
@@ -752,9 +1088,3 @@ class MovieList:
         for people in peoples.values():
             for movie in people.associated_movies():
                 yield Role(self, movie, people)
-
-    # We want to guarantee a consistent ordering on find(), and associated_X() functions because it spares attribute implementations from worrying about ordering on their end.
-    # Python dictionaries guarantee to preserve the order keys were added so we can have both efficient lookups and ordering in one data structure if we build it right.
-    @classmethod
-    def _findables_to_sorted_dict[T: Findable](cls, findables: typing.Iterable[T]) -> dict[str, T]:
-        return {f.uid: f for f in sorted(findables, key=lambda fi: fi.uid)}

@@ -26,16 +26,20 @@ import weakref
 import itertools
 import difflib
 import contextlib
+import enum
+import glob
+import shutil
 
 from . import _cfg
 from . import _exc
 from . import _filter
 from . import _ldef
 from . import _mlf
+from . import _mlv
+from . import _ml
 from . import _md
 from . import _reg
 from . import _fetch
-from . import _ml
 from . import _dbg
 from . import _attr
 from . import _gen_version
@@ -43,10 +47,15 @@ from . import utils
 
 DEFAULT_FLAM_DIR = _dbg.FlamEnv.CTX_DIR.get_or_default(os.path.join(os.path.expanduser('~'), '.film_flam'))
 
+class PrecachePreference(enum.IntEnum):
+    DEFAULTS = enum.auto()      # Generate all composite lists, and populate all movie list vaults with some defaults that we think make sense to cache.
+    EVERYTHING = enum.auto()    # Precompute everything that can possibly be precomputed.
+    RESET = enum.auto()         # Don't precompute - instead delete existing cache files.
+
 # Utility for "inverting" registries: instead of first the registration level then the item type, it's first the item type then the levels.
 # Has to be implemented this way because some of the registries are contextual, some global.
 class RegistriesOf[T: (type[_fetch.ListFetcher], type[_filter.Predicate], _attr.Attribute)]:
-    def __init__(self, type_selector: typing.Callable[[_reg.Registry], _reg.RegistryOf[T]], ctx_registry: _reg.Registry, use_global_extensions: bool) -> None:
+    def __init__(self, type_selector: typing.Callable[[_reg.Registry], _reg._RegistryOf[T]], ctx_registry: _reg.Registry, use_global_extensions: bool) -> None:
         # Ordering lets you shadow builtins with extensions.
         self._registries_to_try = [
             ctx_registry,
@@ -57,7 +66,7 @@ class RegistriesOf[T: (type[_fetch.ListFetcher], type[_filter.Predicate], _attr.
             _reg._builtins
         ]
 
-        self._type_selector: typing.Callable[[_reg.Registry], _reg.RegistryOf[T]] = type_selector
+        self._type_selector: typing.Callable[[_reg.Registry], _reg._RegistryOf[T]] = type_selector
     
     def __getitem__(self, qualified_name: str) -> T:
         return self.get(qualified_name)
@@ -129,9 +138,10 @@ class RegistriesOf[T: (type[_fetch.ListFetcher], type[_filter.Predicate], _attr.
 
 # This class is the user's entry point to basically everything that is "built in" to this API: accessing lists, filtering, configuring.
 class FlamContext:
-    _LISTFILES_DIR = 'movie_lists'
+    _MLF_DIR = 'movie_lists'
+    _MLV_DIR = 'movie_list_vaults'
     _CACHE_DIR = 'cache'
-    _CONFIGURATION_FILE = 'config.json'
+    _CONFIG_FILE = 'config.json'
     _METADATA_FILE = 'metadata.json'
 
     def __init__(self, flam_dir: None | str = DEFAULT_FLAM_DIR, import_extensions: bool = False) -> None:
@@ -156,6 +166,7 @@ class FlamContext:
         try:
             self._cfg = _cfg.Configuration.load(self._cfg_path)
         except FileNotFoundError:
+            _dbg.logger.info("Configuration file doesn't exist, creating a new one")
             self._cfg = _cfg.Configuration(
                 version = _gen_version.__version__,
                 simple_lists_raw = [],
@@ -163,18 +174,18 @@ class FlamContext:
                 extensions = [],
             )
 
-            _dbg.logger.info("Configuration file doesn't exist, creating a new one.")
             self._write_cfg()
 
         try:
             self._metadata = _md._FlamMetadata.load(self._metadata_path)
         except FileNotFoundError:
+            _dbg.logger.info("Metadata file doesn't exist, creating a new one")
             self._metadata = _md._FlamMetadata(
                 version = _gen_version.__version__,
                 composite_lists_by_uid = {},
+                movie_list_vaults = [],
             )
 
-            _dbg.logger.info("Metadata file doesn't exist, creating a new one.")
             self._write_metadata()
 
         # I wish I could print these prettier but it's not worth the hassle.
@@ -195,6 +206,33 @@ class FlamContext:
         if import_extensions:
             for extension in self._cfg.extensions:
                 self._import_extension(extension)
+        
+        # Not the prettiest cleanup job but it's good to do.
+        self._delete_leaky_mlvs()
+
+    # Tidy up the metadata and avoid potential leaks - delete MLVs and their MD entries if they're based on deleted MLFs.
+    def _delete_leaky_mlvs(self) -> None:
+        should_save = False
+
+        # Iterate in reverse because we'll be deleting elements as we go.
+        for i in reversed(range(len(self._metadata.movie_list_vaults))):
+            mlv_meta = self._metadata.movie_list_vaults[i]
+
+            if os.path.isfile(self._get_mlf_path(mlv_meta.abstract_listdef)):
+                continue
+
+            _dbg.logger.warning(f"Found leaky movie list vault: {mlv_meta.abstract_listdef}. Deleting it")
+            del self._metadata.movie_list_vaults[i]
+            
+            try:
+                os.remove(self._get_mlv_path(mlv_meta.abstract_listdef))
+            except FileNotFoundError:
+                pass     
+
+            should_save = True
+
+        if should_save:
+            self._write_metadata()
 
     @property
     def flam_dir(self) -> str:
@@ -218,7 +256,7 @@ class FlamContext:
 
     @property
     def _cfg_path(self) -> str:
-        return os.path.join(self._flam_dir, self._CONFIGURATION_FILE)
+        return os.path.join(self._flam_dir, self._CONFIG_FILE)
 
     @property
     def _metadata_path(self) -> str:
@@ -228,9 +266,10 @@ class FlamContext:
         # Make sure to keep it topologically sorted.
         directories = [
             self._flam_dir,
-            os.path.join(self._flam_dir, self._LISTFILES_DIR),
+            os.path.join(self._flam_dir, self._MLF_DIR),
             os.path.join(self._flam_dir, self._CACHE_DIR),
-            os.path.join(self._flam_dir, self._CACHE_DIR, self._LISTFILES_DIR),
+            os.path.join(self._flam_dir, self._CACHE_DIR, self._MLF_DIR),
+            os.path.join(self._flam_dir, self._CACHE_DIR, self._MLV_DIR),
         ]
 
         for d in directories:
@@ -242,11 +281,13 @@ class FlamContext:
         # Log what the flam dir looked like at the beginning.
         _dbg.logger.info(f"Made flam dir. Structure:\n{'\n'.join(utils.tree(self._flam_dir, stats=lambda f: f" (size={os.path.getsize(f)}B, mtime={os.path.getmtime(f)})"))}")
 
-    # List files.
+    # Movie lists.
     def get_movie_list(self, listdefs: str | typing.Iterable[str], filter: None | _filter.Filter = None) -> _ml.MovieList:
-        listdefs_iterable = listdefs if not isinstance(listdefs, str) else (listdefs,)
-        canon_listdefs = list(_ldef.CanonListdef.parse_and_expand(listdefs_iterable, self, _ldef.ExpandFlavor.FIND))
+        listdefs_iterable = listdefs if not isinstance(listdefs, str) else [listdefs]
+        canon_listdefs = list(_ldef.CanonListdef.parse_and_expand(listdefs_iterable, self, _ldef._ExpandFlavor.FIND))
+        return self._get_movie_list_from_canon_listdefs(canon_listdefs, filter)
 
+    def _get_movie_list_from_canon_listdefs(self, canon_listdefs: list[_ldef.CanonListdef], filter: None | _filter.Filter = None) -> _ml.MovieList:
         if len(canon_listdefs) == 0:
             raise _exc.InputError("Can't create movie list of 0 LISTDEFs. Did you forget to set a default?")
 
@@ -255,7 +296,7 @@ class FlamContext:
             filter = self.compile_filter([], _ml.FindableType.MOVIES)
 
         # There is no way to express an anonymous list with a single listdef and no filter.
-        # They are what happens when you put together multiple lists and filters to spin a new list "on-the-fly".
+        # They are what happens when you put together multiple lists and/or a filter to spin a new list "on-the-fly".
         if len(canon_listdefs) == 1 and filter.is_empty:
             mlf = self._get_persistable_mlf(canon_listdefs[0])
         else:
@@ -310,7 +351,7 @@ class FlamContext:
     # and if we hit it anyway because the user is a file-meddling bitch, _get_persistable_mlf will handle that.
     def _should_regenerate_composite_list(self, uid: str) -> bool:
         if uid not in self._metadata.composite_lists_by_uid:
-            _dbg.logger.info(f"Composite list {uid=} is not in the metadata.")
+            _dbg.logger.info(f"Composite list {uid=} is not in the metadata, should regenerate")
             return True
 
         cl_config = self._cfg.composite_lists.get_by_uid(uid)
@@ -318,14 +359,14 @@ class FlamContext:
 
         for sl_uid in cl_config.simple_list_uids:
             if sl_uid not in cl_meta.dependency_mtime:
-                _dbg.logger.info(f"Composite list {uid=} has a missing dependency: {sl_uid=}")
+                _dbg.logger.warning(f"Composite list {uid=} has a missing dependency: {sl_uid=}, should regenerate")
                 return True
 
             sl_path = self._get_mlf_path(_ldef.CanonListdef(_ldef.SpecialListType.SIMPLE, sl_uid))
 
             try:
                 if sl_uid not in cl_meta.dependency_mtime or os.path.getmtime(sl_path) > cl_meta.dependency_mtime[sl_uid]:
-                    _dbg.logger.info(f"Composite list {uid=} has an outdated dependency: {sl_uid=}")
+                    _dbg.logger.info(f"Composite list {uid=} has an outdated dependency: {sl_uid=}, should regenerate")
                     return True
             except FileNotFoundError as e:
                 cl_listdef = _ldef.CanonListdef(_ldef.SpecialListType.COMPOSITE, uid)
@@ -390,7 +431,15 @@ class FlamContext:
             mlf_movie.per_src_data = sorted(per_src_data.deepcopy() for per_src_data in dep_src_datas.values())
 
         if not filter.is_empty:
+            # For applying the filter, we'll have to wrap the MLF in a MovieList. But the MovieList can't have the listdef of the composite list we are generating, because:
+            # 1. Conceptually, it would be wrong. This list is not yet the composite list we were asked to generate.
+            # 2. If we did use the same listdef, then this list would try to acquire the MLV of the composite list whose MLF is not yet created so not yet on disk,
+            #    and that causes a crash in _get_mlv.
+            # So we will temporarily masquerade this MLF as an anonymous composite.
+            original_cldef = merged_mlf.abstract_listdef
+            merged_mlf.abstract_listdef = _ldef.CanonListdef(_ldef.SpecialListType.ANONYMOUS, f'temp list for exporting {original_cldef}')
             merged_mlf = _ml.MovieList(merged_mlf, self).export(filter)
+            merged_mlf.abstract_listdef = original_cldef
             
         _dbg.logger.info(f"Generated '{merged_mlf.abstract_listdef}' with {len(merged_mlf.movies_by_uid)} movies, {len(merged_mlf.people_by_uid)} people")
         return merged_mlf
@@ -412,9 +461,107 @@ class FlamContext:
                 raise RuntimeError(f"Unexpected {abstract_listdef.list_type=}")
             case _ldef.SpecialListType.COMPOSITE:
                 # Everything that can be easily regenerated should go under cache so it's easy to delete them all at once.
-                return os.path.join(self._flam_dir, self._CACHE_DIR, self._LISTFILES_DIR, filename)
+                return os.path.join(self._flam_dir, self._CACHE_DIR, self._MLF_DIR, filename)
             case _:
-                return os.path.join(self._flam_dir, self._LISTFILES_DIR, filename)
+                return os.path.join(self._flam_dir, self._MLF_DIR, filename)
+
+    def _get_mlv(self, abstract_listdef: _ldef.CanonListdef) -> tuple[_mlv._MovieListVault, float]:
+        if not self._should_regenerate_mlv(abstract_listdef):
+            path = self._get_mlv_path(abstract_listdef)
+
+            try:
+                # If shouldn't regenerate MLV then the meta must exist.
+                return _mlv._MovieListVault.load(path), self._metadata.get_mlv_meta(abstract_listdef).dependency_mtime
+            except (FileNotFoundError, _exc.FileValidationError) as e:
+                # Simply regenerate if we failed to load it.
+                _dbg.logger.info(f"Movie list vault {abstract_listdef=} failed to load from disk due to error: {e}")
+
+        # Create a new one, write it, return it.
+        mlv = _mlv._MovieListVault(
+            version = _gen_version.__version__,
+            abstract_listdef = abstract_listdef,
+            peoples = [],
+            assoc_peoples = [],
+            assoc_movies = [],
+            minsupers = [],
+        )
+
+        # Assume that for non-anonymous lists this always succeeds, so after this get_mlv_meta should work.
+        self._write_mlv(mlv)
+
+        if abstract_listdef.list_type != _ldef.SpecialListType.ANONYMOUS:
+            mlv_meta = self._metadata.get_mlv_meta(abstract_listdef)
+            dependency_mtime = mlv_meta.dependency_mtime
+        else:
+            dependency_mtime = 0.0
+
+        return mlv, dependency_mtime
+
+    def _should_regenerate_mlv(self, abstract_listdef: _ldef.CanonListdef) -> bool:
+        # Anonymous lists are not backed to disk so the MLV should always be regenerated.
+        if abstract_listdef.list_type == _ldef.SpecialListType.ANONYMOUS:
+            return True
+
+        try:
+            mlv_meta = self._metadata.get_mlv_meta(abstract_listdef)
+        except KeyError:
+            _dbg.logger.info(f"Movie list vault {abstract_listdef=} is not in the metadata, should regenerate")
+            return True
+
+        # Assume we've loaded the MLF before asking to load its MLV - so mlf_path should exist.
+        mlf_path = self._get_mlf_path(abstract_listdef)
+
+        if os.path.getmtime(mlf_path) > mlv_meta.dependency_mtime:
+            _dbg.logger.info(f"Movie list vault {abstract_listdef=} is outdated, should regenerate")
+            return True
+
+        return False
+
+    def _write_mlv(self, mlv: _mlv._MovieListVault, gen_mtime: None | float = None) -> None:
+        # Anonymous lists are not backed to disk so neither is their vault.
+        if mlv.abstract_listdef.list_type == _ldef.SpecialListType.ANONYMOUS:
+            return
+
+        mlf_path = self._get_mlf_path(mlv.abstract_listdef)
+
+        try:
+            mlf_mtime = os.path.getmtime(mlf_path)
+
+            # We want to support API use cases like get_movie_list -> fetch -> get_movie_list.
+            # That is, someone is holding onto a ML backed by an MLF that has since been fetched, and a new ML exists based on the more up-to-date MLF.
+            # In that case what we want is to not persist the MLV old ML to disk. The ML can still use it in memory.
+            # The way we do it is we remember the mtime of the MLF when the MLV was generated, and we don't persist MLVs if the MLF has since been touched.
+            # 
+            # Note I've also considered the case where the MLF is not touched, and you have multiple MLs based on the same MLF all competing for who gets to persist his vault.
+            # I think in that case we'll let them compete. It shouldn't be a problem.
+            if gen_mtime is not None and gen_mtime < mlf_mtime:
+                _dbg.logger.warning(f"In-use movie list vault {mlv.abstract_listdef=} is based on outdated MLF, will not save it")
+                return
+        except FileNotFoundError:
+            # Also support the case where the MLF was deleted but an ML based on it is still alive.
+            _dbg.logger.warning(f"In-use movie list vault {mlv.abstract_listdef=} is based on deleted MLF, will not save it")
+            return
+
+        mlv_path = self._get_mlv_path(mlv.abstract_listdef)
+
+        # Mark the MLV as up-to-date as long as the MLF still has the mtime it has now.
+        try:
+            self._metadata.get_mlv_meta(mlv.abstract_listdef).dependency_mtime = mlf_mtime
+        except KeyError:
+            _dbg.logger.info(f"Creating new MD entry for movie list vault {mlv.abstract_listdef=}")
+            self._metadata.movie_list_vaults.append(_md._MLVMetadata(
+                abstract_listdef = mlv.abstract_listdef,
+                dependency_mtime = mlf_mtime,
+            ))
+
+        # Writing the mlv before the metadata I think is important.
+        mlv.write(mlv_path)
+        self._write_metadata()
+
+    def _get_mlv_path(self, abstract_listdef: _ldef.CanonListdef) -> str:
+        # Movie list vault files are named the same as the movie list but with .cache.
+        filename = utils.slugify(f'{abstract_listdef.list_type}_{abstract_listdef.address}.cache.json')
+        return os.path.join(self._flam_dir, self._CACHE_DIR, self._MLV_DIR, filename)
 
     def _import_extension(self, extension: str) -> None:
         # Try both ways.
@@ -520,7 +667,7 @@ class FlamContext:
             self._cfg = editable_copy
             self._write_cfg()
         except:
-            _dbg.logger.warning("Caught exception while writing configuration change. Will rollback.")
+            _dbg.logger.warning("Caught exception while writing configuration change. Will rollback")
             self._cfg = old_cfg
             raise
 
@@ -594,7 +741,7 @@ class FlamContext:
         # We use stable_dedup to not fetch the same thing twice but in a way which preserves the requested fetch order.
         fetchers = [
             self._get_fetcher(cldef)
-            for cldef in utils.stable_dedup((_ldef.CanonListdef.parse_and_expand(listdefs, self, _ldef.ExpandFlavor.FETCH)))
+            for cldef in utils.stable_dedup((_ldef.CanonListdef.parse_and_expand(listdefs, self, _ldef._ExpandFlavor.FETCH)))
         ]
 
         try:
@@ -629,13 +776,13 @@ class FlamContext:
             _dbg.logger.info(f"Fetching {fetcher.abstract_listdef} into file with {len(mlf.movies_by_uid)} movies, {len(mlf.people_by_uid)} people")
                 
             # We need both the old and new versions to compare at the end. But it's important that the new one is the deepcopy,
-            # so that anyone currently holding on to a list handle won't have the underlying list file changed.
+            # so that anyone currently holding on to a movie list won't have the underlying MLF changed.
             new_mlf = mlf.deepcopy()
             
             try:
                 fetcher.fetch(new_mlf, refetch_re, quiet)
             except _exc.FetchInterrupt:
-                _dbg.logger.info(f"Partially fetched {fetcher.abstract_listdef} due to an interrupt.")
+                _dbg.logger.info(f"Partially fetched {fetcher.abstract_listdef} due to an interrupt")
                 self._close_fetch(mlf, new_mlf)
                 raise
 
@@ -663,6 +810,129 @@ class FlamContext:
         fetcher_cls = self.fetchers[concrete_listdef.list_type]
         _dbg.logger.info(f"Created fetcher of type {fetcher_cls} for {concrete_listdef=}, {abstract_listdef=}")
         return fetcher_cls(concrete_listdef, abstract_listdef, self)
+
+    def precache(self, preference: PrecachePreference = PrecachePreference.DEFAULTS, quiet: bool = True) -> None:
+        _dbg.logger.info(f"Precaching movie list results with {preference=}")
+
+        if preference == PrecachePreference.RESET:
+            # Easiest way is to delete the entire cache dir. But then we have to recreate it empty because other functions assume it exists.
+            shutil.rmtree(os.path.join(self._flam_dir, self._CACHE_DIR))
+            self._make_flam_dir()
+            return
+
+        if preference == PrecachePreference.DEFAULTS:
+            # Below are the default computations we always want to do. Added in topological order w.r.t. computations depending on previous computations.
+            base_computations = [
+                # Vault groupings for all default ctgms except any. This computation should come first because other computations depend on it.
+                # Note I really only wanted to compute this for crew types which are grouped by default, but the next computations wind up vaulting this for separates anyway.
+                # Only CrewType.ANY can be skipped because it's such a trivial computation it never gets vaulted anyway.
+                *(_ml._PeopleComputation(ct, ct.default_group_mode) for ct in _ml.CrewType.iterate_except_any()),
+                
+                # Vault associated movies for all default ctgms because there is no efficient way to compute it ever.
+                *(_ml._AssocMoviesComputation(ct, ct.default_group_mode) for ct in _ml.CrewType),
+                
+                # Vault associated people only for crew types that are grouped by default because it's efficient to compute for GroupMode.SEPARATE.
+                # Important to do this after AssocMoviesComputation because this depends on that.
+                *(_ml._AssocPeopleComputation(ct, ct.default_group_mode) for ct in _ml.CrewType if ct.default_group_mode == _ml.GroupMode.GROUP),
+            ]
+        elif preference == PrecachePreference.EVERYTHING:
+            base_computations = [
+                # Vault all groupings.
+                *(_ml._PeopleComputation(ct, gm) for ct in _ml.CrewType for gm in _ml.GroupMode.iterate_except_default()),
+                
+                # Vault all associated movies.
+                *(_ml._AssocMoviesComputation(ct, gm) for ct in _ml.CrewType for gm in _ml.GroupMode.iterate_except_default()),
+                
+                # Vault associated people for all crew types but only the GROUP case, because it's efficient to compute for GroupMode.SEPARATE.
+                *(_ml._AssocPeopleComputation(ct, _ml.GroupMode.GROUP) for ct in _ml.CrewType),
+
+                # Vault minimal superset people for all CrewType x CrewType (ct1, ct2) pairs except ones where both are the same type (ct1 == ct2) because those are trivial.
+                # Also only vault for GroupMode.GROUP because otherwise it's a light computation.
+                # Note that "minimal superset people" is not a bidirectional relationship - if I am your min superset, doesn't mean that you are mine.
+                # So we really do have to compute both directions.
+                *(_ml._MinSupersetPeopleComputation(ct1, ct2, _ml.GroupMode.GROUP) for ct1 in _ml.CrewType for ct2 in _ml.CrewType if ct1 != ct2),
+            ]
+        else:
+            raise RuntimeError(f'Unexpected {preference=}')
+
+        # Handling for DEFAULTS/EVERYTHING is very similar.
+        all_listdefs = self._get_all_listdefs()
+
+        for cldef in all_listdefs:
+            # Copy computations because we may add some additional ones specific to this list.
+            computations = list(base_computations)
+
+            # In DEFAULTS case we want to add any computations that were previously vaulted on this list.
+            # Important to do this *before* get_movie_list because when we load the ML we will also get its MLV which will reset the file if it's stale.
+            if preference == PrecachePreference.DEFAULTS:
+                try:
+                    # Load the MLV directly, not via _get_mlv. This is because _get_mlv will reset the file if it's gone stale, and create it if it doesn't exist.
+                    # For our current purposes we don't want that - we don't care if the vaulted values are accurate, we just want to know what's vaulted.
+                    mlv_path = self._get_mlv_path(cldef)
+                    mulva = _mlv._MovieListVault.load(mlv_path)
+
+                    # Add all vaulted computations but then remove duplicates in a stable way. We use the description to check "computation equality", it's a bit hacky.
+                    # If we didn't remove duplicates, the infra is smart enough to not recompute things twice. But the user will see the repetition in the progress bar.
+                    # And essentially every time you call this function after the first, every default will be duplicated.
+                    computations.extend(mulva.get_vaulted_computations())
+                    computations = list(utils.stable_dedup(computations, key=lambda c: c.description))
+                except (FileNotFoundError, _exc.FileValidationError):
+                    # No mulva no worries.
+                    pass
+
+            try:
+                # If it's a composite list this will regenerate it - which is a part of what we want to precache.
+                # We assume _get_all_listdefs returned composite lists last, so we only get to them after their dependencies were touched.
+                # I'd like to make this a part of the progress bar but it's tricky and it runs so fast I don't think there's a real need.
+                ml = self._get_movie_list_from_canon_listdefs([cldef])
+            except _exc.InputError as e:
+                # Simple list may not have been fetched, or it's a composite list whose dependencies aren't fetched.
+                _dbg.logger.info(f"Failed to get movie list file {cldef} due to error: {e} Skipping it")
+                continue
+            
+            # Compute and vault everything, save only once at the end.
+            # Note that even if computations list were to contain duplicates (it doesn't), there is no risk of computing the same thing twice here.
+            # This is because we use should_vault=True and _compute_or_load won't recompute something if it's vaulted.
+            with open(os.devnull, 'w') as devnull, contextlib.redirect_stdout(devnull) if quiet else contextlib.nullcontext():
+                with utils.ProgressBar(computations,
+                        desc=cldef.pretty(self),
+                        keyfunc=lambda c: c.description) as bar:
+                    for computation in bar:
+                        ml._compute_or_load(computation, should_vault=True, should_write=False)
+
+            ml._write_vault()
+
+    # Guarantees that composite lists will only show up after other kinds of lists.
+    def _get_all_listdefs(self) -> list[_ldef.CanonListdef]:
+        # Getting all known listdefs is a bit complicated - there are 3 kinds:
+        # 1. Concrete listdefs - ones which aren't simple or composite lists. They aren't reachable except by checking what files we have fetched.
+        # 2. Simple lists - they're reachable from the configuration but also stored in the same filter as concrete listdefs.
+        # 3. Composite lists - they're reachable from the configuration and stored in a separate directory than the other two because they're considered cache files.
+
+        # First get the simple lists from the configuration.
+        canon_listdefs = [sl.abstract_listdef for sl in self._cfg.simple_lists]
+
+        # Now get concrete listdefs. They can only be reached by checking which files exist.
+        # Even then it's a bitch because the _get_mlf_path is not inversible so we'll have to read the entire MLF (expensive) just to get the listdef out of it.
+        # This is why we handle concrete listdefs different than simple lists - performance.
+        non_composite_mlfs = glob.glob(os.path.join(self._flam_dir, self._MLF_DIR, '*.json'))
+
+        for mlf_path in non_composite_mlfs:
+            # If this is a simple list we should've already added it. Note that checking mlf_path.startswith('list_') would've been faster but susceptible to false positives.
+            if any(self._get_mlf_path(cldef) == mlf_path for cldef in canon_listdefs):
+                continue
+
+            # Load the MLF directly and read the listdef. It's called "abstract" but it's concrete for concrete lists.
+            # Since we reached this file by globbing we have no idea what it is and we don't trust it - if it fails to load, we simply ignore it.
+            try:
+                mlf = _mlf.MovieListFile.load(mlf_path)
+                canon_listdefs.append(mlf.abstract_listdef)
+            except _exc.FileValidationError as e:
+                _dbg.logger.warning(f"Failed to load movie list file {mlf_path} due to error: {e} Skipping it")
+
+        # Add composite lists only after the rest.
+        canon_listdefs.extend(cl.abstract_listdef for cl in self._cfg.composite_lists)
+        return canon_listdefs
 
     # Filtering.
     def compile_filter(self, tokens: list[str], find: _ml.FindableType) -> _filter.Filter:

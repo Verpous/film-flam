@@ -16,12 +16,25 @@
 from __future__ import annotations
 
 from . import _file
+from . import _ldef
 
 class _CompositeListMetadata(_file._FlamSerializable):
     uid:                    str
     dependency_mtime:       dict[str, float]
 
+class _MLVMetadata(_file._FlamSerializable):
+    abstract_listdef:       _ldef.CanonListdef
+    dependency_mtime:       float
+
 # The MD file doesn't get canonicalized.
 class _FlamMetadata(_file._FlamSerializable):
     version:                str
     composite_lists_by_uid: dict[str, _CompositeListMetadata]
+    movie_list_vaults:      list[_MLVMetadata]
+
+    def get_mlv_meta(self, abstract_listdef: _ldef.CanonListdef) -> _MLVMetadata:
+        for mlv_meta in self.movie_list_vaults:
+            if mlv_meta.abstract_listdef == abstract_listdef:
+                return mlv_meta
+
+        raise KeyError(f"No vault metadata for movie list '{abstract_listdef}'")
