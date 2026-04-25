@@ -23,15 +23,24 @@ from . import _ml
 
 # MovieListFile-related objects go here.
 class MLFRole(_file._FlamSerializable):
+    """
+    Serializable object with data about a role in a movie.
+    """
     person_uid:             str
     characters:             list[str]
     is_star:                None | bool
 
 class MLFCrew(_file._FlamSerializable):
+    """
+    Serializable object with data about the crew of a specific type in a movie.
+    """
     crew_type:              _ml.CrewType
     roles_by_uid:           dict[str, MLFRole]
 
 class MLFPerson(_file._FlamSerializable):
+    """
+    Serializable object with data about a person who appeared in one or more movies from the list.
+    """
     uid:                    str
     name:                   None | str
     gender:                 None | str # I am not going down the rabbit hole of enum-ing the possible gender values.
@@ -44,12 +53,23 @@ class MLFPerson(_file._FlamSerializable):
 # but instead as sourced from the concrete or simple list it originally came from. And we'll deduplicate them.
 # When fetching a list, the user is expected to create only one PerListData for each movie. And we'll take care of the listdef field in postprocess.
 class MLFMoviePerSourceData(_file._FlamSerializable):
+    """
+    Serializable object with data about a movie which is specific to the list from which it came, not universal data about that movie.
+    """
+    
     canon_listdef:          _ldef.CanonListdef
+    """
+    The list this data belongs to.
+    """
+
     list_index:             None | int
     listing_date:           None | datetime.date
     note:                   None | str
 
 class MLFMovie(_file._FlamSerializable):
+    """
+    Serializable object with data about a movie.
+    """
     uid:                    str
     per_src_data:           list[MLFMoviePerSourceData]
 
@@ -68,12 +88,15 @@ class MLFMovie(_file._FlamSerializable):
     countries:              list[str]
 
     # crew type -> crew object. It makes things much nicer when you can reference the crew type you want with this indirection,
-    # but the downside (as opposed to having a field for each crew type), is that we have to check dynamically that no crew types were added or are missing in sanity_checks.
+    # but the downside (as opposed to having a field for each crew type), is that we have to check dynamically that no crew types were added or are missing in _sanity_checks.
     # msgspec supports TypedDict, but it has problems with initializing a default.
     crew:                   dict[_ml.CrewType, MLFCrew]
 
 # MLFs get canonicalized so users can expect all lists in this file to be sorted.
 class MovieListFile(_file._FlamSerializable):
+    """
+    Serializable object with all the data about a movie list.
+    """
     version:                str
     
     # This field is redundant, since the user must've known it ahead-of-time to even know where to load this file. But if I'll omit it I'll regret it.
@@ -87,8 +110,8 @@ class MovieListFile(_file._FlamSerializable):
     movies_by_uid:          dict[str, MLFMovie]
     people_by_uid:          dict[str, MLFPerson]
 
-    def sanity_checks(self) -> None:
-        super().sanity_checks()
+    def _sanity_checks(self) -> None:
+        super()._sanity_checks()
 
         # Check if every movie has a key for every crew type. This sounds expensive for big lists but it has a profiler stamp of approval.
         num_crew_types_except_any = sum(1 for _ in _ml.CrewType.iterate_except_any())

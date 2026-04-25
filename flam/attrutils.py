@@ -27,38 +27,235 @@ from . import _ml
 from . import _exc
 from . import utils
 
+# If the way this EasyAttribute business is coded looks funny to you, here is why:
+# 1. I want the "_extract_from_x" functions to only be defined in the concrete classes that need them, as opposed to being inherited abstract methods.
+#    That way roles can optionally define "from_person/movie" extractors that we invoke if they "hasattr" it.
+# 2. Despite all these extractor methods basically returning "Any", I want mypy to still check each one for type correctness.
+# 3. We're gonna be implementing a 100 attributes so boilerplate must be kept to a minimum.
+# 4. Lots of little constraints to please mypy and pylint about what we're doing.
+@dataclasses.dataclass
+class EasyAttributeParams:
+    """
+    Parameters used to create an :py:class:`EasyAttribute`.
+    """
+    name_without_type: str
+    aliases_without_type: list[str]
+    findable_type: _ml.FindableType
+    type_handler: TypeHandler
+    is_ascending: bool
+    truncation_style: utils.TruncationStyle
+    """
+    Indicates how this attribute's values should be truncated if their string representation is too long.
+    """
+    
+    default_max_len: int
+    """
+    The maximum length beyond which attribute values as strings get truncated.
+    """
+
+class EasyAttribute(_attr.Attribute):
+    """
+    Utility for easily implementing an attribute. You always have the option of inheriting directly from :py:class:`~._attr.Attribute`,
+    but if you inherit from this instead you will have to do a lot less work. You only need to implement an extractor function for getting the attribute value:
+
+    .. code-block:: python
+
+        class MovieTitleAttribute(EasyAttribute):
+            def _extract_from_movie(self, movie: Movie, mlf_movie: MLFMovie) -> None | str:
+                return mlf_movie.title
+
+        register(MovieTitleAttribute(EasyAttributeParams(
+            name_without_type = 'title',
+            aliases_without_type = ['name', 'movie'],
+            findable_type = FindableType.MOVIES,
+            type_handler = STR_HANDLER,
+            is_ascending = True,
+            truncation_style = TruncationStyle.TRIM_END,
+            default_max_len = 45,
+        )))
+    """
+    def __init__(self, params: EasyAttributeParams) -> None:
+        """
+        :param params: dataclass with all this attribute's parameters.
+        """
+        super().__init__(params.findable_type, params.name_without_type, params.aliases_without_type)
+        self._params = params
+
+    @property
+    def is_ascending(self) -> bool:
+        """
+        :meta private:
+        """
+        return self._params.is_ascending
+
+    @property
+    def default_op(self) -> _attr.ComparisonOp:
+        """
+        :meta private:
+        """
+        return self._params.type_handler.default_op
+
+    def str_of_value(self, value: _attr.AttributeValue, abbreviate: bool = False, **extras: typing.Any) -> str:
+        """
+        See :py:class:`Attribute.str_of_value <flam._attr.Attribute.str_of_value>`. EasyAttributes support two optional ``extras``:
+
+        * max_len - the maximum length beyond which the string will be truncated down to this length.
+        * ellipsis - short string to use to indicate a truncated part of the string.
+        """
+        value_str = super().str_of_value(value, abbreviate, **extras)
+
+        if not abbreviate:
+            return value_str
+            
+        max_len = extras.get('max_len', self._params.default_max_len)
+        ellipsis = extras.get('ellipsis', '...')
+
+        if not isinstance(max_len, int):
+            raise _exc.InputError(f"Invalid max_len type: '{type(max_len)}': must be int.")
+
+        if not isinstance(ellipsis, str):
+            raise _exc.InputError(f"Invalid ellipsis type: '{type(ellipsis)}': must be str.")
+
+        return utils.truncate(value_str, max_len, ellipsis=ellipsis, truncation_style=self._params.truncation_style)
+
+    def _parse_primitive_not_none(self, primitive_str: str) -> _attr.AttributePrimitive:
+        """
+        :meta private:
+        """
+        try:
+            return self._params.type_handler.parse(primitive_str)
+        except ValueError as e:
+            raise _exc.InputError(f"Invalid {self.qualified_name}: '{primitive_str}'.") from e
+
+    def _str_of_primitive_not_none(self, primitive: _attr.AttributePrimitive, abbreviate: bool, extras: dict[str, typing.Any]) -> str:
+        """
+        :meta private:
+        """
+        return self._params.type_handler.str_of(primitive, abbreviate, extras)
+
+type MovieExtractor[T] = typing.Callable[[EasyAttribute, _ml.Movie, _mlf.MLFMovie], T]
+"""
+Type signature for ``_extract_from_movie``.
+"""
+
+type PeopleExtractor[T] = typing.Callable[[EasyAttribute, _ml.People, list[_mlf.MLFPerson]], T]
+"""
+Type signature for ``_extract_from_people``.
+"""
+
+type RoleExtractor[T] = typing.Callable[[EasyAttribute, _ml.Role, _ml.MLFRolesDict, _mlf.MLFMovie, list[_mlf.MLFPerson]], T]
+"""
+Type signature for ``_extract_from_role``.
+"""
+
+type Extractor[T] = MovieExtractor | PeopleExtractor[T] | RoleExtractor[T]
+"""
+Type signature for any extractor method.
+"""
+
+_extractor_names = {
+    _ml.FindableType.MOVIES: '_extract_from_movie',
+    _ml.FindableType.PEOPLE: '_extract_from_people',
+    _ml.FindableType.ROLES: '_extract_from_role',
+}
+
+# This function has TRet's syndrome.
+def easy_attribute[TRet](params: EasyAttributeParams) -> typing.Callable[[Extractor[TRet]], EasyAttribute]:
+    """
+    Decorator you can apply to an extractor function to create an :py:class:`EasyAttribute` from it and return an instance of that class.
+    This is an extra layer of convenience so you don't even have to explicitly inherit from EasyAttribute or instantiate it. For example:
+
+    .. code-block:: python
+
+        @register
+        @easy_attribute(EasyAttributeParams(
+            name_without_type = 'title',
+            aliases_without_type = ['name', 'movie'],
+            findable_type = FindableType.MOVIES,
+            type_handler = STR_HANDLER,
+            is_ascending = True,
+            truncation_style = TruncationStyle.TRIM_END,
+            default_max_len = 45,
+        ))
+        def _movie_title_extractor(self, movie: Movie, mlf_movie: MLFMovie) -> None | str:
+            return mlf_movie.title
+
+    :param params: dataclass with all the attribute's parameters.
+    """
+    def inner(extractor: Extractor[TRet]) -> EasyAttribute:
+        class SpecificAttribute(EasyAttribute):
+            pass
+
+        setattr(SpecificAttribute, _extractor_names[params.findable_type], extractor)
+        SpecificAttribute.__doc__ = extractor.__doc__
+        return SpecificAttribute(params)
+    return inner
+
 # There are some facilities that we need out of every possible value attributes may extract (e.g.: parse, str_of, etc.).
 # I don't want to wrap every such value in a "Value" class to provide those facitilites because that would mean making lots of small objects.
 # Solution: Flyweight pattern. Subclasses of TypeHandler provide all the facilities we need, with the underlying value externalized.
 # Downside: Casting/type assertion everywhere, or in many places just assuming the types are fine and not checking.
 class TypeHandler(abc.ABC):
+    """
+    Utility for operations pertaining to the type of an attribute's values, so you don't have to repeat the same code for each attribute of that type.
+
+    Note that all attributes are assumed to also possibly return ``None`` or a list of values.
+    So even if your attribute returns ``list[None | float]``, it may still use :py:data:`FLOAT_HANDLER`, for example.
+    """
     @property
     @abc.abstractmethod
     def default_op(self) -> _attr.ComparisonOp:
-        pass
+        """
+        The default comparison operator that makes sense for this type.
+        """
 
     @abc.abstractmethod
     def parse(self, primitive_str: str) -> _attr.AttributePrimitive:
-        pass
+        """
+        Parse a string representing a single primitive of this handler's type. You do not need to handle ``None`` or lists in this function.
 
-    # Assumes primitive is not None.
+        :param primitive_str: a string representation of a single primitive value.
+        """
+
     @abc.abstractmethod
     def str_of(self, primitive: _attr.AttributePrimitive, abbreviate: bool, extras: dict[str, typing.Any]) -> str:
-        pass
+        """
+        Return a string representation of a single primitive value of this handler's type. You do not need to handle ``None`` or lists in this function.
+
+        If ``abbreviate`` is false, then this method must be the inverse of :py:meth:`parse`.
+
+        :param primitive: a single primitive value. You may assume this is not ``None``.
+        :param abbreviate: indicates if the string should be abbreviated. Abbreviation can mean different things for different types. It's allowed to be lossy.
+        :param extras: additional optional arguments to control the string conversion.
+        """
 
 class IntHandler(TypeHandler):
+    """
+    Type handler for integers with support for pretty strings.
+    """
+    __no_init_doc__ = True
+
     def __init__(self, abbreviable: bool) -> None:
         super().__init__()
         self._abbreviable = abbreviable
 
     @property
     def default_op(self) -> _attr.ComparisonOp:
+        """
+        :meta private:
+        """
         return _attr.ComparisonOp.EQ
 
     def parse(self, primitive_str: str) -> int:
+        """
+        :meta private:
+        """
         return utils.parse_num_pretty(primitive_str)
 
     def str_of(self, primitive: _attr.AttributePrimitive, abbreviate: bool, extras: dict[str, typing.Any]) -> str:
+        """
+        :meta private:
+        """
         assert isinstance(primitive, int)
         
         if abbreviate and self._abbreviable:
@@ -67,14 +264,26 @@ class IntHandler(TypeHandler):
         return str(primitive)
 
 class FloatHandler(TypeHandler):
+    """
+    Type handler for floats with support for rounding off small decimal digits.
+    """
     @property
     def default_op(self) -> _attr.ComparisonOp:
+        """
+        :meta private:
+        """
         return _attr.ComparisonOp.EQ
 
     def parse(self, primitive_str: str) -> float:
+        """
+        :meta private:
+        """
         return float(primitive_str)
 
     def str_of(self, primitive: _attr.AttributePrimitive, abbreviate: bool, extras: dict[str, typing.Any]) -> str:
+        """
+        :meta private:
+        """
         if abbreviate:
             return f'{primitive:.1f}'
         
@@ -82,6 +291,9 @@ class FloatHandler(TypeHandler):
         return str(primitive)
 
 class BoolHandler(TypeHandler):
+    """
+    Type handler for booleans with support for various, case-insensitive ways you might describe a boolean (e.g., 'true', 'yes', 'no', 'n', etc.).
+    """
     _str_reps = {
         'true':     True,
         't':        True,
@@ -95,34 +307,64 @@ class BoolHandler(TypeHandler):
 
     @property
     def default_op(self) -> _attr.ComparisonOp:
+        """
+        :meta private:
+        """
         return _attr.ComparisonOp.EQ
 
     def parse(self, primitive_str: str) -> bool:
+        """
+        :meta private:
+        """
         try:
             return self._str_reps[primitive_str.lower()]
         except KeyError as e:
             raise ValueError(f"Invalid boolean string: '{primitive_str}'") from e
 
     def str_of(self, primitive: _attr.AttributePrimitive, abbreviate: bool, extras: dict[str, typing.Any]) -> str:
+        """
+        :meta private:
+        """
         return str(primitive)
 
 class StrHandler(TypeHandler):
+    """
+    Type handler for strings.
+    """
     @property
     def default_op(self) -> _attr.ComparisonOp:
+        """
+        :meta private:
+        """
         return _attr.ComparisonOp.RX
 
     def parse(self, primitive_str: str) -> str:
+        """
+        :meta private:
+        """
         return primitive_str
 
     def str_of(self, primitive: _attr.AttributePrimitive, abbreviate: bool, extras: dict[str, typing.Any]) -> str:
+        """
+        :meta private:
+        """
         return typing.cast(str, primitive)
 
 class MinutesHandler(TypeHandler):
+    """
+    Type handler for minutes with support for pretty formatting of hours:minutes.
+    """
     @property
     def default_op(self) -> _attr.ComparisonOp:
+        """
+        :meta private:
+        """
         return _attr.ComparisonOp.EQ
 
     def parse(self, primitive_str: str) -> int:
+        """
+        :meta private:
+        """
         # We don't check for things like negative numbers, minutes exceeding 60, etc. because what the hell for.
         colon_idx = primitive_str.find(':')
         hrs_str, mins_str = (primitive_str[:colon_idx], primitive_str[colon_idx + 1:]) if colon_idx != -1 else ('0', primitive_str)
@@ -132,6 +374,9 @@ class MinutesHandler(TypeHandler):
         return hrs * 60 + mins
 
     def str_of(self, primitive: _attr.AttributePrimitive, abbreviate: bool, extras: dict[str, typing.Any]) -> str:
+        """
+        :meta private:
+        """
         assert isinstance(primitive, int)
 
         if abbreviate:
@@ -140,6 +385,11 @@ class MinutesHandler(TypeHandler):
         return str(primitive)
 
 class DateHandler(TypeHandler):
+    """
+    Type handler for dates in many possible formats.
+    """
+    __no_init_doc__ = True
+
     def __init__(self, name: str, datefmt: str, is_ascending: bool, strmap: None | dict[str, str] = None) -> None:
         super().__init__()
         self._name = name
@@ -149,33 +399,58 @@ class DateHandler(TypeHandler):
 
     @property
     def default_op(self) -> _attr.ComparisonOp:
+        """
+        :meta private:
+        """
         return _attr.ComparisonOp.EQ
 
     @property
     def name(self) -> str:
+        """
+        Name of the date format which can be appended to an attribute name to create a name for that attribute with that date format. Ex: '-year', '-day-of-month'.
+        """
         return self._name
 
     @property
     def datefmt(self) -> str:
+        """
+        Format string for this date handler. See ``datetime.strftime`` in the python docs for format syntax.
+        """
         return self._datefmt
 
     @property
     def is_ascending(self) -> bool:
+        """
+        Suggestion for whether you should sort this attribute in ascending or descending order.
+        """
         return self._is_ascending
 
     def parse(self, primitive_str: str) -> datetime.date:
+        """
+        :meta private:
+        """
         # First try to parse it with its datefmt. Otherwise use freeform parsing, and then drop the parts that aren't part of the format.
         try:
             return self._strptime(primitive_str)
         except ValueError:
             return self.strip(dateutil.parser.parse(primitive_str, default=datetime.datetime.min).date())
 
-    # This function is to take date objects which have more than the datefmt cares about and zero out the parts we want to ignore in the date.
     def strip(self, date: datetime.date) -> datetime.date:
+        """
+        Takes a date and "zeroes out" the parts of the date which are irrelevant to this handler's :py:attr:`datefmt`.
+        
+        For instance, a handler which returns the year only doesn't care about the day and month.
+        So by stripping those out, dates which have the same year but different days and months can be considered equal.
+
+        :param date:
+        """
         # As an optimization, don't do anything for complete dates.
         return self._strptime(date.strftime(self._datefmt)) if self._datefmt != "%Y-%m-%d" else date
 
     def str_of(self, primitive: _attr.AttributePrimitive, abbreviate: bool, extras: dict[str, typing.Any]) -> str:
+        """
+        :meta private:
+        """
         assert isinstance(primitive, datetime.date)
         datestr = primitive.strftime(self._datefmt)
         return datestr if self._strmap is None else self._strmap[datestr]
@@ -193,11 +468,34 @@ class DateHandler(TypeHandler):
                 return datetime.datetime.strptime(date_str, self._datefmt).date()
 
 SMALL_INT_HANDLER               = IntHandler(abbreviable=False)
+"""
+Handler object you can use for attributes which return small integers that do not need to be abbreviated.
+"""
+
 BIG_INT_HANDLER                 = IntHandler(abbreviable=True)
+"""
+Handler object you can use for attributes which return big integers that sometimes need to be abbreviated.
+"""
+
 FLOAT_HANDLER                   = FloatHandler()
+"""
+Handler object you can use for attributes which return floats.
+"""
+
 BOOL_HANDLER                    = BoolHandler()
+"""
+Handler object you can use for attributes which return booleans.
+"""
+
 STR_HANDLER                     = StrHandler()
+"""
+Handler object you can use for attributes which return strings.
+"""
+
 MINUTES_HANDLER                 = MinutesHandler()
+"""
+Handler object you can use for attributes which return a minutes duration.
+"""
 
 DATE_HANDLERS = [
     DateHandler('-date',                '%Y-%m-%d', False),
@@ -243,64 +541,26 @@ DATE_HANDLERS = [
             '7': 'Sunday',
         }),
 ]
+"""
+List of date handlers in many date formats available to use.
 
-# If the way this EasyAttribute business is coded looks funny to you, here is why:
-# 1. I want the "_extract_from_x" functions to only be defined in the concrete classes that need them, as opposed to being inherited abstract methods.
-#    That way roles can optionally define "from_person/movie" extractors that we invoke if they "hasattr" it.
-# 2. Despite all these extractor methods basically returning "Any", I want mypy to still check each one for type correctness.
-# 3. We're gonna be implementing a 100 attributes so boilerplate must be kept to a minimum.
-# 4. Lots of little constraints to please mypy and pylint about what we're doing.
-@dataclasses.dataclass
-class EasyAttributeParams:
-    name_without_type: str
-    aliases_without_type: list[str]
-    findable_type: _ml.FindableType
-    type_handler: TypeHandler
-    is_ascending: bool
-    truncation_style: utils.TruncationStyle
-    default_max_len: int
-
-class EasyAttribute(_attr.Attribute):
-    def __init__(self, params: EasyAttributeParams) -> None:
-        super().__init__(params.findable_type, params.name_without_type, params.aliases_without_type)
-        self._params = params
-
-    @property
-    def is_ascending(self) -> bool:
-        return self._params.is_ascending
-
-    @property
-    def default_op(self) -> _attr.ComparisonOp:
-        return self._params.type_handler.default_op
-
-    def str_of_value(self, value: _attr.AttributeValue, abbreviate: bool = False, **extras: typing.Any) -> str:
-        value_str = super().str_of_value(value, abbreviate, **extras)
-
-        if not abbreviate:
-            return value_str
-            
-        max_len = extras.get('max_len', self._params.default_max_len)
-        ellipsis = extras.get('ellipsis', '...')
-
-        if not isinstance(max_len, int):
-            raise _exc.InputError(f"Invalid max_len type: '{type(max_len)}': must be int.")
-
-        if not isinstance(ellipsis, str):
-            raise _exc.InputError(f"Invalid ellipsis type: '{type(ellipsis)}': must be str.")
-
-        return utils.truncate(value_str, max_len, ellipsis=ellipsis, truncation_style=self._params.truncation_style)
-
-    def _parse_primitive_not_none(self, primitive_str: str) -> _attr.AttributePrimitive:
-        try:
-            return self._params.type_handler.parse(primitive_str)
-        except ValueError as e:
-            raise _exc.InputError(f"Invalid {self.qualified_name}: '{primitive_str}'.") from e
-
-    def _str_of_primitive_not_none(self, primitive: _attr.AttributePrimitive, abbreviate: bool, extras: dict[str, typing.Any]) -> str:
-        return self._params.type_handler.str_of(primitive, abbreviate, extras)
+:meta hide-value:
+"""
 
 class ArrayLengthAttribute(EasyAttribute):
+    """
+    Attribute which returns the number of elements in another attribute's return value. For attributes which don't return a list, the length is 1:
+
+    .. code-block:: python
+
+        register(ArrayLengthAttribute(my_attr))
+    """
     def __init__(self, wrapped_attr: _attr.Attribute) -> None:
+        """
+        Initializes this attribute with the name 'num-<wrapped_attr.name_without_type>'.
+
+        :param wrapped_attr: the attribute whose num of elements will be returned.
+        """
         super().__init__(EasyAttributeParams(
             name_without_type = 'num-' + wrapped_attr.name_without_type,
             aliases_without_type = ['num-' + alias_without_type for alias_without_type in wrapped_attr.aliases_without_type],
@@ -328,7 +588,15 @@ class ArrayLengthAttribute(EasyAttribute):
         return len(value) if isinstance(value, list) else 1
 
 class StringLengthAttribute(EasyAttribute):
+    """
+    Attribute which returns length of another attribute's return value as a string.
+    """
     def __init__(self, wrapped_attr: _attr.Attribute) -> None:
+        """
+        Initializes this attribute with the name 'len-<wrapped_attr.name_without_type>'.
+
+        :param wrapped_attr: the attribute whose string length will be returned.
+        """
         super().__init__(EasyAttributeParams(
             name_without_type = 'len-' + wrapped_attr.name_without_type,
             aliases_without_type = ['len-' + alias_without_type for alias_without_type in wrapped_attr.aliases_without_type],
@@ -356,7 +624,33 @@ class StringLengthAttribute(EasyAttribute):
         return len(self._wrapped_attr.str_of_value(value))
 
 class AverageAttribute(EasyAttribute):
+    """
+    Attribute which returns the average of another attribute's value.
+
+    For movie attributes, this will be a people attribute with the average across all movies those people were in.
+
+    For people attributes, this will be a movie attribute with the average across all people in the movie with the same crew type.
+
+    Example usage:
+
+    .. code-block:: python
+
+        register(AverageAttribute(my_attr))
+
+        for ct in CrewType:
+            register(AverageAttribute(my_attr, as_crew_type=ct))
+    """
     def __init__(self, wrapped_attr: _attr.Attribute, as_crew_type: None | _ml.CrewType = None) -> None:
+        """
+        Initializes this attribute with the name 'avg-<wrapped_attr.name_without_type>'.
+
+        :param wrapped_attr: the attribute whose average will be returned.
+        :param as_crew_type: optional modifier for this attribute. If provided, the attribute's name will be 'avg-<wrapped_attr.name_without_type>-as-<crew_type>':
+
+            For movie attributes, this will be a people attribute with the average across all movies those people were in as this crew type.
+
+            For people attributes, this will be a movie attribute with the average across all people in the movie with this crew type.
+        """
         as_suffix = '' if as_crew_type is None else f'-as-{as_crew_type}'
 
         super().__init__(EasyAttributeParams(
@@ -413,7 +707,24 @@ class AverageAttribute(EasyAttribute):
                 raise RuntimeError(f'Unexpected {findable_type=}')
 
 class SumAttribute(EasyAttribute):
+    """
+    Attribute which returns the sum of another attribute's value.
+
+    For movie attributes, this will be a people attribute with the sum across all movies those people were in.
+
+    For people attributes, this will be a movie attribute with the sum across all people in the movie with the same crew type.
+    """
     def __init__(self, wrapped_attr: _attr.Attribute, type_handler: TypeHandler, as_crew_type: None | _ml.CrewType = None) -> None:
+        """
+        Initializes this attribute with the name 'sum-<wrapped_attr.name_without_type>'.
+
+        :param wrapped_attr: the attribute whose sum will be returned.
+        :param as_crew_type: optional modifier for this attribute. If provided, the attribute's name will be 'sum-<wrapped_attr.name_without_type>-as-<crew_type>':
+
+            For movie attributes, this will be a people attribute with the sum across all movies those people were in as this crew type.
+
+            For people attributes, this will be a movie attribute with the sum across all people in the movie with this crew type.
+        """
         # Works the same as AverageAttribute in many ways but for summing up instead.
         # One difference is we have to accept a TypeHandler. Averaging turns everything to floats but summation preserves types.
         # Valid type handlers are not just INT or FLOAT, but MINUTES too for example.
@@ -462,23 +773,3 @@ class SumAttribute(EasyAttribute):
                 total += x
 
         return total
-
-type MovieExtractor[T] = typing.Callable[[EasyAttribute, _ml.Movie, _mlf.MLFMovie], T]
-type PeopleExtractor[T] = typing.Callable[[EasyAttribute, _ml.People, list[_mlf.MLFPerson]], T]
-type RoleExtractor[T] = typing.Callable[[EasyAttribute, _ml.Role, _ml.MLFRolesDict, _mlf.MLFMovie, list[_mlf.MLFPerson]], T]
-type Extractor[T] = MovieExtractor | PeopleExtractor[T] | RoleExtractor[T]
-
-_extractor_names = {
-    _ml.FindableType.MOVIES: '_extract_from_movie',
-    _ml.FindableType.PEOPLE: '_extract_from_people',
-    _ml.FindableType.ROLES: '_extract_from_role',
-}
-
-def easy_attribute[ET](params: EasyAttributeParams) -> typing.Callable[[Extractor[ET]], EasyAttribute]:
-    def inner(extractor: Extractor[ET]) -> EasyAttribute:
-        class SpecificAttribute(EasyAttribute):
-            pass
-
-        setattr(SpecificAttribute, _extractor_names[params.findable_type], extractor)
-        return SpecificAttribute(params)
-    return inner

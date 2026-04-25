@@ -100,12 +100,13 @@ class _CsvRow:
 
         raise ValueError(f'Invalid date: {date}')
 
-@_reg._register_builtin
+# NOTE: not registered because cinemagoer is broken so this fetcher is temporarily (permanently?) unsupported.
+# @_reg._register_builtin
 class SeleniumCinemagoerListFetcher(_fetch.ListFetcher, list_type='imdb-browser-cinemagoer-listid', uid_family=_UID_FAMILY):
     exports_server: None | multiprocessing.Process = None
     requests_queue: multiprocessing.Queue = multiprocessing.Queue()
 
-    def fetch_into_file(self, movie_list_file: _mlf.MovieListFile) -> None:
+    def _fetch_into_file(self, movie_list_file: _mlf.MovieListFile) -> None:
         _dbg.logger.info(f"Cinemagoer: Going to download the CSV for IMDb list id: {self.concrete_listdef.address}")
         movies_csv = self.download_csv(self.concrete_listdef)
         _fetch_movies_in_csv(movies_csv, movie_list_file, self, _Cinemagoer.fetch_movies_from_api)
@@ -118,7 +119,7 @@ class SeleniumCinemagoerListFetcher(_fetch.ListFetcher, list_type='imdb-browser-
         downloads_dir = _dbg.FlamEnv.DOWNLOADS_DIR.get_or_default(os.path.join(os.path.expanduser('~'), 'Downloads'))
 
         if not os.path.isdir(downloads_dir):
-            raise _exc.InputError(f"Invalid FLAM_DOWNLOADS: '{downloads_dir}': not a directory.")
+            raise _exc.InputError(f"Invalid {_dbg.FlamEnv.DOWNLOADS_DIR}: '{downloads_dir}': not a directory.")
 
         _dbg.logger.info(f"CSV should be downloaded into {downloads_dir=}")
 
@@ -147,7 +148,7 @@ class SeleniumCinemagoerListFetcher(_fetch.ListFetcher, list_type='imdb-browser-
         _dbg.logger.info(f"Successfully downloaded CSV: '{latest_csv}'")
 
         # CSV documentation says to use newline=''.
-        with open(latest_csv, 'r', newline='') as movies_csv_file:
+        with open(latest_csv, 'r', newline='', encoding='utf-8') as movies_csv_file:
             movies_csv = _read_csv(movies_csv_file)
 
         # TODO: Instead of remove, mov it to the flam dir and figure out how the hell to support using the already-downloaded CSV to refetch?
@@ -196,9 +197,10 @@ def _exports_server_cleanup() -> None:
     else:
         _dbg.logger.info("No need to do server cleanup")
 
-@_reg._register_builtin
+# NOTE: not registered because cinemagoer is broken so this fetcher is temporarily (permanently?) unsupported.
+# @_reg._register_builtin
 class CsvCinemagoerListFetcher(_fetch.ListFetcher, list_type='imdb-csv-cinemagoer-path', uid_family=_UID_FAMILY):
-    def fetch_into_file(self, movie_list_file: _mlf.MovieListFile) -> None:
+    def _fetch_into_file(self, movie_list_file: _mlf.MovieListFile) -> None:
         _dbg.logger.info(f"Cinemagoer: Fetching IMDb list by CSV: '{self.concrete_listdef.address}'")
         movies_csv = self.open_csv(self.concrete_listdef)
         _fetch_movies_in_csv(movies_csv, movie_list_file, self, _Cinemagoer.fetch_movies_from_api)
@@ -206,7 +208,7 @@ class CsvCinemagoerListFetcher(_fetch.ListFetcher, list_type='imdb-csv-cinemagoe
     @classmethod
     def open_csv(cls, concrete_listdef: _ldef.CanonListdef) -> list[_CsvRow]:
         try:
-            movies_csv_file = open(concrete_listdef.address, 'r', newline='')
+            movies_csv_file = open(concrete_listdef.address, 'r', newline='', encoding='utf-8')
         except FileNotFoundError as e:
             raise _exc.InputError(f"Invalid LISTDEF {concrete_listdef}: no such file.") from e
 
@@ -215,18 +217,38 @@ class CsvCinemagoerListFetcher(_fetch.ListFetcher, list_type='imdb-csv-cinemagoe
 
 @_reg._register_builtin
 class SeleniumApiDevListFetcher(_fetch.ListFetcher, list_type='imdb-browser-apidev-listid', uid_family=_UID_FAMILY):
-    def fetch_into_file(self, movie_list_file: _mlf.MovieListFile) -> None:
+    """IMDB_LIST_ID
+
+    Takes an IMDb list ID as an input, and downloads information in two steps:
+
+    #. Export the list to CSV from the IMDb website - this will automatically launch your browser and click some buttons!
+    #. Fill in a bunch of additional information using this free API: https://imdbapi.dev/
+    
+    It's easy to check what is your list's ID. Just open it in the browser, and the URL should look like this: https://www.imdb.com/list/ls083886771. The list ID in this example is "083886771".
+
+    There are a few environment variables you can export to control the browser use:
+
+    * **FLAM_DOWNLOADS** - Path to the downloads folder on your computer so flam will know where to look for the downloaded CSV. If your browser doesn't download things to ~/Downloads, you must set this variable for this fetcher to work
+    * **FLAM_BROWSER** - Which browser to use: 'chrome', 'edge', or 'firefox'. By default flam tries to detect your default browser
+    * **FLAM_BROWSER_PROFILE** - Path to your browser profile. This is only needed if your list is set to private so a profile is needed where you are expected to be already logged in
+    """
+    def _fetch_into_file(self, movie_list_file: _mlf.MovieListFile) -> None:
         _dbg.logger.info(f"IMDbApiDev: Going to download the CSV for IMDb list id: {self.concrete_listdef.address}")
         movies_csv = SeleniumCinemagoerListFetcher.download_csv(self.concrete_listdef)
         _fetch_movies_in_csv(movies_csv, movie_list_file, self, _IMDbApiDev.fetch_movies_from_api)
 
 @_reg._register_builtin
 class CsvApiDevListFetcher(_fetch.ListFetcher, list_type='imdb-csv-apidev-path', uid_family=_UID_FAMILY):
-    def fetch_into_file(self, movie_list_file: _mlf.MovieListFile) -> None:
+    """CSV_PATH
+
+    Takes a CSV that was manually exported from an IMDb list, and downloads additional information using this free API: https://imdbapi.dev/.
+    """
+    def _fetch_into_file(self, movie_list_file: _mlf.MovieListFile) -> None:
         _dbg.logger.info(f"IMDbApiDev: Fetching IMDb list by CSV: '{self.concrete_listdef.address}'")
         movies_csv = CsvCinemagoerListFetcher.open_csv(self.concrete_listdef)
         _fetch_movies_in_csv(movies_csv, movie_list_file, self, _IMDbApiDev.fetch_movies_from_api)
 
+# TODO: cinemagoer doesn't really work anymore, but there's https://github.com/cinemagoer/cinemagoerng which might work?
 class _Cinemagoer:
     @classmethod
     def fetch_movies_from_api(cls, movies_csv: list[_CsvRow], mlf: _mlf.MovieListFile, fetcher: _fetch.ListFetcher) -> None:
@@ -241,7 +263,7 @@ class _Cinemagoer:
                 cls._fetch_movie(movie_csv, mlf, ia)
                 
                 # Checkpoint after each film I guess.
-                fetcher.checkpoint(mlf)
+                fetcher._checkpoint(mlf)
 
         _dbg.logger.info("Done fetching movies")
 
@@ -253,7 +275,7 @@ class _Cinemagoer:
                 cls._refetch_person(mlf_person, ia)
 
                 # After each fixed person too..
-                fetcher.checkpoint(mlf)
+                fetcher._checkpoint(mlf)
 
         _dbg.logger.info("Done fetching people")
 
@@ -386,7 +408,7 @@ class _IMDbApiDev:
             for i, movie_csv in enumerate(bar):
                 if i % BATCH_SIZE == 0:
                     # Save the progress so far after every batch to mitigate the pain of potential crashes in the middle of the download.
-                    fetcher.checkpoint(mlf)
+                    fetcher._checkpoint(mlf)
 
                     batch = movies_to_fetch[i:i + BATCH_SIZE]
 
@@ -559,7 +581,8 @@ class _IMDbApiDev:
             # but nothing seems as fast as just firing requests at our maximum pace and then sleeping when the API complains.
             # For the record, guy on telegram says that the counter is per endpoint, and limited to 5 requests per second for most endpoints,
             # but 20 requests per 10 seconds for batch endpoints.
-            if response.status_code == requests.codes.too_many_requests: # pylint: disable=no-member
+            # Sometimes we actually get status code 500 (server error), and the response text explains it was actually a 429, so we need to catch that case too..
+            if response.status_code == requests.codes.too_many_requests or '429' in response.text: # pylint: disable=no-member
                 time.sleep(SLEEP_BETWEEN_RETRIES)
                 _dbg.logger.warning(f"Request failed because of too many requests. Will try again in {SLEEP_BETWEEN_RETRIES} seconds (retry {i}/{NUM_RETRIES})")
                 continue
@@ -570,6 +593,8 @@ class _IMDbApiDev:
             except requests.HTTPError as e:
                 # Server errors are fetch-interrupts.
                 if 500 <= response.status_code < 600:
+                    # The response text sometimes contains additional information.
+                    _dbg.logger.error(f'Got this response alongside server error: {response.text}')
                     raise _exc.FetchInterrupt(f"{type(e).__name__}: {e}") from e
 
                 # Everything else is a crash.

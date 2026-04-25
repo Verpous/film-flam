@@ -29,9 +29,11 @@ from . import _mlf
 
 #region generic predicates
 
-# -true : Always true.
 @_reg._register_builtin
 class TruePredicatePredicate(_filter.Predicate, name_without_type='true'):
+    """
+    Always true."""
+
     @classmethod
     def eat(cls, params: _filter.EatParams, at: int) -> tuple[_filter.Predicate, int]:
         return cls(), at
@@ -39,9 +41,11 @@ class TruePredicatePredicate(_filter.Predicate, name_without_type='true'):
     def excrete(self, findable: _ml.Findable) -> bool:
         return True
 
-# -false : Always false.
 @_reg._register_builtin
 class FalsePredicatePredicate(_filter.Predicate, name_without_type='false'):
+    """
+    Always false."""
+
     @classmethod
     def eat(cls, params: _filter.EatParams, at: int) -> tuple[_filter.Predicate, int]:
         return cls(), at
@@ -49,9 +53,11 @@ class FalsePredicatePredicate(_filter.Predicate, name_without_type='false'):
     def excrete(self, findable: _ml.Findable) -> bool:
         return False
 
-# -every ATTRIBUTE CMPTO : for array attributes, check if every array element compares true.
 @_reg._register_builtin
 class EveryPredicate(_filter.Predicate, name_without_type='every'):
+    """ATTRIBUTE CMPTO
+    For array attributes, check if every array element compares true."""
+
     def __init__(self, attribute: _attr.Attribute, cmpto: _attr.CmpTo) -> None:
         # This and all other predicates here should name their fields referencing attributes by this name '_attribute', because parse_columns expects it.
         self._attribute = attribute
@@ -76,9 +82,11 @@ class EveryPredicate(_filter.Predicate, name_without_type='every'):
         yield self._attribute.qualified_name
         yield str(self._cmpto)
 
-# -has ATTRIBUTE : true if we have some value populated for this attribute (i.e. not none or empty).
 @_reg._register_builtin
 class HasPredicate(_filter.Predicate, name_without_type='has'):
+    """ATTRIBUTE
+    True if we have some value populated for this attribute (i.e. not none or empty)."""
+
     def __init__(self, attribute: _attr.Attribute) -> None:
         self._attribute = attribute
     
@@ -100,9 +108,11 @@ class HasPredicate(_filter.Predicate, name_without_type='has'):
         yield from super().regurgitate()
         yield self._attribute.qualified_name
 
-# -index ATTRIBUTE INDEX CMPTO : true if the attribute compares true at the given index.
 @_reg._register_builtin
 class IndexPredicate(_filter.Predicate, name_without_type='index'):
+    """ATTRIBUTE INDEX CMPTO
+    True if the attribute compares true at the given index."""
+
     def __init__(self, attribute: _attr.Attribute, index: int, cmpto: _attr.CmpTo) -> None:
         self._attribute = attribute
         self._index = index
@@ -135,9 +145,11 @@ class IndexPredicate(_filter.Predicate, name_without_type='index'):
         yield str(self._index)
         yield str(self._cmpto)
 
-# -has-index ATTRIBUTE INDEX : true if the attribute has a not-None value at this index.
 @_reg._register_builtin
 class HasIndexPredicate(_filter.Predicate, name_without_type='has-index'):
+    """ATTRIBUTE INDEX
+    True if the attribute has a not-None value at this index."""
+
     def __init__(self, attribute: _attr.Attribute, index: int) -> None:
         self._attribute = attribute
         self._index = index
@@ -170,9 +182,11 @@ class HasIndexPredicate(_filter.Predicate, name_without_type='has-index'):
 # flam find movies -subset director [ coen tarantino spielberg ] - must be directed by coen, tarantino, and spielberg at least. Same as `-director coen -director tarantino -director spielberg`
 # flam find movies -sameset director [ coen tarantino spielberg ] - must be directed by a coen, tarantino, and spielberg exactly
 
-# -superset ATTRIBUTE CMPTO... : true if every array element in the attribute matches at least one of CMPTOs.
 @_reg._register_builtin
 class SupersetPredicate(_filter.Predicate, name_without_type='superset'):
+    """ATTRIBUTE CMPTO...
+    True if every array element in the attribute matches at least one of CMPTOs."""
+
     # There is no nice way to remove the code repetition that all XSetPredicate classes have the same functions except excrete.
     # * Code sharing via subclassing doesn't work because you can't pass the name_without_type yet at class init time.
     # * Code sharing via mixin class or shared classmethods is just really horrible to type hint and adds a lot of boilerplate.
@@ -208,9 +222,11 @@ class SupersetPredicate(_filter.Predicate, name_without_type='superset'):
         yield from (str(cmpto) for cmpto in self._cmptos)
         yield min(_filter.Pipeline.RPAREN)
 
-# -subset ATTRIBUTE CMPTO... : true if every CMPTO matches at least one array element in the attribute.
 @_reg._register_builtin
 class SubsetPredicate(_filter.Predicate, name_without_type='subset'):
+    """ATTRIBUTE CMPTO...
+    True if every CMPTO matches at least one array element in the attribute."""
+
     def __init__(self, attribute: _attr.Attribute, cmptos: list[_attr.CmpTo]) -> None:
         self._attribute = attribute
         self._cmptos = cmptos
@@ -243,9 +259,11 @@ class SubsetPredicate(_filter.Predicate, name_without_type='subset'):
         yield from (str(cmpto) for cmpto in self._cmptos)
         yield min(_filter.Pipeline.RPAREN)
 
-# -sameset ATTRIBUTE CMPTO... : true if every CMPTO matches at least one array element in the attribute and every array element in the attribute matches at least one CMPTO.
 @_reg._register_builtin
 class SamesetPredicate(_filter.Predicate, name_without_type='sameset'):
+    """ATTRIBUTE CMPTO...
+    True if every CMPTO matches at least one array element in the attribute and every array element in the attribute matches at least one CMPTO."""
+
     def __init__(self, attribute: _attr.Attribute, cmptos: list[_attr.CmpTo]) -> None:
         self._attribute = attribute
         self._cmptos = cmptos
@@ -267,10 +285,12 @@ class SamesetPredicate(_filter.Predicate, name_without_type='sameset'):
         yield from (str(cmpto) for cmpto in self._cmptos)
         yield min(_filter.Pipeline.RPAREN)
 
-# -in-list LISTDEF... : true if the findable is also in the list defined by LISTDEFs.
 # NOTE: this predicate doesn't check for uid family mismatch. If there is a mismatch then it will simply not find the uid and return false.
 @_reg._register_builtin
 class InListPredicate(_filter.Predicate, name_without_type='in-list'):
+    """LISTDEF...
+    True if the findable is also in the list defined by LISTDEFs."""
+
     def __init__(self, movie_list: _ml.MovieList) -> None:
         self._movie_list = movie_list
     
@@ -306,10 +326,12 @@ class InListPredicate(_filter.Predicate, name_without_type='in-list'):
 
 #region movie predicates
 
-# -any-role CT_GM... ROLES_SINGLE : scan the movie's crew according to CT_GMs for a group which passes the filter ROLES_SINGLE.
 # There's no need for -any-people because the relationship between associated people and roles is 1 to 1.
 @_reg._register_builtin
 class AnyRolePredicate(_filter.Predicate, name_without_type='any-role', findable_type=_ml.FindableType.MOVIES):
+    """CT_GM... ROLES_SINGLE
+    Scan the movie's crew according to CT_GMs for a group which passes the filter ROLES_SINGLE."""
+
     # Would be really nice to not duplicate all the similar code between any-X and every-X predicates but it's not so simple. See comment on SupersetPredicate.
     def __init__(self, ct_gms: list[tuple[_ml.CrewType, _ml.GroupMode]], filter: _filter.Filter) -> None:
         self._ct_gms = ct_gms
@@ -346,9 +368,11 @@ class AnyRolePredicate(_filter.Predicate, name_without_type='any-role', findable
         yield self
         yield from self._filter.colonoscopy()
 
-# -every-role CT_GM... ROLES_SINGLE : scan the movie's crew according to CT_GMs to see if every group passes the filter ROLES_SINGLE.
 @_reg._register_builtin
 class EveryRolePredicate(_filter.Predicate, name_without_type='every-role', findable_type=_ml.FindableType.MOVIES):
+    """CT_GM... ROLES_SINGLE
+    Scan the movie's crew according to CT_GMs to see if every group passes the filter ROLES_SINGLE."""
+
     def __init__(self, ct_gms: list[tuple[_ml.CrewType, _ml.GroupMode]], filter: _filter.Filter) -> None:
         self._ct_gms = ct_gms
         self._filter = filter
@@ -388,10 +412,12 @@ class EveryRolePredicate(_filter.Predicate, name_without_type='every-role', find
 
 #region people predicates
 
-# -any-movie MOVIES_SINGLE : scan the people's associated movies for one which passes the filter MOVIES_SINGLE.
 # There's no need for -any-people because the relationship between associated people and roles is 1 to 1.
 @_reg._register_builtin
 class AnyMoviePredicate(_filter.Predicate, name_without_type='any-movie', findable_type=_ml.FindableType.PEOPLE):
+    """MOVIES_SINGLE
+    Scan the people's associated movies for one which passes the filter MOVIES_SINGLE."""
+
     def __init__(self, filter: _filter.Filter) -> None:
         self._filter = filter
     
@@ -416,9 +442,11 @@ class AnyMoviePredicate(_filter.Predicate, name_without_type='any-movie', findab
         yield self
         yield from self._filter.colonoscopy()
 
-# -every-movie MOVIES_SINGLE : scan the people's associated movies to see if they all pass the filter MOVIES_SINGLE.
 @_reg._register_builtin
 class EveryMoviePredicate(_filter.Predicate, name_without_type='every-movie', findable_type=_ml.FindableType.PEOPLE):
+    """MOVIES_SINGLE
+    Scan the people's associated movies to see if they all pass the filter MOVIES_SINGLE."""
+
     def __init__(self, filter: _filter.Filter) -> None:
         self._filter = filter
     
@@ -444,9 +472,11 @@ class EveryMoviePredicate(_filter.Predicate, name_without_type='every-movie', fi
         yield self
         yield from self._filter.colonoscopy()
 
-# -as CREW_TYPE PEOPLE_SINGLE : check if the people pass the filter PEOPLE_SINGLE when they are another crew type.
 @_reg._register_builtin
 class AsPredicate(_filter.Predicate, name_without_type='as', findable_type=_ml.FindableType.PEOPLE):
+    """CREW_TYPE PEOPLE_SINGLE
+    Check if the people pass the filter PEOPLE_SINGLE when they are another crew type."""
+
     def __init__(self, crew_type: _ml.CrewType, filter: _filter.Filter) -> None:
         self._crew_type = crew_type
         self._filter = filter
@@ -470,9 +500,11 @@ class AsPredicate(_filter.Predicate, name_without_type='as', findable_type=_ml.F
         yield self
         yield from self._filter.colonoscopy()
 
-# -any-person PEOPLE_SINGLE : Separate the people if they are grouped and check if any of the split people pass the filter PEOPLE_SINGLE.
 @_reg._register_builtin
 class AnyPersonPredicate(_filter.Predicate, name_without_type='any-person', findable_type=_ml.FindableType.PEOPLE):
+    """PEOPLE_SINGLE
+    Separate the people if they are grouped and check if any of the split people pass the filter PEOPLE_SINGLE."""
+
     def __init__(self, filter: _filter.Filter) -> None:
         self._filter = filter
     
@@ -509,9 +541,11 @@ class AnyPersonPredicate(_filter.Predicate, name_without_type='any-person', find
         yield self
         yield from self._filter.colonoscopy()
 
-# -every-person PEOPLE_SINGLE : Separate the people if they are grouped and check if every split person passes the filter PEOPLE_SINGLE.
 @_reg._register_builtin
 class EveryPersonPredicate(_filter.Predicate, name_without_type='every-person', findable_type=_ml.FindableType.PEOPLE):
+    """PEOPLE_SINGLE
+    Separate the people if they are grouped and check if every split person passes the filter PEOPLE_SINGLE."""
+
     def __init__(self, filter: _filter.Filter) -> None:
         self._filter = filter
     

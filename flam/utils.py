@@ -27,19 +27,34 @@ import importlib.util
 import colorama
 import enum
 
-if typing.TYPE_CHECKING:
-    import _typeshed
-
 class ProgressBar[T]:
-    MAX_DESC = 30
-    MAX_SUFFIX = 40
-    FRAC_FMT = '({} / {})'
+    """
+    Utility for iterating over a list and presenting a progress bar to the user via stdout. Example usage:
+
+    .. code-block:: python
+
+        # How you might hypothetically fetch a list of movies while presenting a progress bar about it.
+        with ProgressBar(movies_to_fetch,
+                desc='Downloading',
+                keyfunc=lambda m: m.title) as bar:
+            for movie in bar:
+                fetch_movie(movie)
+    """
+
+    _MAX_DESC = 30
+    _MAX_SUFFIX = 40
+    _FRAC_FMT = '({} / {})'
 
     def __init__(self, elements: list[T], desc: None | str = None, keyfunc: None | typing.Callable[[T], str] = None) -> None:
+        """
+        :param elements: list of elements to process while displaying the progress bar.
+        :param desc: short description to print to the user of what is being done.
+        :param keyfunc: function which receives an element from the list and returns a short string indicating to the user which element is currently being processed.
+        """
         self._elements = elements
         self._num_of = len(self._elements)
 
-        self._desc = (f'{desc}: ' if desc is not None else '').ljust(self.MAX_DESC)
+        self._desc = (f'{desc}: ' if desc is not None else '').ljust(self._MAX_DESC)
         self._keyfunc = keyfunc if keyfunc is not None else lambda elem: ''
 
         # Type checker needs this hint.
@@ -47,7 +62,7 @@ class ProgressBar[T]:
         self._is_done = True
 
         # The progress fraction's size is fixed to the maximal length it may reach, which is when it's num_of / num_of.
-        self._max_frac_len = len(self.FRAC_FMT.format(self._num_of, self._num_of))
+        self._max_frac_len = len(self._FRAC_FMT.format(self._num_of, self._num_of))
 
         # Of the bar's components, the description and suffix are fixed-size, and the fraction's size is a little flexible but we already took care of it.
         # The most flexible part is the bar itself, which is computed to take up all the space the others haven't.
@@ -55,17 +70,21 @@ class ProgressBar[T]:
         empty_bar = self._build_bar(0, None)
         self._bar_width = max(shutil.get_terminal_size().columns - len(empty_bar), 0) # os.get_terminal_size fails if output is not a tty.
 
+    # Welcome to build-a-bar, how may I help you?
     def _build_bar(self, idx: int, elem: None | T) -> str:
         fill_amt = int((float(idx) / float(self._num_of)) * self._bar_width) if idx != self._num_of else self._bar_width
         fill_str = (fill_amt * '#').ljust(self._bar_width)
-        frac_str = self.FRAC_FMT.format(idx, self._num_of).ljust(self._max_frac_len)
-        suff_str = (truncate(self._keyfunc(elem), self.MAX_SUFFIX) if elem is not None else '').ljust(self.MAX_SUFFIX)
+        frac_str = self._FRAC_FMT.format(idx, self._num_of).ljust(self._max_frac_len)
+        suff_str = (truncate(self._keyfunc(elem), self._MAX_SUFFIX) if elem is not None else '').ljust(self._MAX_SUFFIX)
         return f'{self._desc} [{fill_str}] {frac_str} {suff_str}'
     
     def _repaint(self, idx: int, elem: None | T) -> None:
         print(self._build_bar(idx, elem), end='\r')
 
     def __iter__(self) -> typing.Iterator[T]:
+        """
+        Iterate over ``elements`` and update the progress bar with each iteration.
+        """
         self._iterator = iter(enumerate(self._elements))
         self._is_done = False
         return self
@@ -83,39 +102,75 @@ class ProgressBar[T]:
         return elem
 
     def __enter__(self) -> typing.Self:
+        """
+        Returns self. When the context exits the progress bar will be cleaned up.
+        """
         return self
 
     def __exit__(self, exc_type: type[BaseException], exc_value: None | BaseException, traceback: None | types.TracebackType) -> None:
+        """
+        Cleanly ends the progress bar while ensuring it correctly reflects the element where iteration stopped.
+        """
         if self._iterator is None:
             return
 
-        # This variable is needed because if we just checked if__next__ raises StopIteration, we fail the edge case where we break on the last element.
+        # This variable is needed because if we just checked if __next__ raises StopIteration, we fail the edge case where we break on the last element.
         if self._is_done:
             self._repaint(self._num_of, None)
 
         print()
 
 class Timeout:
+    """
+    Utility for keeping track of time and raising an exception if a timeout is reached. Example usage:
+
+    .. code-block:: python
+        
+        with Timeout(30) as timeout:
+            do_some_operation_async()
+
+            while operation_not_complete()
+                time.sleep(1)
+                timeout.tick()
+
+            return operation_result()
+    """
     def __init__(self, timeout_secs: float = float('inf')) -> None:
+        """
+        :param timeout_secs: the timeout.
+        """
         self._timeout_secs = timeout_secs
         self._enter_time = float('nan')
 
     def tick(self) -> None:
+        """
+        Raises a ``TimeoutError`` if the time spent in the current context is greater than the timeout.
+        """
         if time.time() - self._enter_time > self._timeout_secs:
             raise TimeoutError(f"Operation timed out after {self._timeout_secs} seconds.")
 
     def __enter__(self) -> typing.Self:
+        """
+        Begins counting time and returns self.
+        """
         self._enter_time = time.time()
         return self
 
     def __exit__(self, exc_type: type[BaseException], exc_value: None | BaseException, traceback: None | types.TracebackType) -> None:
+        """
+        Resets the time counter.
+        """
         self._enter_time = float('nan')
 
-def subclasses_recursive(cls: type) -> set[type]:
-    classes = set(cls.__subclasses__())
-    return classes.union(sc for c in classes for sc in subclasses_recursive(c))
-
 def download_file_using_browser(download_cmd: typing.Callable[[], typing.Any], file_extension: str, downloads_dir: str, timeout_secs: float = float('inf')) -> str:
+    """
+    Handles downloading a file with an external tool which should download it to some directory. Watches that directory and waits for the downloaded file to appear.
+
+    :param download_cmd: function which should trigger an asynchronous file download.
+    :param file_extension: the extension the downloaded file should have.
+    :param downloads_dir: path to where the file is expected to be downloaded.
+    :param timeout_secs: timeout for the download.
+    """
     # We do a little closures.
     def get_latest_in_downloads() -> None | str:
         files_in_dowloads = glob.glob(os.path.join(downloads_dir, f'*.{file_extension}'))
@@ -162,13 +217,23 @@ def download_file_using_browser(download_cmd: typing.Callable[[], typing.Any], f
     return latest_file
 
 # Thanks to this guy: https://stackoverflow.com/a/295466/12553917.
-# Converts a string into a valid filename (meant for URLs but whatever).
-def slugify(value: str) -> str:
-    value = unicodedata.normalize('NFKD', value).encode('ascii', 'ignore').decode('ascii')
-    value = re.sub(r'[^\w\s.-]', '', value.lower())
-    return re.sub(r'[-\s]+', '-', value).strip('-_')
+# This was originally meant for URLs but whatever.
+def slugify(s: str) -> str:
+    """
+    Removes special characters from a string to turn it into a valid filename.
+
+    :param s: string to convert.
+    """
+    s = unicodedata.normalize('NFKD', s).encode('ascii', 'ignore').decode('ascii')
+    s = re.sub(r'[^\w\s.-]', '', s.lower())
+    return re.sub(r'[-\s]+', '-', s).strip('-_')
 
 def import_file(file: str) -> types.ModuleType:
+    """
+    Dynamically imports a file based on a path, and returns the module object.
+
+    :param file: path of the file to import.
+    """
     module_name = os.path.splitext(os.path.basename(file))[0]
     spec = importlib.util.spec_from_file_location(module_name, file)
 
@@ -187,6 +252,13 @@ _tree_tee =    '├── '
 _tree_last =   '└── '
 
 def tree(dir_path: str, prefix: str = '', stats: None | typing.Callable[[str], str] = None) -> typing.Iterator[str]:
+    """
+    Iterate over lines which together represent a directory tree in a pretty, human-readable format.
+
+    :param dir_path: path to the directory whose subtree we're interested in.
+    :param prefix: string that will appear at the start of each line.
+    :param stats: function which receives a file path and returns a string with information to display next to that file.
+    """
     contents = os.listdir(dir_path)
     
     # contents each get pointers that are ├── with a final └──
@@ -214,7 +286,16 @@ def tabulate(
         header_color: str = '',
         fill_color: str = colorama.Fore.BLACK + colorama.Style.BRIGHT,
         column_colors: None | list[str] = None) -> typing.Iterable[str]:
+    """
+    Turn a table into a nice printable format and iterate over its lines.
 
+    :param records: the table as a list of lists, where the outer lists are rows and the inner lists are columns.
+    :param fillchar: character to use as spacing between columns.
+    :param use_color: whether columns should be colored for enhanced readability.
+    :param header_color: additional color to apply on the header row. It may combine with the column colors.
+    :param fill_color: color to use for ``fillchar``.
+    :param column_colors: list of colors to use for columns. They will be used round-robin. If this is ``None``, a default list of colors will be used.
+    """
     # Do default value like this to avoid "dangerous default" warning by pylint.
     if column_colors is None:
         column_colors = [
@@ -255,12 +336,39 @@ def tabulate(
         header_color = ''
 
 class TruncationStyle(enum.Enum):
-    NO_TRIM             = enum.auto() # 'abcdefghijklmnopqrstuvwxyz' -> 'abcdefghijklmnopqrstuvwxyz'
-    TRIM_END            = enum.auto() # 'abcdefghijklmnopqrstuvwxyz' -> 'abcdefghi...'
-    TRIM_START          = enum.auto() # 'abcdefghijklmnopqrstuvwxyz' -> '...rstuvwxyz'
-    TRIM_MIDDLE         = enum.auto() # 'abcdefghijklmnopqrstuvwxyz' -> 'abcde...wxyz'
+    """
+    Enumeration of possible ways to truncate a string.
+    """
+    
+    NO_TRIM             = enum.auto()
+    """
+    "What's in the box?" -> "What's in the box?"
+    """
+
+    TRIM_END            = enum.auto()
+    """
+    "What's in the box?" -> "What's i..."
+    """
+
+    TRIM_START          = enum.auto()
+    """
+    "What's in the box?" -> "...the box?"
+    """
+
+    TRIM_MIDDLE         = enum.auto()
+    """
+    "What's in the box?" -> "What...box?"
+    """
 
 def truncate(s: str, max_len: int, ellipsis: str = '...', truncation_style: TruncationStyle = TruncationStyle.TRIM_END) -> str:
+    """
+    Truncates a string.
+
+    :param s: the string to truncate.
+    :param max_len: the maximum length beyond which the string will be truncated down to this length.
+    :param ellipsis: short string to use to indicate a truncated part of the string.
+    :param truncation_style: preference for which part of the string to truncate.
+    """
     if max_len < len(ellipsis):
         raise ValueError(f'Ellipsis must not be longer than max_len. {ellipsis=}, {max_len=}.')
 
@@ -286,6 +394,12 @@ def truncate(s: str, max_len: int, ellipsis: str = '...', truncation_style: Trun
 _magnitudes = ['', 'K', 'M', 'B', 'T']
 
 def num_pretty(num: int, abbreviate: bool = True) -> str:
+    """
+    Formats a large number as a human-readable string.
+
+    :param num: the number to convert.
+    :param abbreviate: whether to shorten large numbers with a magnitude sign.
+    """
     if not abbreviate:
         return f'{num:,}'
 
@@ -302,6 +416,9 @@ def num_pretty(num: int, abbreviate: bool = True) -> str:
     return num_str + _magnitudes[magnitude]
 
 def parse_num_pretty(num_str: str) -> int:
+    """
+    Inverse of :py:func:`num_pretty`.
+    """
     try:
         magnitude = 3 * _magnitudes.index(num_str[-1])
     except (ValueError, IndexError):
@@ -309,13 +426,15 @@ def parse_num_pretty(num_str: str) -> int:
 
     return int(float(num_str.replace(',', '')) * (10 ** magnitude))
 
-def clamp(num: _typeshed.SupportsRichComparisonT, lower_bound: _typeshed.SupportsRichComparisonT, upper_bound: _typeshed.SupportsRichComparisonT) -> _typeshed.SupportsRichComparisonT:
-    return min(upper_bound, max(lower_bound, num))
-
 def stable_dedup[TElem, TKey](elements: typing.Iterable[TElem], key: None | typing.Callable[[TElem], TKey] = None) -> typing.Iterable[TElem]:
+    """
+    Removes duplicate elements from an iterable but preserves the original order.
+
+    :param elements: ordered collection of objects to deduplicate
+    :param key: function which receives an element and returns a value by which to deduplicate it. I.e., all elements with the same key are considered duplicates.
+    """
     if key is None:
-        key = lambda e: e
-    
-    # Dictionaries preseve insertion order, but dedup if two elements are equal.
-    d = {key(e): e for e in elements}
-    yield from d.values()
+        # Dictionaries preseve insertion order, but dedup if two elements are equal.
+        yield from {e: None for e in elements}
+    else:
+        yield from {key(e): e for e in elements}.values()

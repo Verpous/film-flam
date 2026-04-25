@@ -18,6 +18,7 @@
 # Makefiles are crap for anything other than compiling things. We just want helper functions for development so it's better to use a "make-like" bash script.
 
 shopt -s extglob
+shopt -s globstar
 
 # Below this point assume we are in the project directory.
 project_folder="$(dirname -- "$BASH_SOURCE")"
@@ -27,6 +28,7 @@ mdl=flam
 cli=flam
 pkg=film-flam
 build=dist
+docs=docs
 
 flam_dir=.film_flam_dev
 srcfiles=($mdl/*.py)
@@ -45,6 +47,7 @@ pylint_ignore+=C0325, # superfluous-parens
 pylint_ignore+=C0411, # wrong-import-order
 pylint_ignore+=C0413, # wrong-import-position
 pylint_ignore+=C0415, # import-outside-toplevel
+pylint_ignore+=C3001, # unnecessary-lambda-assignment
 
 pylint_ignore+=R0401, # cyclic-import
 pylint_ignore+=R0402, # consider-using-from-import
@@ -195,11 +198,12 @@ sanity() {
 }
 
 # Deletes cache files, gitignored items generally. But NOT the dev flam dir!
+# Note this also deletes sphinx's cache files. We could also delete those with sphinx's make clean, but it hits errors with file permissions. Because sphinx sucks!
 clean() {
     # Need this buffer so we don't delete a folder while find is iterating its contents.
     # It'd be a lot nicer if we could just not descend into ignored folders, but that's much slower.
     _mktemp ignored_files
-    find . -name "$(basename -- "$flam_dir")" -prune -o -print0 | git check-ignore -z --stdin > "$ignored_files"
+    find -name "$(basename -- "$flam_dir")" -prune -o -print0 | git check-ignore -z --stdin > "$ignored_files"
     xargs -0 rm -vrf < "$ignored_files"
 }
 
@@ -208,7 +212,8 @@ clean-ctx() {
     rm -rf "$flam_dir"
 }
 
-rmcache() {
+# Deletes the dev flam dir cache files.
+clean-vault() {
     rm -rf "$flam_dir"/cache
 }
 
@@ -244,7 +249,14 @@ pylint() {
 
 # Counts how many lines we have in the codebase ^_^
 wc() {
-    command wc -l -- "${srcfiles[@]}" | sort -n
+    # Count all non-ignored .py, .rst, or .sh files.
+    find -name .git -prune -o \( -name \*.py -o -name \*.rst -o -name \*.sh -o -name \*.toml \) -print | _check_not_ignored | xargs wc -l -- | sort -n
+}
+
+_check_not_ignored() {
+    _mktemp ignored_files
+    find -print | git check-ignore --stdin > "$ignored_files"
+    grep -Fxvf "$ignored_files"
 }
 
 # Opens the logs, with tail -f by default but you can pass a different command to use.
@@ -262,7 +274,7 @@ log() {
     $cmd "$(echo "import $mdl; print($mdl.get_log_file_path())" | FLAM_LOGLEVEL=critical python)"
 }
 
-# Just a wrapper around running the flam CLI in a debug environment.
+# A wrapper around running the flam CLI in a debug environment - with optional support for profiling.
 flam() {
     _gen_version
 
@@ -285,12 +297,14 @@ flam() {
     fi
 }
 
+# A wrapper around running the flam CLI in a dev environment with profiling enabled. Will show the profiling results instead of flam output once done.
 # NOTE: this only does CPU profiling. I am really curious to use a memory profiler, but sadly python seems to be lacking in good ones.
 # The best one is memray but it doesn't support Windows. The others look like crap, so I think I'll pass.
 profile() {
     FLAM_PROFILE=1 $cli "$@"
 }
 
+# Inspects the results of a profiled run. By default looks at the most recent run but you can provide a path (all runs are stored in profiles/).
 pstats() {
     # If no arguments, default to the latest profile.
     if (( $# == 0 )); then
@@ -310,6 +324,8 @@ pstats() {
     done
 }
 
+# Runs some subset of flam commands designed to provide the most code coverage with the least amount of commands.
+# This is just an easy enough solution to spin up until maybe one day we'll have a more robust test suite.
 coverage() {
     # Support `coverage profile` for coverage with profiling.
     local cmd="${1:-$cli}"
@@ -347,6 +363,34 @@ coverage() {
         time "$cmd" find -croles-\* cast:group specials -any-movie -true -every-movie -true -as director -true -any-person -true -every-person -true
         time "$cmd" find -croles-\* cast:separate specials -any-movie -true -every-movie -true -as director -true -any-person -true -every-person -true
     } > /dev/null
+}
+
+# Compiles the documentation.
+# TODO: hook this to the release pipeline so when we create an actual release we also create the documentation and upload it.
+sphinx() {
+    # TODO: _gen_version here may be a problem, because we'd want it to use the existing version as part of the release process.
+    _gen_version
+    
+    (
+        cd $docs
+
+        case "${1,,}" in
+            ""|actual)
+                # TODO: also man. And make clean first?
+                make html
+                ;;
+            live)
+                # Only for HTML docs, we have this ability to edit them live with the browser window refreshing on every change.
+                # We go aggressive with --write-all, --fresh-env, and --watch the mdl dir so that anywhere we make a change will cause a sync.
+                # Without these you'd have to change the specific .rst file to sync, even if the change you made was in the conf.py or the python docstrings.
+                sphinx-autobuild --open-browser --quiet --fail-on-warning --show-traceback --write-all --fresh-env --watch ../$mdl ./source/ ./build/
+                ;;
+            *)
+                echo "Invalid sphinx flavor: '$1'" >&2
+                false
+                ;;
+        esac
+    )
 }
 
 # Prints which commands this "makefile" has.

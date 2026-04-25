@@ -128,18 +128,27 @@ def print_table(table: list[list[str]],
         else:
             # Output in a pretty table.
             line_spacing = '\n\n' if spacious else '\n'
-            out.write(line_spacing.join(utils.tabulate(
-                table,
-                fillchar = '.' if use_color else ' ',
-                use_color = use_color,
-                header_color = '' if no_titles else '\033[4m\033[K' # Underline, not supported by colorama.
-            )))
-            out.write('\n')
+
+            try:
+                out.write(line_spacing.join(utils.tabulate(
+                    table,
+                    fillchar = '.' if use_color else ' ',
+                    use_color = use_color,
+                    header_color = '' if no_titles else '\033[4m\033[K' # Underline, not supported by colorama.
+                )))
+                out.write('\n')
+            except BrokenPipeError:
+                # Broken pipe just means that flam was piping to some other program like `more` and that program was exited.
+                # We don't want to show the user a worrying traceback for that.
+                flam.logger.warning(f"Exiting early due to broken pipe.")
+                sys.exit(1)
         
         # NOTE: considered once the file is written to also write it to the logs. But I don't think there's a need - if users have an issue they will show me what was printed.
         out.flush()
 
         if paginate:
+            # NOTE: python has a hidden feature in pydoc.pager which sounds like a cross-platform solution to this issue,
+            # but it doesn't process ANSI escapes very well and is generally a sucky solution.
             try:
                 subprocess.call(['less', '-RS', out.name])
             except Exception as e:

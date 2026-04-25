@@ -22,45 +22,49 @@ from . import _ctx
 from . import _exc
 from . import _dbg
 
-# Listdefs are basically a spec for identifying a list. Users pass them in as a string of the form "<list_type>=<address>", where:
-# * <list_type> describes where to look for the list
-# * <address> describes, well, the address in the list type where you are looking
-# In some cases the list_type or the address can be omitted and we automatically infer it.
-#
-# Internally we take listdefs through a process called "canonicalization" where we:
-# * Parse them into a named tuple CanonListdef(list_type, address)
-# * "Expand" them which is a process of handling special listdefs. For example '*' is a special string which we expand to a list of all configured simple lists.
-#
-# Some important things to know about listdefs:
-# * Once they're past canonicalizaton, the list types ALL and DEFAULTS are handled and you don't have to check for them.
-# * Simple/composite lists are described with the address being their name, but during canonicalization we change that to their uid
-# * When printing a listdef to the user, it's best to format it pretty() because that will convert these list uids back to their names
-#
-# Concrete and abstract canon listdefs:
-# * Canon listdefs are "concrete" when they describe the raw address from which the data was fetched. Like "imdb=0123456789".
-# * Canon listdefs are "abstract" when they describe a configured list. Like "list=watched".
-
-class SpecialListType(enum.StrEnum):
-    ALL         = '*'           # *[=]                  All configured simple lists.
-    DEFAULTS    = 'defaults'    # defaults[=]           All configured as default lists. We have different defaults for fetch vs find.
-    SIMPLE      = 'list'        # list=<uid>            A simple list. Lists which are just a name for the raw data list from the source.
-    COMPOSITE   = 'composite'   # composite=<uid>       A composite list. Lists which are a combination of other lists with a filter.
-    ANONYMOUS   = 'anonymous'   # anonymous='<listdef1> <listdef2> ... <listdefN>'  For internal use only - anonymous composites. Composite lists which are not preconfigured but spun on-the-fly.
-    
-    def __repr__(self) -> str:
-        return str(self)
-
-class _ExpandFlavor(enum.Enum):
-    FIND        = enum.auto()
-    FETCH       = enum.auto()
-
-# Users input LISTDEF strings and we turn them into this more convenient representation.
 class CanonListdef(typing.NamedTuple):
+    """
+    Represents a spec for identifying a list. Listdefs as a strings have the form "<list_type>=<address>", or sometimes just "<address>",
+    and internally we "canonicalize" them into this object. This process involves:
+
+    * Inferring the list type if it's missing - we're only able to infer the types for configured simple or composite lists
+    * Handling some special values. See :py:class:`SpecialListType`.
+
+    Some important things to know about listdefs:
+    
+    * Once they're past canonicalization, the special list types :py:attr:`SpecialListType.ALL` and :py:attr:`SpecialListType.DEFAULTS` are handled and you don't have to check for them
+    * Simple/composite lists are described with the address being their name, but during canonicalization we change that to their UID
+    * When printing a listdef to the user, it's best to format it :py:meth:`pretty` because that will convert these list uids back to their names
+    
+    Concrete and abstract canon listdefs:
+
+    * Canon listdefs are "concrete" when they describe the raw address from which the data was fetched. E.g., "imdb-browser-apidev-listid=083886771"
+    * Canon listdefs are "abstract" when they describe a configured list. E.g., "list=watched"
+    """
+
     list_type: str
+    """
+    The fetcher used to download information about this list. Also supports a few special values, see :py:class:`SpecialListType`.
+    """
+
     address: str
+    """
+    An address pointing to an exact list. This could be different based on the list type - it could be a path, a URL, a name, or anything else.
+    """
 
     @classmethod
     def parse(cls, listdef: str, ctx: _ctx.FlamContext) -> CanonListdef:
+        """
+        Parse a string representation of a listdef and canonicalize it.
+
+        :param listdef: the listdef as a string. It can have a few forms:
+        
+            * :py:attr:`SpecialListType.ALL`
+            * :py:attr:`SpecialListType.DEFAULTS`
+            * '<name>' - where <name> is the name of a simple or composite list
+            * '<list_type>=<address>' - where <list_type> is :py:attr:`SpecialListType.SIMPLE`, :py:attr:`SpecialListType.COMPOSITE`, or the name of a fetcher.
+        :param ctx: the context containing list configurations we need to know.
+        """
         eq_idx = listdef.find('=')
         before_eq, after_eq = (listdef[:eq_idx], listdef[eq_idx + 1:]) if eq_idx != -1 else (listdef, '')
         result: None | CanonListdef = None
@@ -94,15 +98,15 @@ class CanonListdef(typing.NamedTuple):
         return result
 
     @classmethod
-    def parse_and_expand(cls, listdefs: typing.Iterable[str], ctx: _ctx.FlamContext, flavor: _ExpandFlavor) -> typing.Iterable[CanonListdef]:
+    def _parse_and_expand(cls, listdefs: typing.Iterable[str], ctx: _ctx.FlamContext, flavor: _ExpandFlavor) -> typing.Iterable[CanonListdef]:
         for ldef in listdefs:
             cldef = cls.parse(ldef, ctx)
             
-            for expanded in cldef.expand(ctx, flavor):
+            for expanded in cldef._expand(ctx, flavor):
                 _dbg.logger.info(f"Expansion of {cldef} includes {expanded}")
                 yield expanded
 
-    def expand(self, ctx: _ctx.FlamContext, flavor: _ExpandFlavor) -> typing.Iterable[CanonListdef]:
+    def _expand(self, ctx: _ctx.FlamContext, flavor: _ExpandFlavor) -> typing.Iterable[CanonListdef]:
         match self.list_type:
             case SpecialListType.ALL:
                 yield from (sl.abstract_listdef for sl in ctx.cfg_readonly.simple_lists)
@@ -135,11 +139,17 @@ class CanonListdef(typing.NamedTuple):
 
     @property
     def is_special(self) -> bool:
+        """
+        Whether this listdef has a special type.
+        """
         return self.list_type in SpecialListType
 
     # SimpleList/CompositeList listdefs are abstract because they can't be fetched directly, only through the underlying "concrete" type.
     @property
     def is_abstract(self) -> bool:
+        """
+        Whether this listdef is "abstract", meaning it describes a configured list. E.g., "list=watched".
+        """
         match self.list_type:
             case SpecialListType.SIMPLE | SpecialListType.COMPOSITE | SpecialListType.ANONYMOUS:
                 return True
@@ -149,11 +159,19 @@ class CanonListdef(typing.NamedTuple):
     # "Concrete" listdefs have a type that directly corresponds to a ListFetcher.
     @property
     def is_concrete(self) -> bool:
+        """
+        Whether this listdef is "concrete", meaning it describes a raw address from which the data was fetched. E.g., "imdb-browser-apidev-listid=083886771".
+        """
         return not self.is_special
 
     # Internally when canonicalizing listdefs it's convenient to convert list names to UIDs,
     # but it means that whenever we print the listdef we need to convert it back to have human-readable list names.
     def pretty(self, ctx: _ctx.FlamContext) -> str:
+        """
+        Returns a pretty string representation of this listdef. Use this so configured lists will be printed with their name instead of a long ugly UID.
+
+        :param ctx: the context containing list configurations we need to know.
+        """
         # Printing the "anonymous=" part isn't pretty. Since anonymous lists are only ever stringified for pretty printing,
         # the lists that make it up are already pretty.
         if self.list_type == SpecialListType.ANONYMOUS:
@@ -168,3 +186,30 @@ class CanonListdef(typing.NamedTuple):
 
     def __str__(self) -> str:
         return f'{self.list_type}={self.address}'
+
+class SpecialListType(enum.StrEnum):
+    """
+    An enumeration of special listdef types.
+    """
+    ALL         = '*'
+    """All configured simple lists."""
+    
+    DEFAULTS    = 'defaults'
+    """All configured as default lists. We have different defaults for fetch vs find."""
+    
+    SIMPLE      = 'list'
+    """A simple list. Lists which are just a name for the raw data list from the source. Outwardly uses the name as the address, but internally uses a uid."""
+    
+    COMPOSITE   = 'composite'
+    """A composite list. Lists which are a combination of other lists with a filter. Outwardly uses the name as the address, but internally uses a uid."""
+    
+    # Has the string form 'anonymous=<listdef1> <listdef2> ... <listdefN>'
+    ANONYMOUS   = 'anonymous'
+    """FOR INTERNAL USE ONLY - anonymous composites. Composite lists which are not preconfigured but spun on-the-fly."""
+    
+    def __repr__(self) -> str:
+        return str(self)
+
+class _ExpandFlavor(enum.Enum):
+    FIND        = enum.auto()
+    FETCH       = enum.auto()

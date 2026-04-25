@@ -22,12 +22,13 @@ from . import _fetch
 from . import _filter
 from . import _attr
 from . import _dbg
+from . import _ml
 
 _BUILTIN_NAME = 'builtin'
 _GLOBAL_NAME = 'global'
 
 class _RegistryOf[T: (type[_fetch.ListFetcher], type[_filter.Predicate], _attr.Attribute)]:
-    def __init__(self, reg: Registry, name: str) -> None:
+    def __init__(self, reg: _Registry, name: str) -> None:
         self._registered_items: dict[str, None | T] = {}
         self._parent_reg = reg
         self._name = name
@@ -90,14 +91,14 @@ class _RegistryOfAttributes(_RegistryOf[_attr.Attribute]):
         super().register(item)
 
         # This completely violates type-safety but we hacky boys.
-        self._parent_reg.predicates.register(item, as_none=True) # type: ignore
+        self._parent_reg._predicates.register(item, as_none=True) # type: ignore
 
 class _RegistryOfPredicates(_RegistryOf[type[_filter.Predicate]]):
     def __getitem__(self, qualified_name: str) -> type[_filter.Predicate]:
         predicate = self._registered_items[qualified_name]
         
         if predicate is None:
-            attr = self._parent_reg.attributes[qualified_name]
+            attr = self._parent_reg._attributes[qualified_name]
 
             # Remember attributes support aliasing, so qualified_name might not be equal to attr.qualified_name.
             # We'll optimize by always caching the AttributePredicate to the primary name of the predicate,
@@ -114,56 +115,60 @@ class _RegistryOfPredicates(_RegistryOf[type[_filter.Predicate]]):
 
         return predicate
 
-class Registry:
+class _Registry:
     def __init__(self, name: str) -> None:
         self._name = name
         self._fetchers: _RegistryOf[type[_fetch.ListFetcher]] = _RegistryOf(self, 'fetcher')
         self._predicates: _RegistryOf[type[_filter.Predicate]] = _RegistryOfPredicates(self, 'predicate')
         self._attributes: _RegistryOf[_attr.Attribute] = _RegistryOfAttributes(self, 'attribute')
 
-    @property
-    def fetchers(self) -> _RegistryOf[type[_fetch.ListFetcher]]:
-        return self._fetchers
-
-    @property
-    def predicates(self) -> _RegistryOf[type[_filter.Predicate]]:
-        return self._predicates
-
-    @property
-    def attributes(self) -> _RegistryOf[_attr.Attribute]:
-        return self._attributes
-
     def register(self, obj: typing.Any) -> None:
         if isinstance(obj, type) and issubclass(obj, _fetch.ListFetcher):
-            self.fetchers.register(obj)
+            self._fetchers.register(obj)
         elif isinstance(obj, type) and issubclass(obj, _filter.Predicate):
-            self.predicates.register(obj)
+            self._predicates.register(obj)
         elif isinstance(obj, _attr.Attribute):
-            self.attributes.register(obj)
+            self._attributes.register(obj)
         else:
             raise _exc.InputError(f"Invalid object for registration: {obj}.")
 
-_builtins = Registry(_BUILTIN_NAME)
-_global_extensions = Registry(_GLOBAL_NAME)
+_builtins = _Registry(_BUILTIN_NAME)
+_global_extensions = _Registry(_GLOBAL_NAME)
 
 def _register_builtin[T](obj: T) -> T:
     _builtins.register(obj)
     return obj
 
 def register[T](obj: T) -> T:
+    """
+    Register an predicate, attribute, or fetcher as a global extension. Global extensions are available to use from any context with ``import_extensions=True``.
+    """
     _global_extensions.register(obj)
     return obj
 
-def compose_qualified_attr_or_pred_name(findable_type: str, name_without_type: str) -> str:
+def compose_qualified_attr_or_pred_name(findable_type: _ml.FindableType, name_without_type: str) -> str:
+    """
+    Compose an attribute or predicate qualified name from its parts. For example:
+
+    .. code-block::
+
+        compose_qualified_attr_or_pred_name(FindableType.MOVIES, 'title') # Returns 'movies-title'.
+
+    :param findable_type: the item's type.
+    :param name_without_type: the item's name without the type.
+    """
     return f'{findable_type}-{name_without_type}'
 
-def decompose_qualified_attr_or_pred_name(qualified_name: str) -> tuple[str, str]:
+def decompose_qualified_attr_or_pred_name(qualified_name: str) -> tuple[_ml.FindableType, str]:
+    """
+    Inverse of :py:meth:`compose_qualified_attr_or_pred_name`.
+    """
     split = qualified_name.split('-', maxsplit=1)
 
     if len(split) != 2:
         raise _exc.InputError(f"Invalid qualified_name: '{qualified_name}'")
 
-    return split[0], split[1]
+    return _ml.FindableType(split[0]), split[1]
 
 # Import builtin extensions only here to avoid cyclic dependency issues.
 from . import _imdb # pylint: disable=unused-import
@@ -171,6 +176,6 @@ from . import _builtin_attr # pylint: disable=unused-import
 from . import _builtin_pred # pylint: disable=unused-import
 
 # Logging per registered builtin is very expensive and causes our import time to go way up. So instead we log them all in a big batch at the end.
-_dbg.logger.info(f"Registered builtin fetchers:\n    {'\n    '.join(_builtins.fetchers)}")
-_dbg.logger.info(f"Registered builtin attributes:\n    {'\n    '.join(_builtins.attributes)}")
-_dbg.logger.info(f"Registered builtin predicates:\n    {'\n    '.join(_builtins.predicates)}")
+_dbg.logger.info(f"Registered builtin fetchers:\n    {'\n    '.join(_builtins._fetchers)}")
+_dbg.logger.info(f"Registered builtin attributes:\n    {'\n    '.join(_builtins._attributes)}")
+_dbg.logger.info(f"Registered builtin predicates:\n    {'\n    '.join(_builtins._predicates)}")

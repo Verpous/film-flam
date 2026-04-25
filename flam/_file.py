@@ -30,18 +30,25 @@ _VERSION_KEY = 'version'
 # * All kinds of primitive(ish) types: int, str, bool, datetime..
 # * _FlamSerializables
 # * lists or dicts of any of the above
-# In other words we don't support sets, or lists of lists, or whatever else data structure. The reason is depth_first_iter. It can be expanded to support more if needed.
+# In other words we don't support sets, or lists of lists, or whatever else data structure. The reason is _depth_first_iter. It can be expanded to support more if needed.
 # File implementations also shouldn't change the order of fields because it has bearing on canonicalization.
 class _FlamSerializable(msgspec.Struct,
         forbid_unknown_fields=True,     # Better to be strict and reject files which have been tampered with.
         weakref=True,                   # Support referencing file objects by weakref. We use this for configuration files.
         order=True,                     # Support order operators '<', '>=', etc. on file objects, so we can canonicalize even files with lists of serializables.
         kw_only=True):                  # Only allow kw arguments in constructors. Helps avoid bugs.
+
+    # NOTE: I would've liked to document the public members of this class, but they still won't show in the docs so whatever.
     def replace(self, **changes: dict[str, typing.Any]) -> typing.Self:
         return msgspec.structs.replace(self, **changes)
 
+    # This is *significantly* faster than copy.deepcopy.
+    def deepcopy(self) -> typing.Self:
+        encoded = msgspec.json.encode(self)
+        return msgspec.json.decode(encoded, type=type(self))
+
     @classmethod
-    def load(cls, path: str) -> typing.Self:
+    def _load(cls, path: str) -> typing.Self:
         with open(path, 'rb') as f:
             contents = f.read()
 
@@ -64,12 +71,12 @@ class _FlamSerializable(msgspec.Struct,
 
             if is_version_upgrade_needed:
                 obj = cls._get_upgraded(obj_json, version_upgrades)
-                obj.write(path)
+                obj._write(path)
                 _dbg.logger.info(f"Successfully upgraded version of {cls}")
             else:
                 raise cls._validation_error(f'{ve}.') from ve
 
-        obj.sanity_checks()
+        obj._sanity_checks()
         _dbg.logger.info(f'Successfully loaded a {cls} of size {len(contents)}B')
         return obj
 
@@ -106,11 +113,11 @@ class _FlamSerializable(msgspec.Struct,
     def _version_upgrades(cls) -> dict[str, typing.Callable[[dict[str, typing.Any]], None]]:
         return {}
 
-    def write(self, path: str) -> None:
+    def _write(self, path: str) -> None:
         assert hasattr(self, _VERSION_KEY)
         self.version = _gen_version.__version__ # pylint: disable=attribute-defined-outside-init
 
-        self.sanity_checks()
+        self._sanity_checks()
 
         try:
             encoded = msgspec.json.encode(self)
@@ -125,15 +132,15 @@ class _FlamSerializable(msgspec.Struct,
         _dbg.logger.info(f'Successfully wrote a {type(self)} of size {len(formatted)}B')
 
     # Subclasses can override this to add file validity checks beyond what msgspec already does.
-    def sanity_checks(self) -> None:
+    def _sanity_checks(self) -> None:
         pass
 
     # Sorts all lists in the file recursively so that we can compare files for equality.
-    def canonicalize(self) -> None:
+    def _canonicalize(self) -> None:
         _dbg.logger.info(f'Canonicalizing a {type(self)}')
 
         # Must be depth-first for this to work.
-        for node in self.depth_first_iter():
+        for node in self._depth_first_iter():
             # This is a *significantly* faster way to get the field names than msgspec.structs.fields(node).
             for field in node.__struct_fields__:
                 value = getattr(node, field)
@@ -141,25 +148,20 @@ class _FlamSerializable(msgspec.Struct,
                 if isinstance(value, list):
                     value.sort()
 
-    def depth_first_iter(self) -> typing.Iterable[_FlamSerializable]:
+    def _depth_first_iter(self) -> typing.Iterable[_FlamSerializable]:
         # This is a *significantly* faster way to get the field names than msgspec.structs.fields(node).
         for field in self.__struct_fields__:
             value = getattr(self, field)
 
             # If a data structure isn't here we don't support it.
             if isinstance(value, _FlamSerializable):
-                yield from value.depth_first_iter()
+                yield from value._depth_first_iter()
             elif isinstance(value, list) and len(value) > 0 and isinstance(value[0], _FlamSerializable):
-                yield from (descendant for child in value for descendant in child.depth_first_iter())
+                yield from (descendant for child in value for descendant in child._depth_first_iter())
             elif isinstance(value, dict) and len(value) > 0 and isinstance(next(iter(value.values())), _FlamSerializable):
-                yield from (descendant for child in value.values() for descendant in child.depth_first_iter())
+                yield from (descendant for child in value.values() for descendant in child._depth_first_iter())
 
         yield self
-
-    # This is *significantly* faster than copy.deepcopy.
-    def deepcopy(self) -> typing.Self:
-        encoded = msgspec.json.encode(self)
-        return msgspec.json.decode(encoded, type=type(self))
 
     @classmethod
     def _validation_error(cls, message: str) -> _exc.FileValidationError:

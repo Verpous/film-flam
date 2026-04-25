@@ -27,30 +27,83 @@ import concurrent_log_handler
 
 # Very on the fence about this enum. I guess it's kind of nice but also I kind of don't like it. Whatever. It stays.
 class FlamEnv(enum.StrEnum):
+    """
+    Collection of environment variables used by flam.
+    """
+
     DEBUG               = 'FLAM_DEBUG'
+    """
+    If :py:attr:`is_truthy`, flam will operate in debug mode. We're more strict with exceptions in debug mode.
+    """
+
     LOG2CONSOLE         = 'FLAM_LOG2CONSOLE'
+    """
+    If :py:attr:`is_truthy`, logs will be printed not just to their log file but also to the console.
+    """
+
     CTX_DIR             = 'FLAM_DIR'
+    """
+    Overrides the default path used to store files.
+    """
+
     DOWNLOADS_DIR       = 'FLAM_DOWNLOADS'
+    """
+    Overrides the default path searched for files downloaded from the browser when fetching from IMDb.
+    """
+
     BROWSER             = 'FLAM_BROWSER'
+    """
+    Manually decide which browser to use to download CSVs from IMDb: 'chrome', 'edge', or 'firefox'.
+    """
+
     BROWSER_PROFILE     = 'FLAM_BROWSER_PROFILE'
+    """
+    Path to a browser profile to open the browser with when downloading CSVs from IMDb.
+    
+    This is only needed if your list is set to private so a profile is needed where you are expected to be already logged in.
+    """
+
     LOGLEVEL            = 'FLAM_LOGLEVEL'
+    """
+    Suppresses logs below this level.
+    """
 
     @property
     def is_defined(self) -> bool:
+        """
+        True if this environment variable is defined.
+        """
         return self in os.environ
 
     @property
     def is_truthy(self) -> bool:
+        """
+        True if this environment variable is defined, not empty, and not '0'.
+        """
         val = self.get_or_default()
         return val != '' and val != '0'
 
     def get_or_default(self, default: str = '') -> str:
+        """
+        Return the value of this environment variable, or some default if it is not defined.
+        """
         return os.environ.get(self, default)
 
 def is_debug() -> bool:
+    """
+    True if flam is in debug mode.
+    """
     return FlamEnv.DEBUG.is_truthy
 
 def get_log_file_path() -> str:
+    """
+    Returns the path where flam stores its logs:
+
+    * Windows: %LOCALAPPDATA%/film_flam/output.log
+    * Linux: ~/.local/state/film_flam/output.log
+    * macOS: ~/Library/Logs/film_flam/output.log
+    * On other platforms, uses the current directory (./output.log)
+    """
     DIRNAME = 'film_flam'
     FILENAME = 'output.log'
 
@@ -60,6 +113,7 @@ def get_log_file_path() -> str:
     if sys.platform.startswith('linux'):
         return os.path.join(os.path.expanduser('~'), '.local', 'state', DIRNAME, FILENAME)
 
+    # Darwin is mac.
     if sys.platform.startswith('darwin'):
         return os.path.join(os.path.expanduser('~'), 'Library', 'Logs', DIRNAME, FILENAME)
         
@@ -102,7 +156,7 @@ def _make_logger() -> logging.Logger:
 def _flam_record_factory(*args: typing.Any, **kwargs: typing.Any) -> logging.LogRecord:
     record = _prev_record_factory(*args, **kwargs)
     record.resetcolor = colorama.Style.RESET_ALL
-    record.levelcolor = _levelcolors[record.levelno]
+    record.levelcolor = _levelcolors.get(record.levelno, '') # Sphinx hits an error if we don't have a default.
     record.scriptName = _script_name
     return record
 
@@ -124,9 +178,15 @@ _prev_record_factory = logging.getLogRecordFactory()
 logging.setLogRecordFactory(_flam_record_factory)
 
 logger = _make_logger()
+"""
+The logger flam uses for all its logs. It is thread-safe and multiprocess-safe, and you may also use it.
+
+:meta hide-value:
+"""
 
 _prev_excepthook = sys.excepthook
 sys.excepthook = _log_exception
 
 # As a rule, flam logs should start with a capital letter and not end with a period!
+# NOTE: I am aware this log could be a problem because sometimes users store secrets in their env vars. I think I'll keep it anyway.
 logger.info(f"Environment variables:\n    {'\n    '.join(f'"{k}": \t"{v}"' for k, v in os.environ.items())}")

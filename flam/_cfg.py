@@ -23,6 +23,10 @@ from . import _ldef
 from . import _exc
 
 class SimpleList(_file._FlamSerializable):
+    """
+    Serializable object with configuration data about a simple list.
+    """
+
     uid:                    str
     name:                   str
     concrete_listdef:       _ldef.CanonListdef
@@ -34,6 +38,10 @@ class SimpleList(_file._FlamSerializable):
         return _ldef.CanonListdef(_ldef.SpecialListType.SIMPLE, self.uid)
 
 class CompositeList(_file._FlamSerializable):
+    """
+    Serializable object with configuration data about a composite list.
+    """
+
     uid:                    str
     name:                   str
     simple_list_uids:       list[str]
@@ -49,6 +57,10 @@ class CompositeList(_file._FlamSerializable):
 
 # Configuration files are not canonicalized because there is no need.
 class Configuration(_file._FlamSerializable):
+    """
+    Serializable object with all the configuration data.
+    """
+
     version:                str
     simple_lists_raw:       list[SimpleList]
     composite_lists_raw:    list[CompositeList]
@@ -57,13 +69,24 @@ class Configuration(_file._FlamSerializable):
 
     @property
     def simple_lists(self) -> ConfigurationLists[SimpleList]:
+        """
+        Data structure of all simple lists with some niceities that aren't serialized. Prefer this over :py:attr:`simple_lists_raw`.
+        """
         return _ConfigurationExtras.of(self).simple_lists
 
     @property
     def composite_lists(self) -> ConfigurationLists[CompositeList]:
+        """
+        Data structure of all composite lists with some niceities that aren't serialized. Prefer this over :py:attr:`composite_lists_raw`.
+        """
         return _ConfigurationExtras.of(self).composite_lists
 
     def lists_of_type(self, list_type: str) -> ConfigurationLists[SimpleList] | ConfigurationLists[CompositeList]:
+        """
+        Generic wrapper for :py:attr:`composite_lists`, :py:attr:`composite_lists`.
+
+        :param list_type: :py:attr:`~._ldef.SpecialListType.SIMPLE` or :py:attr:`~._ldef.SpecialListType.COMPOSITE`.
+        """
         match list_type:
             case _ldef.SpecialListType.SIMPLE:
                 return self.simple_lists
@@ -73,10 +96,15 @@ class Configuration(_file._FlamSerializable):
                 raise _exc.InputError(f"Invalid list type: '{list_type}': must be '{_ldef.SpecialListType.SIMPLE}' or '{_ldef.SpecialListType.COMPOSITE}'.")
 
     def get_list_by_abstract_listdef(self, abstract_listdef: _ldef.CanonListdef) -> SimpleList | CompositeList:
+        """
+        Returns a configured list based on the listdef.
+
+        :param abstract_listdef: listdef with the type and UID of the list.
+        """
         return self.lists_of_type(abstract_listdef.list_type).get_by_uid(abstract_listdef.address)
         
-    def sanity_checks(self) -> None:
-        super().sanity_checks()
+    def _sanity_checks(self) -> None:
+        super()._sanity_checks()
 
         # We permit names that satisfy looks_like_filter_token, as the ambiguity can be defeated with explicit listdefs if the user chooses to punish himself.
         # We permit names with wacky special characters, because we slugify everything when turning it into a filename.
@@ -120,8 +148,12 @@ class _ConfigurationExtras:
             cls._all_extras[id_] = extras
             return extras
 
-# Data structure for generically using simple or composite lists.
 class ConfigurationLists[T: (SimpleList, CompositeList)]:
+    """
+    Data structure for generically interfacing with :py:attr:`Configuration.simple_lists_raw` or :py:attr:`Configuration.composite_lists_raw`.
+    """
+    __no_init_doc__ = True
+    
     def __init__(self, cfg_weak: weakref.ref[Configuration], list_type: type[T]) -> None:
         self._cfg_weak = cfg_weak
         self._lists: typing.Callable[[], list[T]]
@@ -137,22 +169,45 @@ class ConfigurationLists[T: (SimpleList, CompositeList)]:
             raise RuntimeError(f"Unexpected {list_type=}")
 
     def __iter__(self) -> typing.Iterator[T]:
+        """
+        Iterate over all configured lists of this type.
+        """
         return iter(self._lists())
 
     def get_idx_by_uid(self, uid: str) -> int:
+        """
+        Get a list's index in the configuration using its UID.
+
+        :param uid: the list's UID.
+        """
         try:
             return next(i for i, l in enumerate(self) if l.uid == uid)
         except StopIteration as e:
             raise _exc.InputError(f"Invalid {self._list_type} UID: '{uid}'.") from e
 
     def get_idx_by_name(self, name: str) -> int:
+        """
+        Get a list's index in the configuration using its name.
+
+        :param name: the list's name.
+        """
         try:
             return next(i for i, l in enumerate(self) if l.name == name)
         except StopIteration as e:
             raise _exc.InputError(f"Invalid {self._list_type} name: '{name}'.") from e
 
     def get_by_uid(self, uid: str) -> T:
+        """
+        Get a list's configuration using its UID.
+
+        :param uid: the list's UID.
+        """
         return self._lists()[self.get_idx_by_uid(uid)]
 
     def get_by_name(self, name: str) -> T:
+        """
+        Get a list's configuration using its name.
+
+        :param name: the list's name.
+        """
         return self._lists()[self.get_idx_by_name(name)]

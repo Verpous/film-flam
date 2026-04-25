@@ -32,18 +32,36 @@ from . import _dbg
 from . import _ldef
 
 class GroupMode(enum.StrEnum):
+    """
+    Indicates whether people who collaborate together should be grouped into a single "person".
+    For example, if grouping is enabled then the Coen brothers will be presented as a single entry when finding directors.
+
+    """
     DEFAULT             = 'default'
+    """Use whichever default makes sense for the crew type."""
+
     GROUP               = 'group'
+    """Do try to group collaborators together."""
+
     SEPARATE            = 'separate'
+    """Don't group - keep each person as a separate entry."""
 
     def __repr__(self) -> str:
         return str(self)
 
     @classmethod
     def iterate_except_default(cls) -> typing.Iterable[GroupMode]:
+        """
+        Iterate over all values except :py:attr:`DEFAULT`.
+        """
         yield from _group_modes_except_default
 
 class CrewType(enum.StrEnum):
+    """
+    A job on a movie set.
+    """
+
+    # No need to have docstrings for each member, it's obvious what they mean. We won't document the default group mod either.
     CAST                = 'cast'
     STUNTCAST           = 'stuntcast'
     DIRECTOR            = 'director'
@@ -53,11 +71,15 @@ class CrewType(enum.StrEnum):
     CINEMATOGRAPHER     = 'cinematographer'
     EDITOR              = 'editor'
     ANY                 = 'any'
+    """No crew type in particular, only care about if the person was in the movie in any capacity."""
 
     # NOTE: throughout this file, public functions which receive a GroupMode are all expected to replace DEFAULT with whatever the default is.
     # Private functions all assume they won't receive DEFAULT and don't need to handle it.
     @property
     def default_group_mode(self) -> GroupMode:
+        """
+        The group mode which makes the most sense for this crew type.
+        """
         # There is a way to add this as an attribute of each enum but it has... problems.
         # It's also tricky to define a ClassVar to an enum so we put it outside the class.
         return _default_group_modes[self]
@@ -67,9 +89,19 @@ class CrewType(enum.StrEnum):
 
     @classmethod
     def iterate_except_any(cls) -> typing.Iterable[CrewType]:
+        """
+        Iterate over all values except :py:attr:`ANY`.
+        """
         yield from _crew_types_except_any
 
 def parse_ct_gm(ct_gm_str: str) -> tuple[CrewType, GroupMode]:
+    """
+    Parse a CTGM, short for "crew type + group mode", and returns it as a tuple.
+    
+    CTGMs can be just the crew type or also the group mode with a colon delimiter. Ex: 'director:group', 'cast:separate', 'writer:default' or just 'writer'.
+
+    :param ct_gm_str: the CTGM as a string.
+    """
     colon_idx = ct_gm_str.find(':')
     crew_type_str, group_mode_str = (ct_gm_str[:colon_idx], ct_gm_str[colon_idx + 1:]) if colon_idx != -1 else (ct_gm_str, GroupMode.DEFAULT)
 
@@ -86,6 +118,12 @@ def parse_ct_gm(ct_gm_str: str) -> tuple[CrewType, GroupMode]:
     return crew_type, group_mode
 
 def ct_gm_to_str(crew_type: CrewType, group_mode: GroupMode) -> str:
+    """
+    Inverse of :py:meth:`parse_ct_gm`.
+
+    :param crew_type: the crew type.
+    :param group_mode: the group mode.
+    """
     return f'{crew_type}:{group_mode}'
 
 _default_group_modes = {
@@ -525,11 +563,33 @@ class _MinSupersetPeopleComputation(_MLVComputation):
         _dbg.logger.info(f"Vaulted minimal superset people for {self_ct_gm=}, {self._other_crew_type=}")
 
 class FindableType(enum.StrEnum):
+    """
+    The type of an object which can be found in a movie list.
+    """
     MOVIES              = 'movies'
+    """Each object represents a single movie from the list."""
+
     PEOPLE              = 'people'
+    """Each object may represent more than one person from the list, if grouping is enabled. They can also be limited to a specific crew type and group mode."""
+
     ROLES               = 'roles'
+    """Each object represents an appearance of a person (or several grouped people) in a specific film in some specific capacity.
+    Think "Cristoph Waltz as a castmember in Inglorious Basterds".
+    
+    So when searching for roles, you will see an entry per person per movie."""
 
     def is_applicable_to(self, find: FindableType) -> bool:
+        """
+        True if attributes of this findable type can be extracted from objects of type ``find``.
+
+        Movie objects only support movie attributes.
+        
+        People objects only support people attributes.
+        
+        Roles are a combination of a movie and a people, so they support all attribute types.
+        
+        :param find: the type of the object you would try to extract an attribute from.
+        """
         # Roles are compatible with everything because a role is associated with people and a movie.
         # DECISION: I considered allowing total cross applicability, by say applying movie attributes to a person
         # by returning the array of results for every movie the person is in. But that's ridiculous and confusing and we're not doing it.
@@ -539,22 +599,34 @@ class FindableType(enum.StrEnum):
         return str(self)
 
 class Findable(abc.ABC):
+    """
+    Base class for "findables"; objects which can be found in a movie list.
+    """
+    __no_init_doc__ = True
+    
     def __init__(self, movie_list: MovieList) -> None:
         self._movie_list = movie_list
 
     @property
     def movie_list(self) -> MovieList:
+        """
+        The list this object came from.
+        """
         return self._movie_list
 
     @property
     @abc.abstractmethod
     def type_(self) -> FindableType:
-        pass
+        """
+        The type of this object.
+        """
 
     @property
     @abc.abstractmethod
     def uid(self) -> str:
-        pass
+        """
+        A unique string identifying this object. It's unique only per movie list.
+        """
 
     @abc.abstractmethod
     def _extract_internal(self, attribute: _attr.Attribute) -> _attr.AttributeValue:
@@ -565,6 +637,11 @@ class Findable(abc.ABC):
         pass
 
     def extract(self, attribute: _attr.Attribute) -> _attr.AttributeValue:
+        """
+        Get the value of an attribute which is applicable to this object. See :py:meth:`FindableType.is_applicable_to`.
+
+        :param attribute: the attribute whose value you are interested in.
+        """
         if not attribute.findable_type.is_applicable_to(self.type_):
             raise _exc.InputError(f"Attribute '{attribute.qualified_name}' is a {attribute.findable_type} attribute, so it is not found on {self.type_}.")
 
@@ -572,10 +649,18 @@ class Findable(abc.ABC):
 
     # __getitem__ for also encapsulating the attribute lookup, the ultimate quick & dirty way. extract() for more efficient and clean code.
     def __getitem__(self, attribute_name: str) -> _attr.AttributeValue:
+        """
+        Same as :py:meth:`extract`, but resolves the attribute from its name.
+
+        :param attribute_name: the name of the attribute. It does not have to be a qualified name.
+        """
         attr = self._movie_list.ctx.attributes.get(attribute_name, type_hint=self.type_)
         return self.extract(attr)
 
 class Movie(Findable):
+    """
+    Represents a movie from the list.
+    """
     def __init__(self, movie_list: MovieList, mlf_movie: _mlf.MLFMovie) -> None:
         super().__init__(movie_list)
         self._mlf_movie = mlf_movie
@@ -591,6 +676,12 @@ class Movie(Findable):
 
     @property
     def underlying_file_movie_readonly(self) -> _mlf.MLFMovie:
+        """
+        Serializable object we use to store all the movie's data to disk. It can technically be modified, but you shouldn't do that.
+
+        NOTE: this is mostly an internal API; you might need it when implementing a custom extension.
+        For typical use cases, you should use attributes to read the movie's data instead.
+        """
         return self._mlf_movie
 
     def _extract_internal(self, attribute: _attr.Attribute) -> _attr.AttributeValue:
@@ -600,6 +691,12 @@ class Movie(Findable):
         return predicate._excrete_from_movie(self, self._mlf_movie) # type: ignore
 
     def associated_people(self, crew_type: CrewType, group_mode: GroupMode) -> typing.Iterable[People]:
+        """
+        Iterate over all people who were in this movie in a specific capacity. The order of iteration is guaranteed to be consistent.
+
+        :param crew_type: only find people who performed this specific job on the movie
+        :param group_mode: indicates if collaborators should be grouped together
+        """
         if group_mode == GroupMode.DEFAULT:
             group_mode = crew_type.default_group_mode
 
@@ -615,6 +712,9 @@ class Movie(Findable):
         yield from self._associated_people_cache[ct_gm]
 
     def associated_roles(self, crew_type: CrewType, group_mode: GroupMode) -> typing.Iterable[Role]:
+        """
+        Same as :py:meth:`associated_people`, but returns them as :py:class:`Role` objects where the movie is this movie.
+        """
         ml = self.movie_list
 
         if group_mode == GroupMode.DEFAULT:
@@ -629,11 +729,20 @@ class Movie(Findable):
             yield role
 
 class PeopleUidParts(typing.NamedTuple):
+    """
+    The parts which make up a People UID. Returned by :py:meth:`People.decompose_uid`.
+    """
     mlf_people_uids: typing.Iterable[str]
+    """"""
     crew_type: CrewType
+    """"""
     group_mode: GroupMode
+    """"""
 
 class People(Findable):
+    """
+    Represents a person in their capacity as a specific crew type, or several collaborating people if grouping is enabled.
+    """
     def __init__(self, movie_list: MovieList, mlf_people: typing.Iterable[_mlf.MLFPerson], crew_type: CrewType, group_mode: GroupMode) -> None:
         super().__init__(movie_list)
 
@@ -655,14 +764,26 @@ class People(Findable):
 
     @property
     def crew_type(self) -> CrewType:
+        """
+        The job these people perform in movies.
+        """
         return self._crew_type
 
     @property
     def group_mode(self) -> GroupMode:
+        """
+        Whether these people were searched with grouping enabled.
+        """
         return self._group_mode
 
     @property
     def underlying_file_people_readonly(self) -> list[_mlf.MLFPerson]:
+        """
+        List of serializable objects we use to store each person's data to disk, sorted in a consistent order. It can technically be modified, but you shouldn't do that.
+
+        NOTE: this is mostly an internal API; you might need it when implementing a custom extension.
+        For typical use cases, you should use attributes to read the people's data instead.
+        """
         return self._mlf_people
     
     def _extract_internal(self, attribute: _attr.Attribute) -> _attr.AttributeValue:
@@ -672,6 +793,11 @@ class People(Findable):
         return predicate._excrete_from_people(self, self._mlf_people) # type: ignore
 
     def associated_movies(self) -> typing.Iterable[Movie]:
+        """
+        Iterate over movies these people were in as this crew type. The order of iteration is guaranteed to be consistent.
+
+        Note that in the case of several grouped people, only movies that they **were all in together** will be returned.
+        """
         # Guaranteed consisted ordering because find() has consistent ordering.
         if self._associated_movies_cache is None:
             # NOTE: we encounter the need to compute this from a specific People instance, but the computation will actually compute it *for every* People with this CTGM.
@@ -682,6 +808,9 @@ class People(Findable):
         yield from self._associated_movies_cache.values()
 
     def associated_roles(self) -> typing.Iterable[Role]:
+        """
+        Same as :py:meth:`associated_movies`, but returns them as :py:class:`Role` objects where the people are these people.
+        """
         ml = self.movie_list
 
         # Since associated people are all guaranteed to be in the movie, they should each correspond to a Role object.
@@ -692,10 +821,14 @@ class People(Findable):
             assert role is not None
             yield role
 
-    # Find the smallest group of people in another crew type who contain every person in this group.
-    # I think by nature of our grouping algorithm, there is guaranteed to be either no such group, or exactly 1 unique group like this.
+    # I think by nature of our grouping algorithm, there is guaranteed to be either no min superset, or exactly 1 unique min superset like this.
     # Assume our group is P1,P2 and in another crew type there's the groups P1,P2,P3 and P1,P2,P4. So then the grouping algorithm would've created P1,P2 as well.
     def minimal_superset_people_in_other_crew_type(self, crew_type: CrewType) -> None | People:
+        """
+        Returns the smallest group of people in another crew type who contain every person in this group, or ``None`` if there is no such group.
+
+        :param crew_type: which crew type to search for these people in.
+        """
         # Optimization - same crew type, same people.
         if crew_type == self.crew_type:
             return self
@@ -708,8 +841,13 @@ class People(Findable):
 
         return self._minimal_superset_people_cache[crew_type]
 
-    # Find the smallest group of people in another movie list and optionally different crew type who contain every person in this group.
     def minimal_superset_people_in_other_list(self, other_list: MovieList, crew_type: None | CrewType = None) -> None | People:
+        """
+        Returns the smallest group of people in another movie list and optionally different crew type who contain every person in this group, or ``None`` if there is no such group.
+
+        :param other_list: which movie list to search for these people in.
+        :param crew_type: which crew type to search for these people in. By default searches in the same crew type as these people.
+        """
         if crew_type is None:
             crew_type = self.crew_type
 
@@ -771,6 +909,11 @@ class People(Findable):
         return minsuper
 
     def are_in_movie(self, movie: Movie) -> bool:
+        """
+        Check if these people were in a movie as their crew type.
+
+        :param movie: the movie to check.
+        """
         # Naively checking if these people are in the movie by inspecting the MLF sounds like a fast algorithm,
         # but we call this function so many times it was actually a major slowdown. So we've made _associated_movies_cache a dict and use it instead.
         if self._associated_movies_cache is None:
@@ -782,6 +925,13 @@ class People(Findable):
 
     @classmethod
     def compose_uid(cls, mlf_people_uids: typing.Iterable[str], crew_type: CrewType, group_mode: GroupMode) -> str:
+        """
+        Compose a people UID which can be used to :py:meth:`MovieList.get_people_by_uid`.
+
+        :param mlf_people_uids: the UID of each person in the source that the movie list was fetched from.
+        :param crew_type: the people's crew type.
+        :param group_mode: the people's group mode.
+        """
         if group_mode == GroupMode.DEFAULT:
             group_mode = crew_type.default_group_mode
             
@@ -791,6 +941,9 @@ class People(Findable):
 
     @classmethod
     def decompose_uid(cls, uid: str) -> PeopleUidParts:
+        """
+        Inverse of :py:meth:`compose_uid`.
+        """
         try:
             split = uid.split('::')
             crew_type = CrewType(split[0])
@@ -800,12 +953,25 @@ class People(Findable):
             raise _exc.InputError(f"Invalid People uid: '{uid}'") from e
 
 class RoleUidParts(typing.NamedTuple):
+    """
+    The parts which make up a Role UID. Returned by :py:meth:`Role.decompose_uid`.
+    """
+
+    # Empty docs because they aren't needed but if it wasn't empty it would be inherited from NamedTuple.
     movie_uid: str
+    """"""
     people_uid: str
+    """"""
 
 type MLFRolesDict = dict[str, dict[CrewType, _mlf.MLFRole]]
+"""
+Return type of :py:meth:`Role.underlying_file_roles_readonly`.
+"""
 
 class Role(Findable):
+    """
+    Represents an appearance of a person (or several grouped people) in a specific film in some specific capacity. Think "Cristoph Waltz as a castmember in Inglorious Basterds".
+    """
     def __init__(self, movie_list: MovieList, movie: Movie, people: People) -> None:
         super().__init__(movie_list)
         self._movie = movie
@@ -842,22 +1008,50 @@ class Role(Findable):
 
     @property
     def movie(self) -> Movie:
+        """
+        The movie this role was in.
+        """
         return self._movie
 
     @property
     def people(self) -> People:
+        """
+        The people who performed this role.
+        """
         return self._people
 
     @property
     def crew_type(self) -> CrewType:
+        """
+        The job these people performed in this movie.
+        """
         return self._people.crew_type
 
     @property
     def group_mode(self) -> GroupMode:
+        """
+        Whether these people were grouped by collaborators.
+        """
         return self._people.group_mode
 
     @property
     def underlying_file_roles_readonly(self) -> MLFRolesDict:
+        """
+        Dictionary of serializable objects we use to store each role's data to disk. It can technically be modified, but you shouldn't do that.
+
+        The data structure maps the "MLF" UID of people in the group (i.e., the UID of a person in the fetch source) and the crew type to the object with the role data.
+
+        If :py:attr:`crew_type` isn't :py:attr:`CrewType.ANY`, then that'll be the only crew type in the dictionary.
+        Otherwise, the dictionary will have every crew type the person occupied.
+
+        .. code-block:: python
+            
+            # mlf_person is a person's underlying file object, and crew_type is the crew type he was in in this role.
+            mlf_role = roles_dict[mlf_person.uid][crew_type]
+            print(mlf_role.characters)
+
+        NOTE: this is mostly an internal API; you might need it when implementing a custom extension. For typical use cases, you should use attributes to read the role's data instead.
+        """
         return self._mlf_roles
 
     def _extract_internal(self, attribute: _attr.Attribute) -> _attr.AttributeValue:
@@ -890,10 +1084,19 @@ class Role(Findable):
 
     @classmethod
     def compose_uid(cls, movie: Movie, people: People) -> str:
+        """
+        Compose a role UID which can be used to :py:meth:`MovieList.get_role_by_uid`.
+
+        :param movie: the movie the role was in.
+        :param people: the people in the role.
+        """
         return f'{movie.uid}::{people.uid}'
 
     @classmethod
     def decompose_uid(cls, uid: str) -> RoleUidParts:
+        """
+        Inverse of :py:meth:`compose_uid`.
+        """
         try:
             split = uid.split('::', maxsplit=1)
             return RoleUidParts(movie_uid=split[0], people_uid=split[1])
@@ -901,6 +1104,11 @@ class Role(Findable):
             raise _exc.InputError(f"Invalid Role uid: '{uid}'") from e
 
 class MovieList:
+    """
+    Represents a movie list with functions to inspect the objects in the list.
+    """
+    __no_init_doc__ = True
+
     def __init__(self, movie_list_file: _mlf.MovieListFile, ctx: _ctx.FlamContext) -> None:
         _dbg.logger.info(f"Creating movie list for '{movie_list_file.abstract_listdef}', "
             f"which has {len(movie_list_file.movies_by_uid)} movies, {len(movie_list_file.people_by_uid)} people")
@@ -922,24 +1130,48 @@ class MovieList:
     # If you're implementing an attribute you should be allowed to peek "under the hood" more than a typical user anyway.
     @property
     def underlying_file_readonly(self) -> _mlf.MovieListFile:
+        """
+        Serializable object we use to store all the list's data to disk. It can technically be modified, but you shouldn't do that.
+
+        NOTE: this is mostly an internal API; you might need it when implementing a custom extension.
+        For typical use cases, you should use :py:meth:`find` to read the list's data instead.
+        """
         return self._movie_list_file
 
     @property
     def ctx(self) -> _ctx.FlamContext:
+        """
+        The context used to load this list.
+        """
         return self._ctx
 
     @property
     def abstract_listdef(self) -> _ldef.CanonListdef:
+        """
+        Listdef which describes how to get this list.
+        """
         return self._movie_list_file.abstract_listdef
 
     @property
     def uid_family(self) -> str:
+        """
+        The UID family used to fetch this list or all lists compositing it.
+        I.e., if you have multiple ways to fetch data from IMDb, they would all have the same family and be compatible with one another for compositing.
+        """
         return self._movie_list_file.uid_family
 
     # Don't default to CrewType.ANY, I would rather users be explicit.
     # I want to log when this function is called but that could flood the logs too much.
     def find(self, what: FindableType, crew_type: None | CrewType = None, group_mode: GroupMode = GroupMode.DEFAULT,
             filter: None | _filter.Filter = None) -> typing.Iterable[Findable]:
+        """
+        Iterate over objects in the list. They're guaranteed to be returned in a consistent order every time.
+
+        :param what: which objects to find.
+        :param crew_type: limit the search to a crew type. This has no meaning when finding :py:attr:`FindableType.MOVIES`, but is required for :py:attr:`FindableType.PEOPLE` or :py:attr:`FindableType.ROLES`.
+        :param group_mode: specify whether to group collaborators. This has no meaning when finding :py:attr:`FindableType.MOVIES`, and is optional for the rest.
+        :param filter: skip objects which don't pass this filter. It must have the same findable type as ``what``.
+        """
         if filter is not None and filter.findable_type != what:
             raise _exc.InputError(f"Requested to find {what} but filter is of type {filter.findable_type}.")
 
@@ -977,16 +1209,25 @@ class MovieList:
                     yield f
 
     def find_movies(self, filter: None | _filter.Filter = None) -> typing.Iterable[Movie]:
+        """
+        Wrapper for :py:meth:`find` when searching for :py:attr:`FindableType.MOVIES`.
+        """
         # The infrastructure we will need to write these functions without ignoring types is too much to bother.
         return typing.cast(typing.Iterable[Movie], self.find(FindableType.MOVIES, filter=filter))
 
     def find_people(self, crew_type: CrewType, group_mode: GroupMode = GroupMode.DEFAULT, filter: None | _filter.Filter = None) -> typing.Iterable[People]:
+        """
+        Wrapper for :py:meth:`find` when searching for :py:attr:`FindableType.PEOPLE`.
+        """
         return typing.cast(typing.Iterable[People], self.find(FindableType.PEOPLE, crew_type=crew_type, group_mode=group_mode, filter=filter))
 
     def find_roles(self, crew_type: CrewType, group_mode: GroupMode = GroupMode.DEFAULT, filter: None | _filter.Filter = None) -> typing.Iterable[Role]:
+        """
+        Wrapper for :py:meth:`find` when searching for :py:attr:`FindableType.ROLES`.
+        """
         return typing.cast(typing.Iterable[Role], self.find(FindableType.ROLES, crew_type=crew_type, group_mode=group_mode, filter=filter))
 
-    def export(self, filter: _filter.Filter) -> _mlf.MovieListFile:
+    def _export(self, filter: _filter.Filter) -> _mlf.MovieListFile:
         _dbg.logger.info(f"Exporting '{self._movie_list_file.abstract_listdef}' with {filter=!s}")
         filtered_file = self._movie_list_file.deepcopy()
 
@@ -997,7 +1238,27 @@ class MovieList:
         _dbg.logger.info(f"Resulting file has {len(filtered_file.movies_by_uid)} movies, {len(filtered_file.people_by_uid)} people")
         return filtered_file
 
+    def get_by_uid(self, findable_type: FindableType, uid: str) -> None | Findable:
+        """
+        Get an object by its UID, or ``None`` if it doesn't exist.
+
+        :param findable_type: the type of object to get.
+        :param uid: the object's UID.
+        """
+        match findable_type:
+            case FindableType.MOVIES:
+                return self.get_movie_by_uid(uid)
+            case FindableType.PEOPLE:
+                return self.get_people_by_uid(uid)
+            case FindableType.ROLES:
+                return self.get_role_by_uid(uid)
+            case _:
+                raise RuntimeError(f"Unexpected {findable_type=}")
+
     def get_movie_by_uid(self, uid: str) -> None | Movie:
+        """
+        Wrapper for :py:meth:`get_by_uid` when searching for :py:attr:`FindableType.MOVIES`.
+        """
         # These getters return None instead of raising an exception because FlamErrors create a log,
         # and it's too expensive for the amount of times we expect this to be called and fail.
         movies = self._generate_movies()
@@ -1006,6 +1267,11 @@ class MovieList:
     # The ct_gm can be deduced from the uid but from profiling we know it's a little expensive.
     # The caller almost always knows the ct_gm beforehand so we can ask them to help us be efficient. On large workloads this optimization is significant.
     def get_people_by_uid(self, uid: str, ct_gm_hint: None | tuple[CrewType, GroupMode] = None) -> None | People:
+        """
+        Wrapper for :py:meth:`get_by_uid` when searching for :py:attr:`FindableType.PEOPLE`.
+
+        :param ct_gm_hint: the people's crew type and group mode. This is optional because it can be deduced from ``uid``, but it helps performance.
+        """
         if ct_gm_hint is None:
             # Break down the uid to determine the ct_gm and know which list to search in.
             breakdown = People.decompose_uid(uid)
@@ -1017,6 +1283,11 @@ class MovieList:
         return peoples.get(uid, None)
 
     def get_role_by_uid(self, uid: str, ct_gm_hint: None | tuple[CrewType, GroupMode] = None) -> None | Role:
+        """
+        Wrapper for :py:meth:`get_by_uid` when searching for :py:attr:`FindableType.ROLES`.
+
+        :param ct_gm_hint: the role's crew type and group mode. This is optional because it can be deduced from ``uid``, but it helps performance.
+        """
         if ct_gm_hint is None:
             # Break down the uid to determine the ct_gm and know which list to search in.
             role_breakdown = Role.decompose_uid(uid)
@@ -1027,17 +1298,6 @@ class MovieList:
             
         roles = self._generate_roles(*ct_gm)
         return roles.get(uid, None)
-
-    def get_by_uid(self, findable_type: FindableType, uid: str) -> None | Findable:
-        match findable_type:
-            case FindableType.MOVIES:
-                return self.get_movie_by_uid(uid)
-            case FindableType.PEOPLE:
-                return self.get_people_by_uid(uid)
-            case FindableType.ROLES:
-                return self.get_role_by_uid(uid)
-            case _:
-                raise RuntimeError(f"Unexpected {findable_type=}")
 
     def _compute_or_load(self, computation: _MLVComputation, should_vault: bool = True, should_write: bool = True) -> None:
         if computation.load_if_vaulted(self, self._vault):

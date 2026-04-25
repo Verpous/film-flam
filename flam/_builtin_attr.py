@@ -65,6 +65,7 @@ def _register_easy_attribute[T](params: attrutils.EasyAttributeParams,
     default_max_len = _STR_LEN_DONTCARE,
 ))
 def _movie_uid_extractor(self: attrutils.EasyAttribute, movie: _ml.Movie, mlf_movie: _mlf.MLFMovie) -> str:
+    """the movie's UID in flam"""
     return movie.uid
 
 # For movies specifically the ML uid and the MLF uid are the same, but still implement them separately.
@@ -78,6 +79,7 @@ def _movie_uid_extractor(self: attrutils.EasyAttribute, movie: _ml.Movie, mlf_mo
     default_max_len = _STR_LEN_DONTCARE,
 ))
 def _movie_origin_uid_extractor(self: attrutils.EasyAttribute, movie: _ml.Movie, mlf_movie: _mlf.MLFMovie) -> str:
+    """the movie's UID in the source from which the data is fetched"""
     return mlf_movie.uid
 
 # Primary name should be 'title' because People have an attribute named 'name'.
@@ -91,6 +93,7 @@ def _movie_origin_uid_extractor(self: attrutils.EasyAttribute, movie: _ml.Movie,
     default_max_len = _STR_LEN_LONG,
 ))
 def _movie_title_extractor(self: attrutils.EasyAttribute, movie: _ml.Movie, mlf_movie: _mlf.MLFMovie) -> None | str:
+    """the movie's title"""
     return mlf_movie.title
 
 @_register_easy_attribute(attrutils.EasyAttributeParams(
@@ -103,6 +106,7 @@ def _movie_title_extractor(self: attrutils.EasyAttribute, movie: _ml.Movie, mlf_
     default_max_len = _STR_LEN_SHORT,
 ))
 def _movie_source_extractor(self: attrutils.EasyAttribute, movie: _ml.Movie, mlf_movie: _mlf.MLFMovie) -> list[str]:
+    """for composite lists - which lists this movie came from"""
     sources = []
 
     # Guaranteed consistent ordering by canonicalization of per_src_data.
@@ -126,6 +130,7 @@ def _movie_source_extractor(self: attrutils.EasyAttribute, movie: _ml.Movie, mlf
     default_max_len = _STR_LEN_DONTCARE,
 ))
 def _movie_synopsis_extractor(self: attrutils.EasyAttribute, movie: _ml.Movie, mlf_movie: _mlf.MLFMovie) -> None | str:
+    """the movie's synopsis"""
     return mlf_movie.synopsis
 
 def _make_date_aliases(name: str) -> list[str]:
@@ -154,6 +159,7 @@ for handler in attrutils.DATE_HANDLERS:
         default_max_len = _STR_LEN_DONTCARE,
     ))
     def _movie_watch_date_extractor(self: attrutils.EasyAttribute, movie: _ml.Movie, mlf_movie: _mlf.MLFMovie) -> list[datetime.date]:
+        """list of dates that you watched the film in this date format"""
         return [typing.cast(attrutils.DateHandler, self._params.type_handler).strip(watch_date) for watch_date in mlf_movie.watch_dates]
 
     name_without_type = 'release' + handler.name
@@ -168,6 +174,7 @@ for handler in attrutils.DATE_HANDLERS:
         default_max_len = _STR_LEN_DONTCARE,
     ))
     def _movie_release_date_extractor(self: attrutils.EasyAttribute, movie: _ml.Movie, mlf_movie: _mlf.MLFMovie) -> None | datetime.date:
+        """the movie's release date in this date format"""
         return None if mlf_movie.release_date is None else typing.cast(attrutils.DateHandler, self._params.type_handler).strip(mlf_movie.release_date)
 
     name_without_type = 'listing' + handler.name
@@ -182,6 +189,7 @@ for handler in attrutils.DATE_HANDLERS:
         default_max_len = _STR_LEN_SHORT,
     ))
     def _movie_listing_date_extractor(self: attrutils.EasyAttribute, movie: _ml.Movie, mlf_movie: _mlf.MLFMovie) -> list[None | datetime.date]:
+        """list of when you added this movie to this list or all lists compositing this list, in this date format"""
         return [
             None if per_src_data.listing_date is None else typing.cast(attrutils.DateHandler, self._params.type_handler).strip(per_src_data.listing_date)
             for per_src_data in mlf_movie.per_src_data
@@ -197,6 +205,7 @@ for handler in attrutils.DATE_HANDLERS:
     default_max_len = _STR_LEN_LONG,
 ))
 def _movie_note_extractor(self: attrutils.EasyAttribute, movie: _ml.Movie, mlf_movie: _mlf.MLFMovie) -> list[None | str]:
+    """a personal note you left on this movie"""
     return [per_src_data.note for per_src_data in mlf_movie.per_src_data]
 
 # 'index' only as an alias because there's a predicate by the same name.
@@ -210,6 +219,7 @@ def _movie_note_extractor(self: attrutils.EasyAttribute, movie: _ml.Movie, mlf_m
     default_max_len = _STR_LEN_SHORT,
 ))
 def _movie_index_extractor(self: attrutils.EasyAttribute, movie: _ml.Movie, mlf_movie: _mlf.MLFMovie) -> list[None | int]:
+    """list of the movie's indexes in the lists it came from"""
     return [per_src_data.list_index for per_src_data in mlf_movie.per_src_data]
 
 @_register_easy_attribute(attrutils.EasyAttributeParams(
@@ -222,6 +232,7 @@ def _movie_index_extractor(self: attrutils.EasyAttribute, movie: _ml.Movie, mlf_
     default_max_len = _STR_LEN_DONTCARE,
 ), create_numericals = True)
 def _movie_runtime_extractor(self: attrutils.EasyAttribute, movie: _ml.Movie, mlf_movie: _mlf.MLFMovie) -> None | int:
+    """the movie's runtime in minutes"""
     return mlf_movie.runtime_minutes
 
 @_register_easy_attribute(attrutils.EasyAttributeParams(
@@ -234,6 +245,7 @@ def _movie_runtime_extractor(self: attrutils.EasyAttribute, movie: _ml.Movie, ml
     default_max_len = _STR_LEN_DONTCARE,
 ), create_numericals = True)
 def _movie_metascore_extractor(self: attrutils.EasyAttribute, movie: _ml.Movie, mlf_movie: _mlf.MLFMovie) -> None | int:
+    """the movie's metascore"""
     return mlf_movie.metascore
 
 @_register_easy_attribute(attrutils.EasyAttributeParams(
@@ -246,19 +258,8 @@ def _movie_metascore_extractor(self: attrutils.EasyAttribute, movie: _ml.Movie, 
     default_max_len = _STR_LEN_DONTCARE,
 ), create_numericals = True)
 def _movie_metascore_votes_extractor(self: attrutils.EasyAttribute, movie: _ml.Movie, mlf_movie: _mlf.MLFMovie) -> None | int:
+    """how many critic's reviews went into this movie's metascore"""
     return mlf_movie.metascore_votes
-
-@_register_easy_attribute(attrutils.EasyAttributeParams(
-    name_without_type = 'votes',
-    aliases_without_type = ['vote-count'],
-    findable_type = _ml.FindableType.MOVIES,
-    type_handler = attrutils.BIG_INT_HANDLER,
-    is_ascending = False,
-    truncation_style = utils.TruncationStyle.NO_TRIM,
-    default_max_len = _STR_LEN_DONTCARE,
-), create_numericals = True)
-def _movie_votes_extractor(self: attrutils.EasyAttribute, movie: _ml.Movie, mlf_movie: _mlf.MLFMovie) -> None | int:
-    return mlf_movie.votes
 
 @_register_easy_attribute(attrutils.EasyAttributeParams(
     name_without_type = 'rating',
@@ -270,7 +271,21 @@ def _movie_votes_extractor(self: attrutils.EasyAttribute, movie: _ml.Movie, mlf_
     default_max_len = _STR_LEN_DONTCARE,
 ), create_numericals = True)
 def _movie_rating_extractor(self: attrutils.EasyAttribute, movie: _ml.Movie, mlf_movie: _mlf.MLFMovie) -> None | float:
+    """the movie's rating"""
     return mlf_movie.rating
+
+@_register_easy_attribute(attrutils.EasyAttributeParams(
+    name_without_type = 'votes',
+    aliases_without_type = ['vote-count'],
+    findable_type = _ml.FindableType.MOVIES,
+    type_handler = attrutils.BIG_INT_HANDLER,
+    is_ascending = False,
+    truncation_style = utils.TruncationStyle.NO_TRIM,
+    default_max_len = _STR_LEN_DONTCARE,
+), create_numericals = True)
+def _movie_votes_extractor(self: attrutils.EasyAttribute, movie: _ml.Movie, mlf_movie: _mlf.MLFMovie) -> None | int:
+    """how many people voted on this movie's rating"""
+    return mlf_movie.votes
 
 @_register_easy_attribute(attrutils.EasyAttributeParams(
     name_without_type = 'my-rating',
@@ -282,6 +297,7 @@ def _movie_rating_extractor(self: attrutils.EasyAttribute, movie: _ml.Movie, mlf
     default_max_len = _STR_LEN_DONTCARE,
 ), create_numericals = True)
 def _movie_my_rating_extractor(self: attrutils.EasyAttribute, movie: _ml.Movie, mlf_movie: _mlf.MLFMovie) -> None | float:
+    """the rating you gave to this movie"""
     return mlf_movie.my_rating
 
 @_register_easy_attribute(attrutils.EasyAttributeParams(
@@ -294,6 +310,7 @@ def _movie_my_rating_extractor(self: attrutils.EasyAttribute, movie: _ml.Movie, 
     default_max_len = _STR_LEN_LONG,
 ))
 def _movie_genres_extractor(self: attrutils.EasyAttribute, movie: _ml.Movie, mlf_movie: _mlf.MLFMovie) -> list[str]:
+    """list of the movie's genres"""
     # Assume lists are sorted at the source, because of canonicalization. So we won't sort them here.
     # However we do have to copy the list to prevent giving the user access to memory he shouldn't have.
     return list(mlf_movie.genres)
@@ -308,6 +325,7 @@ def _movie_genres_extractor(self: attrutils.EasyAttribute, movie: _ml.Movie, mlf
     default_max_len = _STR_LEN_SHORT,
 ))
 def _movie_languages_extractor(self: attrutils.EasyAttribute, movie: _ml.Movie, mlf_movie: _mlf.MLFMovie) -> list[str]:
+    """list of the movie's languages"""
     # Assume lists are sorted at the source, because of canonicalization. So we won't sort them here.
     # However we do have to copy the list to prevent giving the user access to memory he shouldn't have.
     return list(mlf_movie.languages)
@@ -322,6 +340,7 @@ def _movie_languages_extractor(self: attrutils.EasyAttribute, movie: _ml.Movie, 
     default_max_len = _STR_LEN_SHORT,
 ))
 def _movie_countries_extractor(self: attrutils.EasyAttribute, movie: _ml.Movie, mlf_movie: _mlf.MLFMovie) -> list[str]:
+    """list of the movie's producing countries"""
     # Assume lists are sorted at the source, because of canonicalization. So we won't sort them here.
     # However we do have to copy the list to prevent giving the user access to memory he shouldn't have.
     return list(mlf_movie.countries)
@@ -340,6 +359,7 @@ for crew_type in _ml.CrewType:
         default_max_len = _STR_LEN_SHORT,
     ))
     def _movie_crew_type_extractor(self: attrutils.EasyAttribute, movie: _ml.Movie, mlf_movie: _mlf.MLFMovie) -> list[None | str]:
+        """list of names of the movie's crewmembers in this crew type"""
         # Use self.name_without_type instead of crew_type to avoid cell-var-from-loop error. This is important.
         ct = _ml.CrewType(self.name_without_type) if self.name_without_type != 'people' else _ml.CrewType.ANY
 
@@ -368,6 +388,7 @@ def _get_only_value[TKey, TVal](d: dict[TKey, TVal]) -> TVal:
     default_max_len = _STR_LEN_LONG,
 ))
 def _movie_stars_extractor(self: attrutils.EasyAttribute, movie: _ml.Movie, mlf_movie: _mlf.MLFMovie) -> list[None | str]:
+    """list names of the movie's starring actors"""
     # Consistent ordering guaranteed by associated_roles.
     return [
         role.people.underlying_file_people_readonly[0].name
@@ -389,7 +410,22 @@ def _movie_stars_extractor(self: attrutils.EasyAttribute, movie: _ml.Movie, mlf_
     default_max_len = _STR_LEN_DONTCARE,
 ))
 def _people_uid_extractor(self: attrutils.EasyAttribute, people: _ml.People, mlf_people: list[_mlf.MLFPerson]) -> str:
+    """the people's UID in flam"""
     return people.uid
+
+@_register_easy_attribute(attrutils.EasyAttributeParams(
+    name_without_type = 'origin-uid',
+    aliases_without_type = ['origin-id', 'origin-guid', 'origin-identifier'],
+    findable_type = _ml.FindableType.PEOPLE,
+    type_handler = attrutils.STR_HANDLER,
+    is_ascending = True,
+    truncation_style = utils.TruncationStyle.TRIM_MIDDLE,
+    default_max_len = _STR_LEN_SHORT,
+))
+def _people_origin_uid_extractor(self: attrutils.EasyAttribute, people: _ml.People, mlf_people: list[_mlf.MLFPerson]) -> list[str]:
+    """list of every person's UID in the source from which the data is fetched"""
+    # Guaranteed consistent ordering because mlf_people should already be sorted by uid.
+    return [mlf_person.uid for mlf_person in mlf_people]
 
 @_register_easy_attribute(attrutils.EasyAttributeParams(
     name_without_type = 'crew-type',
@@ -401,6 +437,7 @@ def _people_uid_extractor(self: attrutils.EasyAttribute, people: _ml.People, mlf
     default_max_len = _STR_LEN_DONTCARE,
 ))
 def _people_crew_type_extractor(self: attrutils.EasyAttribute, people: _ml.People, mlf_people: list[_mlf.MLFPerson]) -> str:
+    """the people's crew type"""
     return people.crew_type
 
 @_register_easy_attribute(attrutils.EasyAttributeParams(
@@ -413,20 +450,8 @@ def _people_crew_type_extractor(self: attrutils.EasyAttribute, people: _ml.Peopl
     default_max_len = _STR_LEN_DONTCARE,
 ))
 def _people_group_mode_extractor(self: attrutils.EasyAttribute, people: _ml.People, mlf_people: list[_mlf.MLFPerson]) -> str:
+    """the people's group mode"""
     return people.group_mode
-
-@_register_easy_attribute(attrutils.EasyAttributeParams(
-    name_without_type = 'origin-uid',
-    aliases_without_type = ['origin-id', 'origin-guid', 'origin-identifier'],
-    findable_type = _ml.FindableType.PEOPLE,
-    type_handler = attrutils.STR_HANDLER,
-    is_ascending = True,
-    truncation_style = utils.TruncationStyle.TRIM_MIDDLE,
-    default_max_len = _STR_LEN_SHORT,
-))
-def _people_origin_uid_extractor(self: attrutils.EasyAttribute, people: _ml.People, mlf_people: list[_mlf.MLFPerson]) -> list[str]:
-    # Guaranteed consistent ordering because mlf_people should already be sorted by uid.
-    return [mlf_person.uid for mlf_person in mlf_people]
 
 @_register_easy_attribute(attrutils.EasyAttributeParams(
     name_without_type = 'name',
@@ -438,6 +463,7 @@ def _people_origin_uid_extractor(self: attrutils.EasyAttribute, people: _ml.Peop
     default_max_len = _STR_LEN_LONG,
 ))
 def _people_name_extractor(self: attrutils.EasyAttribute, people: _ml.People, mlf_people: list[_mlf.MLFPerson]) -> list[None | str]:
+    """list of every person's name"""
     # Guaranteed consistent ordering because mlf_people should already be sorted by uid.
     return [mlf_person.name for mlf_person in mlf_people]
 
@@ -451,6 +477,7 @@ def _people_name_extractor(self: attrutils.EasyAttribute, people: _ml.People, ml
     default_max_len = _STR_LEN_SHORT,
 ))
 def _people_gender_extractor(self: attrutils.EasyAttribute, people: _ml.People, mlf_people: list[_mlf.MLFPerson]) -> list[None | str]:
+    """list of every person's gender (the exact strings representing each gender can vary based on where the data was fetched from)"""
     # Guaranteed consistent ordering because mlf_people should already be sorted by uid.
     return [mlf_person.gender for mlf_person in mlf_people]
 
@@ -465,6 +492,7 @@ def _people_gender_extractor(self: attrutils.EasyAttribute, people: _ml.People, 
     default_max_len = _STR_LEN_SHORT,
 ), create_numericals = True)
 def _people_height_extractor(self: attrutils.EasyAttribute, people: _ml.People, mlf_people: list[_mlf.MLFPerson]) -> list[None | float]:
+    """list of every person's height in centimeters"""
     # Guaranteed consistent ordering because mlf_people should already be sorted by uid.
     return [mlf_person.height_cm for mlf_person in mlf_people]
 
@@ -478,6 +506,7 @@ def _people_height_extractor(self: attrutils.EasyAttribute, people: _ml.People, 
     default_max_len = _STR_LEN_SHORT,
 ))
 def _people_countries_extractor(self: attrutils.EasyAttribute, people: _ml.People, mlf_people: list[_mlf.MLFPerson]) -> list[str]:
+    """list of every person's countries"""
     # Guaranteed consistent ordering because mlf_people should already be sorted by uid.
     # Considered printing the union of all people's countries (no duplicates), or the intersection..
     # In the end I think the best is to print each person's entire nationalities joined with '-'.
@@ -494,6 +523,7 @@ def _people_countries_extractor(self: attrutils.EasyAttribute, people: _ml.Peopl
     default_max_len = _STR_LEN_LONG,
 ))
 def _people_movies_extractor(self: attrutils.EasyAttribute, people: _ml.People, mlf_people: list[_mlf.MLFPerson]) -> list[None | str]:
+    """list of movie titles these people were in"""
     # Guaranteed ordering by associated_movies().
     return [
         movie.underlying_file_movie_readonly.title
@@ -511,6 +541,7 @@ for crew_type in _ml.CrewType:
         default_max_len = _STR_LEN_LONG,
     ))
     def _people_movies_as_extractor(self: attrutils.EasyAttribute, people: _ml.People, mlf_people: list[_mlf.MLFPerson]) -> list[None | str]:
+        """list of movie titles these people were in as this crew type"""
         ct = _ml.CrewType(self.name_without_type.removeprefix('movies-as-'))
 
         # Find the smallest group in another crew type which has at least the same people as this one, if one exists, and return their movies.
@@ -535,6 +566,7 @@ for crew_type in _ml.CrewType:
     default_max_len = _STR_LEN_SHORT,
 ))
 def _people_professions_extractor(self: attrutils.EasyAttribute, people: _ml.People, mlf_people: list[_mlf.MLFPerson]) -> list[str]:
+    """list of crew types occupied by these people"""
     professions = []
     
     # Iterate over crew types and check if this group of people also collaborated on that crew type.
@@ -559,6 +591,7 @@ def _people_professions_extractor(self: attrutils.EasyAttribute, people: _ml.Peo
     default_max_len = _STR_LEN_SHORT,
 ))
 def _people_top_genres_extractor(self: attrutils.EasyAttribute, people: _ml.People, mlf_people: list[_mlf.MLFPerson]) -> list[str]:
+    """list of up to 3 genres these people appear in the most"""
     genre_occurences: dict[str, int] = collections.defaultdict(lambda : 0)
 
     # Count occurences of each genre these people were in.
@@ -583,6 +616,7 @@ for handler in attrutils.DATE_HANDLERS:
         default_max_len = _STR_LEN_SHORT,
     ))
     def _people_birthday_extractor(self: attrutils.EasyAttribute, people: _ml.People, mlf_people: list[_mlf.MLFPerson]) -> list[None | datetime.date]:
+        """list of every person's birthday in this date format"""
         hnd = typing.cast(attrutils.DateHandler, self._params.type_handler)
 
         # Guaranteed consistent ordering because mlf_people should already be sorted by uid.
@@ -605,6 +639,7 @@ for handler in attrutils.DATE_HANDLERS:
     default_max_len = _STR_LEN_DONTCARE,
 ))
 def _role_uid_extractor(self: attrutils.EasyAttribute, role: _ml.Role, mlf_roles: _ml.MLFRolesDict, mlf_movie: _mlf.MLFMovie, mlf_people: list[_mlf.MLFPerson]) -> str:
+    """the role's UID in flam"""
     return role.uid
 
 @_register_easy_attribute(attrutils.EasyAttributeParams(
@@ -617,6 +652,7 @@ def _role_uid_extractor(self: attrutils.EasyAttribute, role: _ml.Role, mlf_roles
     default_max_len = _STR_LEN_SHORT,
 ))
 def _role_characters_extractor(self: attrutils.EasyAttribute, role: _ml.Role, mlf_roles: _ml.MLFRolesDict, mlf_movie: _mlf.MLFMovie, mlf_people: list[_mlf.MLFPerson]) -> list[str]:
+    """list of characters played by this role (mainly for actors)"""
     # Guaranteed consistent ordering because:
     # * mlf_people is sorted by uids
     # * python preserves dictionary order and crew types were added to mlf_roles[mlf_people] in the same order everytime
@@ -638,6 +674,7 @@ def _role_characters_extractor(self: attrutils.EasyAttribute, role: _ml.Role, ml
     default_max_len = _STR_LEN_SHORT,
 ))
 def _role_star_extractor(self: attrutils.EasyAttribute, role: _ml.Role, mlf_roles: _ml.MLFRolesDict, mlf_movie: _mlf.MLFMovie, mlf_people: list[_mlf.MLFPerson]) -> list[None | bool]:
+    """list of every person's star status in this movie - i.e. true or false based on if that person is starring"""
     # Guaranteed consistent ordering because:
     # * mlf_people is sorted by uids
     # * python preserves dictionary order and crew types were added to mlf_roles[mlf_people] in the same order everytime

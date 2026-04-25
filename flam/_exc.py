@@ -20,6 +20,11 @@ from . import _dbg
 
 # As a rule, flam exceptions should start with a capital letter and end with a period!
 class FlamError(Exception):
+    """
+    Base class for all errors raised by flam.
+    """
+    __no_init_doc__ = True
+
     def __init__(self, *args: object, log_trace: bool = True, stacklevel: int = 2) -> None:
         super().__init__(*args)
 
@@ -28,14 +33,22 @@ class FlamError(Exception):
         _dbg.logger.error(f"Raised exception: {self}", stacklevel=stacklevel, stack_info=log_trace)
 
 class InputError(FlamError):
-    pass
+    """
+    Base class for errors raised by flam because of bad input from the user.
+    """
 
 class CloseInputError(FlamError):
+    """
+    Input error with suggestions for similar values to help with typos.
+    """
     def __init__(self, message: str, suggestions: list) -> None:
         super().__init__(message, stacklevel=3)
         self.suggestions = suggestions
 
 class FilterSyntaxError(InputError):
+    """
+    Input error for filters that don't compile.
+    """
     def __init__(self, message: str, tokens: list[str], error_indices: int | typing.Iterable[int] = -1, is_terminal: bool = True) -> None:
         super().__init__(f'FILTER syntax error{'' if is_terminal else ' (not terminal)'}: {message}\nIn: {self.join_tokens(tokens, error_indices)}',
             log_trace=is_terminal, stacklevel=3)
@@ -64,7 +77,11 @@ class FilterSyntaxError(InputError):
         return colorized
 
 class FetchInterrupt(FlamError):
-    pass
+    """
+    Error used to gracefully exit :py:meth:`~._ctx.FlamContext.fetch` in the middle of work.
+    """
 
 class FileValidationError(FlamError):
-    pass
+    """
+    Error indicating that a file loaded by flam was corrupted or tampered with.
+    """

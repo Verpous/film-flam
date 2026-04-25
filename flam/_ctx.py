@@ -45,99 +45,35 @@ from . import _attr
 from . import _gen_version
 from . import utils
 
+# Without hide-value this would've shown a local path on my machine in the documentation.
 DEFAULT_FLAM_DIR = _dbg.FlamEnv.CTX_DIR.get_or_default(os.path.join(os.path.expanduser('~'), '.film_flam'))
+"""
+The default path where flam stores all your movie lists and configuration. Equal to the environment variable FLAM_DIR, or ~/.film_flam if it's not defined.
+
+:meta hide-value:
+"""
 
 class PrecachePreference(enum.IntEnum):
-    DEFAULTS = enum.auto()      # Generate all composite lists, and populate all movie list vaults with some defaults that we think make sense to cache.
-    EVERYTHING = enum.auto()    # Precompute everything that can possibly be precomputed.
-    RESET = enum.auto()         # Don't precompute - instead delete existing cache files.
+    """
+    Preference for what you'd like to be cached. For use with :py:meth:`FlamContext.precache`.
+    """
+    DEFAULTS = enum.auto()
+    """Generate all composite lists, and cache particularly expensive computations for all movie lists."""
 
-# Utility for "inverting" registries: instead of first the registration level then the item type, it's first the item type then the levels.
-# Has to be implemented this way because some of the registries are contextual, some global.
-class RegistriesOf[T: (type[_fetch.ListFetcher], type[_filter.Predicate], _attr.Attribute)]:
-    def __init__(self, type_selector: typing.Callable[[_reg.Registry], _reg._RegistryOf[T]], ctx_registry: _reg.Registry, use_global_extensions: bool) -> None:
-        # Ordering lets you shadow builtins with extensions.
-        self._registries_to_try = [
-            ctx_registry,
-            _reg._global_extensions,
-            _reg._builtins
-        ] if use_global_extensions else [
-            ctx_registry,
-            _reg._builtins
-        ]
+    EVERYTHING = enum.auto()
+    """Cache everything that can possibly be cached."""
 
-        self._type_selector: typing.Callable[[_reg.Registry], _reg._RegistryOf[T]] = type_selector
-    
-    def __getitem__(self, qualified_name: str) -> T:
-        return self.get(qualified_name)
-
-    def __contains__(self, qualified_name: str) -> bool:
-        return any(qualified_name in self._type_selector(reg) for reg in self._registries_to_try)
-
-    # Support iteration only over keys and not values, because some values may be lazily allocated once you __getitem__.
-    def __iter__(self) -> typing.Iterator[str]:
-        for reg in self._registries_to_try:
-            yield from self._type_selector(reg)
-
-    def register(self, item: T) -> None:
-        # Last registry is the context extensions.
-        self._type_selector(self._registries_to_try[-1]).register(item)
-
-    # __getitem__ expects a qualified name. This function supports inferring the full name from a partial one.
-    def get(self, name: str, type_hint: None | _ml.FindableType = None) -> T:
-        for reg in self._registries_to_try:
-            reg_of_type = self._type_selector(reg)
-            
-            # First try if it was a qualified name.
-            try:
-                return reg_of_type[name]
-            except KeyError:
-                pass
-
-            # If got a type hint, try all types, but try the hinted type first.
-            # Note that type_hint does *not* guarantee the result will be applicable to this type.
-            # It only activates support for non-qualified names, and promises to resolve ambiguities by preferring the hinted type.
-            if type_hint is not None:
-                # Try hinted type.
-                try:
-                    return reg_of_type[_reg.compose_qualified_attr_or_pred_name(type_hint, name)]
-                except KeyError:
-                    pass
-
-                # Try the others.
-                best_match = None
-
-                for findable_type in _ml.FindableType:
-                    # Already checked the type hint.
-                    if findable_type == type_hint:
-                        continue
-
-                    qualified_name = _reg.compose_qualified_attr_or_pred_name(findable_type, name)
-
-                    try:
-                        match = reg_of_type[qualified_name]
-                    except KeyError:
-                        continue
-
-                    # This won't be true in case we actually found it by an alias. In that case, we'd rather see if we can find a match which isn't based on an alias.
-                    # This solves the issue of movies and people both having a 'name' but for movies it's an alias to 'titles' and for people it's the primary name.
-                    if match.qualified_name == qualified_name:
-                        best_match = match
-                        break
-
-                    if best_match is None:
-                        best_match = match
-                
-                if best_match is not None:
-                    return best_match
-        
-        # Use a smaller-than-default cutoff so that it finds matches even if you tried a name without the type (e.g. 'title' should closely match 'movies-title').
-        close_matches = difflib.get_close_matches(name, self, cutoff=0.45)
-        suggestions = f' (did you mean: {", ".join(close_matches)}?)' if len(close_matches) > 0 else '.'
-        raise _exc.CloseInputError(f"No registered item with the name: '{name}'{suggestions}", close_matches)
+    RESET = enum.auto()
+    """Don't cache anything, instead delete existing cache files."""
 
 # This class is the user's entry point to basically everything that is "built in" to this API: accessing lists, filtering, configuring.
+# Important to have it as much at the top of the file as possible because I want this to be the first thing users see in the documentation.
 class FlamContext:
+    """
+    Represents a user of a flam directory. All API use generally begins with creating a context, and anything you might do with flam generally goes through the context.
+
+    Only one context is allowed per flam directory at any given time.
+    """
     _MLF_DIR = 'movie_lists'
     _MLV_DIR = 'movie_list_vaults'
     _CACHE_DIR = 'cache'
@@ -145,6 +81,10 @@ class FlamContext:
     _METADATA_FILE = 'metadata.json'
 
     def __init__(self, flam_dir: None | str = DEFAULT_FLAM_DIR, import_extensions: bool = False) -> None:
+        """
+        :param flam_dir: the directory where all movie lists and configuration should be stored. If this is None, flam will work in "volatile mode" - everything you fetch or configure will be lost when the context dies.
+        :param import_extensions: import all configured extensions, and subscribe to globally registered extensions. Only enable this if you trust the extensions in the configuration.
+        """
         _dbg.logger.info(f"Making a context, {flam_dir=}, {import_extensions=}")
 
         # Support None for users who just want to work with volatile memory and not load or save anything, we call it volatile mode.
@@ -164,7 +104,7 @@ class FlamContext:
         self._make_flam_dir()
 
         try:
-            self._cfg = _cfg.Configuration.load(self._cfg_path)
+            self._cfg = _cfg.Configuration._load(self._cfg_path)
         except FileNotFoundError:
             _dbg.logger.info("Configuration file doesn't exist, creating a new one")
             self._cfg = _cfg.Configuration(
@@ -177,7 +117,7 @@ class FlamContext:
             self._write_cfg()
 
         try:
-            self._metadata = _md._FlamMetadata.load(self._metadata_path)
+            self._metadata = _md._FlamMetadata._load(self._metadata_path)
         except FileNotFoundError:
             _dbg.logger.info("Metadata file doesn't exist, creating a new one")
             self._metadata = _md._FlamMetadata(
@@ -196,10 +136,10 @@ class FlamContext:
         # It's good to make this an option with default false for security, and I prefer to keep the two options as one for simplicity.
         self._should_import_extensions = import_extensions
 
-        ctx_extensions = _reg.Registry(f'context ({self.flam_dir})')
-        self._fetchers = RegistriesOf(lambda reg: reg.fetchers, ctx_extensions, import_extensions)
-        self._predicates = RegistriesOf(lambda reg: reg.predicates, ctx_extensions, import_extensions)
-        self._attributes = RegistriesOf(lambda reg: reg.attributes, ctx_extensions, import_extensions)
+        ctx_extensions = _reg._Registry(f'context ({self.flam_dir})')
+        self._fetchers = RegistriesOf(lambda reg: reg._fetchers, ctx_extensions, import_extensions)
+        self._predicates = RegistriesOf(lambda reg: reg._predicates, ctx_extensions, import_extensions)
+        self._attributes = RegistriesOf(lambda reg: reg._attributes, ctx_extensions, import_extensions)
 
         # If one of the extensions is bad it can be annoying to delete it from the configuration because flam will fail to load.
         # I don't want to sweep bad extensions under the rug though, so I think the solution of `flam --no-extensions config extension --delete` will just have to do.
@@ -236,22 +176,37 @@ class FlamContext:
 
     @property
     def flam_dir(self) -> str:
+        """
+        The directory where all movie lists and configuration are stored.
+        """
         return self._flam_dir
 
     @property
     def cfg_readonly(self) -> _cfg.Configuration:
+        """
+        All configuration settings. This object can technically be modified to but that would lead to disaster. If you want to modify the configuration, use :py:meth:`configure`.
+        """
         return self._cfg
 
     @property
     def fetchers(self) -> RegistriesOf[type[_fetch.ListFetcher]]:
+        """
+        A registry object with all registered fetchers.
+        """
         return self._fetchers
 
     @property
     def predicates(self) -> RegistriesOf[type[_filter.Predicate]]:
+        """
+        A registry object with all registered predicates.
+        """
         return self._predicates
 
     @property
     def attributes(self) -> RegistriesOf[_attr.Attribute]:
+        """
+        A registry object with all registered attributes.
+        """
         return self._attributes
 
     @property
@@ -283,8 +238,14 @@ class FlamContext:
 
     # Movie lists.
     def get_movie_list(self, listdefs: str | typing.Iterable[str], filter: None | _filter.Filter = None) -> _ml.MovieList:
+        """
+        Create or open a movie list.
+
+        :param listdefs: indicates which lists to open, or which lists to composite into this movie list. They must all be already fetched.
+        :param filter: a movie filter used to filter out movies from the list. If provided, the returned list will be a composite list. 
+        """
         listdefs_iterable = listdefs if not isinstance(listdefs, str) else [listdefs]
-        canon_listdefs = list(_ldef.CanonListdef.parse_and_expand(listdefs_iterable, self, _ldef._ExpandFlavor.FIND))
+        canon_listdefs = list(_ldef.CanonListdef._parse_and_expand(listdefs_iterable, self, _ldef._ExpandFlavor.FIND))
         return self._get_movie_list_from_canon_listdefs(canon_listdefs, filter)
 
     def _get_movie_list_from_canon_listdefs(self, canon_listdefs: list[_ldef.CanonListdef], filter: None | _filter.Filter = None) -> _ml.MovieList:
@@ -313,7 +274,7 @@ class FlamContext:
 
             if not self._should_regenerate_composite_list(abstract_listdef.address):
                 try:
-                    mlf = _mlf.MovieListFile.load(self._get_mlf_path(abstract_listdef))
+                    mlf = _mlf.MovieListFile._load(self._get_mlf_path(abstract_listdef))
                 except (FileNotFoundError, _exc.FileValidationError) as e:
                     # Simply regenerate if we failed to load it.
                     _dbg.logger.info(f"Composite list {abstract_listdef.address=} failed to load from disk due to error: {e}")
@@ -340,7 +301,7 @@ class FlamContext:
                 self._write_metadata()
         else:
             try:
-                mlf = _mlf.MovieListFile.load(self._get_mlf_path(abstract_listdef))
+                mlf = _mlf.MovieListFile._load(self._get_mlf_path(abstract_listdef))
             except FileNotFoundError as e:
                 raise _exc.InputError(f"LISTDEF '{abstract_listdef.pretty(self)}' isn't fetched.") from e
 
@@ -438,7 +399,7 @@ class FlamContext:
             # So we will temporarily masquerade this MLF as an anonymous composite.
             original_cldef = merged_mlf.abstract_listdef
             merged_mlf.abstract_listdef = _ldef.CanonListdef(_ldef.SpecialListType.ANONYMOUS, f'temp list for exporting {original_cldef}')
-            merged_mlf = _ml.MovieList(merged_mlf, self).export(filter)
+            merged_mlf = _ml.MovieList(merged_mlf, self)._export(filter)
             merged_mlf.abstract_listdef = original_cldef
             
         _dbg.logger.info(f"Generated '{merged_mlf.abstract_listdef}' with {len(merged_mlf.movies_by_uid)} movies, {len(merged_mlf.people_by_uid)} people")
@@ -447,7 +408,7 @@ class FlamContext:
     def _write_mlf(self, mlf: _mlf.MovieListFile) -> None:
         path = self._get_mlf_path(mlf.abstract_listdef)
         _dbg.logger.info(f"Writing movie list file with {len(mlf.movies_by_uid)} movies, {len(mlf.people_by_uid)} people to {path=}")
-        mlf.write(path)
+        mlf._write(path)
 
     def _get_mlf_path(self, abstract_listdef: _ldef.CanonListdef) -> str:
         # After much deliberation, I decided that files for named lists should be named according to the list type and UID,
@@ -471,7 +432,7 @@ class FlamContext:
 
             try:
                 # If shouldn't regenerate MLV then the meta must exist.
-                return _mlv._MovieListVault.load(path), self._metadata.get_mlv_meta(abstract_listdef).dependency_mtime
+                return _mlv._MovieListVault._load(path), self._metadata.get_mlv_meta(abstract_listdef).dependency_mtime
             except (FileNotFoundError, _exc.FileValidationError) as e:
                 # Simply regenerate if we failed to load it.
                 _dbg.logger.info(f"Movie list vault {abstract_listdef=} failed to load from disk due to error: {e}")
@@ -555,7 +516,7 @@ class FlamContext:
             ))
 
         # Writing the mlv before the metadata I think is important.
-        mlv.write(mlv_path)
+        mlv._write(mlv_path)
         self._write_metadata()
 
     def _get_mlv_path(self, abstract_listdef: _ldef.CanonListdef) -> str:
@@ -586,6 +547,16 @@ class FlamContext:
     # * Users may shoot themselves in the foot, if you make an invalid edit you will only know it when you close the context (hopefully we catch every case).
     @contextlib.contextmanager
     def configure(self) -> typing.Iterator[_cfg.Configuration]:
+        """
+        Returns the configuration settings inside a context where they may be modified. When the context exits, all changes are saved.
+
+        Example:
+
+        .. code-block:: python
+
+            with ctx.configure() as cfg:
+                cfg.extensions.append('my_extension.py')
+        """
         editable_copy = self._cfg.deepcopy()
         error_occured = False
 
@@ -726,22 +697,33 @@ class FlamContext:
         
     def _write_cfg(self) -> None:
         _dbg.logger.info(f"Writing configuration: {self._cfg=}")
-        self._cfg.write(self._cfg_path)
+        self._cfg._write(self._cfg_path)
         
     # Metadata
     def _write_metadata(self) -> None:
         _dbg.logger.info(f"Writing metadata: {self._metadata=}")
-        self._metadata.write(self._metadata_path)
+        self._metadata._write(self._metadata_path)
 
     # Fetching.
     def fetch(self, listdefs: typing.Iterable[str], refetch_pattern: None | str = None, quiet: bool = True) -> None:
+        """
+        Fetch movie lists, i.e. download all their data from some external source and store it locally. Depending on the fetcher and the size of the list, this may run for a long time - even hours.
+
+        :param listdefs: which lists to fetch. For composite lists, will actually fetch all simple lists which composite it. A few special values are also supported:
+
+            * Supports 'defaults' to fetch all lists configured with is_default_fetch=True
+            * Supports ``'*'`` to fetch all configured lists
+
+        :param refetch_pattern: forces titles that match this regular expression (case-insensitive) to be refetched even if they are already locally stored. The expression only needs to match any part of the title, not the whole title. This feature is intended for redownloading shows after a new season has come out.
+        :param quiet: indicates if progress should be printed to stdout.
+        """
         _dbg.logger.info(f"Requested to fetch {listdefs=}, {refetch_pattern=}, {quiet=}")
 
         # Get all fetchers before using any so that if one of the listdefs doesn't parse good we will raise an error now and not before fetching a few.
         # We use stable_dedup to not fetch the same thing twice but in a way which preserves the requested fetch order.
         fetchers = [
             self._get_fetcher(cldef)
-            for cldef in utils.stable_dedup((_ldef.CanonListdef.parse_and_expand(listdefs, self, _ldef._ExpandFlavor.FETCH)))
+            for cldef in utils.stable_dedup((_ldef.CanonListdef._parse_and_expand(listdefs, self, _ldef._ExpandFlavor.FETCH)))
         ]
 
         try:
@@ -780,7 +762,7 @@ class FlamContext:
             new_mlf = mlf.deepcopy()
             
             try:
-                fetcher.fetch(new_mlf, refetch_re, quiet)
+                fetcher._fetch(new_mlf, refetch_re, quiet)
             except _exc.FetchInterrupt:
                 _dbg.logger.info(f"Partially fetched {fetcher.abstract_listdef} due to an interrupt")
                 self._close_fetch(mlf, new_mlf)
@@ -791,7 +773,7 @@ class FlamContext:
 
     def _close_fetch(self, old_mlf: None | _mlf.MovieListFile, new_mlf: _mlf.MovieListFile) -> None:
         # Must canonicalize before comparing for equality.
-        new_mlf.canonicalize()
+        new_mlf._canonicalize()
 
         # We'll only write the new contents if they're different than before, and we'll return whether there was a diff or not.
         # This allows us to check the file mtime to know if it's dirty and dependent files need to be regenerated.
@@ -812,6 +794,12 @@ class FlamContext:
         return fetcher_cls(concrete_listdef, abstract_listdef, self)
 
     def precache(self, preference: PrecachePreference = PrecachePreference.DEFAULTS, quiet: bool = True) -> None:
+        """
+        Precompute some things and cache them to disk so that flam will work faster. This is strictly optional.
+        
+        :param preference: what you prefer to be cached.
+        :param quiet: if False, will print about its progress to stdout.
+        """
         _dbg.logger.info(f"Precaching movie list results with {preference=}")
 
         if preference == PrecachePreference.RESET:
@@ -869,7 +857,7 @@ class FlamContext:
                     # Load the MLV directly, not via _get_mlv. This is because _get_mlv will reset the file if it's gone stale, and create it if it doesn't exist.
                     # For our current purposes we don't want that - we don't care if the vaulted values are accurate, we just want to know what's vaulted.
                     mlv_path = self._get_mlv_path(cldef)
-                    mulva = _mlv._MovieListVault.load(mlv_path)
+                    mulva = _mlv._MovieListVault._load(mlv_path)
 
                     # Add all vaulted computations but then remove duplicates in a stable way. We use the description to check "computation equality", it's a bit hacky.
                     # If we didn't remove duplicates, the infra is smart enough to not recompute things twice. But the user will see the repetition in the progress bar.
@@ -925,7 +913,7 @@ class FlamContext:
             # Load the MLF directly and read the listdef. It's called "abstract" but it's concrete for concrete lists.
             # Since we reached this file by globbing we have no idea what it is and we don't trust it - if it fails to load, we simply ignore it.
             try:
-                mlf = _mlf.MovieListFile.load(mlf_path)
+                mlf = _mlf.MovieListFile._load(mlf_path)
                 canon_listdefs.append(mlf.abstract_listdef)
             except _exc.FileValidationError as e:
                 _dbg.logger.warning(f"Failed to load movie list file {mlf_path} due to error: {e} Skipping it")
@@ -936,7 +924,157 @@ class FlamContext:
 
     # Filtering.
     def compile_filter(self, tokens: list[str], find: _ml.FindableType) -> _filter.Filter:
+        """
+        Compile a string into a filter object.
+
+        :param tokens: the desired filter string split into tokens. Here is an example to illustrate how to split it:
+
+            .. code-block:: python
+                
+                # As a string:
+                '-title lebowski -o -release-year 1980'
+                
+                # Split into tokens:
+                ['-title', 'lebowski', '-o', 'release-year', '1980']
+
+        :param find: the type of objects the filter is supposed to filter. Some predicates may be specific to a certain findable type.
+        """
         params = _filter.EatParams(tokens=tokens, find=find, ctx=self)
-        filter = _filter.Filter.eat(params)
+        filter = _filter.Filter._eat(params)
         _dbg.logger.info(f"Compiled {tokens=}, {find=} into: {filter}")
         return filter
+
+# Utility for "inverting" registries: instead of first the registration level then the item type, it's first the item type then the levels.
+# Has to be implemented this way because some of the registries are contextual, some global.
+class RegistriesOf[T: (type[_fetch.ListFetcher], type[_filter.Predicate], _attr.Attribute)]:
+    # Don't link the possibles values of T because it's impossible without using internal module name.
+    """
+    Object representing everything that is registered in a :py:class:`FlamContext` of type ``T``.
+    ``T`` may be either :py:class:`~._attr.Attribute`, :py:class:`type[Predicate] <._filter.Predicate>`, or :py:class:`type[ListFetcher] <._fetch.ListFetcher>`.
+    """
+    __no_init_doc__ = True
+    
+    def __init__(self, type_selector: typing.Callable[[_reg._Registry], _reg._RegistryOf[T]], ctx_registry: _reg._Registry, use_global_extensions: bool) -> None:
+        # Ordering lets you shadow builtins with extensions.
+        self._registries_to_try = [
+            ctx_registry,
+            _reg._global_extensions,
+            _reg._builtins
+        ] if use_global_extensions else [
+            ctx_registry,
+            _reg._builtins
+        ]
+
+        self._type_selector: typing.Callable[[_reg._Registry], _reg._RegistryOf[T]] = type_selector
+    
+    def __getitem__(self, qualified_name: str) -> T:
+        """
+        Get a registered item.
+        
+        :param qualified_name: the full, qualified name of the item. Qualified names include both the name and the type. E.g., instead of 'title', it should be 'movies-title'.
+        """
+        return self.get(qualified_name)
+
+    def __contains__(self, qualified_name: str) -> bool:
+
+        """
+        Check if the registry contains an item with this name.
+
+        :param qualified_name: the full, qualified name of the item.
+        """
+        return any(qualified_name in self._type_selector(reg) for reg in self._registries_to_try)
+
+    # Support iteration only over keys and not values, because some values may be lazily allocated once you __getitem__.
+    # TODO: consider supporting iterate_no_aliases? Even no_shadowing too?
+    def __iter__(self) -> typing.Iterator[str]:
+        """
+        Iterate over the names of all items in the registry. Some things to be careful of:
+
+            * Extensions may be registered with the same name as a builtin and shadow them. This will cause the same name to be returned multiple times.
+            * Because items can have aliases, this may return multiple names for the same item. If you want to iterate over every item exactly once, here is how to skip aliases:
+
+                .. code-block:: python
+
+                    for attr_name in ctx.attributes:
+                        attr = ctx.attributes[attr_name]
+
+                        # Skip because it's an alias.
+                        if attr_name != attr.qualified_name:
+                            continue
+
+                        do_something(attr)
+        """
+
+        for reg in self._registries_to_try:
+            yield from self._type_selector(reg)
+
+    def register(self, item: T) -> None:
+        """
+        Register a context-level extension. Context extensions are only available from the specific context to which they were registered.
+        
+        :param item: the item to register.
+        """
+        # Last registry is the context extensions.
+        self._type_selector(self._registries_to_try[-1]).register(item)
+
+    # TODO: can we change type_hint so it does guarantee to only check that type? Investigate.
+    # NOTE: for some reason the type hint in the documentation also shows the module name, only for this function and nothing else. Sigh...
+    def get(self, name: str, type_hint: None | _ml.FindableType = None) -> T:
+        """
+        Get a registered item, with support for non-qualified names.
+        
+        :param name: the name of the item. If the name is not a qualified name, the type will be inferred.
+        :param type_hint: a hint about which type to search the item in. Multiple items can have the same name but with a different type, so this helps resolve that ambiguity.
+
+            Note that this does NOT guarantee that the returned item will have the same type! It only guarantees to prefer that type if it exists.
+        """
+        for reg in self._registries_to_try:
+            reg_of_type = self._type_selector(reg)
+            
+            # First try if it was a qualified name.
+            try:
+                return reg_of_type[name]
+            except KeyError:
+                pass
+
+            # If got a type hint, try all types, but try the hinted type first.
+            # Note that type_hint does *not* guarantee the result will be applicable to this type.
+            # It only activates support for non-qualified names, and promises to resolve ambiguities by preferring the hinted type.
+            if type_hint is not None:
+                # Try hinted type.
+                try:
+                    return reg_of_type[_reg.compose_qualified_attr_or_pred_name(type_hint, name)]
+                except KeyError:
+                    pass
+
+                # Try the others.
+                best_match = None
+
+                for findable_type in _ml.FindableType:
+                    # Already checked the type hint.
+                    if findable_type == type_hint:
+                        continue
+
+                    qualified_name = _reg.compose_qualified_attr_or_pred_name(findable_type, name)
+
+                    try:
+                        match = reg_of_type[qualified_name]
+                    except KeyError:
+                        continue
+
+                    # This won't be true in case we actually found it by an alias. In that case, we'd rather see if we can find a match which isn't based on an alias.
+                    # This solves the issue of movies and people both having a 'name' but for movies it's an alias to 'titles' and for people it's the primary name.
+                    if match.qualified_name == qualified_name:
+                        best_match = match
+                        break
+
+                    if best_match is None:
+                        best_match = match
+                
+                if best_match is not None:
+                    return best_match
+        
+        # Use a smaller-than-default cutoff so that it finds matches even if you tried a name without the type (e.g. 'title' should closely match 'movies-title').
+        close_matches = difflib.get_close_matches(name, self, cutoff=0.45)
+        suggestions = f' (did you mean: {", ".join(close_matches)}?)' if len(close_matches) > 0 else '.'
+        raise _exc.CloseInputError(f"No registered item with the name: '{name}'{suggestions}", close_matches)

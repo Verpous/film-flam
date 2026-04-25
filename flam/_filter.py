@@ -49,26 +49,47 @@ _EinGafrurError = _exc.FilterSyntaxError
 
 @dataclasses.dataclass(frozen=True)
 class EatParams:
+    """
+    Common parameters passed around during filter "eating" (i.e. compilation).
+    """
     tokens: list[str]
+    """
+    The complete list of tokens to compile, including ones already processed.
+    """
+    
     find: _ml.FindableType
-    ctx: _ctx.FlamContext
+    """
+    The type of objects this filter filters. Some predicates are specific to a findable type, so some filters will compile for one findable type but not another.
+    """
 
-# We represent filters as an AST of FilterMembers.
+    ctx: _ctx.FlamContext
+    """
+    Context that this filter came from. Some filters will only compile with a specific context in which you've registered predicates other contexts don't know about.
+    """
+
 class FilterMember(abc.ABC):
-    # Takes in a found item (movie, person, or role) and returns true if it passes the filter.
+    """
+    Base class for all components of a filter. Filters are essentially an AST (abstract syntax tree) of filter members.
+    """
     @abc.abstractmethod
     def excrete(self, findable: _ml.Findable) -> bool:
-        pass
+        """
+        Returns True if the findable passes this filter.
 
-    # Decompiles the filter into a list of tokens.
+        :param findable: the object to filter.
+        """
+
     @abc.abstractmethod
     def regurgitate(self) -> typing.Iterable[str]:
-        pass
+        """
+        Decompiles this filter into a list of tokens.
+        """
 
-    # Walk the syntax tree. Members should be returned from left to right.
     @abc.abstractmethod
     def colonoscopy(self) -> typing.Iterable[FilterMember]:
-        pass
+        """
+        Iterate over all members of the filter. They're returned from left to right.
+        """
 
     def __str__(self) -> str:
         return ' '.join(self.regurgitate())
@@ -76,16 +97,48 @@ class FilterMember(abc.ABC):
     # Helper methods for parsing below.
     @classmethod
     def eat_str(cls, params: EatParams, at: int, description: str, error_indices: int | typing.Iterable[int] = -1, is_terminal: bool = True) -> str:
+        """
+        Helper method to eat and return ``params.tokens[at]``, or raise :py:exc:`~._exc.FilterSyntaxError` if the index is out of bounds.
+
+        :param params: general parameters of this compilation.
+        :param at: the index of the token to eat.
+        :param description: describes the expected meaning of this token, for raising a meaningful exception (ex: 'a valid attribute name').
+        :param error_indices: indicates which indices in ``params.tokens`` to highlight as problematic in case of error.
+        :param is_terminal: indicates if an exception would mean that the entire compilation has failed, or is the error recoverable.
+        """
         if at >= len(params.tokens):
             raise _EinGafrurError(f"Expected {description}, but reached the end of input.", tokens=params.tokens, error_indices=error_indices, is_terminal=is_terminal)
 
         return params.tokens[at]
 
-    # eatfunc is assumed to only consume 1.
     # I would've liked to like, type eatfunc as [EatParams, int, **eatfunc_params] and receive in this function **eatfunc_params.
     # But can't do that nicely, so users should just wrap their func in a lambda.
     @classmethod
     def eat_listof[T](cls, eatfunc: typing.Callable[[EatParams, int], T], params: EatParams, at: int, at_least_one: bool) -> tuple[list[T], int]:
+        """
+        Helper method to eat and return a list of tokens. Returns a tuple of the list and the index of the first token after the list. The syntax is as follows:
+
+            * List of 0 or more elements enclosed in parentheses:
+                
+                '-any-role [ **director writer composer** ] -name tarantino'
+            * List of size 1, no parentheses required:
+                
+                '-any-role **director** -name tarantino'
+            * Empty list, both parentheses can be a single token:
+                
+                '-any-role **[]** -name tarantino'
+
+        Eaxmple of eating a list of CTGMs:
+
+            .. code-block:: python
+
+                ct_gms, until = FilterMember.eat_listof(FilterMember.eat_ct_gm, params, at, at_least_one=False)
+
+        :param eatfunc: function which should eat only a single token at at a given index. Each list element will be consumed with this function.
+        :param params: general parameters of this compilation.
+        :param at: index at which the list tokens are expected to begin.
+        :param at_least_one: indicates if this function should fail on empty lists.
+        """
         # Eat the opening parenthesis if you can.
         if at < len(params.tokens) and params.tokens[at] in Pipeline.LPAREN:
             # Seek the closing parenthesis and eat all the way there.
@@ -108,6 +161,15 @@ class FilterMember(abc.ABC):
 
     @classmethod
     def eat_one_of(cls, params: EatParams, at: int, description: str, options: set[str], is_terminal: bool = True) -> str:
+        """
+        Helper method to eat and return a single token which must be one of a set of possible values.
+
+        :param params: general parameters of this compilation.
+        :param at: the index of the token to eat.
+        :param description: describes the expected meaning of this token, for raising a meaningful exception (ex: 'left parenthesis').
+        :param options: set of possible values the token is allowed to have.
+        :param is_terminal: indicates if an exception would mean that the entire compilation has failed, or is the error recoverable.
+        """
         s = cls.eat_str(params, at, description, is_terminal=is_terminal)
         
         if s not in options:
@@ -117,6 +179,12 @@ class FilterMember(abc.ABC):
 
     @classmethod
     def eat_attribute(cls, params: EatParams, at: int) -> _attr.Attribute:
+        """
+        Helper method to eat a token representing an attribute name and return the attribute.
+
+        :param params: general parameters of this compilation.
+        :param at: the index of the token to eat.
+        """
         description = 'a valid attribute name'
         attribute_name = cls.eat_str(params, at, description)
 
@@ -133,9 +201,16 @@ class FilterMember(abc.ABC):
 
     @classmethod
     def eat_cmpto(cls, params: EatParams, at: int, attribute: _attr.Attribute) -> _attr.CmpTo:
+        """
+        Helper method to eat a token representing a :py:class:`~._attr.CmpTo` and return it.
+
+        :param params: general parameters of this compilation.
+        :param at: the index of the token to eat.
+        :param attribute: the attribute whose values are to be compared.
+        """
         # Express it to the user as a value even if to us it's a primitive.
         cmpto_str = cls.eat_str(params, at, 'a value')
-        op, primitive_str = cls.split_cmpto_str(cmpto_str, attribute.default_op)
+        op, primitive_str = cls._split_cmpto_str(cmpto_str, attribute.default_op)
         primitive: _attr.AttributePrimitive | re.Pattern
 
         try:
@@ -152,7 +227,27 @@ class FilterMember(abc.ABC):
         return _attr.CmpTo(op, primitive, attribute)
 
     @classmethod
+    def _split_cmpto_str(cls, cmpto: str, default_op: _attr.ComparisonOp) -> tuple[_attr.ComparisonOp, str]:
+        for op in _attr.ComparisonOp:
+            if cmpto.startswith(op):
+                # NOTE: I considered that if the RHS is the empty string then maybe we should return default_op, cmpto.
+                # This is because '-' is the str rep of Nones and also the sign of 'less than'.
+                # But ultimately I think we won't do it because it will make error messages less helpful,
+                # and there are ways around the Nones issue, which most users probably won't care about anyway.
+                return op, cmpto.removeprefix(op)
+
+        return default_op, cmpto
+
+    @classmethod
     def eat_type[T](cls, params: EatParams, at: int, description: str, type_: typing.Callable[[str], T]) -> T:
+        """
+        Helper method to eat a token which should be parseable as some specific type, and return the parsed value.
+
+        :param params: general parameters of this compilation.
+        :param at: the index of the token to eat.
+        :param description: describes the expected meaning of this token, for raising a meaningful exception (ex: 'a valid attribute name').
+        :param type\\_: function for parsing the token string. E.g., ``int``, :py:class:`~._ml.CrewType`.
+        """
         s = cls.eat_str(params, at, description)
 
         try:
@@ -161,19 +256,14 @@ class FilterMember(abc.ABC):
             raise _EinGafrurError(f"Failed to parse {description} '{s}': {e}", tokens=params.tokens, error_indices=at) from e
 
     @classmethod
-    def split_cmpto_str(cls, cmpto: str, default_op: _attr.ComparisonOp) -> tuple[_attr.ComparisonOp, str]:
-        for op in _attr.ComparisonOp:
-            if cmpto.startswith(op.sign):
-                # NOTE: I considered that if the RHS is the empty string then maybe we should return default_op, cmpto.
-                # This is because '-' is the str rep of Nones and also the sign of 'less than'.
-                # But ultimately I think we won't do it because it will make error messages less helpful,
-                # and there are ways around the Nones issue, which most users probably won't care about anyway.
-                return op, cmpto.removeprefix(op.sign)
-
-        return default_op, cmpto
-
-    @classmethod
     def eat_movie_list(cls, params: EatParams, at: int) -> tuple[_ml.MovieList, int]:
+        """
+        Helper method to eat a list of tokens representing listdefs which together compose a :py:class:`~._ml.MovieList`.
+        Returns a tuple of the movie list and the index of the first token after the list.
+
+        :param params: general parameters of this compilation.
+        :param at: index at which the listdef tokens are expected to begin.
+        """
         listdefs, until = cls.eat_listof(lambda p, a: cls.eat_str(p, a, 'a LISTDEF'), params, at, at_least_one=True)
 
         try:
@@ -183,6 +273,12 @@ class FilterMember(abc.ABC):
 
     @classmethod
     def eat_ct_gm(cls, params: EatParams, at: int) -> tuple[_ml.CrewType, _ml.GroupMode]:
+        """
+        Helper method to eat a token representing a :py:class:`~._ml.CrewType` and optional :py:class:`~._ml.GroupMode`. See :py:func:`~._ml.parse_ct_gm`.
+
+        :param params: general parameters of this compilation.
+        :param at: the index of the token to eat.
+        """
         ct_gm_str = cls.eat_str(params, at, 'crew type[:group mode]')
 
         try:
@@ -190,17 +286,35 @@ class FilterMember(abc.ABC):
         except _exc.InputError as e:
             raise _EinGafrurError(f"Expected a valid crew type[:group mode], but got error: {e}", tokens=params.tokens, error_indices=at) from e
 
-    # Some predicates take a Single as an argument. But this Single should be wrapped in a Filter so that we can treat it as a complete expression of its own.
+    # Singles are wrapped in a Filter so that we can treat it as a complete expression of its own.
     @classmethod
     def eat_single(cls, params: EatParams, at: int) -> tuple[Filter, int]:
+        """
+        Helper method to eat a list of tokens representing a subfilter that is either made up of a single member or enclosed in parentheses.
+        Returns a tuple of the subfilter and the index of the first token after the filter.
+
+        :param params: general parameters of this compilation. Sometimes subfilters may have a different :py:attr:`EatParams.find` than the parent filter. For example:
+
+            .. code-block:: python
+
+                sub_params = dataclasses.replace(params, find=FindableType.ROLES)
+                sub_filter, until = FilterMember.eat_single(sub_params, at)
+
+        :param at: index at which the subfilter tokens are expected to begin.
+        """
         # Allow a way to indicate "empty" because we require tokens to have something in it to eat.
         if at < len(params.tokens) and params.tokens[at] in ('', '-'):
             return Filter(None, params.find, params.ctx), at + 1
         
-        single, until = Single.eat(params, at)        
+        single, until = _Single._eat(params, at)        
         return Filter(single, params.find, params.ctx), until
 
 class Filter(FilterMember):
+    """
+    Represents the root member of a filter.
+    """
+    __no_init_doc__ = True
+
     def __init__(self, filter: None | Predicate | Negative | Pipeline, find: _ml.FindableType, ctx: _ctx.FlamContext) -> None:
         self._filter = filter
         self._find = find
@@ -210,15 +324,24 @@ class Filter(FilterMember):
 
     @property
     def findable_type(self) -> _ml.FindableType:
+        """
+        The type of objects this filter filters. Some predicates are specific to a findable type, so some filters will compile for one findable type but not another.
+        """
         return self._find
 
-    # Yes, the context is part of the filter's state. The reason is the filter may contain predicates like -in-other which bind it to the context.
+    # Yes, the context is part of the filter's state. The reason is the filter may contain predicates like -in-list which bind it to the context.
     @property
     def ctx(self) -> _ctx.FlamContext:
+        """
+        Context that this filter came from. Some filters will only compile with a specific context in which you've registered predicates other contexts don't know about.
+        """
         return self._ctx
 
     @property
     def is_empty(self) -> bool:
+        """
+        True if this filter checks nothing.
+        """
         return self._filter is None
 
     # We compile by defining "eat" classmethods for all the FilterMembers (and some classes which aren't FilterMembers).
@@ -226,11 +349,11 @@ class Filter(FilterMember):
     # It "eats" tokens starting from the given index and returns the FilterMember object created from them, and the index where it stopped eating.
     # Filter is the root object so it's a little different, it expects to eat everything to it doesn't need start or end indices.
     @classmethod
-    def eat(cls, params: EatParams) -> Filter:
+    def _eat(cls, params: EatParams) -> Filter:
         if len(params.tokens) == 0:
             return cls(None, params.find, params.ctx)
         
-        pipeline, _ = Pipeline.eat(params, 0, True)
+        pipeline, _ = Pipeline._eat(params, 0, True)
         return cls(pipeline, params.find, params.ctx)
 
     def excrete(self, findable: _ml.Findable) -> bool:
@@ -250,9 +373,26 @@ class Filter(FilterMember):
             yield from self._filter.colonoscopy()
 
 class Pipeline(FilterMember):
+    """
+    Represents a sequence of filter members combined with an implicit logical AND.
+    """
+
+    __no_init_doc__ = True
+
     LPAREN = {'(', '[', '-lparen'}
+    """
+    Set of accepted strings representing a left parenthesis. Use ``min(LPAREN)`` as the representative for regurgitation.
+    """
+
     RPAREN = {')', ']', '-rparen'}
+    """
+    Set of accepted strings representing a right parenthesis. There is no requirement for the left and right parentheses to use matching strings.
+    """
+    
     BOTHPAREN = {'[]', '()'}
+    """
+    Set of accepted strings representing an empty list.
+    """
 
     _LPAREN_DESC = 'left parenthesis'
     _RPAREN_DESC = 'matching right parenthesis'
@@ -264,7 +404,7 @@ class Pipeline(FilterMember):
         self._is_entire_filter = is_entire_filter
         
     @classmethod
-    def eat(cls, params: EatParams, at: int, is_entire_filter: bool) -> tuple[Pipeline, int]:
+    def _eat(cls, params: EatParams, at: int, is_entire_filter: bool) -> tuple[Pipeline, int]:
         # If we don't expect to eat the entire filter what we do eat must be parenthesized.
         if is_entire_filter:
             single_idx = at
@@ -273,7 +413,7 @@ class Pipeline(FilterMember):
             single_idx = at + 1
 
         closed_parentheses = False
-        single, until = Single.eat(params, single_idx)
+        single, until = _Single._eat(params, single_idx)
         joinables = []
 
         while until < len(params.tokens):
@@ -283,7 +423,7 @@ class Pipeline(FilterMember):
                 until += 1
                 break
 
-            jable, until = Joinable.eat(params, until)
+            jable, until = _Joinable._eat(params, until)
             joinables.append(jable)
 
         if not is_entire_filter and not closed_parentheses:
@@ -325,26 +465,27 @@ class Pipeline(FilterMember):
         for jable in self._joinables:
             yield from jable.colonoscopy()
 
-# Some "FilterMembers" (as defined in the BNF) don't need to be instantiated. Eating a "Single" directly returns what its "child" would be.
-class Single:
+# Some "FilterMembers" (as defined in the BNF) don't need to be instantiated. Eating a "_Single" directly returns what its "child" would be.
+# Because they don't need to be instantiated, they also don't need to be public.
+class _Single:
     @classmethod
-    def eat(cls, params: EatParams, at: int) -> tuple[Predicate | Negative | Pipeline, int]:
+    def _eat(cls, params: EatParams, at: int) -> tuple[Predicate | Negative | Pipeline, int]:
         # The order is important for raising the most meaningful exception.
         try:
-            return Negative.eat(params, at)
+            return Negative._eat(params, at)
         except _EinGafrurError as e:
-            # If the exception was that there isn't a 'not' symbol, we want to try parsing this as a Positive.
+            # If the exception was that there isn't a 'not' symbol, we want to try parsing this as a _Positive.
             # Otherwise, there's no point to even try, and the most meaningful exception we can raise is this one.
             if e.is_terminal:
                 raise
 
-        return Positive.eat(params, at)
+        return _Positive._eat(params, at)
 
-class Positive:
+class _Positive:
     @classmethod
-    def eat(cls, params: EatParams, at: int) -> tuple[Predicate | Pipeline, int]:
+    def _eat(cls, params: EatParams, at: int) -> tuple[Predicate | Pipeline, int]:
         try:
-            return Pipeline.eat(params, at, False)
+            return Pipeline._eat(params, at, False)
         except _EinGafrurError as e:
             if e.is_terminal:
                 raise
@@ -352,16 +493,26 @@ class Positive:
         return Predicate.eat(params, at)
 
 class Negative(FilterMember):
+    """
+    Represents a single filter member whose result is logically negated (true becomes false, false becomes true).
+    """
+
+    __no_init_doc__ = True
+
     NEGATE = {'!', '-n', '-not'}
+    """
+    Set of accepted strings representing "not".
+    """
+
     _DESC = "'not' symbol"
 
     def __init__(self, positive: Predicate | Pipeline) -> None:
         self._positive = positive
 
     @classmethod
-    def eat(cls, params: EatParams, at: int) -> tuple[Negative, int]:
+    def _eat(cls, params: EatParams, at: int) -> tuple[Negative, int]:
         cls.eat_one_of(params, at, cls._DESC, cls.NEGATE, is_terminal=False)
-        positive, until = Positive.eat(params, at + 1)
+        positive, until = _Positive._eat(params, at + 1)
         return cls(positive), until
 
     def excrete(self, findable: _ml.Findable) -> bool:
@@ -375,46 +526,64 @@ class Negative(FilterMember):
         yield self
         yield from self._positive.colonoscopy()
 
-class Joinable(FilterMember):
+class _Joinable:
     @classmethod
-    def eat(cls, params: EatParams, at: int) -> tuple[Disjoined | Predicate | Negative | Pipeline, int]:
+    def _eat(cls, params: EatParams, at: int) -> tuple[Disjoined | Predicate | Negative | Pipeline, int]:
         # Ordered this way so we raise the most meaningful exception possible.
         try:
-            return Disjoined.eat(params, at)
+            return Disjoined._eat(params, at)
         except _EinGafrurError as e:
             if e.is_terminal:
                 raise
 
         try:
-            return Conjoined.eat(params, at)
+            return Conjoined._eat(params, at)
         except _EinGafrurError as e:
             if e.is_terminal:
                 raise
 
-        return Single.eat(params, at)
+        return _Single._eat(params, at)
 
 class Conjoined:
+    """
+    Represents a single fitler member combined to its previous member with logical AND. This class is never actually instantiated, since members are combined with AND by default.
+    """
+
     CONJOIN = {'&', '-a', '-and'}
+    """
+    Set of accepted strings representing "and".
+    """
+
     _DESC = "'and' symbol"
 
     @classmethod
-    def eat(cls, params: EatParams, at: int) -> tuple[Predicate | Negative | Pipeline, int]:
+    def _eat(cls, params: EatParams, at: int) -> tuple[Predicate | Negative | Pipeline, int]:
         FilterMember.eat_one_of(params, at, cls._DESC, cls.CONJOIN, is_terminal=False)
 
         # There is no need to return a Coinjoined object because conjoining is the default behavior when boolean operators are omitted.
-        return Single.eat(params, at + 1)
+        return _Single._eat(params, at + 1)
 
 class Disjoined(FilterMember):
+    """
+    Represents a single fitler member combined to its previous member with logical OR.
+    """
+
+    __no_init_doc__ = True
+
     DISJOIN = {'|', '-o', '-or'}
+    """
+    Set of accepted strings representing "or".
+    """
+
     _DESC = "'or' symbol"
 
     def __init__(self, single: Predicate | Negative | Pipeline) -> None:
         self._single = single
 
     @classmethod
-    def eat(cls, params: EatParams, at: int) -> tuple[Disjoined, int]:
+    def _eat(cls, params: EatParams, at: int) -> tuple[Disjoined, int]:
         cls.eat_one_of(params, at, cls._DESC, cls.DISJOIN, is_terminal=False)
-        single, until = Single.eat(params, at + 1)
+        single, until = _Single._eat(params, at + 1)
         return cls(single), until
 
     def excrete(self, findable: _ml.Findable) -> bool:
@@ -429,15 +598,47 @@ class Disjoined(FilterMember):
         yield from self._single.colonoscopy()
 
 class Predicate(FilterMember):
+    """
+    Base class for all predicates - filter members which check something about a findable object.
+    
+    You can extend flam by inheriting from this class and registering your own custom predicates (read more about that in the docs).
+    """
+    
     PREFIX = '-'
+    """
+    All predicate names in a filter should begin with this string.
+    """
     
     # These are READ ONLY. We would wrap them in a propety but classmethod-properties are not supported.
     # We would UPPERCASE them to communicate that they're constants but the registry infra expects the name to be lowercased.
     qualified_name: str
+    """
+    The predicate's name (not including :py:attr:`PREFIX`). For predicates specific to some findable type, this also includes the type (e.g., 'movies-any-role', not 'any-role').
+    """
+
     qualified_aliases: list[str]
+    """
+    List of aliases for the predicate.
+    """
+
     findable_type: None | _ml.FindableType
+    """
+    Which type of objects this predicate is for. If this is ``None``, all types are supported.
+    """
     
     def __init_subclass__(cls, name_without_type: str, aliases_without_type: None | list[str] = None, findable_type: None | _ml.FindableType = None, **kwargs: typing.Any) -> None:
+        """
+        Defines parameters that subclasses can (or must) pass in as part of subclassing. Ex:
+
+        .. code-block::
+
+            class MyCustomPredicate(Predicate, name_without_type='my-predicate', findable_type=FindableType.MOVIES):
+                # ...
+
+        :param name_without_type: the name of the predicate without the findable type.
+        :param qualified_aliases: list of aliases for the predicate, also without the type.
+        :param findable_type: which type of objects this predicate is for, or ``None`` if it's for all types.
+        """
         super().__init_subclass__(**kwargs)
         cls.findable_type = findable_type
         
@@ -448,6 +649,23 @@ class Predicate(FilterMember):
 
     @classmethod
     def eat(cls, params: EatParams, at: int) -> tuple[Predicate, int]:
+        """
+        Eats tokens which are arguments to this predicate starting from ``params.tokens[at]``. Returns the consumed predicate and the index of the first token after it.
+        
+        Subclasses must override this with their own custom logic. You don't have to worry about eating the predicate name itself. For example:
+
+        .. code-block:: python
+
+            @classmethod
+            def eat(cls, params: EatParams, at: int) -> tuple[Predicate, int]:
+                # This predicate takes an attribute and a CMPTO as its arguments.
+                attribute = cls.eat_attribute(params, at)
+                cmpto = cls.eat_cmpto(params, at + 1, attribute)
+                return cls(attribute, cmpto), at + 2
+
+        :param params: general parameters of this compilation.
+        :param at: index at which the predicate tokens are expected to begin.
+        """
         prefixed_name = cls.eat_str(params, at, 'a predicate name')
 
         if prefixed_name in Pipeline.RPAREN:
@@ -515,11 +733,16 @@ def _make_attribute_predicate(attribute: _attr.Attribute) -> type[Predicate]:
     return AttributePredicate
 
 # Doesn't guarantee that token is valid, only indicates that it looks like it should be.
-def looks_like_filter_token(token: str) -> bool:
-    return (token.startswith(Predicate.PREFIX)
-        or token in Negative.NEGATE
-        or token in Disjoined.DISJOIN
-        or token in Conjoined.CONJOIN
-        or token in Pipeline.LPAREN
-        or token in Pipeline.RPAREN
-        or token in Pipeline.BOTHPAREN)
+def looks_like_filter_token(s: str) -> bool:
+    """
+    Checks if a string matches one of the known forms of a filter token. Use this to split an args list where you expect a filter to start somewhere in the middle of the list.
+
+    :param s: the string which might belong in a filter.
+    """
+    return (s.startswith(Predicate.PREFIX)
+        or s in Negative.NEGATE
+        or s in Disjoined.DISJOIN
+        or s in Conjoined.CONJOIN
+        or s in Pipeline.LPAREN
+        or s in Pipeline.RPAREN
+        or s in Pipeline.BOTHPAREN)
