@@ -498,6 +498,7 @@ Handler object you can use for attributes which return a minutes duration.
 """
 
 DATE_HANDLERS = [
+    #           name                    datefmt     is_ascending
     DateHandler('-date',                '%Y-%m-%d', False),
     DateHandler('-year',                '%Y',       False),
     DateHandler('-month',               '%Y-%m',    False),

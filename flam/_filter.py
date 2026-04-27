@@ -353,7 +353,7 @@ class Filter(FilterMember):
         if len(params.tokens) == 0:
             return cls(None, params.find, params.ctx)
         
-        pipeline, _ = Pipeline._eat(params, 0, True)
+        pipeline, _ = Pipeline._eat(params, 0, is_entire_filter=True)
         return cls(pipeline, params.find, params.ctx)
 
     def excrete(self, findable: _ml.Findable) -> bool:
@@ -485,7 +485,7 @@ class _Positive:
     @classmethod
     def _eat(cls, params: EatParams, at: int) -> tuple[Predicate | Pipeline, int]:
         try:
-            return Pipeline._eat(params, at, False)
+            return Pipeline._eat(params, at, is_entire_filter=False)
         except _EinGafrurError as e:
             if e.is_terminal:
                 raise

@@ -34,6 +34,7 @@ import glob
 import fnmatch
 import time
 import itertools
+import importlib.resources
 
 # Unlike all other modules in this package, this one pretends it's from outside the package and simply "imports flam".
 import flam
@@ -149,6 +150,7 @@ def print_table(table: list[list[str]],
         if paginate:
             # NOTE: python has a hidden feature in pydoc.pager which sounds like a cross-platform solution to this issue,
             # but it doesn't process ANSI escapes very well and is generally a sucky solution.
+            # The python package "rich" also supports a paginator which may or may not be useful someday..
             try:
                 subprocess.call(['less', '-RS', out.name])
             except Exception as e:
@@ -1011,6 +1013,48 @@ See the full documentation for filter syntax.''')
         for record in values_table:
             yield [attributes[i][0].str_of_value(record[i], abbreviate=not args.verbose) for i in range(len(attributes))]
 
+class SubcommandDocs:
+    @classmethod
+    def add_subparser(cls, subparsers: argparse._SubParsersAction) -> argparse.ArgumentParser:
+        parser = subparsers.add_parser(
+            'docs',
+            formatter_class=argparse.RawTextHelpFormatter,
+            description = (
+'''View the documentation.
+'''),
+        )
+
+        parser.set_defaults(function=cls.execute)
+        parser.add_argument('-b', '--browser', action='store_true', help='Open the documentation in the browser.')
+        return parser
+
+    @classmethod
+    def execute(cls, ctx: flam.FlamContext, args: argparse.Namespace) -> None:
+        MAN_FILE = '_gen_docs.1'
+        TXT_FILE = '_gen_docs.txt'
+
+        if args.browser:
+            # TODO: implement once integrated with some website.
+            return
+
+        data_files = importlib.resources.files('flam.data')
+
+        # First preference is to open the docs with man because it has some pretty formatting.
+        if shutil.which('man') is not None:
+            with data_files.joinpath(MAN_FILE) as docs_path:
+                # man won't eat up Windows paths.
+                subprocess.call(['man', docs_path.as_posix()])
+                return
+
+        # As a fallback also support just paginating a plaintext version with less.
+        if shutil.which('less') is not None:
+            with data_files.joinpath(TXT_FILE) as docs_path:
+                subprocess.call(['less', docs_path])
+                return
+
+        # Last resort is to just print the plaintext to the terminal.
+        print(data_files.joinpath(TXT_FILE).read_text())
+
 # class SubcommandChart:
 #     @classmethod
 #     def add_subparser(cls, subparsers: argparse._SubParsersAction) -> argparse.ArgumentParser:
@@ -1060,6 +1104,7 @@ A bit of information on each subcommand:
     config      View or change the configuration - configure lists, custom extensions, etc.
     fetch       Download movie lists locally so they can be used
     find        Query for movies, people, or roles in your movie lists
+    docs        Read the complete documentation
 
 The default subcommand is `find`. See `%(prog)s find --help` to know which arguments it accepts. There is a help option for all subcommands.
 '''),
@@ -1095,6 +1140,7 @@ The default subcommand is `find`. See `%(prog)s find --help` to know which argum
         SubcommandConfig.add_subparser(subparsers)
         SubcommandFetch.add_subparser(subparsers)
         find_subparser = SubcommandFind.add_subparser(subparsers, None)
+        SubcommandDocs.add_subparser(subparsers)
         # SubcommandChart.add_subparser(subparsers)
     else:
         find_subparser = SubcommandFind.add_subparser(None, parser)
@@ -1133,7 +1179,7 @@ def main() -> None:
     #   we fallback to a parser where the main parser is configured with both main and find parser configs.
     #   This works because we preserve the trait that <WHAT> isn't followed by optional arguments.
     # * If the fallback parser fails we print the error as if it came from find as a subparser, not find as embedded in the main parser.
-    parser, find_subparser = make_main_parser(True)
+    parser, find_subparser = make_main_parser(add_subparsers=True)
 
     try:
         try:
@@ -1144,12 +1190,12 @@ def main() -> None:
                 parser.error(str(e))
             
             flam.logger.info(f"Will default to parsing as find due to error: {e}")
-            find_mainparser, _ = make_main_parser(False)
+            find_mainparser, _ = make_main_parser(add_subparsers=False)
 
             try:
                 args = find_mainparser.parse_args()
             except argparse.ArgumentError as e2:
-                # Print errors as if they came from "flam find".
+                # Print errors as if they came from `flam find`.
                 find_subparser.error(str(e2))
             
         flam.logger.info(f"Parsed args into: {args=}")

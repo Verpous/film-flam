@@ -13,12 +13,13 @@
 # You should have received a copy of the GNU General Public License
 # along with this program. If not, see <https://www.gnu.org/licenses/>.
 
-from ._gen_version import __version__
-
 # Important to import _reg first, because it's the only module with a function that should be callable during the import process (the register() function).
 # Counterintuitively, by importing it first, what we're actually ensuring is that it's imported *last*.
 # The first modules that are fully imported are actually the ones that _reg imports, so by the time python evalutes _reg itself, its dependencies are ready.
 from ._reg import *
+
+# Can't star-import this because it's "private".
+from ._gen_version import __version__
 
 # I don't want long lines and hate importing specific things with "from", so script names tend to be short.
 # We don't import non-hidden modules 'utils', 'attrutils' here. They are for importing specifically by the user if he wants them.

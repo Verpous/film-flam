@@ -117,13 +117,15 @@ release() {
             ;;
     esac
 
+    # Clean the old build, old docs, old version file, etc.
+    clean
     _gen_requirements
-    _gen_version $flavor force
+    _gen_version $flavor
+    sphinx
 
     # For actual releases, require mypy and pylint to report no problems.
     [[ "$flavor" != actual ]] || { mypy && pylint; } > /dev/null
 
-    rm -rf $build
     python -m build --outdir $build
 
     # Twine can fail with HTTP 403 if the API token is bad. There should be a ~/.pypirc with the API token, and it's also saved in my Bitwarden.
@@ -155,9 +157,10 @@ s/.*/^\0==/g' "$req_patterns" # Add a "==" so that the next step will grep these
     (( "$(command wc -l < "$req_patterns")" == "$(command wc -l < _gen_requirements.txt)" ))
 }
 
-# Code-generation of the file containing the current version from use from within the code. Supports all release flavors. Optionally can check if the file already exists.
+# Code-generation of the file containing the current version from use from within the code. Supports all release flavors.
 _gen_version() {
-    [[ ! "$2" && -f $mdl/_gen_version.py ]] && return
+    # Don't actually create the file if it already exists. It can mess with a couple of places.
+    [[ -f $mdl/_gen_version.py ]] && return
 
     {
         # We use date versioning because it requires the least manual intervention.
@@ -366,9 +369,7 @@ coverage() {
 }
 
 # Compiles the documentation.
-# TODO: hook this to the release pipeline so when we create an actual release we also create the documentation and upload it.
 sphinx() {
-    # TODO: _gen_version here may be a problem, because we'd want it to use the existing version as part of the release process.
     _gen_version
     
     (
@@ -376,8 +377,27 @@ sphinx() {
 
         case "${1,,}" in
             ""|actual)
-                # TODO: also man. And make clean first?
+                # Build HTML which for viewing the docs online.
                 make html
+
+                # Build man for viewing the docs in the terminal with `flam docs`.
+                make man
+                man_build=build/man
+                
+                # The man is built with the default name, which is the package name, and then renamed.
+                # There is a way to name it this to begin with by defining man_pages in conf.py, but it also fucks with the title of the page.
+                mv $man_build/*.1 $man_build/_gen_docs.1
+
+                # For systems without `man`, also generate a plaintext version. Sphinx has a 'text' builder for generating text files prettier than this,
+                # but it compiles each .rst into its own .txt, whereas man essentially catenates all files together. We'll live with it.
+                # NOTE: this logs a warning every time which we will live with. We don't want to ignore all of stderr because it's useful sometimes.
+                # HACK: man is set up weird on my environment, and this is the only way I can get it to work.
+                MSYS_NO_PATHCONV=1 cmd /c man $man_build/*.1 > $man_build/_gen_docs.txt
+
+                # Copy everything to the package folder so it will be accessible and packaged with flam.
+                # NOTE: from what I can tell, pyproject.toml should include data files like these by default in the distribution.
+                # If it doesn't, there's a way to configure it so it does.
+                cp $man_build/* ../$mdl/data/
                 ;;
             live)
                 # Only for HTML docs, we have this ability to edit them live with the browser window refreshing on every change.
@@ -404,9 +424,9 @@ help() {
     fi
 }
 
-# Little system which lets us make tempfiles without worrying about cleanup.
+# Little system which lets us make tempfiles without worrying about cleanup (also log when a failure happens).
 tmpfiles=()
-trap 'rm -f -- "${tmpfiles[@]}"' EXIT
+trap '(( $? != 0 )) && echo "Quitting early because of an error!"; rm -f -- "${tmpfiles[@]}"' EXIT
 
 # This function must be executed not in a subshell, so instead of printing the result it writes it to a variable.
 _mktemp() {

@@ -26,3 +26,6 @@ flam = "flam.__main__:main"
 [tool.setuptools.dynamic]
 dependencies = { file = ["_gen_requirements.txt"] }
 version = { attr = "flam._gen_version.__version__" }
+
+[tool.setuptools.package-data]
+"flam.data" = ["*"]

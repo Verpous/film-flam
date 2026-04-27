@@ -33,14 +33,6 @@ extensions = [
 html_theme = 'sphinx_rtd_theme'
 html_static_path = ['_static']
 
-# TODO: does this work?
-man_pages = [
-    ('index', 'flam', 'the complete flam documentation', '', 1),
-    ('attributes', 'flam-attributes', 'documentation on supported attributes in flam', '', 1),
-    ('predicates', 'flam-predicates', 'documentation on supported predicates in flam', '', 1),
-    ('fetchers', 'flam-fetchers', 'documentation on supported fetchers in flam', '', 1),
-]
-
 rst_prolog = f"""
 .. |project| replace:: {project}
 """
