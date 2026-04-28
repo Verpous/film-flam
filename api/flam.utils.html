@@ -1,0 +1,481 @@
+
+
+<!DOCTYPE html>
+<html class="writer-html5" lang="en" data-content_root="../">
+<head>
+  <meta charset="utf-8" /><meta name="viewport" content="width=device-width, initial-scale=1" />
+
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>flam.utils &mdash; FilmFlam 2026.4.28.dev1777405935 documentation</title>
+      <link rel="stylesheet" type="text/css" href="../_static/pygments.css?v=80d5e7a1" />
+      <link rel="stylesheet" type="text/css" href="../_static/css/theme.css?v=9edc463e" />
+
+  
+      <script src="../_static/jquery.js?v=5d32c60e"></script>
+      <script src="../_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
+      <script src="../_static/documentation_options.js?v=87924221"></script>
+      <script src="../_static/doctools.js?v=fd6eb6e6"></script>
+      <script src="../_static/sphinx_highlight.js?v=6ffebe34"></script>
+    <script src="../_static/js/theme.js"></script>
+    <link rel="index" title="Index" href="../genindex.html" />
+    <link rel="search" title="Search" href="../search.html" />
+    <link rel="next" title="flam.attrutils" href="flam.attrutils.html" />
+    <link rel="prev" title="flam" href="flam.html" /> 
+</head>
+
+<body class="wy-body-for-nav"> 
+  <div class="wy-grid-for-nav">
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search" >
+
+          
+          
+          <a href="../index.html" class="icon icon-home">
+            FilmFlam
+          </a>
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="../search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" aria-label="Search docs" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+        </div><div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
+              <p class="caption" role="heading"><span class="caption-text">Contents:</span></p>
+<ul class="current">
+<li class="toctree-l1"><a class="reference internal" href="../install.html">Setup</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../examples.html">Examples</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../findables.html">Findables</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../listdefs.html">Listdefs</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../filters.html">Filters</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../attributes.html">Attributes</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../predicates.html">Predicates</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../fetchers.html">Fetchers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../cli/cli.html">Commandline tool</a></li>
+<li class="toctree-l1 current"><a class="reference internal" href="api.html">API</a><ul class="current">
+<li class="toctree-l2"><a class="reference internal" href="flam.html">flam</a></li>
+<li class="toctree-l2 current"><a class="current reference internal" href="#">flam.utils</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="#flam.utils.ProgressBar"><code class="docutils literal notranslate"><span class="pre">ProgressBar</span></code></a><ul>
+<li class="toctree-l4"><a class="reference internal" href="#flam.utils.ProgressBar.__init__"><code class="docutils literal notranslate"><span class="pre">ProgressBar.__init__()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="#flam.utils.ProgressBar.__iter__"><code class="docutils literal notranslate"><span class="pre">ProgressBar.__iter__()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="#flam.utils.ProgressBar.__enter__"><code class="docutils literal notranslate"><span class="pre">ProgressBar.__enter__()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="#flam.utils.ProgressBar.__exit__"><code class="docutils literal notranslate"><span class="pre">ProgressBar.__exit__()</span></code></a></li>
+</ul>
+</li>
+<li class="toctree-l3"><a class="reference internal" href="#flam.utils.Timeout"><code class="docutils literal notranslate"><span class="pre">Timeout</span></code></a><ul>
+<li class="toctree-l4"><a class="reference internal" href="#flam.utils.Timeout.__init__"><code class="docutils literal notranslate"><span class="pre">Timeout.__init__()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="#flam.utils.Timeout.tick"><code class="docutils literal notranslate"><span class="pre">Timeout.tick()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="#flam.utils.Timeout.__enter__"><code class="docutils literal notranslate"><span class="pre">Timeout.__enter__()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="#flam.utils.Timeout.__exit__"><code class="docutils literal notranslate"><span class="pre">Timeout.__exit__()</span></code></a></li>
+</ul>
+</li>
+<li class="toctree-l3"><a class="reference internal" href="#flam.utils.download_file_using_browser"><code class="docutils literal notranslate"><span class="pre">download_file_using_browser()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="#flam.utils.slugify"><code class="docutils literal notranslate"><span class="pre">slugify()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="#flam.utils.import_file"><code class="docutils literal notranslate"><span class="pre">import_file()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="#flam.utils.tree"><code class="docutils literal notranslate"><span class="pre">tree()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="#flam.utils.tabulate"><code class="docutils literal notranslate"><span class="pre">tabulate()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="#flam.utils.TruncationStyle"><code class="docutils literal notranslate"><span class="pre">TruncationStyle</span></code></a><ul>
+<li class="toctree-l4"><a class="reference internal" href="#flam.utils.TruncationStyle.NO_TRIM"><code class="docutils literal notranslate"><span class="pre">TruncationStyle.NO_TRIM</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="#flam.utils.TruncationStyle.TRIM_END"><code class="docutils literal notranslate"><span class="pre">TruncationStyle.TRIM_END</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="#flam.utils.TruncationStyle.TRIM_START"><code class="docutils literal notranslate"><span class="pre">TruncationStyle.TRIM_START</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="#flam.utils.TruncationStyle.TRIM_MIDDLE"><code class="docutils literal notranslate"><span class="pre">TruncationStyle.TRIM_MIDDLE</span></code></a></li>
+</ul>
+</li>
+<li class="toctree-l3"><a class="reference internal" href="#flam.utils.truncate"><code class="docutils literal notranslate"><span class="pre">truncate()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="#flam.utils.num_pretty"><code class="docutils literal notranslate"><span class="pre">num_pretty()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="#flam.utils.parse_num_pretty"><code class="docutils literal notranslate"><span class="pre">parse_num_pretty()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="#flam.utils.stable_dedup"><code class="docutils literal notranslate"><span class="pre">stable_dedup()</span></code></a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="flam.attrutils.html">flam.attrutils</a></li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="../extending.html">Extending Flam</a></li>
+</ul>
+
+        </div>
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap"><nav class="wy-nav-top" aria-label="Mobile navigation menu" >
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="../index.html">FilmFlam</a>
+      </nav>
+
+      <div class="wy-nav-content">
+        <div class="rst-content">
+          <div role="navigation" aria-label="Page navigation">
+  <ul class="wy-breadcrumbs">
+      <li><a href="../index.html" class="icon icon-home" aria-label="Home"></a></li>
+          <li class="breadcrumb-item"><a href="api.html">API</a></li>
+      <li class="breadcrumb-item active">flam.utils</li>
+      <li class="wy-breadcrumbs-aside">
+            <a href="../_sources/api/flam.utils.rst.txt" rel="nofollow"> View page source</a>
+      </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+             
+  <section id="flam-utils">
+<h1>flam.utils<a class="headerlink" href="#flam-utils" title="Link to this heading"></a></h1>
+<p>This page documents the <code class="docutils literal notranslate"><span class="pre">flam.utils</span></code> module. It contains generic utilities used by flam which may be useful for you too.</p>
+<dl class="py class" id="module-flam.utils">
+<dt class="sig sig-object py" id="flam.utils.ProgressBar">
+<span class="property"><span class="k"><span class="pre">class</span></span><span class="w"> </span></span><span class="sig-name descname"><span class="pre">ProgressBar</span></span><a class="headerlink" href="#flam.utils.ProgressBar" title="Link to this definition"></a></dt>
+<dd><p>Utility for iterating over a list and presenting a progress bar to the user via stdout. Example usage:</p>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="c1"># How you might hypothetically fetch a list of movies while presenting a progress bar about it.</span>
+<span class="k">with</span> <span class="n">ProgressBar</span><span class="p">(</span><span class="n">movies_to_fetch</span><span class="p">,</span>
+        <span class="n">desc</span><span class="o">=</span><span class="s1">&#39;Downloading&#39;</span><span class="p">,</span>
+        <span class="n">keyfunc</span><span class="o">=</span><span class="k">lambda</span> <span class="n">m</span><span class="p">:</span> <span class="n">m</span><span class="o">.</span><span class="n">title</span><span class="p">)</span> <span class="k">as</span> <span class="n">bar</span><span class="p">:</span>
+    <span class="k">for</span> <span class="n">movie</span> <span class="ow">in</span> <span class="n">bar</span><span class="p">:</span>
+        <span class="n">fetch_movie</span><span class="p">(</span><span class="n">movie</span><span class="p">)</span>
+</pre></div>
+</div>
+<dl class="py method">
+<dt class="sig sig-object py" id="flam.utils.ProgressBar.__init__">
+<span class="sig-name descname"><span class="pre">__init__</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">elements</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">list</span><span class="p"><span class="pre">[</span></span><span class="pre">T</span><span class="p"><span class="pre">]</span></span></span></em>, <em class="sig-param"><span class="n"><span class="pre">desc</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">None</span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><span class="pre">str</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">keyfunc</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">None</span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><span class="pre">Callable</span><span class="p"><span class="pre">[</span></span><span class="p"><span class="pre">[</span></span><span class="pre">T</span><span class="p"><span class="pre">]</span></span><span class="p"><span class="pre">,</span></span><span class="w"> </span><span class="pre">str</span><span class="p"><span class="pre">]</span></span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">None</span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">None</span></span></span><a class="headerlink" href="#flam.utils.ProgressBar.__init__" title="Link to this definition"></a></dt>
+<dd><dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>elements</strong> (<em>list</em><em>[</em><em>T</em><em>]</em>) – list of elements to process while displaying the progress bar.</p></li>
+<li><p><strong>desc</strong> (<em>None</em><em> | </em><em>str</em>) – short description to print to the user of what is being done.</p></li>
+<li><p><strong>keyfunc</strong> (<em>None</em><em> | </em><em>Callable</em><em>[</em><em>[</em><em>T</em><em>]</em><em>, </em><em>str</em><em>]</em>) – function which receives an element from the list and returns a short string indicating to the user which element is currently being processed.</p></li>
+</ul>
+</dd>
+<dt class="field-even">Return type<span class="colon">:</span></dt>
+<dd class="field-even"><p>None</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="flam.utils.ProgressBar.__iter__">
+<span class="sig-name descname"><span class="pre">__iter__</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">Iterator</span><span class="p"><span class="pre">[</span></span><span class="pre">T</span><span class="p"><span class="pre">]</span></span></span></span><a class="headerlink" href="#flam.utils.ProgressBar.__iter__" title="Link to this definition"></a></dt>
+<dd><p>Iterate over <code class="docutils literal notranslate"><span class="pre">elements</span></code> and update the progress bar with each iteration.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Return type<span class="colon">:</span></dt>
+<dd class="field-odd"><p><em>Iterator</em>[T]</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="flam.utils.ProgressBar.__enter__">
+<span class="sig-name descname"><span class="pre">__enter__</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">Self</span></span></span><a class="headerlink" href="#flam.utils.ProgressBar.__enter__" title="Link to this definition"></a></dt>
+<dd><p>Returns self. When the context exits the progress bar will be cleaned up.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Return type<span class="colon">:</span></dt>
+<dd class="field-odd"><p><em>Self</em></p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="flam.utils.ProgressBar.__exit__">
+<span class="sig-name descname"><span class="pre">__exit__</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">exc_type</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">type</span><span class="p"><span class="pre">[</span></span><span class="pre">BaseException</span><span class="p"><span class="pre">]</span></span></span></em>, <em class="sig-param"><span class="n"><span class="pre">exc_value</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">None</span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><span class="pre">BaseException</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">traceback</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">None</span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><span class="pre">TracebackType</span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">None</span></span></span><a class="headerlink" href="#flam.utils.ProgressBar.__exit__" title="Link to this definition"></a></dt>
+<dd><p>Cleanly ends the progress bar while ensuring it correctly reflects the element where iteration stopped.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>exc_type</strong> (<em>type</em><em>[</em><em>BaseException</em><em>]</em>)</p></li>
+<li><p><strong>exc_value</strong> (<em>None</em><em> | </em><em>BaseException</em>)</p></li>
+<li><p><strong>traceback</strong> (<em>None</em><em> | </em><em>TracebackType</em>)</p></li>
+</ul>
+</dd>
+<dt class="field-even">Return type<span class="colon">:</span></dt>
+<dd class="field-even"><p>None</p>
+</dd>
+</dl>
+</dd></dl>
+
+</dd></dl>
+
+<dl class="py class">
+<dt class="sig sig-object py" id="flam.utils.Timeout">
+<span class="property"><span class="k"><span class="pre">class</span></span><span class="w"> </span></span><span class="sig-name descname"><span class="pre">Timeout</span></span><a class="headerlink" href="#flam.utils.Timeout" title="Link to this definition"></a></dt>
+<dd><p>Utility for keeping track of time and raising an exception if a timeout is reached. Example usage:</p>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="k">with</span> <span class="n">Timeout</span><span class="p">(</span><span class="mi">30</span><span class="p">)</span> <span class="k">as</span> <span class="n">timeout</span><span class="p">:</span>
+    <span class="n">do_some_operation_async</span><span class="p">()</span>
+
+    <span class="k">while</span> <span class="n">operation_not_complete</span><span class="p">()</span>
+        <span class="n">time</span><span class="o">.</span><span class="n">sleep</span><span class="p">(</span><span class="mi">1</span><span class="p">)</span>
+        <span class="n">timeout</span><span class="o">.</span><span class="n">tick</span><span class="p">()</span>
+
+    <span class="k">return</span> <span class="n">operation_result</span><span class="p">()</span>
+</pre></div>
+</div>
+<dl class="py method">
+<dt class="sig sig-object py" id="flam.utils.Timeout.__init__">
+<span class="sig-name descname"><span class="pre">__init__</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">timeout_secs</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">float</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">float('inf')</span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">None</span></span></span><a class="headerlink" href="#flam.utils.Timeout.__init__" title="Link to this definition"></a></dt>
+<dd><dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><p><strong>timeout_secs</strong> (<em>float</em>) – the timeout.</p>
+</dd>
+<dt class="field-even">Return type<span class="colon">:</span></dt>
+<dd class="field-even"><p>None</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="flam.utils.Timeout.tick">
+<span class="sig-name descname"><span class="pre">tick</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">None</span></span></span><a class="headerlink" href="#flam.utils.Timeout.tick" title="Link to this definition"></a></dt>
+<dd><p>Raises a <code class="docutils literal notranslate"><span class="pre">TimeoutError</span></code> if the time spent in the current context is greater than the timeout.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Return type<span class="colon">:</span></dt>
+<dd class="field-odd"><p>None</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="flam.utils.Timeout.__enter__">
+<span class="sig-name descname"><span class="pre">__enter__</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">Self</span></span></span><a class="headerlink" href="#flam.utils.Timeout.__enter__" title="Link to this definition"></a></dt>
+<dd><p>Begins counting time and returns self.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Return type<span class="colon">:</span></dt>
+<dd class="field-odd"><p><em>Self</em></p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="flam.utils.Timeout.__exit__">
+<span class="sig-name descname"><span class="pre">__exit__</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">exc_type</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">type</span><span class="p"><span class="pre">[</span></span><span class="pre">BaseException</span><span class="p"><span class="pre">]</span></span></span></em>, <em class="sig-param"><span class="n"><span class="pre">exc_value</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">None</span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><span class="pre">BaseException</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">traceback</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">None</span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><span class="pre">TracebackType</span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">None</span></span></span><a class="headerlink" href="#flam.utils.Timeout.__exit__" title="Link to this definition"></a></dt>
+<dd><p>Resets the time counter.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>exc_type</strong> (<em>type</em><em>[</em><em>BaseException</em><em>]</em>)</p></li>
+<li><p><strong>exc_value</strong> (<em>None</em><em> | </em><em>BaseException</em>)</p></li>
+<li><p><strong>traceback</strong> (<em>None</em><em> | </em><em>TracebackType</em>)</p></li>
+</ul>
+</dd>
+<dt class="field-even">Return type<span class="colon">:</span></dt>
+<dd class="field-even"><p>None</p>
+</dd>
+</dl>
+</dd></dl>
+
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="flam.utils.download_file_using_browser">
+<span class="sig-name descname"><span class="pre">download_file_using_browser</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">download_cmd</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">Callable</span><span class="p"><span class="pre">[</span></span><span class="p"><span class="pre">[</span></span><span class="p"><span class="pre">]</span></span><span class="p"><span class="pre">,</span></span><span class="w"> </span><span class="pre">Any</span><span class="p"><span class="pre">]</span></span></span></em>, <em class="sig-param"><span class="n"><span class="pre">file_extension</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">str</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">downloads_dir</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">str</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">timeout_secs</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">float</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">float('inf')</span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">str</span></span></span><a class="headerlink" href="#flam.utils.download_file_using_browser" title="Link to this definition"></a></dt>
+<dd><p>Handles downloading a file with an external tool which should download it to some directory. Watches that directory and waits for the downloaded file to appear.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>download_cmd</strong> (<em>Callable</em><em>[</em><em>[</em><em>]</em><em>, </em><em>Any</em><em>]</em>) – function which should trigger an asynchronous file download.</p></li>
+<li><p><strong>file_extension</strong> (<em>str</em>) – the extension the downloaded file should have.</p></li>
+<li><p><strong>downloads_dir</strong> (<em>str</em>) – path to where the file is expected to be downloaded.</p></li>
+<li><p><strong>timeout_secs</strong> (<em>float</em>) – timeout for the download.</p></li>
+</ul>
+</dd>
+<dt class="field-even">Return type<span class="colon">:</span></dt>
+<dd class="field-even"><p>str</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="flam.utils.slugify">
+<span class="sig-name descname"><span class="pre">slugify</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">s</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">str</span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">str</span></span></span><a class="headerlink" href="#flam.utils.slugify" title="Link to this definition"></a></dt>
+<dd><p>Removes special characters from a string to turn it into a valid filename.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><p><strong>s</strong> (<em>str</em>) – string to convert.</p>
+</dd>
+<dt class="field-even">Return type<span class="colon">:</span></dt>
+<dd class="field-even"><p>str</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="flam.utils.import_file">
+<span class="sig-name descname"><span class="pre">import_file</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">file</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">str</span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">ModuleType</span></span></span><a class="headerlink" href="#flam.utils.import_file" title="Link to this definition"></a></dt>
+<dd><p>Dynamically imports a file based on a path, and returns the module object.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><p><strong>file</strong> (<em>str</em>) – path of the file to import.</p>
+</dd>
+<dt class="field-even">Return type<span class="colon">:</span></dt>
+<dd class="field-even"><p><em>ModuleType</em></p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="flam.utils.tree">
+<span class="sig-name descname"><span class="pre">tree</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">dir_path</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">str</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">prefix</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">str</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">''</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">stats</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">None</span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><span class="pre">Callable</span><span class="p"><span class="pre">[</span></span><span class="p"><span class="pre">[</span></span><span class="pre">str</span><span class="p"><span class="pre">]</span></span><span class="p"><span class="pre">,</span></span><span class="w"> </span><span class="pre">str</span><span class="p"><span class="pre">]</span></span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">None</span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">Iterator</span><span class="p"><span class="pre">[</span></span><span class="pre">str</span><span class="p"><span class="pre">]</span></span></span></span><a class="headerlink" href="#flam.utils.tree" title="Link to this definition"></a></dt>
+<dd><p>Iterate over lines which together represent a directory tree in a pretty, human-readable format.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>dir_path</strong> (<em>str</em>) – path to the directory whose subtree we’re interested in.</p></li>
+<li><p><strong>prefix</strong> (<em>str</em>) – string that will appear at the start of each line.</p></li>
+<li><p><strong>stats</strong> (<em>None</em><em> | </em><em>Callable</em><em>[</em><em>[</em><em>str</em><em>]</em><em>, </em><em>str</em><em>]</em>) – function which receives a file path and returns a string with information to display next to that file.</p></li>
+</ul>
+</dd>
+<dt class="field-even">Return type<span class="colon">:</span></dt>
+<dd class="field-even"><p><em>Iterator</em>[str]</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="flam.utils.tabulate">
+<span class="sig-name descname"><span class="pre">tabulate</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">records</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">list</span><span class="p"><span class="pre">[</span></span><span class="pre">list</span><span class="p"><span class="pre">[</span></span><span class="pre">str</span><span class="p"><span class="pre">]</span></span><span class="p"><span class="pre">]</span></span></span></em>, <em class="sig-param"><span class="n"><span class="pre">fillchar</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">str</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">'</span> <span class="pre">'</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">use_color</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">bool</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">True</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">header_color</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">str</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">''</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">fill_color</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">str</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">colorama.Fore.BLACK</span> <span class="pre">+</span> <span class="pre">colorama.Style.BRIGHT</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">column_colors</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">None</span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><span class="pre">list</span><span class="p"><span class="pre">[</span></span><span class="pre">str</span><span class="p"><span class="pre">]</span></span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">None</span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">Iterable</span><span class="p"><span class="pre">[</span></span><span class="pre">str</span><span class="p"><span class="pre">]</span></span></span></span><a class="headerlink" href="#flam.utils.tabulate" title="Link to this definition"></a></dt>
+<dd><p>Turn a table into a nice printable format and iterate over its lines.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>records</strong> (<em>list</em><em>[</em><em>list</em><em>[</em><em>str</em><em>]</em><em>]</em>) – the table as a list of lists, where the outer lists are rows and the inner lists are columns.</p></li>
+<li><p><strong>fillchar</strong> (<em>str</em>) – character to use as spacing between columns.</p></li>
+<li><p><strong>use_color</strong> (<em>bool</em>) – whether columns should be colored for enhanced readability.</p></li>
+<li><p><strong>header_color</strong> (<em>str</em>) – additional color to apply on the header row. It may combine with the column colors.</p></li>
+<li><p><strong>fill_color</strong> (<em>str</em>) – color to use for <code class="docutils literal notranslate"><span class="pre">fillchar</span></code>.</p></li>
+<li><p><strong>column_colors</strong> (<em>None</em><em> | </em><em>list</em><em>[</em><em>str</em><em>]</em>) – list of colors to use for columns. They will be used round-robin. If this is <code class="docutils literal notranslate"><span class="pre">None</span></code>, a default list of colors will be used.</p></li>
+</ul>
+</dd>
+<dt class="field-even">Return type<span class="colon">:</span></dt>
+<dd class="field-even"><p><em>Iterable</em>[str]</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py class">
+<dt class="sig sig-object py" id="flam.utils.TruncationStyle">
+<span class="property"><span class="k"><span class="pre">class</span></span><span class="w"> </span></span><span class="sig-name descname"><span class="pre">TruncationStyle</span></span><a class="headerlink" href="#flam.utils.TruncationStyle" title="Link to this definition"></a></dt>
+<dd><p>Enumeration of possible ways to truncate a string.</p>
+<dl class="py attribute">
+<dt class="sig sig-object py" id="flam.utils.TruncationStyle.NO_TRIM">
+<span class="sig-name descname"><span class="pre">NO_TRIM</span></span><span class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">1</span></span><a class="headerlink" href="#flam.utils.TruncationStyle.NO_TRIM" title="Link to this definition"></a></dt>
+<dd><p>“What’s in the box?” -&gt; “What’s in the box?”</p>
+</dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="flam.utils.TruncationStyle.TRIM_END">
+<span class="sig-name descname"><span class="pre">TRIM_END</span></span><span class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">2</span></span><a class="headerlink" href="#flam.utils.TruncationStyle.TRIM_END" title="Link to this definition"></a></dt>
+<dd><p>“What’s in the box?” -&gt; “What’s i…”</p>
+</dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="flam.utils.TruncationStyle.TRIM_START">
+<span class="sig-name descname"><span class="pre">TRIM_START</span></span><span class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">3</span></span><a class="headerlink" href="#flam.utils.TruncationStyle.TRIM_START" title="Link to this definition"></a></dt>
+<dd><p>“What’s in the box?” -&gt; “…the box?”</p>
+</dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="flam.utils.TruncationStyle.TRIM_MIDDLE">
+<span class="sig-name descname"><span class="pre">TRIM_MIDDLE</span></span><span class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">4</span></span><a class="headerlink" href="#flam.utils.TruncationStyle.TRIM_MIDDLE" title="Link to this definition"></a></dt>
+<dd><p>“What’s in the box?” -&gt; “What…box?”</p>
+</dd></dl>
+
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="flam.utils.truncate">
+<span class="sig-name descname"><span class="pre">truncate</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">s</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">str</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">max_len</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">int</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">ellipsis</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">str</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">'...'</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">truncation_style</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference internal" href="#flam.utils.TruncationStyle" title="flam.utils.TruncationStyle"><span class="pre">TruncationStyle</span></a></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">TruncationStyle.TRIM_END</span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">str</span></span></span><a class="headerlink" href="#flam.utils.truncate" title="Link to this definition"></a></dt>
+<dd><p>Truncates a string.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>s</strong> (<em>str</em>) – the string to truncate.</p></li>
+<li><p><strong>max_len</strong> (<em>int</em>) – the maximum length beyond which the string will be truncated down to this length.</p></li>
+<li><p><strong>ellipsis</strong> (<em>str</em>) – short string to use to indicate a truncated part of the string.</p></li>
+<li><p><strong>truncation_style</strong> (<a class="reference internal" href="#flam.utils.TruncationStyle" title="flam.utils.TruncationStyle"><em>TruncationStyle</em></a>) – preference for which part of the string to truncate.</p></li>
+</ul>
+</dd>
+<dt class="field-even">Return type<span class="colon">:</span></dt>
+<dd class="field-even"><p>str</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="flam.utils.num_pretty">
+<span class="sig-name descname"><span class="pre">num_pretty</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">num</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">int</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">abbreviate</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">bool</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">True</span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">str</span></span></span><a class="headerlink" href="#flam.utils.num_pretty" title="Link to this definition"></a></dt>
+<dd><p>Formats a large number as a human-readable string.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>num</strong> (<em>int</em>) – the number to convert.</p></li>
+<li><p><strong>abbreviate</strong> (<em>bool</em>) – whether to shorten large numbers with a magnitude sign.</p></li>
+</ul>
+</dd>
+<dt class="field-even">Return type<span class="colon">:</span></dt>
+<dd class="field-even"><p>str</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="flam.utils.parse_num_pretty">
+<span class="sig-name descname"><span class="pre">parse_num_pretty</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">num_str</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">str</span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">int</span></span></span><a class="headerlink" href="#flam.utils.parse_num_pretty" title="Link to this definition"></a></dt>
+<dd><p>Inverse of <a class="reference internal" href="#flam.utils.num_pretty" title="flam.utils.num_pretty"><code class="xref py py-func docutils literal notranslate"><span class="pre">num_pretty()</span></code></a>.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><p><strong>num_str</strong> (<em>str</em>)</p>
+</dd>
+<dt class="field-even">Return type<span class="colon">:</span></dt>
+<dd class="field-even"><p>int</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="flam.utils.stable_dedup">
+<span class="sig-name descname"><span class="pre">stable_dedup</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">elements</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">Iterable</span><span class="p"><span class="pre">[</span></span><span class="pre">TElem</span><span class="p"><span class="pre">]</span></span></span></em>, <em class="sig-param"><span class="n"><span class="pre">key</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">None</span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><span class="pre">Callable</span><span class="p"><span class="pre">[</span></span><span class="p"><span class="pre">[</span></span><span class="pre">TElem</span><span class="p"><span class="pre">]</span></span><span class="p"><span class="pre">,</span></span><span class="w"> </span><span class="pre">TKey</span><span class="p"><span class="pre">]</span></span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">None</span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">Iterable</span><span class="p"><span class="pre">[</span></span><span class="pre">TElem</span><span class="p"><span class="pre">]</span></span></span></span><a class="headerlink" href="#flam.utils.stable_dedup" title="Link to this definition"></a></dt>
+<dd><p>Removes duplicate elements from an iterable but preserves the original order.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>elements</strong> (<em>Iterable</em><em>[</em><em>TElem</em><em>]</em>) – ordered collection of objects to deduplicate</p></li>
+<li><p><strong>key</strong> (<em>None</em><em> | </em><em>Callable</em><em>[</em><em>[</em><em>TElem</em><em>]</em><em>, </em><em>TKey</em><em>]</em>) – function which receives an element and returns a value by which to deduplicate it. I.e., all elements with the same key are considered duplicates.</p></li>
+</ul>
+</dd>
+<dt class="field-even">Return type<span class="colon">:</span></dt>
+<dd class="field-even"><p><em>Iterable</em>[TElem]</p>
+</dd>
+</dl>
+</dd></dl>
+
+</section>
+
+
+           </div>
+          </div>
+          <footer><div class="rst-footer-buttons" role="navigation" aria-label="Footer">
+        <a href="flam.html" class="btn btn-neutral float-left" title="flam" accesskey="p" rel="prev"><span class="fa fa-arrow-circle-left" aria-hidden="true"></span> Previous</a>
+        <a href="flam.attrutils.html" class="btn btn-neutral float-right" title="flam.attrutils" accesskey="n" rel="next">Next <span class="fa fa-arrow-circle-right" aria-hidden="true"></span></a>
+    </div>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>&#169; Copyright 2026, Aviv Edery.</p>
+  </div>
+
+  Built with <a href="https://www.sphinx-doc.org/">Sphinx</a> using a
+    <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a>
+    provided by <a href="https://readthedocs.org">Read the Docs</a>.
+   
+
+</footer>
+        </div>
+      </div>
+    </section>
+  </div>
+  <script>
+      jQuery(function () {
+          SphinxRtdTheme.Navigation.enable(true);
+      });
+  </script> 
+
+</body>
+</html>

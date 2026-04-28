@@ -1,0 +1,233 @@
+
+
+<!DOCTYPE html>
+<html class="writer-html5" lang="en" data-content_root="../">
+<head>
+  <meta charset="utf-8" /><meta name="viewport" content="width=device-width, initial-scale=1" />
+
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>API &mdash; FilmFlam 2026.4.28.dev1777405935 documentation</title>
+      <link rel="stylesheet" type="text/css" href="../_static/pygments.css?v=80d5e7a1" />
+      <link rel="stylesheet" type="text/css" href="../_static/css/theme.css?v=9edc463e" />
+
+  
+      <script src="../_static/jquery.js?v=5d32c60e"></script>
+      <script src="../_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
+      <script src="../_static/documentation_options.js?v=87924221"></script>
+      <script src="../_static/doctools.js?v=fd6eb6e6"></script>
+      <script src="../_static/sphinx_highlight.js?v=6ffebe34"></script>
+    <script src="../_static/js/theme.js"></script>
+    <link rel="index" title="Index" href="../genindex.html" />
+    <link rel="search" title="Search" href="../search.html" />
+    <link rel="next" title="flam" href="flam.html" />
+    <link rel="prev" title="flam find" href="../cli/find.html" /> 
+</head>
+
+<body class="wy-body-for-nav"> 
+  <div class="wy-grid-for-nav">
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search" >
+
+          
+          
+          <a href="../index.html" class="icon icon-home">
+            FilmFlam
+          </a>
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="../search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" aria-label="Search docs" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+        </div><div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
+              <p class="caption" role="heading"><span class="caption-text">Contents:</span></p>
+<ul class="current">
+<li class="toctree-l1"><a class="reference internal" href="../install.html">Setup</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../examples.html">Examples</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../findables.html">Findables</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../listdefs.html">Listdefs</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../filters.html">Filters</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../attributes.html">Attributes</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../predicates.html">Predicates</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../fetchers.html">Fetchers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../cli/cli.html">Commandline tool</a></li>
+<li class="toctree-l1 current"><a class="current reference internal" href="#">API</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="flam.html">flam</a></li>
+<li class="toctree-l2"><a class="reference internal" href="flam.utils.html">flam.utils</a></li>
+<li class="toctree-l2"><a class="reference internal" href="flam.attrutils.html">flam.attrutils</a></li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="../extending.html">Extending Flam</a></li>
+</ul>
+
+        </div>
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap"><nav class="wy-nav-top" aria-label="Mobile navigation menu" >
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="../index.html">FilmFlam</a>
+      </nav>
+
+      <div class="wy-nav-content">
+        <div class="rst-content">
+          <div role="navigation" aria-label="Page navigation">
+  <ul class="wy-breadcrumbs">
+      <li><a href="../index.html" class="icon icon-home" aria-label="Home"></a></li>
+      <li class="breadcrumb-item active">API</li>
+      <li class="wy-breadcrumbs-aside">
+            <a href="../_sources/api/api.rst.txt" rel="nofollow"> View page source</a>
+      </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+             
+  <section id="api">
+<h1>API<a class="headerlink" href="#api" title="Link to this heading"></a></h1>
+<p>To use FilmFlam as an API,</p>
+<div class="toctree-wrapper compound">
+<p class="caption" role="heading"><span class="caption-text">Contents:</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="flam.html">flam</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="flam.html#flam._ctx.DEFAULT_FLAM_DIR"><code class="docutils literal notranslate"><span class="pre">DEFAULT_FLAM_DIR</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="flam.html#flam._ctx.PrecachePreference"><code class="docutils literal notranslate"><span class="pre">PrecachePreference</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="flam.html#flam._ctx.FlamContext"><code class="docutils literal notranslate"><span class="pre">FlamContext</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="flam.html#flam._ctx.RegistriesOf"><code class="docutils literal notranslate"><span class="pre">RegistriesOf</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="flam.html#flam._ml.GroupMode"><code class="docutils literal notranslate"><span class="pre">GroupMode</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="flam.html#flam._ml.CrewType"><code class="docutils literal notranslate"><span class="pre">CrewType</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="flam.html#flam._ml.parse_ct_gm"><code class="docutils literal notranslate"><span class="pre">parse_ct_gm()</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="flam.html#flam._ml.ct_gm_to_str"><code class="docutils literal notranslate"><span class="pre">ct_gm_to_str()</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="flam.html#flam._ml.FindableType"><code class="docutils literal notranslate"><span class="pre">FindableType</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="flam.html#flam._ml.Findable"><code class="docutils literal notranslate"><span class="pre">Findable</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="flam.html#flam._ml.Movie"><code class="docutils literal notranslate"><span class="pre">Movie</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="flam.html#flam._ml.PeopleUidParts"><code class="docutils literal notranslate"><span class="pre">PeopleUidParts</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="flam.html#flam._ml.People"><code class="docutils literal notranslate"><span class="pre">People</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="flam.html#flam._ml.RoleUidParts"><code class="docutils literal notranslate"><span class="pre">RoleUidParts</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="flam.html#flam._ml.MLFRolesDict"><code class="docutils literal notranslate"><span class="pre">MLFRolesDict</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="flam.html#flam._ml.Role"><code class="docutils literal notranslate"><span class="pre">Role</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="flam.html#flam._ml.MovieList"><code class="docutils literal notranslate"><span class="pre">MovieList</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="flam.html#flam._attr.AttributePrimitive"><code class="docutils literal notranslate"><span class="pre">AttributePrimitive</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="flam.html#flam._attr.AttributeValue"><code class="docutils literal notranslate"><span class="pre">AttributeValue</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="flam.html#flam._attr.ComparisonOp"><code class="docutils literal notranslate"><span class="pre">ComparisonOp</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="flam.html#flam._attr.CmpTo"><code class="docutils literal notranslate"><span class="pre">CmpTo</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="flam.html#flam._attr.Attribute"><code class="docutils literal notranslate"><span class="pre">Attribute</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="flam.html#flam._ldef.CanonListdef"><code class="docutils literal notranslate"><span class="pre">CanonListdef</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="flam.html#flam._ldef.SpecialListType"><code class="docutils literal notranslate"><span class="pre">SpecialListType</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="flam.html#flam._reg.register"><code class="docutils literal notranslate"><span class="pre">register()</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="flam.html#flam._reg.compose_qualified_attr_or_pred_name"><code class="docutils literal notranslate"><span class="pre">compose_qualified_attr_or_pred_name()</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="flam.html#flam._reg.decompose_qualified_attr_or_pred_name"><code class="docutils literal notranslate"><span class="pre">decompose_qualified_attr_or_pred_name()</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="flam.html#flam._fetch.ListFetcher"><code class="docutils literal notranslate"><span class="pre">ListFetcher</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="flam.html#flam._filter.EatParams"><code class="docutils literal notranslate"><span class="pre">EatParams</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="flam.html#flam._filter.FilterMember"><code class="docutils literal notranslate"><span class="pre">FilterMember</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="flam.html#flam._filter.Filter"><code class="docutils literal notranslate"><span class="pre">Filter</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="flam.html#flam._filter.Pipeline"><code class="docutils literal notranslate"><span class="pre">Pipeline</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="flam.html#flam._filter.Negative"><code class="docutils literal notranslate"><span class="pre">Negative</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="flam.html#flam._filter.Conjoined"><code class="docutils literal notranslate"><span class="pre">Conjoined</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="flam.html#flam._filter.Disjoined"><code class="docutils literal notranslate"><span class="pre">Disjoined</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="flam.html#flam._filter.Predicate"><code class="docutils literal notranslate"><span class="pre">Predicate</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="flam.html#flam._filter.looks_like_filter_token"><code class="docutils literal notranslate"><span class="pre">looks_like_filter_token()</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="flam.html#flam._cfg.SimpleList"><code class="docutils literal notranslate"><span class="pre">SimpleList</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="flam.html#flam._cfg.CompositeList"><code class="docutils literal notranslate"><span class="pre">CompositeList</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="flam.html#flam._cfg.Configuration"><code class="docutils literal notranslate"><span class="pre">Configuration</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="flam.html#flam._cfg.ConfigurationLists"><code class="docutils literal notranslate"><span class="pre">ConfigurationLists</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="flam.html#flam._mlf.MLFRole"><code class="docutils literal notranslate"><span class="pre">MLFRole</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="flam.html#flam._mlf.MLFCrew"><code class="docutils literal notranslate"><span class="pre">MLFCrew</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="flam.html#flam._mlf.MLFPerson"><code class="docutils literal notranslate"><span class="pre">MLFPerson</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="flam.html#flam._mlf.MLFMoviePerSourceData"><code class="docutils literal notranslate"><span class="pre">MLFMoviePerSourceData</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="flam.html#flam._mlf.MLFMovie"><code class="docutils literal notranslate"><span class="pre">MLFMovie</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="flam.html#flam._mlf.MovieListFile"><code class="docutils literal notranslate"><span class="pre">MovieListFile</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="flam.html#flam._dbg.FlamEnv"><code class="docutils literal notranslate"><span class="pre">FlamEnv</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="flam.html#flam._dbg.is_debug"><code class="docutils literal notranslate"><span class="pre">is_debug()</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="flam.html#flam._dbg.get_log_file_path"><code class="docutils literal notranslate"><span class="pre">get_log_file_path()</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="flam.html#flam._dbg.logger"><code class="docutils literal notranslate"><span class="pre">logger</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="flam.html#flam._exc.FlamError"><code class="docutils literal notranslate"><span class="pre">FlamError</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="flam.html#flam._exc.InputError"><code class="docutils literal notranslate"><span class="pre">InputError</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="flam.html#flam._exc.CloseInputError"><code class="docutils literal notranslate"><span class="pre">CloseInputError</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="flam.html#flam._exc.FilterSyntaxError"><code class="docutils literal notranslate"><span class="pre">FilterSyntaxError</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="flam.html#flam._exc.FetchInterrupt"><code class="docutils literal notranslate"><span class="pre">FetchInterrupt</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="flam.html#flam._exc.FileValidationError"><code class="docutils literal notranslate"><span class="pre">FileValidationError</span></code></a></li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="flam.utils.html">flam.utils</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="flam.utils.html#flam.utils.ProgressBar"><code class="docutils literal notranslate"><span class="pre">ProgressBar</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="flam.utils.html#flam.utils.Timeout"><code class="docutils literal notranslate"><span class="pre">Timeout</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="flam.utils.html#flam.utils.download_file_using_browser"><code class="docutils literal notranslate"><span class="pre">download_file_using_browser()</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="flam.utils.html#flam.utils.slugify"><code class="docutils literal notranslate"><span class="pre">slugify()</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="flam.utils.html#flam.utils.import_file"><code class="docutils literal notranslate"><span class="pre">import_file()</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="flam.utils.html#flam.utils.tree"><code class="docutils literal notranslate"><span class="pre">tree()</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="flam.utils.html#flam.utils.tabulate"><code class="docutils literal notranslate"><span class="pre">tabulate()</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="flam.utils.html#flam.utils.TruncationStyle"><code class="docutils literal notranslate"><span class="pre">TruncationStyle</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="flam.utils.html#flam.utils.truncate"><code class="docutils literal notranslate"><span class="pre">truncate()</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="flam.utils.html#flam.utils.num_pretty"><code class="docutils literal notranslate"><span class="pre">num_pretty()</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="flam.utils.html#flam.utils.parse_num_pretty"><code class="docutils literal notranslate"><span class="pre">parse_num_pretty()</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="flam.utils.html#flam.utils.stable_dedup"><code class="docutils literal notranslate"><span class="pre">stable_dedup()</span></code></a></li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="flam.attrutils.html">flam.attrutils</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="flam.attrutils.html#flam.attrutils.EasyAttributeParams"><code class="docutils literal notranslate"><span class="pre">EasyAttributeParams</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="flam.attrutils.html#flam.attrutils.EasyAttribute"><code class="docutils literal notranslate"><span class="pre">EasyAttribute</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="flam.attrutils.html#flam.attrutils.MovieExtractor"><code class="docutils literal notranslate"><span class="pre">MovieExtractor</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="flam.attrutils.html#flam.attrutils.PeopleExtractor"><code class="docutils literal notranslate"><span class="pre">PeopleExtractor</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="flam.attrutils.html#flam.attrutils.RoleExtractor"><code class="docutils literal notranslate"><span class="pre">RoleExtractor</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="flam.attrutils.html#flam.attrutils.Extractor"><code class="docutils literal notranslate"><span class="pre">Extractor</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="flam.attrutils.html#flam.attrutils.easy_attribute"><code class="docutils literal notranslate"><span class="pre">easy_attribute()</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="flam.attrutils.html#flam.attrutils.TypeHandler"><code class="docutils literal notranslate"><span class="pre">TypeHandler</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="flam.attrutils.html#flam.attrutils.IntHandler"><code class="docutils literal notranslate"><span class="pre">IntHandler</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="flam.attrutils.html#flam.attrutils.FloatHandler"><code class="docutils literal notranslate"><span class="pre">FloatHandler</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="flam.attrutils.html#flam.attrutils.BoolHandler"><code class="docutils literal notranslate"><span class="pre">BoolHandler</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="flam.attrutils.html#flam.attrutils.StrHandler"><code class="docutils literal notranslate"><span class="pre">StrHandler</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="flam.attrutils.html#flam.attrutils.MinutesHandler"><code class="docutils literal notranslate"><span class="pre">MinutesHandler</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="flam.attrutils.html#flam.attrutils.DateHandler"><code class="docutils literal notranslate"><span class="pre">DateHandler</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="flam.attrutils.html#flam.attrutils.SMALL_INT_HANDLER"><code class="docutils literal notranslate"><span class="pre">SMALL_INT_HANDLER</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="flam.attrutils.html#flam.attrutils.BIG_INT_HANDLER"><code class="docutils literal notranslate"><span class="pre">BIG_INT_HANDLER</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="flam.attrutils.html#flam.attrutils.FLOAT_HANDLER"><code class="docutils literal notranslate"><span class="pre">FLOAT_HANDLER</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="flam.attrutils.html#flam.attrutils.BOOL_HANDLER"><code class="docutils literal notranslate"><span class="pre">BOOL_HANDLER</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="flam.attrutils.html#flam.attrutils.STR_HANDLER"><code class="docutils literal notranslate"><span class="pre">STR_HANDLER</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="flam.attrutils.html#flam.attrutils.MINUTES_HANDLER"><code class="docutils literal notranslate"><span class="pre">MINUTES_HANDLER</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="flam.attrutils.html#flam.attrutils.DATE_HANDLERS"><code class="docutils literal notranslate"><span class="pre">DATE_HANDLERS</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="flam.attrutils.html#flam.attrutils.ArrayLengthAttribute"><code class="docutils literal notranslate"><span class="pre">ArrayLengthAttribute</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="flam.attrutils.html#flam.attrutils.StringLengthAttribute"><code class="docutils literal notranslate"><span class="pre">StringLengthAttribute</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="flam.attrutils.html#flam.attrutils.AverageAttribute"><code class="docutils literal notranslate"><span class="pre">AverageAttribute</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="flam.attrutils.html#flam.attrutils.SumAttribute"><code class="docutils literal notranslate"><span class="pre">SumAttribute</span></code></a></li>
+</ul>
+</li>
+</ul>
+</div>
+</section>
+
+
+           </div>
+          </div>
+          <footer><div class="rst-footer-buttons" role="navigation" aria-label="Footer">
+        <a href="../cli/find.html" class="btn btn-neutral float-left" title="flam find" accesskey="p" rel="prev"><span class="fa fa-arrow-circle-left" aria-hidden="true"></span> Previous</a>
+        <a href="flam.html" class="btn btn-neutral float-right" title="flam" accesskey="n" rel="next">Next <span class="fa fa-arrow-circle-right" aria-hidden="true"></span></a>
+    </div>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>&#169; Copyright 2026, Aviv Edery.</p>
+  </div>
+
+  Built with <a href="https://www.sphinx-doc.org/">Sphinx</a> using a
+    <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a>
+    provided by <a href="https://readthedocs.org">Read the Docs</a>.
+   
+
+</footer>
+        </div>
+      </div>
+    </section>
+  </div>
+  <script>
+      jQuery(function () {
+          SphinxRtdTheme.Navigation.enable(true);
+      });
+  </script> 
+
+</body>
+</html>

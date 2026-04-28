@@ -1,0 +1,632 @@
+
+
+<!DOCTYPE html>
+<html class="writer-html5" lang="en" data-content_root="../">
+<head>
+  <meta charset="utf-8" /><meta name="viewport" content="width=device-width, initial-scale=1" />
+
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>flam.attrutils &mdash; FilmFlam 2026.4.28.dev1777405935 documentation</title>
+      <link rel="stylesheet" type="text/css" href="../_static/pygments.css?v=80d5e7a1" />
+      <link rel="stylesheet" type="text/css" href="../_static/css/theme.css?v=9edc463e" />
+
+  
+      <script src="../_static/jquery.js?v=5d32c60e"></script>
+      <script src="../_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
+      <script src="../_static/documentation_options.js?v=87924221"></script>
+      <script src="../_static/doctools.js?v=fd6eb6e6"></script>
+      <script src="../_static/sphinx_highlight.js?v=6ffebe34"></script>
+    <script src="../_static/js/theme.js"></script>
+    <link rel="index" title="Index" href="../genindex.html" />
+    <link rel="search" title="Search" href="../search.html" />
+    <link rel="next" title="Extending Flam" href="../extending.html" />
+    <link rel="prev" title="flam.utils" href="flam.utils.html" /> 
+</head>
+
+<body class="wy-body-for-nav"> 
+  <div class="wy-grid-for-nav">
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search" >
+
+          
+          
+          <a href="../index.html" class="icon icon-home">
+            FilmFlam
+          </a>
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="../search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" aria-label="Search docs" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+        </div><div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
+              <p class="caption" role="heading"><span class="caption-text">Contents:</span></p>
+<ul class="current">
+<li class="toctree-l1"><a class="reference internal" href="../install.html">Setup</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../examples.html">Examples</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../findables.html">Findables</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../listdefs.html">Listdefs</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../filters.html">Filters</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../attributes.html">Attributes</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../predicates.html">Predicates</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../fetchers.html">Fetchers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../cli/cli.html">Commandline tool</a></li>
+<li class="toctree-l1 current"><a class="reference internal" href="api.html">API</a><ul class="current">
+<li class="toctree-l2"><a class="reference internal" href="flam.html">flam</a></li>
+<li class="toctree-l2"><a class="reference internal" href="flam.utils.html">flam.utils</a></li>
+<li class="toctree-l2 current"><a class="current reference internal" href="#">flam.attrutils</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="#flam.attrutils.EasyAttributeParams"><code class="docutils literal notranslate"><span class="pre">EasyAttributeParams</span></code></a><ul>
+<li class="toctree-l4"><a class="reference internal" href="#flam.attrutils.EasyAttributeParams.name_without_type"><code class="docutils literal notranslate"><span class="pre">EasyAttributeParams.name_without_type</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="#flam.attrutils.EasyAttributeParams.aliases_without_type"><code class="docutils literal notranslate"><span class="pre">EasyAttributeParams.aliases_without_type</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="#flam.attrutils.EasyAttributeParams.findable_type"><code class="docutils literal notranslate"><span class="pre">EasyAttributeParams.findable_type</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="#flam.attrutils.EasyAttributeParams.type_handler"><code class="docutils literal notranslate"><span class="pre">EasyAttributeParams.type_handler</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="#flam.attrutils.EasyAttributeParams.is_ascending"><code class="docutils literal notranslate"><span class="pre">EasyAttributeParams.is_ascending</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="#flam.attrutils.EasyAttributeParams.truncation_style"><code class="docutils literal notranslate"><span class="pre">EasyAttributeParams.truncation_style</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="#flam.attrutils.EasyAttributeParams.default_max_len"><code class="docutils literal notranslate"><span class="pre">EasyAttributeParams.default_max_len</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="#flam.attrutils.EasyAttributeParams.__init__"><code class="docutils literal notranslate"><span class="pre">EasyAttributeParams.__init__()</span></code></a></li>
+</ul>
+</li>
+<li class="toctree-l3"><a class="reference internal" href="#flam.attrutils.EasyAttribute"><code class="docutils literal notranslate"><span class="pre">EasyAttribute</span></code></a><ul>
+<li class="toctree-l4"><a class="reference internal" href="#flam.attrutils.EasyAttribute.__init__"><code class="docutils literal notranslate"><span class="pre">EasyAttribute.__init__()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="#flam.attrutils.EasyAttribute.str_of_value"><code class="docutils literal notranslate"><span class="pre">EasyAttribute.str_of_value()</span></code></a></li>
+</ul>
+</li>
+<li class="toctree-l3"><a class="reference internal" href="#flam.attrutils.MovieExtractor"><code class="docutils literal notranslate"><span class="pre">MovieExtractor</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="#flam.attrutils.PeopleExtractor"><code class="docutils literal notranslate"><span class="pre">PeopleExtractor</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="#flam.attrutils.RoleExtractor"><code class="docutils literal notranslate"><span class="pre">RoleExtractor</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="#flam.attrutils.Extractor"><code class="docutils literal notranslate"><span class="pre">Extractor</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="#flam.attrutils.easy_attribute"><code class="docutils literal notranslate"><span class="pre">easy_attribute()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="#flam.attrutils.TypeHandler"><code class="docutils literal notranslate"><span class="pre">TypeHandler</span></code></a><ul>
+<li class="toctree-l4"><a class="reference internal" href="#flam.attrutils.TypeHandler.default_op"><code class="docutils literal notranslate"><span class="pre">TypeHandler.default_op</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="#flam.attrutils.TypeHandler.parse"><code class="docutils literal notranslate"><span class="pre">TypeHandler.parse()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="#flam.attrutils.TypeHandler.str_of"><code class="docutils literal notranslate"><span class="pre">TypeHandler.str_of()</span></code></a></li>
+</ul>
+</li>
+<li class="toctree-l3"><a class="reference internal" href="#flam.attrutils.IntHandler"><code class="docutils literal notranslate"><span class="pre">IntHandler</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="#flam.attrutils.FloatHandler"><code class="docutils literal notranslate"><span class="pre">FloatHandler</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="#flam.attrutils.BoolHandler"><code class="docutils literal notranslate"><span class="pre">BoolHandler</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="#flam.attrutils.StrHandler"><code class="docutils literal notranslate"><span class="pre">StrHandler</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="#flam.attrutils.MinutesHandler"><code class="docutils literal notranslate"><span class="pre">MinutesHandler</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="#flam.attrutils.DateHandler"><code class="docutils literal notranslate"><span class="pre">DateHandler</span></code></a><ul>
+<li class="toctree-l4"><a class="reference internal" href="#flam.attrutils.DateHandler.name"><code class="docutils literal notranslate"><span class="pre">DateHandler.name</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="#flam.attrutils.DateHandler.datefmt"><code class="docutils literal notranslate"><span class="pre">DateHandler.datefmt</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="#flam.attrutils.DateHandler.is_ascending"><code class="docutils literal notranslate"><span class="pre">DateHandler.is_ascending</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="#flam.attrutils.DateHandler.strip"><code class="docutils literal notranslate"><span class="pre">DateHandler.strip()</span></code></a></li>
+</ul>
+</li>
+<li class="toctree-l3"><a class="reference internal" href="#flam.attrutils.SMALL_INT_HANDLER"><code class="docutils literal notranslate"><span class="pre">SMALL_INT_HANDLER</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="#flam.attrutils.BIG_INT_HANDLER"><code class="docutils literal notranslate"><span class="pre">BIG_INT_HANDLER</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="#flam.attrutils.FLOAT_HANDLER"><code class="docutils literal notranslate"><span class="pre">FLOAT_HANDLER</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="#flam.attrutils.BOOL_HANDLER"><code class="docutils literal notranslate"><span class="pre">BOOL_HANDLER</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="#flam.attrutils.STR_HANDLER"><code class="docutils literal notranslate"><span class="pre">STR_HANDLER</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="#flam.attrutils.MINUTES_HANDLER"><code class="docutils literal notranslate"><span class="pre">MINUTES_HANDLER</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="#flam.attrutils.DATE_HANDLERS"><code class="docutils literal notranslate"><span class="pre">DATE_HANDLERS</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="#flam.attrutils.ArrayLengthAttribute"><code class="docutils literal notranslate"><span class="pre">ArrayLengthAttribute</span></code></a><ul>
+<li class="toctree-l4"><a class="reference internal" href="#flam.attrutils.ArrayLengthAttribute.__init__"><code class="docutils literal notranslate"><span class="pre">ArrayLengthAttribute.__init__()</span></code></a></li>
+</ul>
+</li>
+<li class="toctree-l3"><a class="reference internal" href="#flam.attrutils.StringLengthAttribute"><code class="docutils literal notranslate"><span class="pre">StringLengthAttribute</span></code></a><ul>
+<li class="toctree-l4"><a class="reference internal" href="#flam.attrutils.StringLengthAttribute.__init__"><code class="docutils literal notranslate"><span class="pre">StringLengthAttribute.__init__()</span></code></a></li>
+</ul>
+</li>
+<li class="toctree-l3"><a class="reference internal" href="#flam.attrutils.AverageAttribute"><code class="docutils literal notranslate"><span class="pre">AverageAttribute</span></code></a><ul>
+<li class="toctree-l4"><a class="reference internal" href="#flam.attrutils.AverageAttribute.__init__"><code class="docutils literal notranslate"><span class="pre">AverageAttribute.__init__()</span></code></a></li>
+</ul>
+</li>
+<li class="toctree-l3"><a class="reference internal" href="#flam.attrutils.SumAttribute"><code class="docutils literal notranslate"><span class="pre">SumAttribute</span></code></a><ul>
+<li class="toctree-l4"><a class="reference internal" href="#flam.attrutils.SumAttribute.__init__"><code class="docutils literal notranslate"><span class="pre">SumAttribute.__init__()</span></code></a></li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="../extending.html">Extending Flam</a></li>
+</ul>
+
+        </div>
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap"><nav class="wy-nav-top" aria-label="Mobile navigation menu" >
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="../index.html">FilmFlam</a>
+      </nav>
+
+      <div class="wy-nav-content">
+        <div class="rst-content">
+          <div role="navigation" aria-label="Page navigation">
+  <ul class="wy-breadcrumbs">
+      <li><a href="../index.html" class="icon icon-home" aria-label="Home"></a></li>
+          <li class="breadcrumb-item"><a href="api.html">API</a></li>
+      <li class="breadcrumb-item active">flam.attrutils</li>
+      <li class="wy-breadcrumbs-aside">
+            <a href="../_sources/api/flam.attrutils.rst.txt" rel="nofollow"> View page source</a>
+      </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+             
+  <section id="flam-attrutils">
+<h1>flam.attrutils<a class="headerlink" href="#flam-attrutils" title="Link to this heading"></a></h1>
+<p>This page documents the <code class="docutils literal notranslate"><span class="pre">flam.attrutils</span></code> module. It contains utilities for implementing custom attributes with minimal boilerplate.</p>
+<dl class="py class" id="module-flam.attrutils">
+<dt class="sig sig-object py" id="flam.attrutils.EasyAttributeParams">
+<span class="property"><span class="k"><span class="pre">class</span></span><span class="w"> </span></span><span class="sig-name descname"><span class="pre">EasyAttributeParams</span></span><a class="headerlink" href="#flam.attrutils.EasyAttributeParams" title="Link to this definition"></a></dt>
+<dd><p>Parameters used to create an <a class="reference internal" href="#flam.attrutils.EasyAttribute" title="flam.attrutils.EasyAttribute"><code class="xref py py-class docutils literal notranslate"><span class="pre">EasyAttribute</span></code></a>.</p>
+<dl class="py attribute">
+<dt class="sig sig-object py" id="flam.attrutils.EasyAttributeParams.name_without_type">
+<span class="sig-name descname"><span class="pre">name_without_type</span></span><span class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="pre">str</span></span><a class="headerlink" href="#flam.attrutils.EasyAttributeParams.name_without_type" title="Link to this definition"></a></dt>
+<dd></dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="flam.attrutils.EasyAttributeParams.aliases_without_type">
+<span class="sig-name descname"><span class="pre">aliases_without_type</span></span><span class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="pre">list</span><span class="p"><span class="pre">[</span></span><span class="pre">str</span><span class="p"><span class="pre">]</span></span></span><a class="headerlink" href="#flam.attrutils.EasyAttributeParams.aliases_without_type" title="Link to this definition"></a></dt>
+<dd></dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="flam.attrutils.EasyAttributeParams.findable_type">
+<span class="sig-name descname"><span class="pre">findable_type</span></span><span class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><a class="reference internal" href="flam.html#flam._ml.FindableType" title="flam._ml.FindableType"><span class="pre">FindableType</span></a></span><a class="headerlink" href="#flam.attrutils.EasyAttributeParams.findable_type" title="Link to this definition"></a></dt>
+<dd></dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="flam.attrutils.EasyAttributeParams.type_handler">
+<span class="sig-name descname"><span class="pre">type_handler</span></span><span class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><a class="reference internal" href="#flam.attrutils.TypeHandler" title="flam.attrutils.TypeHandler"><span class="pre">TypeHandler</span></a></span><a class="headerlink" href="#flam.attrutils.EasyAttributeParams.type_handler" title="Link to this definition"></a></dt>
+<dd></dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="flam.attrutils.EasyAttributeParams.is_ascending">
+<span class="sig-name descname"><span class="pre">is_ascending</span></span><span class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="pre">bool</span></span><a class="headerlink" href="#flam.attrutils.EasyAttributeParams.is_ascending" title="Link to this definition"></a></dt>
+<dd></dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="flam.attrutils.EasyAttributeParams.truncation_style">
+<span class="sig-name descname"><span class="pre">truncation_style</span></span><span class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><a class="reference internal" href="flam.utils.html#flam.utils.TruncationStyle" title="flam.utils.TruncationStyle"><span class="pre">TruncationStyle</span></a></span><a class="headerlink" href="#flam.attrutils.EasyAttributeParams.truncation_style" title="Link to this definition"></a></dt>
+<dd><p>Indicates how this attribute’s values should be truncated if their string representation is too long.</p>
+</dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="flam.attrutils.EasyAttributeParams.default_max_len">
+<span class="sig-name descname"><span class="pre">default_max_len</span></span><span class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="pre">int</span></span><a class="headerlink" href="#flam.attrutils.EasyAttributeParams.default_max_len" title="Link to this definition"></a></dt>
+<dd><p>The maximum length beyond which attribute values as strings get truncated.</p>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="flam.attrutils.EasyAttributeParams.__init__">
+<span class="sig-name descname"><span class="pre">__init__</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">name_without_type</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">str</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">aliases_without_type</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">list</span><span class="p"><span class="pre">[</span></span><span class="pre">str</span><span class="p"><span class="pre">]</span></span></span></em>, <em class="sig-param"><span class="n"><span class="pre">findable_type</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference internal" href="flam.html#flam._ml.FindableType" title="flam._ml.FindableType"><span class="pre">FindableType</span></a></span></em>, <em class="sig-param"><span class="n"><span class="pre">type_handler</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference internal" href="#flam.attrutils.TypeHandler" title="flam.attrutils.TypeHandler"><span class="pre">TypeHandler</span></a></span></em>, <em class="sig-param"><span class="n"><span class="pre">is_ascending</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">bool</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">truncation_style</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference internal" href="flam.utils.html#flam.utils.TruncationStyle" title="flam.utils.TruncationStyle"><span class="pre">TruncationStyle</span></a></span></em>, <em class="sig-param"><span class="n"><span class="pre">default_max_len</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">int</span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">None</span></span></span><a class="headerlink" href="#flam.attrutils.EasyAttributeParams.__init__" title="Link to this definition"></a></dt>
+<dd><dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>name_without_type</strong> (<em>str</em>)</p></li>
+<li><p><strong>aliases_without_type</strong> (<em>list</em><em>[</em><em>str</em><em>]</em>)</p></li>
+<li><p><strong>findable_type</strong> (<a class="reference internal" href="flam.html#flam._ml.FindableType" title="flam._ml.FindableType"><em>FindableType</em></a>)</p></li>
+<li><p><strong>type_handler</strong> (<a class="reference internal" href="#flam.attrutils.TypeHandler" title="flam.attrutils.TypeHandler"><em>TypeHandler</em></a>)</p></li>
+<li><p><strong>is_ascending</strong> (<em>bool</em>)</p></li>
+<li><p><strong>truncation_style</strong> (<a class="reference internal" href="flam.utils.html#flam.utils.TruncationStyle" title="flam.utils.TruncationStyle"><em>TruncationStyle</em></a>)</p></li>
+<li><p><strong>default_max_len</strong> (<em>int</em>)</p></li>
+</ul>
+</dd>
+<dt class="field-even">Return type<span class="colon">:</span></dt>
+<dd class="field-even"><p>None</p>
+</dd>
+</dl>
+</dd></dl>
+
+</dd></dl>
+
+<dl class="py class">
+<dt class="sig sig-object py" id="flam.attrutils.EasyAttribute">
+<span class="property"><span class="k"><span class="pre">class</span></span><span class="w"> </span></span><span class="sig-name descname"><span class="pre">EasyAttribute</span></span><a class="headerlink" href="#flam.attrutils.EasyAttribute" title="Link to this definition"></a></dt>
+<dd><p>Utility for easily implementing an attribute. You always have the option of inheriting directly from <a class="reference internal" href="flam.html#flam._attr.Attribute" title="flam._attr.Attribute"><code class="xref py py-class docutils literal notranslate"><span class="pre">Attribute</span></code></a>,
+but if you inherit from this instead you will have to do a lot less work. You only need to implement an extractor function for getting the attribute value:</p>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="k">class</span> <span class="nc">MovieTitleAttribute</span><span class="p">(</span><span class="n">EasyAttribute</span><span class="p">):</span>
+    <span class="k">def</span> <span class="nf">_extract_from_movie</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">movie</span><span class="p">:</span> <span class="n">Movie</span><span class="p">,</span> <span class="n">mlf_movie</span><span class="p">:</span> <span class="n">MLFMovie</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span> <span class="o">|</span> <span class="nb">str</span><span class="p">:</span>
+        <span class="k">return</span> <span class="n">mlf_movie</span><span class="o">.</span><span class="n">title</span>
+
+<span class="n">register</span><span class="p">(</span><span class="n">MovieTitleAttribute</span><span class="p">(</span><span class="n">EasyAttributeParams</span><span class="p">(</span>
+    <span class="n">name_without_type</span> <span class="o">=</span> <span class="s1">&#39;title&#39;</span><span class="p">,</span>
+    <span class="n">aliases_without_type</span> <span class="o">=</span> <span class="p">[</span><span class="s1">&#39;name&#39;</span><span class="p">,</span> <span class="s1">&#39;movie&#39;</span><span class="p">],</span>
+    <span class="n">findable_type</span> <span class="o">=</span> <span class="n">FindableType</span><span class="o">.</span><span class="n">MOVIES</span><span class="p">,</span>
+    <span class="n">type_handler</span> <span class="o">=</span> <span class="n">STR_HANDLER</span><span class="p">,</span>
+    <span class="n">is_ascending</span> <span class="o">=</span> <span class="kc">True</span><span class="p">,</span>
+    <span class="n">truncation_style</span> <span class="o">=</span> <span class="n">TruncationStyle</span><span class="o">.</span><span class="n">TRIM_END</span><span class="p">,</span>
+    <span class="n">default_max_len</span> <span class="o">=</span> <span class="mi">45</span><span class="p">,</span>
+<span class="p">)))</span>
+</pre></div>
+</div>
+<dl class="py method">
+<dt class="sig sig-object py" id="flam.attrutils.EasyAttribute.__init__">
+<span class="sig-name descname"><span class="pre">__init__</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">params</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference internal" href="#flam.attrutils.EasyAttributeParams" title="flam.attrutils.EasyAttributeParams"><span class="pre">EasyAttributeParams</span></a></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">None</span></span></span><a class="headerlink" href="#flam.attrutils.EasyAttribute.__init__" title="Link to this definition"></a></dt>
+<dd><dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><p><strong>params</strong> (<a class="reference internal" href="#flam.attrutils.EasyAttributeParams" title="flam.attrutils.EasyAttributeParams"><em>EasyAttributeParams</em></a>) – dataclass with all this attribute’s parameters.</p>
+</dd>
+<dt class="field-even">Return type<span class="colon">:</span></dt>
+<dd class="field-even"><p>None</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="flam.attrutils.EasyAttribute.str_of_value">
+<span class="sig-name descname"><span class="pre">str_of_value</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">value</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference internal" href="flam.html#flam._attr.AttributeValue" title="flam._attr.AttributeValue"><span class="pre">AttributeValue</span></a></span></em>, <em class="sig-param"><span class="n"><span class="pre">abbreviate</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">bool</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">False</span></span></em>, <em class="sig-param"><span class="o"><span class="pre">**</span></span><span class="n"><span class="pre">extras</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">Any</span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">str</span></span></span><a class="headerlink" href="#flam.attrutils.EasyAttribute.str_of_value" title="Link to this definition"></a></dt>
+<dd><p>See <a class="reference internal" href="flam.html#flam._attr.Attribute.str_of_value" title="flam._attr.Attribute.str_of_value"><code class="xref py py-class docutils literal notranslate"><span class="pre">Attribute.str_of_value</span></code></a>. EasyAttributes support two optional <code class="docutils literal notranslate"><span class="pre">extras</span></code>:</p>
+<ul class="simple">
+<li><p>max_len - the maximum length beyond which the string will be truncated down to this length.</p></li>
+<li><p>ellipsis - short string to use to indicate a truncated part of the string.</p></li>
+</ul>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>value</strong> (<a class="reference internal" href="flam.html#flam._attr.AttributeValue" title="flam._attr.AttributeValue"><em>AttributeValue</em></a>)</p></li>
+<li><p><strong>abbreviate</strong> (<em>bool</em>)</p></li>
+<li><p><strong>extras</strong> (<em>Any</em>)</p></li>
+</ul>
+</dd>
+<dt class="field-even">Return type<span class="colon">:</span></dt>
+<dd class="field-even"><p>str</p>
+</dd>
+</dl>
+</dd></dl>
+
+</dd></dl>
+
+<dl class="py type">
+<dt class="sig sig-object py" id="flam.attrutils.MovieExtractor">
+<span class="property"><span class="k"><span class="pre">type</span></span><span class="w"> </span></span><span class="sig-name descname"><span class="pre">MovieExtractor</span></span><span class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">Callable</span><span class="p"><span class="pre">[</span></span><span class="p"><span class="pre">[</span></span><a class="reference internal" href="#flam.attrutils.EasyAttribute" title="flam.attrutils.EasyAttribute"><span class="pre">EasyAttribute</span></a><span class="p"><span class="pre">,</span></span><span class="w"> </span><a class="reference internal" href="flam.html#flam._ml.Movie" title="flam._ml.Movie"><span class="pre">Movie</span></a><span class="p"><span class="pre">,</span></span><span class="w"> </span><a class="reference internal" href="flam.html#flam._mlf.MLFMovie" title="flam._mlf.MLFMovie"><span class="pre">MLFMovie</span></a><span class="p"><span class="pre">]</span></span><span class="p"><span class="pre">,</span></span><span class="w"> </span><span class="pre">T</span><span class="p"><span class="pre">]</span></span></span><a class="headerlink" href="#flam.attrutils.MovieExtractor" title="Link to this definition"></a></dt>
+<dd><p>Type signature for <code class="docutils literal notranslate"><span class="pre">_extract_from_movie</span></code>.</p>
+</dd></dl>
+
+<dl class="py type">
+<dt class="sig sig-object py" id="flam.attrutils.PeopleExtractor">
+<span class="property"><span class="k"><span class="pre">type</span></span><span class="w"> </span></span><span class="sig-name descname"><span class="pre">PeopleExtractor</span></span><span class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">Callable</span><span class="p"><span class="pre">[</span></span><span class="p"><span class="pre">[</span></span><a class="reference internal" href="#flam.attrutils.EasyAttribute" title="flam.attrutils.EasyAttribute"><span class="pre">EasyAttribute</span></a><span class="p"><span class="pre">,</span></span><span class="w"> </span><a class="reference internal" href="flam.html#flam._ml.People" title="flam._ml.People"><span class="pre">People</span></a><span class="p"><span class="pre">,</span></span><span class="w"> </span><span class="pre">list</span><span class="p"><span class="pre">[</span></span><a class="reference internal" href="flam.html#flam._mlf.MLFPerson" title="flam._mlf.MLFPerson"><span class="pre">MLFPerson</span></a><span class="p"><span class="pre">]</span></span><span class="p"><span class="pre">]</span></span><span class="p"><span class="pre">,</span></span><span class="w"> </span><span class="pre">T</span><span class="p"><span class="pre">]</span></span></span><a class="headerlink" href="#flam.attrutils.PeopleExtractor" title="Link to this definition"></a></dt>
+<dd><p>Type signature for <code class="docutils literal notranslate"><span class="pre">_extract_from_people</span></code>.</p>
+</dd></dl>
+
+<dl class="py type">
+<dt class="sig sig-object py" id="flam.attrutils.RoleExtractor">
+<span class="property"><span class="k"><span class="pre">type</span></span><span class="w"> </span></span><span class="sig-name descname"><span class="pre">RoleExtractor</span></span><span class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">Callable</span><span class="p"><span class="pre">[</span></span><span class="p"><span class="pre">[</span></span><a class="reference internal" href="#flam.attrutils.EasyAttribute" title="flam.attrutils.EasyAttribute"><span class="pre">EasyAttribute</span></a><span class="p"><span class="pre">,</span></span><span class="w"> </span><a class="reference internal" href="flam.html#flam._ml.Role" title="flam._ml.Role"><span class="pre">Role</span></a><span class="p"><span class="pre">,</span></span><span class="w"> </span><a class="reference internal" href="flam.html#flam._ml.MLFRolesDict" title="flam._ml.MLFRolesDict"><span class="pre">MLFRolesDict</span></a><span class="p"><span class="pre">,</span></span><span class="w"> </span><a class="reference internal" href="flam.html#flam._mlf.MLFMovie" title="flam._mlf.MLFMovie"><span class="pre">MLFMovie</span></a><span class="p"><span class="pre">,</span></span><span class="w"> </span><span class="pre">list</span><span class="p"><span class="pre">[</span></span><a class="reference internal" href="flam.html#flam._mlf.MLFPerson" title="flam._mlf.MLFPerson"><span class="pre">MLFPerson</span></a><span class="p"><span class="pre">]</span></span><span class="p"><span class="pre">]</span></span><span class="p"><span class="pre">,</span></span><span class="w"> </span><span class="pre">T</span><span class="p"><span class="pre">]</span></span></span><a class="headerlink" href="#flam.attrutils.RoleExtractor" title="Link to this definition"></a></dt>
+<dd><p>Type signature for <code class="docutils literal notranslate"><span class="pre">_extract_from_role</span></code>.</p>
+</dd></dl>
+
+<dl class="py type">
+<dt class="sig sig-object py" id="flam.attrutils.Extractor">
+<span class="property"><span class="k"><span class="pre">type</span></span><span class="w"> </span></span><span class="sig-name descname"><span class="pre">Extractor</span></span><span class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><a class="reference internal" href="#flam.attrutils.MovieExtractor" title="flam.attrutils.MovieExtractor"><span class="pre">MovieExtractor</span></a><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><a class="reference internal" href="#flam.attrutils.PeopleExtractor" title="flam.attrutils.PeopleExtractor"><span class="pre">PeopleExtractor</span></a><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><a class="reference internal" href="#flam.attrutils.RoleExtractor" title="flam.attrutils.RoleExtractor"><span class="pre">RoleExtractor</span></a></span><a class="headerlink" href="#flam.attrutils.Extractor" title="Link to this definition"></a></dt>
+<dd><p>Type signature for any extractor method.</p>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="flam.attrutils.easy_attribute">
+<span class="sig-name descname"><span class="pre">easy_attribute</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">params</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference internal" href="#flam.attrutils.EasyAttributeParams" title="flam.attrutils.EasyAttributeParams"><span class="pre">EasyAttributeParams</span></a></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">Callable</span><span class="p"><span class="pre">[</span></span><span class="p"><span class="pre">[</span></span><a class="reference internal" href="#flam.attrutils.Extractor" title="flam.attrutils.Extractor"><span class="pre">Extractor</span></a><span class="p"><span class="pre">[</span></span><span class="pre">TRet</span><span class="p"><span class="pre">]</span></span><span class="p"><span class="pre">]</span></span><span class="p"><span class="pre">,</span></span><span class="w"> </span><a class="reference internal" href="#flam.attrutils.EasyAttribute" title="flam.attrutils.EasyAttribute"><span class="pre">EasyAttribute</span></a><span class="p"><span class="pre">]</span></span></span></span><a class="headerlink" href="#flam.attrutils.easy_attribute" title="Link to this definition"></a></dt>
+<dd><p>Decorator you can apply to an extractor function to create an <a class="reference internal" href="#flam.attrutils.EasyAttribute" title="flam.attrutils.EasyAttribute"><code class="xref py py-class docutils literal notranslate"><span class="pre">EasyAttribute</span></code></a> from it and return an instance of that class.
+This is an extra layer of convenience so you don’t even have to explicitly inherit from EasyAttribute or instantiate it. For example:</p>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="nd">@register</span>
+<span class="nd">@easy_attribute</span><span class="p">(</span><span class="n">EasyAttributeParams</span><span class="p">(</span>
+    <span class="n">name_without_type</span> <span class="o">=</span> <span class="s1">&#39;title&#39;</span><span class="p">,</span>
+    <span class="n">aliases_without_type</span> <span class="o">=</span> <span class="p">[</span><span class="s1">&#39;name&#39;</span><span class="p">,</span> <span class="s1">&#39;movie&#39;</span><span class="p">],</span>
+    <span class="n">findable_type</span> <span class="o">=</span> <span class="n">FindableType</span><span class="o">.</span><span class="n">MOVIES</span><span class="p">,</span>
+    <span class="n">type_handler</span> <span class="o">=</span> <span class="n">STR_HANDLER</span><span class="p">,</span>
+    <span class="n">is_ascending</span> <span class="o">=</span> <span class="kc">True</span><span class="p">,</span>
+    <span class="n">truncation_style</span> <span class="o">=</span> <span class="n">TruncationStyle</span><span class="o">.</span><span class="n">TRIM_END</span><span class="p">,</span>
+    <span class="n">default_max_len</span> <span class="o">=</span> <span class="mi">45</span><span class="p">,</span>
+<span class="p">))</span>
+<span class="k">def</span> <span class="nf">_movie_title_extractor</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">movie</span><span class="p">:</span> <span class="n">Movie</span><span class="p">,</span> <span class="n">mlf_movie</span><span class="p">:</span> <span class="n">MLFMovie</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span> <span class="o">|</span> <span class="nb">str</span><span class="p">:</span>
+    <span class="k">return</span> <span class="n">mlf_movie</span><span class="o">.</span><span class="n">title</span>
+</pre></div>
+</div>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><p><strong>params</strong> (<a class="reference internal" href="#flam.attrutils.EasyAttributeParams" title="flam.attrutils.EasyAttributeParams"><em>EasyAttributeParams</em></a>) – dataclass with all the attribute’s parameters.</p>
+</dd>
+<dt class="field-even">Return type<span class="colon">:</span></dt>
+<dd class="field-even"><p><em>Callable</em>[[<a class="reference internal" href="#flam.attrutils.Extractor" title="flam.attrutils.Extractor">Extractor</a>[TRet]], <a class="reference internal" href="#flam.attrutils.EasyAttribute" title="flam.attrutils.EasyAttribute">EasyAttribute</a>]</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py class">
+<dt class="sig sig-object py" id="flam.attrutils.TypeHandler">
+<span class="property"><span class="k"><span class="pre">class</span></span><span class="w"> </span></span><span class="sig-name descname"><span class="pre">TypeHandler</span></span><a class="headerlink" href="#flam.attrutils.TypeHandler" title="Link to this definition"></a></dt>
+<dd><p>Utility for operations pertaining to the type of an attribute’s values, so you don’t have to repeat the same code for each attribute of that type.</p>
+<p>Note that all attributes are assumed to also possibly return <code class="docutils literal notranslate"><span class="pre">None</span></code> or a list of values.
+So even if your attribute returns <code class="docutils literal notranslate"><span class="pre">list[None</span> <span class="pre">|</span> <span class="pre">float]</span></code>, it may still use <a class="reference internal" href="#flam.attrutils.FLOAT_HANDLER" title="flam.attrutils.FLOAT_HANDLER"><code class="xref py py-data docutils literal notranslate"><span class="pre">FLOAT_HANDLER</span></code></a>, for example.</p>
+<dl class="py property">
+<dt class="sig sig-object py" id="flam.attrutils.TypeHandler.default_op">
+<span class="property"><span class="k"><span class="pre">abstract</span></span><span class="w"> </span><span class="k"><span class="pre">property</span></span><span class="w"> </span></span><span class="sig-name descname"><span class="pre">default_op</span></span><span class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><a class="reference internal" href="flam.html#flam._attr.ComparisonOp" title="flam._attr.ComparisonOp"><span class="pre">ComparisonOp</span></a></span><a class="headerlink" href="#flam.attrutils.TypeHandler.default_op" title="Link to this definition"></a></dt>
+<dd><p>The default comparison operator that makes sense for this type.</p>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="flam.attrutils.TypeHandler.parse">
+<span class="property"><span class="k"><span class="pre">abstractmethod</span></span><span class="w"> </span></span><span class="sig-name descname"><span class="pre">parse</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">primitive_str</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">str</span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><a class="reference internal" href="flam.html#flam._attr.AttributePrimitive" title="flam._attr.AttributePrimitive"><span class="pre">AttributePrimitive</span></a></span></span><a class="headerlink" href="#flam.attrutils.TypeHandler.parse" title="Link to this definition"></a></dt>
+<dd><p>Parse a string representing a single primitive of this handler’s type. You do not need to handle <code class="docutils literal notranslate"><span class="pre">None</span></code> or lists in this function.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><p><strong>primitive_str</strong> (<em>str</em>) – a string representation of a single primitive value.</p>
+</dd>
+<dt class="field-even">Return type<span class="colon">:</span></dt>
+<dd class="field-even"><p><a class="reference internal" href="flam.html#flam._attr.AttributePrimitive" title="flam._attr.AttributePrimitive"><em>AttributePrimitive</em></a></p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="flam.attrutils.TypeHandler.str_of">
+<span class="property"><span class="k"><span class="pre">abstractmethod</span></span><span class="w"> </span></span><span class="sig-name descname"><span class="pre">str_of</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">primitive</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference internal" href="flam.html#flam._attr.AttributePrimitive" title="flam._attr.AttributePrimitive"><span class="pre">AttributePrimitive</span></a></span></em>, <em class="sig-param"><span class="n"><span class="pre">abbreviate</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">bool</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">extras</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">dict</span><span class="p"><span class="pre">[</span></span><span class="pre">str</span><span class="p"><span class="pre">,</span></span><span class="w"> </span><span class="pre">Any</span><span class="p"><span class="pre">]</span></span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">str</span></span></span><a class="headerlink" href="#flam.attrutils.TypeHandler.str_of" title="Link to this definition"></a></dt>
+<dd><p>Return a string representation of a single primitive value of this handler’s type. You do not need to handle <code class="docutils literal notranslate"><span class="pre">None</span></code> or lists in this function.</p>
+<p>If <code class="docutils literal notranslate"><span class="pre">abbreviate</span></code> is false, then this method must be the inverse of <a class="reference internal" href="#flam.attrutils.TypeHandler.parse" title="flam.attrutils.TypeHandler.parse"><code class="xref py py-meth docutils literal notranslate"><span class="pre">parse()</span></code></a>.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>primitive</strong> (<a class="reference internal" href="flam.html#flam._attr.AttributePrimitive" title="flam._attr.AttributePrimitive"><em>AttributePrimitive</em></a>) – a single primitive value. You may assume this is not <code class="docutils literal notranslate"><span class="pre">None</span></code>.</p></li>
+<li><p><strong>abbreviate</strong> (<em>bool</em>) – indicates if the string should be abbreviated. Abbreviation can mean different things for different types. It’s allowed to be lossy.</p></li>
+<li><p><strong>extras</strong> (<em>dict</em><em>[</em><em>str</em><em>, </em><em>Any</em><em>]</em>) – additional optional arguments to control the string conversion.</p></li>
+</ul>
+</dd>
+<dt class="field-even">Return type<span class="colon">:</span></dt>
+<dd class="field-even"><p>str</p>
+</dd>
+</dl>
+</dd></dl>
+
+</dd></dl>
+
+<dl class="py class">
+<dt class="sig sig-object py" id="flam.attrutils.IntHandler">
+<span class="property"><span class="k"><span class="pre">class</span></span><span class="w"> </span></span><span class="sig-name descname"><span class="pre">IntHandler</span></span><a class="headerlink" href="#flam.attrutils.IntHandler" title="Link to this definition"></a></dt>
+<dd><p>Type handler for integers with support for pretty strings.</p>
+</dd></dl>
+
+<dl class="py class">
+<dt class="sig sig-object py" id="flam.attrutils.FloatHandler">
+<span class="property"><span class="k"><span class="pre">class</span></span><span class="w"> </span></span><span class="sig-name descname"><span class="pre">FloatHandler</span></span><a class="headerlink" href="#flam.attrutils.FloatHandler" title="Link to this definition"></a></dt>
+<dd><p>Type handler for floats with support for rounding off small decimal digits.</p>
+</dd></dl>
+
+<dl class="py class">
+<dt class="sig sig-object py" id="flam.attrutils.BoolHandler">
+<span class="property"><span class="k"><span class="pre">class</span></span><span class="w"> </span></span><span class="sig-name descname"><span class="pre">BoolHandler</span></span><a class="headerlink" href="#flam.attrutils.BoolHandler" title="Link to this definition"></a></dt>
+<dd><p>Type handler for booleans with support for various, case-insensitive ways you might describe a boolean (e.g., ‘true’, ‘yes’, ‘no’, ‘n’, etc.).</p>
+</dd></dl>
+
+<dl class="py class">
+<dt class="sig sig-object py" id="flam.attrutils.StrHandler">
+<span class="property"><span class="k"><span class="pre">class</span></span><span class="w"> </span></span><span class="sig-name descname"><span class="pre">StrHandler</span></span><a class="headerlink" href="#flam.attrutils.StrHandler" title="Link to this definition"></a></dt>
+<dd><p>Type handler for strings.</p>
+</dd></dl>
+
+<dl class="py class">
+<dt class="sig sig-object py" id="flam.attrutils.MinutesHandler">
+<span class="property"><span class="k"><span class="pre">class</span></span><span class="w"> </span></span><span class="sig-name descname"><span class="pre">MinutesHandler</span></span><a class="headerlink" href="#flam.attrutils.MinutesHandler" title="Link to this definition"></a></dt>
+<dd><p>Type handler for minutes with support for pretty formatting of hours:minutes.</p>
+</dd></dl>
+
+<dl class="py class">
+<dt class="sig sig-object py" id="flam.attrutils.DateHandler">
+<span class="property"><span class="k"><span class="pre">class</span></span><span class="w"> </span></span><span class="sig-name descname"><span class="pre">DateHandler</span></span><a class="headerlink" href="#flam.attrutils.DateHandler" title="Link to this definition"></a></dt>
+<dd><p>Type handler for dates in many possible formats.</p>
+<dl class="py property">
+<dt class="sig sig-object py" id="flam.attrutils.DateHandler.name">
+<span class="property"><span class="k"><span class="pre">property</span></span><span class="w"> </span></span><span class="sig-name descname"><span class="pre">name</span></span><span class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="pre">str</span></span><a class="headerlink" href="#flam.attrutils.DateHandler.name" title="Link to this definition"></a></dt>
+<dd><p>Name of the date format which can be appended to an attribute name to create a name for that attribute with that date format. Ex: ‘-year’, ‘-day-of-month’.</p>
+</dd></dl>
+
+<dl class="py property">
+<dt class="sig sig-object py" id="flam.attrutils.DateHandler.datefmt">
+<span class="property"><span class="k"><span class="pre">property</span></span><span class="w"> </span></span><span class="sig-name descname"><span class="pre">datefmt</span></span><span class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="pre">str</span></span><a class="headerlink" href="#flam.attrutils.DateHandler.datefmt" title="Link to this definition"></a></dt>
+<dd><p>Format string for this date handler. See <code class="docutils literal notranslate"><span class="pre">datetime.strftime</span></code> in the python docs for format syntax.</p>
+</dd></dl>
+
+<dl class="py property">
+<dt class="sig sig-object py" id="flam.attrutils.DateHandler.is_ascending">
+<span class="property"><span class="k"><span class="pre">property</span></span><span class="w"> </span></span><span class="sig-name descname"><span class="pre">is_ascending</span></span><span class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="pre">bool</span></span><a class="headerlink" href="#flam.attrutils.DateHandler.is_ascending" title="Link to this definition"></a></dt>
+<dd><p>Suggestion for whether you should sort this attribute in ascending or descending order.</p>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="flam.attrutils.DateHandler.strip">
+<span class="sig-name descname"><span class="pre">strip</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">date</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">date</span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">date</span></span></span><a class="headerlink" href="#flam.attrutils.DateHandler.strip" title="Link to this definition"></a></dt>
+<dd><p>Takes a date and “zeroes out” the parts of the date which are irrelevant to this handler’s <a class="reference internal" href="#flam.attrutils.DateHandler.datefmt" title="flam.attrutils.DateHandler.datefmt"><code class="xref py py-attr docutils literal notranslate"><span class="pre">datefmt</span></code></a>.</p>
+<p>For instance, a handler which returns the year only doesn’t care about the day and month.
+So by stripping those out, dates which have the same year but different days and months can be considered equal.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><p><strong>date</strong> (<em>date</em>)</p>
+</dd>
+<dt class="field-even">Return type<span class="colon">:</span></dt>
+<dd class="field-even"><p><em>date</em></p>
+</dd>
+</dl>
+</dd></dl>
+
+</dd></dl>
+
+<dl class="py data">
+<dt class="sig sig-object py" id="flam.attrutils.SMALL_INT_HANDLER">
+<span class="sig-name descname"><span class="pre">SMALL_INT_HANDLER</span></span><span class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">&lt;flam.attrutils.IntHandler</span> <span class="pre">object&gt;</span></span><a class="headerlink" href="#flam.attrutils.SMALL_INT_HANDLER" title="Link to this definition"></a></dt>
+<dd><p>Handler object you can use for attributes which return small integers that do not need to be abbreviated.</p>
+</dd></dl>
+
+<dl class="py data">
+<dt class="sig sig-object py" id="flam.attrutils.BIG_INT_HANDLER">
+<span class="sig-name descname"><span class="pre">BIG_INT_HANDLER</span></span><span class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">&lt;flam.attrutils.IntHandler</span> <span class="pre">object&gt;</span></span><a class="headerlink" href="#flam.attrutils.BIG_INT_HANDLER" title="Link to this definition"></a></dt>
+<dd><p>Handler object you can use for attributes which return big integers that sometimes need to be abbreviated.</p>
+</dd></dl>
+
+<dl class="py data">
+<dt class="sig sig-object py" id="flam.attrutils.FLOAT_HANDLER">
+<span class="sig-name descname"><span class="pre">FLOAT_HANDLER</span></span><span class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">&lt;flam.attrutils.FloatHandler</span> <span class="pre">object&gt;</span></span><a class="headerlink" href="#flam.attrutils.FLOAT_HANDLER" title="Link to this definition"></a></dt>
+<dd><p>Handler object you can use for attributes which return floats.</p>
+</dd></dl>
+
+<dl class="py data">
+<dt class="sig sig-object py" id="flam.attrutils.BOOL_HANDLER">
+<span class="sig-name descname"><span class="pre">BOOL_HANDLER</span></span><span class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">&lt;flam.attrutils.BoolHandler</span> <span class="pre">object&gt;</span></span><a class="headerlink" href="#flam.attrutils.BOOL_HANDLER" title="Link to this definition"></a></dt>
+<dd><p>Handler object you can use for attributes which return booleans.</p>
+</dd></dl>
+
+<dl class="py data">
+<dt class="sig sig-object py" id="flam.attrutils.STR_HANDLER">
+<span class="sig-name descname"><span class="pre">STR_HANDLER</span></span><span class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">&lt;flam.attrutils.StrHandler</span> <span class="pre">object&gt;</span></span><a class="headerlink" href="#flam.attrutils.STR_HANDLER" title="Link to this definition"></a></dt>
+<dd><p>Handler object you can use for attributes which return strings.</p>
+</dd></dl>
+
+<dl class="py data">
+<dt class="sig sig-object py" id="flam.attrutils.MINUTES_HANDLER">
+<span class="sig-name descname"><span class="pre">MINUTES_HANDLER</span></span><span class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">&lt;flam.attrutils.MinutesHandler</span> <span class="pre">object&gt;</span></span><a class="headerlink" href="#flam.attrutils.MINUTES_HANDLER" title="Link to this definition"></a></dt>
+<dd><p>Handler object you can use for attributes which return a minutes duration.</p>
+</dd></dl>
+
+<dl class="py data">
+<dt class="sig sig-object py" id="flam.attrutils.DATE_HANDLERS">
+<span class="sig-name descname"><span class="pre">DATE_HANDLERS</span></span><a class="headerlink" href="#flam.attrutils.DATE_HANDLERS" title="Link to this definition"></a></dt>
+<dd><p>List of date handlers in many date formats available to use.</p>
+<dl class="field-list simple">
+</dl>
+</dd></dl>
+
+<dl class="py class">
+<dt class="sig sig-object py" id="flam.attrutils.ArrayLengthAttribute">
+<span class="property"><span class="k"><span class="pre">class</span></span><span class="w"> </span></span><span class="sig-name descname"><span class="pre">ArrayLengthAttribute</span></span><a class="headerlink" href="#flam.attrutils.ArrayLengthAttribute" title="Link to this definition"></a></dt>
+<dd><p>Attribute which returns the number of elements in another attribute’s return value. For attributes which don’t return a list, the length is 1:</p>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="n">register</span><span class="p">(</span><span class="n">ArrayLengthAttribute</span><span class="p">(</span><span class="n">my_attr</span><span class="p">))</span>
+</pre></div>
+</div>
+<dl class="py method">
+<dt class="sig sig-object py" id="flam.attrutils.ArrayLengthAttribute.__init__">
+<span class="sig-name descname"><span class="pre">__init__</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">wrapped_attr</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference internal" href="flam.html#flam._attr.Attribute" title="flam._attr.Attribute"><span class="pre">Attribute</span></a></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">None</span></span></span><a class="headerlink" href="#flam.attrutils.ArrayLengthAttribute.__init__" title="Link to this definition"></a></dt>
+<dd><p>Initializes this attribute with the name ‘num-&lt;wrapped_attr.name_without_type&gt;’.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><p><strong>wrapped_attr</strong> (<a class="reference internal" href="flam.html#flam._attr.Attribute" title="flam._attr.Attribute"><em>Attribute</em></a>) – the attribute whose num of elements will be returned.</p>
+</dd>
+<dt class="field-even">Return type<span class="colon">:</span></dt>
+<dd class="field-even"><p>None</p>
+</dd>
+</dl>
+</dd></dl>
+
+</dd></dl>
+
+<dl class="py class">
+<dt class="sig sig-object py" id="flam.attrutils.StringLengthAttribute">
+<span class="property"><span class="k"><span class="pre">class</span></span><span class="w"> </span></span><span class="sig-name descname"><span class="pre">StringLengthAttribute</span></span><a class="headerlink" href="#flam.attrutils.StringLengthAttribute" title="Link to this definition"></a></dt>
+<dd><p>Attribute which returns length of another attribute’s return value as a string.</p>
+<dl class="py method">
+<dt class="sig sig-object py" id="flam.attrutils.StringLengthAttribute.__init__">
+<span class="sig-name descname"><span class="pre">__init__</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">wrapped_attr</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference internal" href="flam.html#flam._attr.Attribute" title="flam._attr.Attribute"><span class="pre">Attribute</span></a></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">None</span></span></span><a class="headerlink" href="#flam.attrutils.StringLengthAttribute.__init__" title="Link to this definition"></a></dt>
+<dd><p>Initializes this attribute with the name ‘len-&lt;wrapped_attr.name_without_type&gt;’.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><p><strong>wrapped_attr</strong> (<a class="reference internal" href="flam.html#flam._attr.Attribute" title="flam._attr.Attribute"><em>Attribute</em></a>) – the attribute whose string length will be returned.</p>
+</dd>
+<dt class="field-even">Return type<span class="colon">:</span></dt>
+<dd class="field-even"><p>None</p>
+</dd>
+</dl>
+</dd></dl>
+
+</dd></dl>
+
+<dl class="py class">
+<dt class="sig sig-object py" id="flam.attrutils.AverageAttribute">
+<span class="property"><span class="k"><span class="pre">class</span></span><span class="w"> </span></span><span class="sig-name descname"><span class="pre">AverageAttribute</span></span><a class="headerlink" href="#flam.attrutils.AverageAttribute" title="Link to this definition"></a></dt>
+<dd><p>Attribute which returns the average of another attribute’s value.</p>
+<p>For movie attributes, this will be a people attribute with the average across all movies those people were in.</p>
+<p>For people attributes, this will be a movie attribute with the average across all people in the movie with the same crew type.</p>
+<p>Example usage:</p>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="n">register</span><span class="p">(</span><span class="n">AverageAttribute</span><span class="p">(</span><span class="n">my_attr</span><span class="p">))</span>
+
+<span class="k">for</span> <span class="n">ct</span> <span class="ow">in</span> <span class="n">CrewType</span><span class="p">:</span>
+    <span class="n">register</span><span class="p">(</span><span class="n">AverageAttribute</span><span class="p">(</span><span class="n">my_attr</span><span class="p">,</span> <span class="n">as_crew_type</span><span class="o">=</span><span class="n">ct</span><span class="p">))</span>
+</pre></div>
+</div>
+<dl class="py method">
+<dt class="sig sig-object py" id="flam.attrutils.AverageAttribute.__init__">
+<span class="sig-name descname"><span class="pre">__init__</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">wrapped_attr</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference internal" href="flam.html#flam._attr.Attribute" title="flam._attr.Attribute"><span class="pre">Attribute</span></a></span></em>, <em class="sig-param"><span class="n"><span class="pre">as_crew_type</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">None</span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><a class="reference internal" href="flam.html#flam._ml.CrewType" title="flam._ml.CrewType"><span class="pre">CrewType</span></a></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">None</span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">None</span></span></span><a class="headerlink" href="#flam.attrutils.AverageAttribute.__init__" title="Link to this definition"></a></dt>
+<dd><p>Initializes this attribute with the name ‘avg-&lt;wrapped_attr.name_without_type&gt;’.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>wrapped_attr</strong> (<a class="reference internal" href="flam.html#flam._attr.Attribute" title="flam._attr.Attribute"><em>Attribute</em></a>) – the attribute whose average will be returned.</p></li>
+<li><p><strong>as_crew_type</strong> (<em>None</em><em> | </em><a class="reference internal" href="flam.html#flam._ml.CrewType" title="flam._ml.CrewType"><em>CrewType</em></a>) – <p>optional modifier for this attribute. If provided, the attribute’s name will be ‘avg-&lt;wrapped_attr.name_without_type&gt;-as-&lt;crew_type&gt;’:</p>
+<p>For movie attributes, this will be a people attribute with the average across all movies those people were in as this crew type.</p>
+<p>For people attributes, this will be a movie attribute with the average across all people in the movie with this crew type.</p>
+</p></li>
+</ul>
+</dd>
+<dt class="field-even">Return type<span class="colon">:</span></dt>
+<dd class="field-even"><p>None</p>
+</dd>
+</dl>
+</dd></dl>
+
+</dd></dl>
+
+<dl class="py class">
+<dt class="sig sig-object py" id="flam.attrutils.SumAttribute">
+<span class="property"><span class="k"><span class="pre">class</span></span><span class="w"> </span></span><span class="sig-name descname"><span class="pre">SumAttribute</span></span><a class="headerlink" href="#flam.attrutils.SumAttribute" title="Link to this definition"></a></dt>
+<dd><p>Attribute which returns the sum of another attribute’s value.</p>
+<p>For movie attributes, this will be a people attribute with the sum across all movies those people were in.</p>
+<p>For people attributes, this will be a movie attribute with the sum across all people in the movie with the same crew type.</p>
+<dl class="py method">
+<dt class="sig sig-object py" id="flam.attrutils.SumAttribute.__init__">
+<span class="sig-name descname"><span class="pre">__init__</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">wrapped_attr</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference internal" href="flam.html#flam._attr.Attribute" title="flam._attr.Attribute"><span class="pre">Attribute</span></a></span></em>, <em class="sig-param"><span class="n"><span class="pre">type_handler</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference internal" href="#flam.attrutils.TypeHandler" title="flam.attrutils.TypeHandler"><span class="pre">TypeHandler</span></a></span></em>, <em class="sig-param"><span class="n"><span class="pre">as_crew_type</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">None</span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><a class="reference internal" href="flam.html#flam._ml.CrewType" title="flam._ml.CrewType"><span class="pre">CrewType</span></a></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">None</span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">None</span></span></span><a class="headerlink" href="#flam.attrutils.SumAttribute.__init__" title="Link to this definition"></a></dt>
+<dd><p>Initializes this attribute with the name ‘sum-&lt;wrapped_attr.name_without_type&gt;’.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>wrapped_attr</strong> (<a class="reference internal" href="flam.html#flam._attr.Attribute" title="flam._attr.Attribute"><em>Attribute</em></a>) – the attribute whose sum will be returned.</p></li>
+<li><p><strong>as_crew_type</strong> (<em>None</em><em> | </em><a class="reference internal" href="flam.html#flam._ml.CrewType" title="flam._ml.CrewType"><em>CrewType</em></a>) – <p>optional modifier for this attribute. If provided, the attribute’s name will be ‘sum-&lt;wrapped_attr.name_without_type&gt;-as-&lt;crew_type&gt;’:</p>
+<p>For movie attributes, this will be a people attribute with the sum across all movies those people were in as this crew type.</p>
+<p>For people attributes, this will be a movie attribute with the sum across all people in the movie with this crew type.</p>
+</p></li>
+<li><p><strong>type_handler</strong> (<a class="reference internal" href="#flam.attrutils.TypeHandler" title="flam.attrutils.TypeHandler"><em>TypeHandler</em></a>)</p></li>
+</ul>
+</dd>
+<dt class="field-even">Return type<span class="colon">:</span></dt>
+<dd class="field-even"><p>None</p>
+</dd>
+</dl>
+</dd></dl>
+
+</dd></dl>
+
+</section>
+
+
+           </div>
+          </div>
+          <footer><div class="rst-footer-buttons" role="navigation" aria-label="Footer">
+        <a href="flam.utils.html" class="btn btn-neutral float-left" title="flam.utils" accesskey="p" rel="prev"><span class="fa fa-arrow-circle-left" aria-hidden="true"></span> Previous</a>
+        <a href="../extending.html" class="btn btn-neutral float-right" title="Extending Flam" accesskey="n" rel="next">Next <span class="fa fa-arrow-circle-right" aria-hidden="true"></span></a>
+    </div>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>&#169; Copyright 2026, Aviv Edery.</p>
+  </div>
+
+  Built with <a href="https://www.sphinx-doc.org/">Sphinx</a> using a
+    <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a>
+    provided by <a href="https://readthedocs.org">Read the Docs</a>.
+   
+
+</footer>
+        </div>
+      </div>
+    </section>
+  </div>
+  <script>
+      jQuery(function () {
+          SphinxRtdTheme.Navigation.enable(true);
+      });
+  </script> 
+
+</body>
+</html>

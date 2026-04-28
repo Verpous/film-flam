@@ -1,0 +1,149 @@
+
+
+<!DOCTYPE html>
+<html class="writer-html5" lang="en" data-content_root="./">
+<head>
+  <meta charset="utf-8" /><meta name="viewport" content="width=device-width, initial-scale=1" />
+
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Fetchers &mdash; FilmFlam 2026.4.28.dev1777405935 documentation</title>
+      <link rel="stylesheet" type="text/css" href="_static/pygments.css?v=80d5e7a1" />
+      <link rel="stylesheet" type="text/css" href="_static/css/theme.css?v=9edc463e" />
+
+  
+      <script src="_static/jquery.js?v=5d32c60e"></script>
+      <script src="_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
+      <script src="_static/documentation_options.js?v=87924221"></script>
+      <script src="_static/doctools.js?v=fd6eb6e6"></script>
+      <script src="_static/sphinx_highlight.js?v=6ffebe34"></script>
+    <script src="_static/js/theme.js"></script>
+    <link rel="index" title="Index" href="genindex.html" />
+    <link rel="search" title="Search" href="search.html" />
+    <link rel="next" title="Commandline tool" href="cli/cli.html" />
+    <link rel="prev" title="Predicates" href="predicates.html" /> 
+</head>
+
+<body class="wy-body-for-nav"> 
+  <div class="wy-grid-for-nav">
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search" >
+
+          
+          
+          <a href="index.html" class="icon icon-home">
+            FilmFlam
+          </a>
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" aria-label="Search docs" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+        </div><div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
+              <p class="caption" role="heading"><span class="caption-text">Contents:</span></p>
+<ul class="current">
+<li class="toctree-l1"><a class="reference internal" href="install.html">Setup</a></li>
+<li class="toctree-l1"><a class="reference internal" href="examples.html">Examples</a></li>
+<li class="toctree-l1"><a class="reference internal" href="findables.html">Findables</a></li>
+<li class="toctree-l1"><a class="reference internal" href="listdefs.html">Listdefs</a></li>
+<li class="toctree-l1"><a class="reference internal" href="filters.html">Filters</a></li>
+<li class="toctree-l1"><a class="reference internal" href="attributes.html">Attributes</a></li>
+<li class="toctree-l1"><a class="reference internal" href="predicates.html">Predicates</a></li>
+<li class="toctree-l1 current"><a class="current reference internal" href="#">Fetchers</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="#list-of-builtin-fetchers">List of builtin fetchers</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#implementing-a-custom-fetcher">Implementing a custom fetcher</a></li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="cli/cli.html">Commandline tool</a></li>
+<li class="toctree-l1"><a class="reference internal" href="api/api.html">API</a></li>
+<li class="toctree-l1"><a class="reference internal" href="extending.html">Extending Flam</a></li>
+</ul>
+
+        </div>
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap"><nav class="wy-nav-top" aria-label="Mobile navigation menu" >
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="index.html">FilmFlam</a>
+      </nav>
+
+      <div class="wy-nav-content">
+        <div class="rst-content">
+          <div role="navigation" aria-label="Page navigation">
+  <ul class="wy-breadcrumbs">
+      <li><a href="index.html" class="icon icon-home" aria-label="Home"></a></li>
+      <li class="breadcrumb-item active">Fetchers</li>
+      <li class="wy-breadcrumbs-aside">
+            <a href="_sources/fetchers.rst.txt" rel="nofollow"> View page source</a>
+      </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+             
+  <section id="fetchers">
+<h1>Fetchers<a class="headerlink" href="#fetchers" title="Link to this heading"></a></h1>
+<p>TODO</p>
+<section id="list-of-builtin-fetchers">
+<h2>List of builtin fetchers<a class="headerlink" href="#list-of-builtin-fetchers" title="Link to this heading"></a></h2>
+<p><strong>imdb-browser-apidev-listid</strong>=IMDB_LIST_ID</p>
+<blockquote>
+<div><p>Takes an IMDb list ID as an input, and downloads information in two steps:</p>
+<ol class="arabic simple">
+<li><p>Export the list to CSV from the IMDb website - this will automatically launch your browser and click some buttons!</p></li>
+<li><p>Fill in a bunch of additional information using this free API: <a class="reference external" href="https://imdbapi.dev/">https://imdbapi.dev/</a></p></li>
+</ol>
+<p>It’s easy to check what is your list’s ID. Just open it in the browser, and the URL should look like this: <a class="reference external" href="https://www.imdb.com/list/ls083886771">https://www.imdb.com/list/ls083886771</a>. The list ID in this example is “083886771”.</p>
+<p>There are a few environment variables you can export to control the browser use:</p>
+<ul class="simple">
+<li><p><strong>FLAM_DOWNLOADS</strong> - Path to the downloads folder on your computer so flam will know where to look for the downloaded CSV. If your browser doesn’t download things to ~/Downloads, you must set this variable for this fetcher to work</p></li>
+<li><p><strong>FLAM_BROWSER</strong> - Which browser to use: ‘chrome’, ‘edge’, or ‘firefox’. By default flam tries to detect your default browser</p></li>
+<li><p><strong>FLAM_BROWSER_PROFILE</strong> - Path to your browser profile. This is only needed if your list is set to private so a profile is needed where you are expected to be already logged in</p></li>
+</ul>
+</div></blockquote>
+<p><strong>imdb-csv-apidev-path</strong>=CSV_PATH</p>
+<blockquote>
+<div><p>Takes a CSV that was manually exported from an IMDb list, and downloads additional information using this free API: <a class="reference external" href="https://imdbapi.dev/">https://imdbapi.dev/</a>.</p>
+</div></blockquote>
+</section>
+<section id="implementing-a-custom-fetcher">
+<h2>Implementing a custom fetcher<a class="headerlink" href="#implementing-a-custom-fetcher" title="Link to this heading"></a></h2>
+</section>
+</section>
+
+
+           </div>
+          </div>
+          <footer><div class="rst-footer-buttons" role="navigation" aria-label="Footer">
+        <a href="predicates.html" class="btn btn-neutral float-left" title="Predicates" accesskey="p" rel="prev"><span class="fa fa-arrow-circle-left" aria-hidden="true"></span> Previous</a>
+        <a href="cli/cli.html" class="btn btn-neutral float-right" title="Commandline tool" accesskey="n" rel="next">Next <span class="fa fa-arrow-circle-right" aria-hidden="true"></span></a>
+    </div>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>&#169; Copyright 2026, Aviv Edery.</p>
+  </div>
+
+  Built with <a href="https://www.sphinx-doc.org/">Sphinx</a> using a
+    <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a>
+    provided by <a href="https://readthedocs.org">Read the Docs</a>.
+   
+
+</footer>
+        </div>
+      </div>
+    </section>
+  </div>
+  <script>
+      jQuery(function () {
+          SphinxRtdTheme.Navigation.enable(true);
+      });
+  </script> 
+
+</body>
+</html>
