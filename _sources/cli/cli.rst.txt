@@ -12,3 +12,4 @@ Commandline tool
     config
     fetch
     find
+    docs

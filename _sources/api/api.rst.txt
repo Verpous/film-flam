@@ -4,7 +4,6 @@ API
 To use |project| as an API, 
 
 .. toctree::
-    :maxdepth: 2
     :caption: Contents:
 
     flam
