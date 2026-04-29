@@ -985,7 +985,6 @@ class RegistriesOf[T: (type[_fetch.ListFetcher], type[_filter.Predicate], _attr.
         return any(qualified_name in self._type_selector(reg) for reg in self._registries_to_try)
 
     # Support iteration only over keys and not values, because some values may be lazily allocated once you __getitem__.
-    # TODO: consider supporting iterate_no_aliases? Even no_shadowing too?
     def __iter__(self) -> typing.Iterator[str]:
         """
         Iterate over the names of all items in the registry. Some things to be careful of:
@@ -1017,7 +1016,6 @@ class RegistriesOf[T: (type[_fetch.ListFetcher], type[_filter.Predicate], _attr.
         # Last registry is the context extensions.
         self._type_selector(self._registries_to_try[-1]).register(item)
 
-    # TODO: can we change type_hint so it does guarantee to only check that type? Investigate.
     # NOTE: for some reason the type hint in the documentation also shows the module name, only for this function and nothing else. Sigh...
     def get(self, name: str, type_hint: None | _ml.FindableType = None) -> T:
         """

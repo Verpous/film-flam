@@ -34,7 +34,7 @@ import glob
 import fnmatch
 import time
 import itertools
-import importlib.resources
+import webbrowser
 
 # Unlike all other modules in this package, this one pretends it's from outside the package and simply "imports flam".
 import flam
@@ -141,7 +141,7 @@ def print_table(table: list[list[str]],
             except BrokenPipeError:
                 # Broken pipe just means that flam was piping to some other program like `more` and that program was exited.
                 # We don't want to show the user a worrying traceback for that.
-                flam.logger.warning(f"Exiting early due to broken pipe.")
+                flam.logger.warning("Exiting early due to broken pipe.")
                 sys.exit(1)
         
         # NOTE: considered once the file is written to also write it to the logs. But I don't think there's a need - if users have an issue they will show me what was printed.
@@ -656,7 +656,6 @@ Found objects are printed in a nice table format, and you can customize what is 
 
         parser.set_defaults(function=cls.execute)
 
-        # TODO: "--split" option to expand array attributes into a row for each one?
         parser.add_argument('-s', '--sort', metavar='ATTRIBUTES', default=None, action='store', help=
 f'''Sort FINDABLEs according to %(metavar)s, which is a comma-delimited list of attributes to sort by, in decreasing priority.
 Each findable type has its own default:
@@ -1029,26 +1028,28 @@ class SubcommandDocs:
         return parser
 
     @classmethod
-    def execute(cls, ctx: flam.FlamContext, args: argparse.Namespace) -> None:
-        MAN_FILE = '_gen_docs.1'
-        TXT_FILE = '_gen_docs.txt'
-
+    def execute(cls, ctx: flam.FlamContext, args: argparse.Namespace) -> None: # pylint: disable=unused-argument
         if args.browser:
-            # TODO: implement once integrated with some website.
+            webbrowser.open('https://verpous.github.io/film-flam/')
             return
 
-        data_files = importlib.resources.files('flam.data')
+        # Somewhat weighty import that we don't ordinarily use so we'll only import it when we need it.
+        from importlib.resources import files, as_file
+
+        MAN_FILE = '_gen_docs.1'
+        TXT_FILE = '_gen_docs.txt'
+        data_files = files('flam.data')
 
         # First preference is to open the docs with man because it has some pretty formatting.
         if shutil.which('man') is not None:
-            with data_files.joinpath(MAN_FILE) as docs_path:
+            with as_file(data_files.joinpath(MAN_FILE)) as docs_path:
                 # man won't eat up Windows paths.
                 subprocess.call(['man', docs_path.as_posix()])
                 return
 
         # As a fallback also support just paginating a plaintext version with less.
         if shutil.which('less') is not None:
-            with data_files.joinpath(TXT_FILE) as docs_path:
+            with as_file(data_files.joinpath(TXT_FILE)) as docs_path:
                 subprocess.call(['less', docs_path])
                 return
 
@@ -1070,7 +1071,6 @@ class SubcommandDocs:
 #         parser.add_argument('-k', '--no-prefix-key', default=False, action='store_true', help="Don't write the key at the start of each bar.")
 #         parser.add_argument('-K', '--suffix-key', default=False, action='store_true', help='Append the key to the end of each bar')
         
-#         # TODO: Not sure about these options yet:
 #         # '-c', '--crew-types',  CREWS      Comma-delimited list of crew types to count in crew-size distribution. Defaults to '*', which means all crew types.
 #     #     parser.add_argument('-f', '--factor', metavar='FACTOR', type=int, action='store', default=0, help=
 #     #         '''Define custom scaling factor to apply to the table. Defaults to %(default)s, which means a value will be computed to make the table fit in the terminal width.

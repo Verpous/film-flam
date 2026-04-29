@@ -27,6 +27,9 @@ extensions = [
 
     # We use this for copying the flam --help outputs to the documentation - pip install sphinxcontrib-programoutput.
     'sphinxcontrib.programoutput',
+
+    # Creates a .nojekyll file as part of html build so that GitHub pages will work as a static html host.
+    "sphinx.ext.githubpages",
 ]
 
 # pip install sphinx-rtd-theme

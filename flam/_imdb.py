@@ -248,7 +248,6 @@ class CsvApiDevListFetcher(_fetch.ListFetcher, list_type='imdb-csv-apidev-path',
         movies_csv = CsvCinemagoerListFetcher.open_csv(self.concrete_listdef)
         _fetch_movies_in_csv(movies_csv, movie_list_file, self, _IMDbApiDev.fetch_movies_from_api)
 
-# TODO: cinemagoer doesn't really work anymore, but there's https://github.com/cinemagoer/cinemagoerng which might work?
 class _Cinemagoer:
     @classmethod
     def fetch_movies_from_api(cls, movies_csv: list[_CsvRow], mlf: _mlf.MovieListFile, fetcher: _fetch.ListFetcher) -> None:
@@ -908,7 +907,6 @@ def _export_lists_handler(requests_queue: multiprocessing.Queue, browser_type: _
     _dbg.logger.info(f"Server will handle export requests for {browser_type=}, {browser_profile_path=}")
 
     # Use empty instead of None as default because it's easier for callers to use.
-    # TODO: auto detect the default profile for all browsers?
     if browser_profile_path != '':
         controller.set_profile(browser_profile_path)
 

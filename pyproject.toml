@@ -29,3 +29,6 @@ version = { attr = "flam._gen_version.__version__" }
 
 [tool.setuptools.package-data]
 "flam.data" = ["*"]
+
+[tool.setuptools.exclude-package-data]
+"flam.data" = [".gitkeep"]
