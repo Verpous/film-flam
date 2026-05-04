@@ -29,7 +29,7 @@ import enum
 
 class ProgressBar[T]:
     """
-    Utility for iterating over a list and presenting a progress bar to the user via stdout. Example usage:
+    Utility for iterating over a list and presenting a progress bar to the user via stdout:
 
     .. code-block:: python
 
@@ -54,7 +54,7 @@ class ProgressBar[T]:
         self._elements = elements
         self._num_of = len(self._elements)
 
-        self._desc = (f'{desc}: ' if desc is not None else '').ljust(self._MAX_DESC)
+        self._desc = truncate(f'{desc}: ' if desc is not None else '', max_len=self._MAX_DESC).ljust(self._MAX_DESC)
         self._keyfunc = keyfunc if keyfunc is not None else lambda elem: ''
 
         # Type checker needs this hint.
@@ -122,7 +122,7 @@ class ProgressBar[T]:
 
 class Timeout:
     """
-    Utility for keeping track of time and raising an exception if a timeout is reached. Example usage:
+    Utility for keeping track of time and raising an exception if a timeout is reached:
 
     .. code-block:: python
         

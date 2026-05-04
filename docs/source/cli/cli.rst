@@ -1,7 +1,7 @@
-Commandline tool
-=======================
+Commandline
+===========
 
-|project| comes packaged with a commandline tool you can run with the command ``flam``:
+FilmFlam comes packaged with a commandline tool you can run with the command ``flam``:
 
 .. program-output:: flam --help
 

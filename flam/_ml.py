@@ -576,7 +576,7 @@ class FindableType(enum.StrEnum):
     """Each object represents an appearance of a person (or several grouped people) in a specific film in some specific capacity.
     Think "Cristoph Waltz as a castmember in Inglorious Basterds".
     
-    So when searching for roles, you will see an entry per person per movie."""
+    So when searching for roles, you will see an entry per people per movie."""
 
     def is_applicable_to(self, find: FindableType) -> bool:
         """
@@ -679,8 +679,11 @@ class Movie(Findable):
         """
         Serializable object we use to store all the movie's data to disk. It can technically be modified, but you shouldn't do that.
 
-        NOTE: this is mostly an internal API; you might need it when implementing a custom extension.
-        For typical use cases, you should use attributes to read the movie's data instead.
+        .. note::
+            
+            This is mostly an internal API; you might need it when :ref:`implementing a custom extension <Extending Flam>`.
+            
+            For typical use cases, you should use attributes to read the movie's data instead.
         """
         return self._mlf_movie
 
@@ -781,8 +784,11 @@ class People(Findable):
         """
         List of serializable objects we use to store each person's data to disk, sorted in a consistent order. It can technically be modified, but you shouldn't do that.
 
-        NOTE: this is mostly an internal API; you might need it when implementing a custom extension.
-        For typical use cases, you should use attributes to read the people's data instead.
+        .. note::
+            
+            This is mostly an internal API; you might need it when :ref:`implementing a custom extension <Extending Flam>`.
+            
+            For typical use cases, you should use attributes to read the people's data instead.
         """
         return self._mlf_people
     
@@ -796,7 +802,7 @@ class People(Findable):
         """
         Iterate over movies these people were in as this crew type. The order of iteration is guaranteed to be consistent.
 
-        Note that in the case of several grouped people, only movies that they **were all in together** will be returned.
+        In the case of several grouped people, only movies that they **were all in together** will be returned.
         """
         # Guaranteed consisted ordering because find() has consistent ordering.
         if self._associated_movies_cache is None:
@@ -910,7 +916,7 @@ class People(Findable):
 
     def are_in_movie(self, movie: Movie) -> bool:
         """
-        Check if these people were in a movie as their crew type.
+        Check if these people were in this movie. This takes the crew type into consideration.
 
         :param movie: the movie to check.
         """
@@ -965,7 +971,17 @@ class RoleUidParts(typing.NamedTuple):
 
 type MLFRolesDict = dict[str, dict[CrewType, _mlf.MLFRole]]
 """
-Return type of :py:meth:`Role.underlying_file_roles_readonly`.
+Data structure with all the raw fetch information about a role.
+It maps the "MLF" UID of people in the group (i.e., the UID of a person in the fetch source) and the crew type to the object with the role data.
+
+If the :py:class:`Role`\\'s crew type isn't :py:attr:`CrewType.ANY`, then that'll be the only crew type in the dictionary.
+Otherwise, the dictionary will have every crew type the person occupied.
+
+.. code-block:: python
+    
+    # mlf_person is a person's underlying file object, and crew_type is the crew type he was in in this role.
+    mlf_role = roles_dict[mlf_person.uid][crew_type]
+    print(mlf_role.characters)
 """
 
 class Role(Findable):
@@ -1039,18 +1055,11 @@ class Role(Findable):
         """
         Dictionary of serializable objects we use to store each role's data to disk. It can technically be modified, but you shouldn't do that.
 
-        The data structure maps the "MLF" UID of people in the group (i.e., the UID of a person in the fetch source) and the crew type to the object with the role data.
-
-        If :py:attr:`crew_type` isn't :py:attr:`CrewType.ANY`, then that'll be the only crew type in the dictionary.
-        Otherwise, the dictionary will have every crew type the person occupied.
-
-        .. code-block:: python
+        .. note::
             
-            # mlf_person is a person's underlying file object, and crew_type is the crew type he was in in this role.
-            mlf_role = roles_dict[mlf_person.uid][crew_type]
-            print(mlf_role.characters)
-
-        NOTE: this is mostly an internal API; you might need it when implementing a custom extension. For typical use cases, you should use attributes to read the role's data instead.
+            This is mostly an internal API; you might need it when :ref:`implementing a custom extension <Extending Flam>`.
+            
+            For typical use cases, you should use attributes to read the role's data instead.
         """
         return self._mlf_roles
 
@@ -1133,8 +1142,11 @@ class MovieList:
         """
         Serializable object we use to store all the list's data to disk. It can technically be modified, but you shouldn't do that.
 
-        NOTE: this is mostly an internal API; you might need it when implementing a custom extension.
-        For typical use cases, you should use :py:meth:`find` to read the list's data instead.
+        .. note::
+            
+            This is mostly an internal API; you might need it when :ref:`implementing a custom extension <Extending Flam>`.
+            
+            For typical use cases, you should use :py:meth:`find` to read the list's data instead.
         """
         return self._movie_list_file
 

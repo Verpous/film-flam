@@ -31,7 +31,7 @@ class ListFetcher(abc.ABC):
     """
     Base class for all fetchers. Fetchers are in charge of actually downloading data about movie lists from some source like IMDb, Letterboxd, etc.
 
-    You can extend flam by inheriting from this class and registering your own custom fetchers (read more about that in the docs).
+    You can extend flam by inheriting from this class and registering :ref:`your own custom fetchers <Implementing a custom fetcher>`.
     """
     # These are READ ONLY. We would wrap them in a propety but classmethod-properties are not supported.
     # We would UPPERCASE them to communicate that they're constants but the registry infra expects the name to be lowercased.
@@ -69,7 +69,7 @@ class ListFetcher(abc.ABC):
 
         :param list_type: the name of this fetcher.
         :param qualified_aliases: list of alises for this fetcher.
-        :param uid_family: which UID family this fetcher uses.
+        :param uid_family: which UID family this fetcher uses. Defaults to ``list_type``, indicating this fetcher is only compatible with itself.
         """
         super().__init_subclass__(**kwargs)
 
@@ -145,7 +145,10 @@ class ListFetcher(abc.ABC):
     @abc.abstractmethod
     def _fetch_into_file(self, movie_list_file: _mlf.MovieListFile) -> None:
         """
-        NOTE: this is an internal method of fetchers. Outside users shouldn't use it, but you need to implement it as part of implementing a custom fetcher.
+        .. note::
+
+            This is an internal method of fetchers. Outside users shouldn't call it,
+            but you need to implement it as part of :ref:`implementing a custom fetcher <Implementing a custom fetcher>`.
         
         Obtain data about the list identified by :py:attr:`concrete_listdef`, and populate ``movie_list_file`` with all the data fetched about movies in the list and the people in them.
 
@@ -156,7 +159,7 @@ class ListFetcher(abc.ABC):
         * Always add the people in a movie before you add the movie itself
         * Only add a movie object after it's fully populated with its data
 
-        The above points ensure that the file is always in a good, save-able state. So if fetching gets interrupted or :py:meth:`_checkpoint` is called and the file is saved,
+        The above points ensure that the file is always in a good, saveable state. So if fetching gets interrupted or :py:meth:`_checkpoint` is called and the file is saved,
         it won't cause partially fetched movies to be in the file, which on the next fetch you won't know you have to re-fetch.
 
         :param movie_list_file: serializable object to populate with all the data we can get about the movie list.

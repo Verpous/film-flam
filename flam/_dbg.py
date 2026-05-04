@@ -65,7 +65,7 @@ class FlamEnv(enum.StrEnum):
 
     LOGLEVEL            = 'FLAM_LOGLEVEL'
     """
-    Suppresses logs below this level.
+    Suppresses logs below this level. See the `python docs on logging levels <https://docs.python.org/3/library/logging.html#levels>`__.
     """
 
     @property
@@ -102,7 +102,7 @@ def get_log_file_path() -> str:
     * Windows: %LOCALAPPDATA%/film_flam/output.log
     * Linux: ~/.local/state/film_flam/output.log
     * macOS: ~/Library/Logs/film_flam/output.log
-    * On other platforms, uses the current directory (./output.log)
+    * On unidentified platforms, uses the current directory (./output.log)
     """
     DIRNAME = 'film_flam'
     FILENAME = 'output.log'

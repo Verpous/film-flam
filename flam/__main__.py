@@ -40,6 +40,7 @@ import webbrowser
 import flam
 from flam import utils
 
+DOCS_URL = 'https://verpous.github.io/film-flam'
 isatty = False
 
 class Choice(enum.StrEnum):
@@ -184,14 +185,13 @@ class SubcommandConfigExtension:
             'extension',
             formatter_class=argparse.RawTextHelpFormatter,
             description = (
-'''View, add, or remove custom extension files. There are various things you can extend:
+f'''View, add, or remove custom extension files. There are various things you can extend:
 
     Attributes      Values belonging to movies, people, or roles
     Predicates      Tests which can be used to filter movies, people, or roles
     Fetchers        Support for downloading movie lists from some specific website or API
 
-Extensions are simply python scripts which implement and register these custom things.
-See the full documentation for how to implement extensions.
+Read more about extensions: {DOCS_URL}/extending.html.
 '''),
             epilog = (
 '''Examples:
@@ -263,15 +263,17 @@ class SubcommandConfigList:
             'list',
             formatter_class=argparse.RawTextHelpFormatter,
             description = (
-'''View, add, edit, or remove "simple" lists. These are lists which are directly copied from some external source like an IMDb list.
+f'''View, add, edit, or remove lists.
 Once configured, lists can be easily used by their name in other commands like `flam fetch`, `flam find`.
+
+Read more about lists: {DOCS_URL}/lists.html.
 '''),
             epilog = (
 '''Examples:
     %(prog)s mylist imdb-browser-apidev-listid=083886771
-        (Create a list 'mylist'. It's a local copy of the IMDb list '083886771' - https://www.imdb.com/list/ls083886771/. It's downloaded via the browser+imdbapi.dev)
+        (Create a list 'mylist'. It's a local copy of the IMDb list '083886771' - https://www.imdb.com/list/ls083886771/)
     %(prog)s mylist --default-fetch=yes --default-find=yes
-        (Modify 'mylist' to be default for fetch and find, so if you run `flam fetch` or `flam find` with no arguments they will use this list)
+        (Modify 'mylist' to be default for fetch and find, so `flam fetch`, `flam find` with no arguments will use this list)
     %(prog)s
         (Print all lists)
     %(prog)s --rename ourlist mylist
@@ -292,12 +294,7 @@ Once configured, lists can be easily used by their name in other commands like `
         parser.add_argument('-i', '--default-find', choices=Choice.yes_no_auto(), default=Choice.AUTO, action='store', help='In --edit, decide if the list should be default for `flam find`.')
         parser.add_argument('-e', '--default-fetch', choices=Choice.yes_no_auto(), default=Choice.AUTO, action='store', help='In --edit, decide if the list should be default for `flam fetch`.')
         parser.add_argument('NAME', action='store', nargs='?', default=None, help='Operate on the list named %(dest)s.')
-        parser.add_argument('LISTDEF', action='store', nargs='?', default=None, help=
-'''In --edit, set the list type and address to %(dest)s.
-%(dest)ss have the form <list type>=<address>, where the list type is some supported way of downloading list information, and the address indicates the exact list to download.
-See the full documentation for a list of supported list types. Below is one recommended example for IMDb lists:
-    imdb-browser-apidev-listid      Takes an IMDb list ID and downloads it by opening the list in the browser and exporting to CSV, then filling in information with https://imdbapi.dev
-''')
+        parser.add_argument('LISTDEF', action='store', nargs='?', default=None, help='In --edit, set the list type and address to %(dest)s.')
         return parser
 
     @classmethod
@@ -353,7 +350,7 @@ See the full documentation for a list of supported list types. Below is one reco
                 simple_list.name = args.rename
 
             if args.LISTDEF is not None:
-                cldef = flam.CanonListdef.parse(args.LISTDEF, ctx)
+                cldef = ctx.parse_listdef(args.LISTDEF)
                 simple_list.concrete_listdef = cldef
 
             if args.default_fetch != Choice.AUTO:
@@ -370,7 +367,7 @@ See the full documentation for a list of supported list types. Below is one reco
         if args.LISTDEF is None:
             raise flam.InputError(f"List '{args.NAME}' doesn't exist, so LISTDEF is required.")
 
-        cldef = flam.CanonListdef.parse(args.LISTDEF, ctx)
+        cldef = ctx.parse_listdef(args.LISTDEF)
 
         simple_list = flam.SimpleList(
             uid = 'INITIALIZED LATER',
@@ -390,8 +387,10 @@ class SubcommandConfigComposite:
             'composite',
             formatter_class=argparse.RawTextHelpFormatter,
             description = (
-'''View, add, edit, or remove "composite" lists. These are remixes of your simple lists which can combine multiple lists together and also filter them.
+f'''View, add, edit, or remove "composite" lists. These are remixes of your other lists which can combine multiple lists together and also filter them.
 Once configured, composite lists can be easily used by their name in other commands like `flam fetch`, `flam find`.
+
+Read more about composite lists: {DOCS_URL}/lists.html.
 '''),
             epilog = (
 '''Examples:
@@ -483,7 +482,7 @@ See the full documentation for filter syntax.''')
 
             if len(filter_tokens) > 0:
                 # Don't have anything to do with this for now, but we can raise an exception if it doesn't compile.
-                ctx.compile_filter(filter_tokens, flam.FindableType.MOVIES)
+                ctx.compile_movies_filter(filter_tokens)
                 composite_list.filter_tokens = filter_tokens
 
             if args.default_find != Choice.AUTO:
@@ -543,15 +542,15 @@ You can rerun this to undo up to the last {cls.UNDO_HISTORY} fetches.''')
 It's enough for %(metavar)s to match any part of the title, not necessarily the whole title.
 This feature is intended for redownloading shows after a new season has come out.''')
 
-        parser.add_argument('LISTDEF', nargs='*', action='store', help=
-'''Which lists to fetch. There are a few supported forms (in order of priority):
-1. "*" for fetching all configured lists
-2. A configured list name (simple or composite) e.g. "mylist"
-3. An explicit "abstract" %(dest)s: "list=<list name>" for simple lists, and "composite=<list name>" for composite lists.
-4. An explicit "concrete" %(dest)s: "<list type>=<address>". See the full documentation for a list of supported types.
+        # Secret argument useful for debugging, to run precache without fetch.
+        parser.add_argument('--nothing', action='store_true', help=argparse.SUPPRESS)
 
+        parser.add_argument('LISTDEF', nargs='*', action='store', help=
+f'''Which lists to fetch.
 In the case of a composite list, will actually fetch the simple lists which it's composited from.
-By default fetches all lists configured with --default-fetch.''')
+By default fetches all lists configured with --default-fetch.
+
+Read more about supported LISTDEFs: {DOCS_URL}/lists.html.''')
 
         return parser
 
@@ -567,14 +566,21 @@ By default fetches all lists configured with --default-fetch.''')
             # Sweep this one silently. Catch any exception type because we don't care too much if it fails.
             flam.logger.error(f"Failed to store state for later undoing with error: {e}")
 
-        listdefs = args.LISTDEF if len(args.LISTDEF) != 0 else [flam.SpecialListType.DEFAULTS]
+        if len(args.LISTDEF) != 0:
+            listdefs = args.LISTDEF
+        elif args.nothing:
+            listdefs = []
+        else:
+            listdefs = [flam.SpecialListType.DEFAULTS]
         
         try:
             ctx.fetch(listdefs, refetch_pattern=args.refetch, quiet=False)
         except flam.FetchInterrupt:
+            print('Precaching heavy computations...')
             ctx.precache(quiet=False)
             raise
 
+        print('Precaching heavy computations...')
         ctx.precache(quiet=False)
 
     @classmethod
@@ -614,11 +620,11 @@ By default fetches all lists configured with --default-fetch.''')
 class SubcommandFind:
     # Use qualified names for performance and to avoid ambiguity.
     DEFAULT_SORT_KEYS = {
-        flam.FindableType.MOVIES: ['movies-release-year', 'movies-title', 'movies-runtime'],
+        flam.FindableType.MOVIES: ['movies-release-year', 'movies-title'],
         flam.FindableType.PEOPLE: ['people-crew-type', 'people-group-mode', 'people-num-movies', 'people-name'],
 
         # We think of roles as being a people search more than a movie search, so it's sort first by people, then by movie.
-        flam.FindableType.ROLES: ['people-crew-type', 'people-group-mode', 'people-num-movies', 'people-name', 'movies-release-year', 'movies-title', 'movies-runtime'],
+        flam.FindableType.ROLES: ['people-crew-type', 'people-group-mode', 'people-num-movies', 'people-name', 'movies-release-year', 'movies-title'],
     }
 
     # The printed name will be abbreviated anyway so it's ok to use the qualified name.
@@ -659,17 +665,22 @@ Found objects are printed in a nice table format, and you can customize what is 
         parser.add_argument('-s', '--sort', metavar='ATTRIBUTES', default=None, action='store', help=
 f'''Sort FINDABLEs according to %(metavar)s, which is a comma-delimited list of attributes to sort by, in decreasing priority.
 Each findable type has its own default:
+
     movies      {','.join(k[k.find('-') + 1:] for k in cls.DEFAULT_SORT_KEYS[flam.FindableType.MOVIES])}
     people      {','.join(k[k.find('-') + 1:] for k in cls.DEFAULT_SORT_KEYS[flam.FindableType.PEOPLE])}
     roles       {','.join(k[k.find('-') + 1:] for k in cls.DEFAULT_SORT_KEYS[flam.FindableType.ROLES])}
-See the full documentation for a list of supported attributes.''')
+
+For a full list of supported attributes: {DOCS_URL}/attributes.html.
+''')
         
         parser.add_argument('-c', '--columns', metavar='ATTRIBUTES', default=None, action='store', help=
-'''Comma-delimited list of attributes of FINDABLE to print.
+f'''Comma-delimited list of attributes of FINDABLE to print.
 Each findable type has its own defaults. There are also "smart" defaults which are printed only if certain conditions are met.
 If %(metavar)s starts with a '+' then they will be printed in addition to the defaults instead of instead.
 Supports globbing (e.g. '*-date' for all date attributes).
-See the full documentation for a list of supported attributes.''')
+
+For a full list of supported attributes: {DOCS_URL}/attributes.html.
+''')
 
         parser.add_argument('-C', '--color', choices=Choice.always_auto_never(), default=Choice.AUTO, action='store', help=
             'Set whether columns should be colored. Defaults to %(default)s.')
@@ -688,35 +699,25 @@ See the full documentation for a list of supported attributes.''')
 
         parser.add_argument('FINDABLE', type=cls.parse_findable, action='store', help=
 f'''Choose what to find: movies, people, or roles.
-Movies are simply the movies in the list.
-
-People are the people were in the movies in the list. They can be searched per crew type (i.e. 'director', 'cast') or as 'any' crew type.
-
-Roles are an appearance of a specific people in a specific film. Think "Cristoph Waltz in Inglorious Basterds". They can also be searched per crew type.
-So when searching for roles, you will see an entry per person per movie.
-Since roles combine a people and a movie, they accept any movie attribute, people attribute, and also their own role attributes.
-
-Supported crew types: {', '.join(flam.CrewType)}
-
-People and roles can be "grouped". Grouping simply combines some people together if they are known collaborators.
-For example, if grouping is enabled then the Coen brothers will become a single "people" entry.
-Each crew type has its own default grouping mode according to what makes sense, but you can override it
 
 People and roles support limiting the search to a specific crew type and optionally also group mode, and support comma-delimited several types. Use 'crew' to catenate all types.
 For roles, it looks like: 'cast', 'director:group', 'composer:separate,stuntcast', 'crew', etc.
 For people, it looks like 'cast-people', 'director-people:group', etc.
 
+Supported crew types: {', '.join(flam.CrewType)}
+
+Read more about findables: {DOCS_URL}/findables.html
+
 ''') # Empty trailing line because this is a lot of text and we gotta space it out.
 
         parser.add_argument('LISTDEF', nargs='*', action='store', help=
-'''Which lists to search in. They must've been previously fetched. See `flam fetch --help` for information about supported forms.
-By default searches in all lists configured with --default-find.
+f'''Which lists to search in. They must've been previously fetched. By default searches in all lists configured with --default-find.
+Read more about supported LISTDEFs: {DOCS_URL}/lists.html.
 
 ''')
         parser.add_argument('FILTER', nargs='*', action='store', help=
-'''Search only for findables which pass %(metavar)s.
-Filters can check the values of attributes and more. They support standard constructs like '-and', '-or', '-not' operators and parenthesized expressions.
-See the full documentation for filter syntax.''')
+f'''Search only for findables which pass FILTER.
+Read more about filters: {DOCS_URL}/filters.html.''')
 
         parser.add_argument('REMAINDER', nargs=argparse.REMAINDER, action='store', help=argparse.SUPPRESS)
         return parser
@@ -780,7 +781,7 @@ See the full documentation for filter syntax.''')
         filter = ctx.compile_filter(filter_tokens, findable_type)
         movie_list = ctx.get_movie_list(listdefs if len(listdefs) > 0 else flam.SpecialListType.DEFAULTS)
 
-        sort_attrs = cls.parse_sortkeys(args, findable_type, ctx)
+        sort_attrs = cls.parse_sortkeys(args, findable_type, ct_gms, ctx)
         column_attrs = cls.parse_columns(args, findable_type, ct_gms, sort_attrs, movie_list, filter, ctx)
 
         flam.logger.info("Building findables list")
@@ -809,16 +810,32 @@ See the full documentation for filter syntax.''')
 
     # Can't do this at argparse time because it depends on the context.
     @classmethod
-    def parse_sortkeys(cls, args: argparse.Namespace, findable_type: flam.FindableType, ctx: flam.FlamContext) -> list[tuple[flam.Attribute, None | str]]:
+    def parse_sortkeys(cls, args: argparse.Namespace, findable_type: flam.FindableType, ct_gms: list[tuple[flam.CrewType, flam.GroupMode]],
+            ctx: flam.FlamContext) -> list[tuple[flam.Attribute, None | str]]:
         attributes: list[tuple[flam.Attribute, None | str]]
 
         if args.sort is None:
             attributes = [(ctx.attributes[a], None) for a in cls.DEFAULT_SORT_KEYS[findable_type]]
+            
+            # Optimization: it's most common to only lookup a single crew type, and yet we have to include the CTGM in the default sort keys.
+            # So we'll remove those sort keys if they're actually meaningless.
+            # Don't do this in the non-defaults case because it will mess with the smart columns.
+            if findable_type in (flam.FindableType.PEOPLE, flam.FindableType.ROLES) and len(ct_gms) == 1:
+                for i in reversed(range(len(attributes))):
+                    attr, _ = attributes[i]
+
+                    if attr.qualified_name in ('people-crew-type', 'people-group-mode'):
+                        del attributes[i]
         else:
             # Return a tuple with the attribute and also a hint of which string to use to print it to the user,
             # so that if this sort attribute is added as a smart column the user will see it by the same alias he used.
             attribute_names = args.sort.split(',') if args.sort != '' else []
             attributes = [(ctx.attributes.get(a, type_hint=findable_type), a) for a in attribute_names]
+
+            # Always add the uid as a fallback sort key so that the output doesn't look random.
+            # This is not needed in the default keys case because we have enough fallbacks there and this has some overhead.
+            # Note there is special handling for this in parse_columns when we add sort keys as smart columns.
+            attributes.append((ctx.attributes[flam.compose_qualified_attr_or_pred_name(findable_type, 'uid')], None))
 
             for attr, alias_hint in attributes:
                 if not attr.findable_type.is_applicable_to(findable_type):
@@ -949,7 +966,8 @@ See the full documentation for filter syntax.''')
 
             # Add a column for every sort key in the end if they are not the default sort keys.
             if args.sort is not None:
-                for attr, alias_hint in sort_attrs:
+                # Skip the last sort key because it's the uid which we add automatically.
+                for attr, alias_hint in sort_attrs[:-1]:
                     uniq_insert(attr, alias_hint, len(attributes))
 
             # Add a column for every attribute referenced in the filter.
@@ -1030,7 +1048,7 @@ class SubcommandDocs:
     @classmethod
     def execute(cls, ctx: flam.FlamContext, args: argparse.Namespace) -> None: # pylint: disable=unused-argument
         if args.browser:
-            webbrowser.open('https://verpous.github.io/film-flam/')
+            webbrowser.open(DOCS_URL)
             return
 
         # Somewhat weighty import that we don't ordinarily use so we'll only import it when we need it.
@@ -1092,12 +1110,12 @@ def make_main_parser(add_subparsers: bool) -> tuple[argparse.ArgumentParser, arg
     parser = argparse.ArgumentParser(
         formatter_class = argparse.RawTextHelpFormatter,
         description = (
-'''Gain insights on your movie lists. Quickly answer questions like "Where have I seen this actor?", or "Which director have I seen the most movies from?", and so much more.
+f'''Gain insights on your movie lists. Quickly answer questions like "Where have I seen this actor?", or "Which director have I seen the most movies from?", and so much more.
 
 1. Create movie lists on IMDb, Letterboxd, or your website of choice
 2. Configure %(prog)s with how to download those lists with `%(prog)s config list`
 3. Download all the information about the movies in those lists with `%(prog)s fetch`
-4. Gain insights on the movies in those lists with `%(prog)s find` and `%(prog)s chart`
+4. Gain insights on the movies in those lists with `%(prog)s find`
 
 A bit of information on each subcommand:
 
@@ -1107,6 +1125,8 @@ A bit of information on each subcommand:
     docs        Read the complete documentation
 
 The default subcommand is `find`. See `%(prog)s find --help` to know which arguments it accepts. There is a help option for all subcommands.
+
+I strongly recommend reading the docs! {DOCS_URL}/introduction.html
 '''),
         epilog = (
 '''Examples:

@@ -53,18 +53,7 @@ class CanonListdef(typing.NamedTuple):
     """
 
     @classmethod
-    def parse(cls, listdef: str, ctx: _ctx.FlamContext) -> CanonListdef:
-        """
-        Parse a string representation of a listdef and canonicalize it.
-
-        :param listdef: the listdef as a string. It can have a few forms:
-        
-            * :py:attr:`SpecialListType.ALL`
-            * :py:attr:`SpecialListType.DEFAULTS`
-            * '<name>' - where <name> is the name of a simple or composite list
-            * '<list_type>=<address>' - where <list_type> is :py:attr:`SpecialListType.SIMPLE`, :py:attr:`SpecialListType.COMPOSITE`, or the name of a fetcher.
-        :param ctx: the context containing list configurations we need to know.
-        """
+    def _parse(cls, listdef: str, ctx: _ctx.FlamContext) -> CanonListdef:
         eq_idx = listdef.find('=')
         before_eq, after_eq = (listdef[:eq_idx], listdef[eq_idx + 1:]) if eq_idx != -1 else (listdef, '')
         result: None | CanonListdef = None
@@ -100,7 +89,7 @@ class CanonListdef(typing.NamedTuple):
     @classmethod
     def _parse_and_expand(cls, listdefs: typing.Iterable[str], ctx: _ctx.FlamContext, flavor: _ExpandFlavor) -> typing.Iterable[CanonListdef]:
         for ldef in listdefs:
-            cldef = cls.parse(ldef, ctx)
+            cldef = cls._parse(ldef, ctx)
             
             for expanded in cldef._expand(ctx, flavor):
                 _dbg.logger.info(f"Expansion of {cldef} includes {expanded}")

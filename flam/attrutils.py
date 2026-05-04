@@ -163,7 +163,7 @@ _extractor_names = {
 def easy_attribute[TRet](params: EasyAttributeParams) -> typing.Callable[[Extractor[TRet]], EasyAttribute]:
     """
     Decorator you can apply to an extractor function to create an :py:class:`EasyAttribute` from it and return an instance of that class.
-    This is an extra layer of convenience so you don't even have to explicitly inherit from EasyAttribute or instantiate it. For example:
+    This is an extra layer of convenience so you don't even have to explicitly inherit from EasyAttribute or instantiate it:
 
     .. code-block:: python
 
@@ -628,11 +628,8 @@ class AverageAttribute(EasyAttribute):
     """
     Attribute which returns the average of another attribute's value.
 
-    For movie attributes, this will be a people attribute with the average across all movies those people were in.
-
-    For people attributes, this will be a movie attribute with the average across all people in the movie with the same crew type.
-
-    Example usage:
+    * For movie attributes, this will be a people attribute with the average across all movies those people were in.
+    * For people attributes, this will be a movie attribute with the average across all people in the movie with the same crew type.
 
     .. code-block:: python
 
@@ -648,9 +645,8 @@ class AverageAttribute(EasyAttribute):
         :param wrapped_attr: the attribute whose average will be returned.
         :param as_crew_type: optional modifier for this attribute. If provided, the attribute's name will be 'avg-<wrapped_attr.name_without_type>-as-<crew_type>':
 
-            For movie attributes, this will be a people attribute with the average across all movies those people were in as this crew type.
-
-            For people attributes, this will be a movie attribute with the average across all people in the movie with this crew type.
+            * For movie attributes, this will be a people attribute with the average across all movies those people were in as this crew type.
+            * For people attributes, this will be a movie attribute with the average across all people in the movie with this crew type.
         """
         as_suffix = '' if as_crew_type is None else f'-as-{as_crew_type}'
 
@@ -711,9 +707,8 @@ class SumAttribute(EasyAttribute):
     """
     Attribute which returns the sum of another attribute's value.
 
-    For movie attributes, this will be a people attribute with the sum across all movies those people were in.
-
-    For people attributes, this will be a movie attribute with the sum across all people in the movie with the same crew type.
+    * For movie attributes, this will be a people attribute with the sum across all movies those people were in.
+    * For people attributes, this will be a movie attribute with the sum across all people in the movie with the same crew type.
     """
     def __init__(self, wrapped_attr: _attr.Attribute, type_handler: TypeHandler, as_crew_type: None | _ml.CrewType = None) -> None:
         """
@@ -722,9 +717,8 @@ class SumAttribute(EasyAttribute):
         :param wrapped_attr: the attribute whose sum will be returned.
         :param as_crew_type: optional modifier for this attribute. If provided, the attribute's name will be 'sum-<wrapped_attr.name_without_type>-as-<crew_type>':
 
-            For movie attributes, this will be a people attribute with the sum across all movies those people were in as this crew type.
-
-            For people attributes, this will be a movie attribute with the sum across all people in the movie with this crew type.
+            * For movie attributes, this will be a people attribute with the sum across all movies those people were in as this crew type.
+            * For people attributes, this will be a movie attribute with the sum across all people in the movie with this crew type.
         """
         # Works the same as AverageAttribute in many ways but for summing up instead.
         # One difference is we have to accept a TypeHandler. Averaging turns everything to floats but summation preserves types.

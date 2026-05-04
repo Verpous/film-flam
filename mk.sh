@@ -31,7 +31,7 @@ build=dist
 docs=docs
 
 flam_dir=.film_flam_dev
-srcfiles=($mdl/*.py)
+srcfiles=($mdl/*.py test_extensions.py)
 profiles=profiles
 
 pylint_ignore+=C0103, # invalid-name
@@ -82,6 +82,7 @@ install() {
             pip install -e .
             ;;
         test)
+            # https://test.pypi.org/project/film-flam/
             pip install --index-url https://test.pypi.org/simple/ --extra-index-url https://pypi.org/simple/ $pkg
             ;;
         actual)
@@ -142,7 +143,7 @@ release() {
     twine upload $twineargs $build/*
     sanity $flavor
 
-    # For actual releases only, publish the docs. They're hosted on https://verpous.github.io/film-flam/.
+    # For actual releases only, publish the docs to GitHub Pages. They're hosted on https://verpous.github.io/film-flam/.
     if [[ "$flavor" == actual ]]; then
         (
             cd $html_worktree
@@ -267,7 +268,7 @@ cfg() {
 
 # Runs mypy to check if our code "compiles".
 mypy() {
-    MYPY_FORCE_COLOR=1 command mypy --disallow-untyped-defs --disallow-incomplete-defs --enable-incomplete-feature=NewGenericSyntax $cli
+    MYPY_FORCE_COLOR=1 command mypy --disallow-untyped-defs --disallow-incomplete-defs --enable-incomplete-feature=NewGenericSyntax $mdl test_extensions.py
 }
 
 # Runs pylint to check if our code is nice and tidy.
@@ -358,8 +359,16 @@ pstats() {
 coverage() {
     # Support `coverage profile` for coverage with profiling.
     local cmd="${1:-$cli}"
+    local i
 
-    # TODO: in case of failure need to run cleanup so that the next run won't fail.
+    # This step is not part of the test, it's just cleanup from the previus run.
+    $cli config extension -D "$PWD"/test_extensions.py 2> /dev/null || true
+    $cli config list -D coverage 2> /dev/null || true
+    $cli config composite -D coverage 2> /dev/null || true
+
+    # Also cleanup the vault so the test is consistent.
+    clean-vault
+
     # Run everything in a scope that's redirected to devnull. If profiling, it will break us out of pstats. If not profiling, it will dump the output of flam.
     time {
         time "$cmd" config extension "$PWD"/test_extensions.py
@@ -376,21 +385,34 @@ coverage() {
         time "$cmd" config composite
         time "$cmd" config composite -D coverage
 
-        # For now I don't want fetch here because it's so slow.
-        # time "$cmd" fetch specials
+        # Fetch is optional since it's so slow.
+        if [[ ! "$2" ]]; then
+            time "$cmd" fetch specials
+        else
+            time "$cmd" fetch --nothing
+        fi
 
-        time "$cmd" find -c\* movies specials [ -true -o -false ] -every director '.*' -has title -has-index countries 0 -index countries 0 '.*' \
-            -superset cast [ a e o i e ] -subset cast [ a e o i e ] -sameset cast [ a e o i e ] -in-list movies -any-role [] -true -every-role [] -true
+        # Clean the vault again, then run all find commands twice. The first time they'll test vault caching, the second time they will test vault loading.
+        clean-vault
 
-        time "$cmd" find -c\* any-people:group specials -any-movie -true -every-movie -true -as cast -true -any-person -true -every-person -true
-        time "$cmd" find -c\* any-people:separate specials -any-movie -true -every-movie -true -as cast -true -any-person -true -every-person -true
-        time "$cmd" find -c\* cast-people:group specials -any-movie -true -every-movie -true -as director -true -any-person -true -every-person -true
-        time "$cmd" find -c\* cast-people:separate specials -any-movie -true -every-movie -true -as director -true -any-person -true -every-person -true
+        for i in 1 2; do
+            time "$cmd" find -c\* movies specials [ -true -o -false ] -every director '.*' -has title -has-index countries 0 -index countries 0 '.*' \
+                -superset cast [ a e o i e ] -subset cast [ a e o i e ] -sameset cast [ a e o i e ] -in-list movies -any-role [] -true -every-role [] -true
 
-        time "$cmd" find -croles-\* any:group specials -any-movie -true -every-movie -true -as cast -true -any-person -true -every-person -true
-        time "$cmd" find -croles-\* any:separate specials -any-movie -true -every-movie -true -as cast -true -any-person -true -every-person -true
-        time "$cmd" find -croles-\* cast:group specials -any-movie -true -every-movie -true -as director -true -any-person -true -every-person -true
-        time "$cmd" find -croles-\* cast:separate specials -any-movie -true -every-movie -true -as director -true -any-person -true -every-person -true
+            time "$cmd" find -c\* any-people:group specials -any-movie -true -every-movie -true -as cast -true -any-person -true -every-person -true
+            time "$cmd" find -c\* any-people:separate specials -any-movie -true -every-movie -true -as cast -true -any-person -true -every-person -true
+            time "$cmd" find -c\* cast-people:group specials -any-movie -true -every-movie -true -as director -true -any-person -true -every-person -true
+            time "$cmd" find -c\* cast-people:separate specials -any-movie -true -every-movie -true -as director -true -any-person -true -every-person -true
+
+            time "$cmd" find -croles-\* any:group specials -any-movie -true -every-movie -true -as cast -true -any-person -true -every-person -true
+            time "$cmd" find -croles-\* any:separate specials -any-movie -true -every-movie -true -as cast -true -any-person -true -every-person -true
+            time "$cmd" find -croles-\* cast:group specials -any-movie -true -every-movie -true -as director -true -any-person -true -every-person -true
+            time "$cmd" find -croles-\* cast:separate specials -any-movie -true -every-movie -true -as director -true -any-person -true -every-person -true
+            
+        done
+
+        # Test precaching again now that lots of things are vaulted.
+        time "$cmd" fetch --nothing
     } > /dev/null
 }
 
@@ -413,7 +435,7 @@ sphinx() {
                 # For systems without `man`, also generate a plaintext version. Sphinx has a 'text' builder for generating text files prettier than this,
                 # but it compiles each .rst into its own .txt, whereas man essentially catenates all files together. We'll live with it.
                 # NOTE: this logs a warning every time which we will live with. We don't want to ignore all of stderr because it's useful sometimes.
-                # HACK: man is set up weird on my environment, and this is the only way I can get it to work.
+                # HACK: man is set up weird on my environment, and this is the only way I can get it to work. This won't work on other people's machines.
                 MSYS_NO_PATHCONV=1 cmd /c man $man_build/filmflam.1 > $man_build/_gen_docs.txt
 
                 # Copy everything to the package folder so it will be accessible and packaged with flam.

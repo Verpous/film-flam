@@ -110,7 +110,7 @@ _cmp_funcs = {
 
 class CmpTo:
     """
-    Represents comparison of some attribute's values to some constant value C, using a specific comparison operator.
+    Represents comparison of some attribute's values to some constant primitive value, using a specific comparison operator.
     
     In a filter, these would be represented as a string like so: '<op><value>', where <op> is the sign of a :py:class:`ComparisonOp`, and <value> is a possible value of an attribute.
     The <op> part is optional as all attributes define a default operator. To illustrate:
@@ -171,7 +171,7 @@ class Attribute(abc.ABC):
     any data you may be interested in obtaining about a movie, people, or role is obtained via attributes.
 
     Attributes provide facilities for using them generically.
-    You can extend flam by inheriting from this class and registering your own custom attributes (read more about that in the docs).
+    You can extend flam by inheriting from this class and registering :ref:`your own custom attributes <Implementing a custom attribute>`.
     """
 
     NONE_STR = '-'
@@ -246,7 +246,10 @@ class Attribute(abc.ABC):
     @abc.abstractmethod
     def _parse_primitive_not_none(self, primitive_str: str) -> AttributePrimitive:
         """
-        NOTE: this is an internal method of attributes. Outside users shouldn't use it, but you need to implement it as part of implementing a custom attribute.
+        .. note::
+
+            This is an internal method of attributes. Outside users shouldn't call it,
+            but you need to implement it as part of :ref:`implementing a custom attribute <Implementing a custom attribute>`.
         
         Parse a string representing a single primitive into the value of this attribute. You do not need to handle ``None`` or lists in this function.
 
@@ -258,7 +261,10 @@ class Attribute(abc.ABC):
     @abc.abstractmethod
     def _str_of_primitive_not_none(self, primitive: AttributePrimitive, abbreviate: bool, extras: dict[str, typing.Any]) -> str:
         """
-        NOTE: this is an internal method of attributes. Outside users shouldn't use it, but you need to implement it as part of implementing a custom attribute.
+        .. note::
+
+            This is an internal method of attributes. Outside users shouldn't call it,
+            but you need to implement it as part of :ref:`implementing a custom attribute <Implementing a custom attribute>`.
         
         Return a string representation of a single primitive value of this attribute. You do not need to handle ``None`` or lists in this function.
 

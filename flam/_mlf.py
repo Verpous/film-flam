@@ -43,7 +43,11 @@ class MLFPerson(_file._FlamSerializable):
     """
     uid:                    str
     name:                   None | str
-    gender:                 None | str # I am not going down the rabbit hole of enum-ing the possible gender values.
+    gender:                 None | str
+    """
+    The exact strings representing each gender may vary based on where the data was fetched from.
+    """
+
     height_cm:              None | float
     birthday:               None | datetime.date
     countries:              list[str]
@@ -59,11 +63,15 @@ class MLFMoviePerSourceData(_file._FlamSerializable):
     
     canon_listdef:          _ldef.CanonListdef
     """
-    The list this data belongs to.
+    The list this data belongs to. Fetchers should make this equal to the :py:attr:`MovieListFile.abstract_listdef`.
     """
 
     list_index:             None | int
     listing_date:           None | datetime.date
+    """
+    The date this movie was added to this list.
+    """
+
     note:                   None | str
 
 class MLFMovie(_file._FlamSerializable):
@@ -72,6 +80,9 @@ class MLFMovie(_file._FlamSerializable):
     """
     uid:                    str
     per_src_data:           list[MLFMoviePerSourceData]
+    """
+    Data about a movie which is specific to the list from which it came. Fetchers should build this list with only one element.
+    """
 
     title:                  None | str
     synopsis:               None | str
@@ -83,6 +94,10 @@ class MLFMovie(_file._FlamSerializable):
     my_rating:              None | float
     release_date:           None | datetime.date
     watch_dates:            list[datetime.date]
+    """
+    The date(s) you watched this movie. It's a list in case you've seen it more than once and have that data.
+    """
+
     genres:                 list[str]
     languages:              list[str]
     countries:              list[str]
@@ -103,9 +118,10 @@ class MovieListFile(_file._FlamSerializable):
     # The name is also kind a lie - if the list is named then this will be its abstract listdef. But if you fetched a raw list it will be concrete of course.
     abstract_listdef:       _ldef.CanonListdef
 
-    # Files are "compatible" if they have a matching uid_family. This is because I have no good way of identifying matching items between, say, IMDb and Letterboxd.
-    # If a list originates from IMDb, all the uids in the file will be from IMDb, and so it will only be compatible with other IMDb-based lists.
     uid_family:             str
+    """
+    Files are "compatible" if they have a matching family. For instance, different IMDb fetchers might all rely on IMDb IDs, so they can all have the same family.
+    """
 
     movies_by_uid:          dict[str, MLFMovie]
     people_by_uid:          dict[str, MLFPerson]

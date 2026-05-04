@@ -102,7 +102,7 @@ class _CsvRow:
 
 # NOTE: not registered because cinemagoer is broken so this fetcher is temporarily (permanently?) unsupported.
 # @_reg._register_builtin
-class SeleniumCinemagoerListFetcher(_fetch.ListFetcher, list_type='imdb-browser-cinemagoer-listid', uid_family=_UID_FAMILY):
+class SeleniumCinemagoerFetcher(_fetch.ListFetcher, list_type='imdb-browser-cinemagoer-listid', uid_family=_UID_FAMILY):
     exports_server: None | multiprocessing.Process = None
     requests_queue: multiprocessing.Queue = multiprocessing.Queue()
 
@@ -186,20 +186,20 @@ class SeleniumCinemagoerListFetcher(_fetch.ListFetcher, list_type='imdb-browser-
 # but multiprocess doesn't actually let you orphan children, because fuck you that's why.
 @atexit.register
 def _exports_server_cleanup() -> None:
-    if SeleniumCinemagoerListFetcher.exports_server is not None and SeleniumCinemagoerListFetcher.exports_server.is_alive():
+    if SeleniumCinemagoerFetcher.exports_server is not None and SeleniumCinemagoerFetcher.exports_server.is_alive():
         _dbg.logger.info("Sending QUIT message to server")
-        SeleniumCinemagoerListFetcher.requests_queue.put_nowait(_REQUEST_QUIT)
+        SeleniumCinemagoerFetcher.requests_queue.put_nowait(_REQUEST_QUIT)
 
         # Join is needed because the subprocess is a daemon, which means it dies when we die,
         # and we don't want it to die before it handles this request.
-        SeleniumCinemagoerListFetcher.exports_server.join()
+        SeleniumCinemagoerFetcher.exports_server.join()
         _dbg.logger.info("Server is dead")
     else:
         _dbg.logger.info("No need to do server cleanup")
 
 # NOTE: not registered because cinemagoer is broken so this fetcher is temporarily (permanently?) unsupported.
 # @_reg._register_builtin
-class CsvCinemagoerListFetcher(_fetch.ListFetcher, list_type='imdb-csv-cinemagoer-path', uid_family=_UID_FAMILY):
+class CsvCinemagoerFetcher(_fetch.ListFetcher, list_type='imdb-csv-cinemagoer-path', uid_family=_UID_FAMILY):
     def _fetch_into_file(self, movie_list_file: _mlf.MovieListFile) -> None:
         _dbg.logger.info(f"Cinemagoer: Fetching IMDb list by CSV: '{self.concrete_listdef.address}'")
         movies_csv = self.open_csv(self.concrete_listdef)
@@ -216,7 +216,7 @@ class CsvCinemagoerListFetcher(_fetch.ListFetcher, list_type='imdb-csv-cinemagoe
             return _read_csv(movies_csv_file)
 
 @_reg._register_builtin
-class SeleniumApiDevListFetcher(_fetch.ListFetcher, list_type='imdb-browser-apidev-listid', uid_family=_UID_FAMILY):
+class SeleniumApiDevFetcher(_fetch.ListFetcher, list_type='imdb-browser-apidev-listid', uid_family=_UID_FAMILY):
     """IMDB_LIST_ID
 
     Takes an IMDb list ID as an input, and downloads information in two steps:
@@ -228,24 +228,28 @@ class SeleniumApiDevListFetcher(_fetch.ListFetcher, list_type='imdb-browser-apid
 
     There are a few environment variables you can export to control the browser use:
 
-    * **FLAM_DOWNLOADS** - Path to the downloads folder on your computer so flam will know where to look for the downloaded CSV. If your browser doesn't download things to ~/Downloads, you must set this variable for this fetcher to work
+    * **FLAM_DOWNLOADS** - Path to the downloads folder on your computer so flam will know where to look for the downloaded CSV
+        
+        .. warning::
+        
+            If your browser doesn't download things to ~/Downloads, you must set this variable for this fetcher to work!
     * **FLAM_BROWSER** - Which browser to use: 'chrome', 'edge', or 'firefox'. By default flam tries to detect your default browser
-    * **FLAM_BROWSER_PROFILE** - Path to your browser profile. This is only needed if your list is set to private so a profile is needed where you are expected to be already logged in
+    * **FLAM_BROWSER_PROFILE** - Path to your browser profile. This is only needed if your list is set to private, and you must use a profile where you're already logged in to IMDb
     """
     def _fetch_into_file(self, movie_list_file: _mlf.MovieListFile) -> None:
         _dbg.logger.info(f"IMDbApiDev: Going to download the CSV for IMDb list id: {self.concrete_listdef.address}")
-        movies_csv = SeleniumCinemagoerListFetcher.download_csv(self.concrete_listdef)
+        movies_csv = SeleniumCinemagoerFetcher.download_csv(self.concrete_listdef)
         _fetch_movies_in_csv(movies_csv, movie_list_file, self, _IMDbApiDev.fetch_movies_from_api)
 
 @_reg._register_builtin
-class CsvApiDevListFetcher(_fetch.ListFetcher, list_type='imdb-csv-apidev-path', uid_family=_UID_FAMILY):
+class CsvApiDevFetcher(_fetch.ListFetcher, list_type='imdb-csv-apidev-path', uid_family=_UID_FAMILY):
     """CSV_PATH
 
     Takes a CSV that was manually exported from an IMDb list, and downloads additional information using this free API: https://imdbapi.dev/.
     """
     def _fetch_into_file(self, movie_list_file: _mlf.MovieListFile) -> None:
         _dbg.logger.info(f"IMDbApiDev: Fetching IMDb list by CSV: '{self.concrete_listdef.address}'")
-        movies_csv = CsvCinemagoerListFetcher.open_csv(self.concrete_listdef)
+        movies_csv = CsvCinemagoerFetcher.open_csv(self.concrete_listdef)
         _fetch_movies_in_csv(movies_csv, movie_list_file, self, _IMDbApiDev.fetch_movies_from_api)
 
 class _Cinemagoer:
@@ -406,9 +410,6 @@ class _IMDbApiDev:
                 keyfunc=lambda m: m.title) as bar:
             for i, movie_csv in enumerate(bar):
                 if i % BATCH_SIZE == 0:
-                    # Save the progress so far after every batch to mitigate the pain of potential crashes in the middle of the download.
-                    fetcher._checkpoint(mlf)
-
                     batch = movies_to_fetch[i:i + BATCH_SIZE]
 
                     # Ex: https://api.imdbapi.dev/titles:batchGet?titleIds=tt0054331&titleIds=tt0110200&titleIds=tt0405422&titleIds=tt0047437&titleIds=tt27847051
@@ -419,6 +420,9 @@ class _IMDbApiDev:
                 
                 movie_json = next(m for m in batch_json['titles'] if movie_csv.uid in m['id'])
                 cls._fetch_movie(movie_csv, mlf, movie_json)
+
+                # Checkpoint after each film, to mitigate the pain of potential crashes in the middle of the download.
+                fetcher._checkpoint(mlf)
 
         _dbg.logger.info("Done fetching movies")
 

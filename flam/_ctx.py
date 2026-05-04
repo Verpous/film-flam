@@ -82,8 +82,14 @@ class FlamContext:
 
     def __init__(self, flam_dir: None | str = DEFAULT_FLAM_DIR, import_extensions: bool = False) -> None:
         """
-        :param flam_dir: the directory where all movie lists and configuration should be stored. If this is None, flam will work in "volatile mode" - everything you fetch or configure will be lost when the context dies.
-        :param import_extensions: import all configured extensions, and subscribe to globally registered extensions. Only enable this if you trust the extensions in the configuration.
+        :param flam_dir: the directory where all movie lists and configuration should be stored. 
+        
+            If this is ``None``, flam will work in "volatile mode" - everything you fetch or configure will be lost when the context dies.
+        :param import_extensions: import all configured extensions, and subscribe to globally registered extensions.
+        
+            .. warning::
+            
+                Only enable this if you trust the extensions in the configuration.
         """
         _dbg.logger.info(f"Making a context, {flam_dir=}, {import_extensions=}")
 
@@ -184,7 +190,7 @@ class FlamContext:
     @property
     def cfg_readonly(self) -> _cfg.Configuration:
         """
-        All configuration settings. This object can technically be modified to but that would lead to disaster. If you want to modify the configuration, use :py:meth:`configure`.
+        All configuration settings. This object can technically be modified, but that would lead to disaster. If you want to modify the configuration, use :py:meth:`configure`.
         """
         return self._cfg
 
@@ -236,6 +242,40 @@ class FlamContext:
         # Log what the flam dir looked like at the beginning.
         _dbg.logger.info(f"Made flam dir. Structure:\n{'\n'.join(utils.tree(self._flam_dir, stats=lambda f: f" (size={os.path.getsize(f)}B, mtime={os.path.getmtime(f)})"))}")
 
+    def parse_listdef(self, listdef: str) -> _ldef.CanonListdef:
+        """
+        Parse a string representation of a :ref:`listdef <Listdefs>` and canonicalize it.
+
+        :param listdef: the listdef as a string. It can have a few forms:
+        
+            * :py:attr:`~._ldef.SpecialListType.ALL`
+            * :py:attr:`~._ldef.SpecialListType.DEFAULTS`
+            * '<name>' - where <name> is the name of a simple or composite list
+            * '<list_type>=<address>' - where <list_type> is :py:attr:`~._ldef.SpecialListType.SIMPLE`, :py:attr:`~._ldef.SpecialListType.COMPOSITE`, or the name of a fetcher.
+        """
+        
+        # This code really belongs in _ldef, but as an interface it's nicer for users if it's through the context.
+        return _ldef.CanonListdef._parse(listdef, self)
+
+    def register[T: (type[_fetch.ListFetcher], type[_filter.Predicate], _attr.Attribute)](self, item: T) -> T:
+        """
+        Register a context-level extension. Context extensions are only available from the specific context to which they were registered.
+        
+        :param item: the item to register.
+        """
+
+        # Yes, this is a copy paste from _reg.register. I don't think it's worth the effort to avoid it.
+        if isinstance(item, type) and issubclass(item, _fetch.ListFetcher):
+            self._fetchers._register(item)
+        elif isinstance(item, type) and issubclass(item, _filter.Predicate):
+            self._predicates._register(item)
+        elif isinstance(item, _attr.Attribute):
+            self._attributes._register(item)
+        else:
+            raise _exc.InputError(f"Invalid object for registration: {item}.")
+
+        return item
+
     # Movie lists.
     def get_movie_list(self, listdefs: str | typing.Iterable[str], filter: None | _filter.Filter = None) -> _ml.MovieList:
         """
@@ -254,7 +294,7 @@ class FlamContext:
 
         # Replace None with empty filter to make the rest of the code nicer.
         if filter is None:
-            filter = self.compile_filter([], _ml.FindableType.MOVIES)
+            filter = self.compile_movies_filter([])
 
         # There is no way to express an anonymous list with a single listdef and no filter.
         # They are what happens when you put together multiple lists and/or a filter to spin a new list "on-the-fly".
@@ -284,7 +324,7 @@ class FlamContext:
 
                 # First generate it.
                 composite_list = self._cfg.composite_lists.get_by_uid(abstract_listdef.address)
-                filter = self.compile_filter(composite_list.filter_tokens, _ml.FindableType.MOVIES)
+                filter = self.compile_movies_filter(composite_list.filter_tokens)
                 dependencies = [_ldef.CanonListdef(_ldef.SpecialListType.SIMPLE, sl_uid) for sl_uid in composite_list.simple_list_uids]
                 mlf = self._generate_composite_mlf(dependencies, filter, abstract_listdef.address)
 
@@ -550,8 +590,6 @@ class FlamContext:
         """
         Returns the configuration settings inside a context where they may be modified. When the context exits, all changes are saved.
 
-        Example:
-
         .. code-block:: python
 
             with ctx.configure() as cfg:
@@ -707,14 +745,16 @@ class FlamContext:
     # Fetching.
     def fetch(self, listdefs: typing.Iterable[str], refetch_pattern: None | str = None, quiet: bool = True) -> None:
         """
-        Fetch movie lists, i.e. download all their data from some external source and store it locally. Depending on the fetcher and the size of the list, this may run for a long time - even hours.
+        Fetch movie lists, i.e. download all their data from some external source and store it locally.
+        Depending on the fetcher and the size of the list, this may run for a long time - even hours.
 
         :param listdefs: which lists to fetch. For composite lists, will actually fetch all simple lists which composite it. A few special values are also supported:
 
             * Supports 'defaults' to fetch all lists configured with is_default_fetch=True
             * Supports ``'*'`` to fetch all configured lists
 
-        :param refetch_pattern: forces titles that match this regular expression (case-insensitive) to be refetched even if they are already locally stored. The expression only needs to match any part of the title, not the whole title. This feature is intended for redownloading shows after a new season has come out.
+        :param refetch_pattern: forces titles that match this regular expression (case-insensitive) to be refetched even if they are already locally stored.
+            The expression only needs to match any part of the title, not the whole title. Intended for redownloading shows after a new season has come out.
         :param quiet: indicates if progress should be printed to stdout.
         """
         _dbg.logger.info(f"Requested to fetch {listdefs=}, {refetch_pattern=}, {quiet=}")
@@ -944,6 +984,24 @@ class FlamContext:
         _dbg.logger.info(f"Compiled {tokens=}, {find=} into: {filter}")
         return filter
 
+    def compile_movies_filter(self, tokens: list[str]) -> _filter.Filter:
+        """
+        Wrapper for :py:meth:`compile_filter` when the filter is for :py:attr:`~._ml.FindableType.MOVIES`.
+        """
+        return self.compile_filter(tokens, _ml.FindableType.MOVIES)
+        
+    def compile_people_filter(self, tokens: list[str]) -> _filter.Filter:
+        """
+        Wrapper for :py:meth:`compile_filter` when the filter is for :py:attr:`~._ml.FindableType.PEOPLE`.
+        """
+        return self.compile_filter(tokens, _ml.FindableType.PEOPLE)
+        
+    def compile_roles_filter(self, tokens: list[str]) -> _filter.Filter:
+        """
+        Wrapper for :py:meth:`compile_filter` when the filter is for :py:attr:`~._ml.FindableType.ROLES`.
+        """
+        return self.compile_filter(tokens, _ml.FindableType.ROLES)
+
 # Utility for "inverting" registries: instead of first the registration level then the item type, it's first the item type then the levels.
 # Has to be implemented this way because some of the registries are contextual, some global.
 class RegistriesOf[T: (type[_fetch.ListFetcher], type[_filter.Predicate], _attr.Attribute)]:
@@ -1007,12 +1065,7 @@ class RegistriesOf[T: (type[_fetch.ListFetcher], type[_filter.Predicate], _attr.
         for reg in self._registries_to_try:
             yield from self._type_selector(reg)
 
-    def register(self, item: T) -> None:
-        """
-        Register a context-level extension. Context extensions are only available from the specific context to which they were registered.
-        
-        :param item: the item to register.
-        """
+    def _register(self, item: T) -> None:
         # Last registry is the context extensions.
         self._type_selector(self._registries_to_try[-1]).register(item)
 
@@ -1024,7 +1077,9 @@ class RegistriesOf[T: (type[_fetch.ListFetcher], type[_filter.Predicate], _attr.
         :param name: the name of the item. If the name is not a qualified name, the type will be inferred.
         :param type_hint: a hint about which type to search the item in. Multiple items can have the same name but with a different type, so this helps resolve that ambiguity.
 
-            Note that this does NOT guarantee that the returned item will have the same type! It only guarantees to prefer that type if it exists.
+            .. warning::
+
+                This does NOT guarantee that the returned item will have the same type! It only guarantees to prefer that type if it exists.
         """
         for reg in self._registries_to_try:
             reg_of_type = self._type_selector(reg)

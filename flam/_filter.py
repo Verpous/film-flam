@@ -31,7 +31,7 @@ from . import _reg
 # FILTER    := PIPELINE | <epsilon>
 # PIPELINE  := SINGLE JOINABLE*
 # SINGLE    := NEGATIVE | POSITIVE
-# POSITIVE  := PREDICATE | ( PIPELINE )
+# POSITIVE  := PREDICATE | [ PIPELINE ]
 # NEGATIVE  := NOT POSITIVE
 # JOINABLE  := CONJOINED | DISJOINED | SINGLE
 # CONJOINED := AND SINGLE
@@ -41,8 +41,8 @@ from . import _reg
 # OR        := -o | -or  | `|`
 # AND       := -a | -and | &
 # NOT       := -n | -not | !
-# (         := (  | [    | -lparen
-# )         := )  | ]    | -rparen
+# [         := [  | (    | -lparen
+# ]         := ]  | )    | -rparen
 
 # This one's for you, mayer.
 _EinGafrurError = _exc.FilterSyntaxError
@@ -128,7 +128,7 @@ class FilterMember(abc.ABC):
                 
                 '-any-role **[]** -name tarantino'
 
-        Eaxmple of eating a list of CTGMs:
+        Example of eating a list of CTGMs:
 
             .. code-block:: python
 
@@ -288,7 +288,7 @@ class FilterMember(abc.ABC):
 
     # Singles are wrapped in a Filter so that we can treat it as a complete expression of its own.
     @classmethod
-    def eat_single(cls, params: EatParams, at: int) -> tuple[Filter, int]:
+    def eat_subfilter(cls, params: EatParams, at: int) -> tuple[Filter, int]:
         """
         Helper method to eat a list of tokens representing a subfilter that is either made up of a single member or enclosed in parentheses.
         Returns a tuple of the subfilter and the index of the first token after the filter.
@@ -298,7 +298,7 @@ class FilterMember(abc.ABC):
             .. code-block:: python
 
                 sub_params = dataclasses.replace(params, find=FindableType.ROLES)
-                sub_filter, until = FilterMember.eat_single(sub_params, at)
+                sub_filter, until = FilterMember.eat_subfilter(sub_params, at)
 
         :param at: index at which the subfilter tokens are expected to begin.
         """
@@ -601,7 +601,7 @@ class Predicate(FilterMember):
     """
     Base class for all predicates - filter members which check something about a findable object.
     
-    You can extend flam by inheriting from this class and registering your own custom predicates (read more about that in the docs).
+    You can extend flam by inheriting from this class and registering :ref:`your own custom predicates <Implementing a custom predicate>`.
     """
     
     PREFIX = '-'

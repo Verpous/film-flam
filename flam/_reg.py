@@ -122,29 +122,34 @@ class _Registry:
         self._predicates: _RegistryOf[type[_filter.Predicate]] = _RegistryOfPredicates(self, 'predicate')
         self._attributes: _RegistryOf[_attr.Attribute] = _RegistryOfAttributes(self, 'attribute')
 
-    def register(self, obj: typing.Any) -> None:
-        if isinstance(obj, type) and issubclass(obj, _fetch.ListFetcher):
-            self._fetchers.register(obj)
-        elif isinstance(obj, type) and issubclass(obj, _filter.Predicate):
-            self._predicates.register(obj)
-        elif isinstance(obj, _attr.Attribute):
-            self._attributes.register(obj)
+    def register(self, item: type[_fetch.ListFetcher] | type[_filter.Predicate] | _attr.Attribute) -> None:
+        if isinstance(item, type) and issubclass(item, _fetch.ListFetcher):
+            self._fetchers.register(item)
+        elif isinstance(item, type) and issubclass(item, _filter.Predicate):
+            self._predicates.register(item)
+        elif isinstance(item, _attr.Attribute):
+            self._attributes.register(item)
         else:
-            raise _exc.InputError(f"Invalid object for registration: {obj}.")
+            # Usually we trust the type checker and don't verify types at runtime, but we'll make an exception here (pun not intended).
+            raise _exc.InputError(f"Invalid object for registration: {item}.")
 
 _builtins = _Registry(_BUILTIN_NAME)
 _global_extensions = _Registry(_GLOBAL_NAME)
 
-def _register_builtin[T](obj: T) -> T:
-    _builtins.register(obj)
-    return obj
+def _register_builtin[T: (type[_fetch.ListFetcher], type[_filter.Predicate], _attr.Attribute)](item: T) -> T:
+    _builtins.register(item)
+    return item
 
-def register[T](obj: T) -> T:
+def register[T: (type[_fetch.ListFetcher], type[_filter.Predicate], _attr.Attribute)](item: T) -> T:
     """
     Register an predicate, attribute, or fetcher as a global extension. Global extensions are available to use from any context with ``import_extensions=True``.
+
+    This function is meant to be used as a decorator (i.e. with ``@register``).
+
+    :param item: the item to register.
     """
-    _global_extensions.register(obj)
-    return obj
+    _global_extensions.register(item)
+    return item
 
 def compose_qualified_attr_or_pred_name(findable_type: _ml.FindableType, name_without_type: str) -> str:
     """

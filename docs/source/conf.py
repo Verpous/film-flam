@@ -29,10 +29,14 @@ extensions = [
     'sphinxcontrib.programoutput',
 
     # Creates a .nojekyll file as part of html build so that GitHub pages will work as a static html host.
-    "sphinx.ext.githubpages",
+    'sphinx.ext.githubpages',
+
+    # Reference other sections by their header instead of having to manually define "goto" labels.
+    'sphinx.ext.autosectionlabel',
 ]
 
 # pip install sphinx-rtd-theme
+# This is the readthedocs theme. We're actually hosted on GitHub Pages, but I like this theme.
 html_theme = 'sphinx_rtd_theme'
 html_static_path = ['_static']
 
@@ -149,6 +153,7 @@ class BuiltinAttributesDirective(docutils.parsers.rst.Directive):
     def run(self):
         rst = ''
         findable_type = flam.FindableType(self.arguments[0])
+        attrs = []
 
         for attr_name in flam._reg._builtins._attributes:
             attr = flam._reg._builtins._attributes[attr_name]
@@ -164,6 +169,13 @@ class BuiltinAttributesDirective(docutils.parsers.rst.Directive):
             if isinstance(attr, attrutils.ArrayLengthAttribute | attrutils.StringLengthAttribute | attrutils.SumAttribute | attrutils.AverageAttribute):
                 continue
 
+            attrs.append(attr)
+
+        # Iterate in two passes with sorting inbetween.
+        # NOTE: this unfortunately splits the <crew type> attribute of movies so they aren't all together, but I think it's still better than no sorting.
+        attrs.sort(key=lambda a: a.name_without_type)
+
+        for attr in attrs:
             if attr.__doc__ is None:
                 logger.warning(f"Missing docstring for attribute: {attr_name}")
 

@@ -56,7 +56,7 @@ class FalsePredicatePredicate(_filter.Predicate, name_without_type='false'):
 @_reg._register_builtin
 class EveryPredicate(_filter.Predicate, name_without_type='every'):
     """ATTRIBUTE CMPTO
-    For array attributes, check if every array element compares true."""
+    For list attributes, check if every list element compares true."""
 
     def __init__(self, attribute: _attr.Attribute, cmpto: _attr.CmpTo) -> None:
         # This and all other predicates here should name their fields referencing attributes by this name '_attribute', because parse_columns expects it.
@@ -185,7 +185,7 @@ class HasIndexPredicate(_filter.Predicate, name_without_type='has-index'):
 @_reg._register_builtin
 class SupersetPredicate(_filter.Predicate, name_without_type='superset'):
     """ATTRIBUTE CMPTO...
-    True if every array element in the attribute matches at least one of CMPTOs."""
+    True if every list element in the attribute matches at least one of CMPTOs."""
 
     # There is no nice way to remove the code repetition that all XSetPredicate classes have the same functions except excrete.
     # * Code sharing via subclassing doesn't work because you can't pass the name_without_type yet at class init time.
@@ -225,7 +225,7 @@ class SupersetPredicate(_filter.Predicate, name_without_type='superset'):
 @_reg._register_builtin
 class SubsetPredicate(_filter.Predicate, name_without_type='subset'):
     """ATTRIBUTE CMPTO...
-    True if every CMPTO matches at least one array element in the attribute."""
+    True if every CMPTO matches at least one list element in the attribute."""
 
     def __init__(self, attribute: _attr.Attribute, cmptos: list[_attr.CmpTo]) -> None:
         self._attribute = attribute
@@ -262,7 +262,7 @@ class SubsetPredicate(_filter.Predicate, name_without_type='subset'):
 @_reg._register_builtin
 class SamesetPredicate(_filter.Predicate, name_without_type='sameset'):
     """ATTRIBUTE CMPTO...
-    True if every CMPTO matches at least one array element in the attribute and every array element in the attribute matches at least one CMPTO."""
+    True if every CMPTO matches at least one list element in the attribute and every list element in the attribute matches at least one CMPTO."""
 
     def __init__(self, attribute: _attr.Attribute, cmptos: list[_attr.CmpTo]) -> None:
         self._attribute = attribute
@@ -329,8 +329,8 @@ class InListPredicate(_filter.Predicate, name_without_type='in-list'):
 # There's no need for -any-people because the relationship between associated people and roles is 1 to 1.
 @_reg._register_builtin
 class AnyRolePredicate(_filter.Predicate, name_without_type='any-role', findable_type=_ml.FindableType.MOVIES):
-    """CT_GM... ROLES_SINGLE
-    Scan the movie's crew according to CT_GMs for a group which passes the filter ROLES_SINGLE."""
+    """CTGM... ROLES_SUBFILTER
+    Scan the movie's crew according to CTGMs for a group which passes the filter ROLES_SUBFILTER."""
 
     # Would be really nice to not duplicate all the similar code between any-X and every-X predicates but it's not so simple. See comment on SupersetPredicate.
     def __init__(self, ct_gms: list[tuple[_ml.CrewType, _ml.GroupMode]], filter: _filter.Filter) -> None:
@@ -346,7 +346,7 @@ class AnyRolePredicate(_filter.Predicate, name_without_type='any-role', findable
             ct_gms = [(crew_type, _ml.GroupMode.DEFAULT) for crew_type in _ml.CrewType.iterate_except_any()]
 
         sub_params = dataclasses.replace(params, find=_ml.FindableType.ROLES)
-        filter, until = cls.eat_single(sub_params, filter_idx)
+        filter, until = cls.eat_subfilter(sub_params, filter_idx)
         return cls(ct_gms, filter), until
 
     def _excrete_from_movie(self, movie: _ml.Movie, mlf_movie: _mlf.MLFMovie) -> bool:
@@ -370,8 +370,8 @@ class AnyRolePredicate(_filter.Predicate, name_without_type='any-role', findable
 
 @_reg._register_builtin
 class EveryRolePredicate(_filter.Predicate, name_without_type='every-role', findable_type=_ml.FindableType.MOVIES):
-    """CT_GM... ROLES_SINGLE
-    Scan the movie's crew according to CT_GMs to see if every group passes the filter ROLES_SINGLE."""
+    """CTGM... ROLES_SUBFILTER
+    Scan the movie's crew according to CTGMs to see if every group passes the filter ROLES_SUBFILTER."""
 
     def __init__(self, ct_gms: list[tuple[_ml.CrewType, _ml.GroupMode]], filter: _filter.Filter) -> None:
         self._ct_gms = ct_gms
@@ -386,7 +386,7 @@ class EveryRolePredicate(_filter.Predicate, name_without_type='every-role', find
             ct_gms = [(crew_type, _ml.GroupMode.DEFAULT) for crew_type in _ml.CrewType.iterate_except_any()]
 
         sub_params = dataclasses.replace(params, find=_ml.FindableType.ROLES)
-        filter, until = cls.eat_single(sub_params, filter_idx)
+        filter, until = cls.eat_subfilter(sub_params, filter_idx)
         return cls(ct_gms, filter), until
 
     def _excrete_from_movie(self, movie: _ml.Movie, mlf_movie: _mlf.MLFMovie) -> bool:
@@ -415,8 +415,8 @@ class EveryRolePredicate(_filter.Predicate, name_without_type='every-role', find
 # There's no need for -any-people because the relationship between associated people and roles is 1 to 1.
 @_reg._register_builtin
 class AnyMoviePredicate(_filter.Predicate, name_without_type='any-movie', findable_type=_ml.FindableType.PEOPLE):
-    """MOVIES_SINGLE
-    Scan the people's associated movies for one which passes the filter MOVIES_SINGLE."""
+    """MOVIES_SUBFILTER
+    Scan the people's associated movies for one which passes the filter MOVIES_SUBFILTER."""
 
     def __init__(self, filter: _filter.Filter) -> None:
         self._filter = filter
@@ -424,7 +424,7 @@ class AnyMoviePredicate(_filter.Predicate, name_without_type='any-movie', findab
     @classmethod
     def eat(cls, params: _filter.EatParams, at: int) -> tuple[_filter.Predicate, int]:
         sub_params = dataclasses.replace(params, find=_ml.FindableType.MOVIES)
-        filter, until = cls.eat_single(sub_params, at)
+        filter, until = cls.eat_subfilter(sub_params, at)
         return cls(filter), until
 
     def _excrete_from_people(self, people: _ml.People, mlf_people: list[_mlf.MLFPerson]) -> bool:
@@ -444,8 +444,8 @@ class AnyMoviePredicate(_filter.Predicate, name_without_type='any-movie', findab
 
 @_reg._register_builtin
 class EveryMoviePredicate(_filter.Predicate, name_without_type='every-movie', findable_type=_ml.FindableType.PEOPLE):
-    """MOVIES_SINGLE
-    Scan the people's associated movies to see if they all pass the filter MOVIES_SINGLE."""
+    """MOVIES_SUBFILTER
+    Scan the people's associated movies to see if they all pass the filter MOVIES_SUBFILTER."""
 
     def __init__(self, filter: _filter.Filter) -> None:
         self._filter = filter
@@ -453,8 +453,7 @@ class EveryMoviePredicate(_filter.Predicate, name_without_type='every-movie', fi
     @classmethod
     def eat(cls, params: _filter.EatParams, at: int) -> tuple[_filter.Predicate, int]:
         sub_params = dataclasses.replace(params, find=_ml.FindableType.MOVIES)
-        filter, until = cls.eat_single(sub_params, at)
-        _dbg.logger.info(f'Ate: {list(filter.regurgitate())}')
+        filter, until = cls.eat_subfilter(sub_params, at)
         return cls(filter), until
 
     def _excrete_from_people(self, people: _ml.People, mlf_people: list[_mlf.MLFPerson]) -> bool:
@@ -474,8 +473,8 @@ class EveryMoviePredicate(_filter.Predicate, name_without_type='every-movie', fi
 
 @_reg._register_builtin
 class AsPredicate(_filter.Predicate, name_without_type='as', findable_type=_ml.FindableType.PEOPLE):
-    """CREW_TYPE PEOPLE_SINGLE
-    Check if the people pass the filter PEOPLE_SINGLE when they are another crew type."""
+    """CREW_TYPE PEOPLE_SUBFILTER
+    Check if the people pass the filter PEOPLE_SUBFILTER when they are another crew type."""
 
     def __init__(self, crew_type: _ml.CrewType, filter: _filter.Filter) -> None:
         self._crew_type = crew_type
@@ -484,7 +483,7 @@ class AsPredicate(_filter.Predicate, name_without_type='as', findable_type=_ml.F
     @classmethod
     def eat(cls, params: _filter.EatParams, at: int) -> tuple[_filter.Predicate, int]:
         crew_type = cls.eat_type(params, at, 'a crew type', _ml.CrewType)
-        filter, until = cls.eat_single(params, at + 1)
+        filter, until = cls.eat_subfilter(params, at + 1)
         return cls(crew_type, filter), until
 
     def _excrete_from_people(self, people: _ml.People, mlf_people: list[_mlf.MLFPerson]) -> bool:
@@ -502,15 +501,15 @@ class AsPredicate(_filter.Predicate, name_without_type='as', findable_type=_ml.F
 
 @_reg._register_builtin
 class AnyPersonPredicate(_filter.Predicate, name_without_type='any-person', findable_type=_ml.FindableType.PEOPLE):
-    """PEOPLE_SINGLE
-    Separate the people if they are grouped and check if any of the split people pass the filter PEOPLE_SINGLE."""
+    """PEOPLE_SUBFILTER
+    Separate the people if they are grouped and check if any of the split people pass the filter PEOPLE_SUBFILTER."""
 
     def __init__(self, filter: _filter.Filter) -> None:
         self._filter = filter
     
     @classmethod
     def eat(cls, params: _filter.EatParams, at: int) -> tuple[_filter.Predicate, int]:
-        filter, until = cls.eat_single(params, at)
+        filter, until = cls.eat_subfilter(params, at)
         return cls(filter), until
 
     def _excrete_from_people(self, people: _ml.People, mlf_people: list[_mlf.MLFPerson]) -> bool:
@@ -543,15 +542,15 @@ class AnyPersonPredicate(_filter.Predicate, name_without_type='any-person', find
 
 @_reg._register_builtin
 class EveryPersonPredicate(_filter.Predicate, name_without_type='every-person', findable_type=_ml.FindableType.PEOPLE):
-    """PEOPLE_SINGLE
-    Separate the people if they are grouped and check if every split person passes the filter PEOPLE_SINGLE."""
+    """PEOPLE_SUBFILTER
+    Separate the people if they are grouped and check if every split person passes the filter PEOPLE_SUBFILTER."""
 
     def __init__(self, filter: _filter.Filter) -> None:
         self._filter = filter
     
     @classmethod
     def eat(cls, params: _filter.EatParams, at: int) -> tuple[_filter.Predicate, int]:
-        filter, until = cls.eat_single(params, at)
+        filter, until = cls.eat_subfilter(params, at)
         return cls(filter), until
 
     def _excrete_from_people(self, people: _ml.People, mlf_people: list[_mlf.MLFPerson]) -> bool:
