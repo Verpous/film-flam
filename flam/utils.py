@@ -251,7 +251,7 @@ _tree_branch = '│   '
 _tree_tee =    '├── '
 _tree_last =   '└── '
 
-def tree(dir_path: str, prefix: str = '', stats: None | typing.Callable[[str], str] = None) -> typing.Iterator[str]:
+def tree(dir_path: str, prefix: str = '', stats: None | typing.Callable[[str], str] = None) -> typing.Iterable[str]:
     """
     Iterate over lines which together represent a directory tree in a pretty, human-readable format.
 

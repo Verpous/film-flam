@@ -260,6 +260,8 @@ class FlamContext:
     def register[T: (type[_fetch.ListFetcher], type[_filter.Predicate], _attr.Attribute)](self, item: T) -> T:
         """
         Register a context-level extension. Context extensions are only available from the specific context to which they were registered.
+
+        You may register an item with the same name as that of a global extension or a builtin, and it will shadow them.
         
         :param item: the item to register.
         """
@@ -1043,25 +1045,44 @@ class RegistriesOf[T: (type[_fetch.ListFetcher], type[_filter.Predicate], _attr.
         return any(qualified_name in self._type_selector(reg) for reg in self._registries_to_try)
 
     # Support iteration only over keys and not values, because some values may be lazily allocated once you __getitem__.
-    def __iter__(self) -> typing.Iterator[str]:
+    def __iter__(self) -> typing.Iterator[T]:
         """
-        Iterate over the names of all items in the registry. Some things to be careful of:
-
-            * Extensions may be registered with the same name as a builtin and shadow them. This will cause the same name to be returned multiple times.
-            * Because items can have aliases, this may return multiple names for the same item. If you want to iterate over every item exactly once, here is how to skip aliases:
-
-                .. code-block:: python
-
-                    for attr_name in ctx.attributes:
-                        attr = ctx.attributes[attr_name]
-
-                        # Skip because it's an alias.
-                        if attr_name != attr.qualified_name:
-                            continue
-
-                        do_something(attr)
+        Iterate over all unique items in the registry.
+        
+        To iterate over the raw registry, see :py:meth:`raw_iterate`.
         """
 
+        for reg_idx, reg in enumerate(self._registries_to_try):
+            reg_of = self._type_selector(reg)
+
+            for item_name in reg_of:
+                item = reg_of[item_name]
+
+                if item_name != item.qualified_name:
+                    continue
+
+                is_shadowed = False
+
+                for higher_reg in self._registries_to_try[:reg_idx]:
+                    if item_name in self._type_selector(higher_reg):
+                        is_shadowed = True
+                        break
+
+                if is_shadowed:
+                    continue
+
+                yield item
+
+    def raw_iterate(self) -> typing.Iterable[str]:
+        """
+        Iterate over the names of all items in the registry. Beware:
+
+            * Items support aliases so the same item may be returned multiple times, once for each name it is known by
+            * Items may be shadowed if a different item with the same name is registered in a higher-level registry, so this may return the same name twice
+
+        To iterate over items without worrying about the above, use :py:meth:`__iter__`.
+        """
+        
         for reg in self._registries_to_try:
             yield from self._type_selector(reg)
 
@@ -1070,16 +1091,18 @@ class RegistriesOf[T: (type[_fetch.ListFetcher], type[_filter.Predicate], _attr.
         self._type_selector(self._registries_to_try[-1]).register(item)
 
     # NOTE: for some reason the type hint in the documentation also shows the module name, only for this function and nothing else. Sigh...
+    # NOTE: this function is a little unintuitive but I think it's ultimately helpful to avoid bugs. If we did type inference without a hint it could be a trap.
     def get(self, name: str, type_hint: None | _ml.FindableType = None) -> T:
         """
-        Get a registered item, with support for non-qualified names.
+        Get a registered item, with optional support for non-qualified names.
         
-        :param name: the name of the item. If the name is not a qualified name, the type will be inferred.
-        :param type_hint: a hint about which type to search the item in. Multiple items can have the same name but with a different type, so this helps resolve that ambiguity.
+        :param name: the name of the item. It must be fully qualified unless ``type_hint`` is given.
+        :param type_hint: attempt to infer the type from a non-qualified name, with a preference for this hinted type.
+            Multiple items can have the same name but with a different type, so this helps resolve that ambiguity.
 
             .. warning::
 
-                This does NOT guarantee that the returned item will have the same type! It only guarantees to prefer that type if it exists.
+                This does NOT guarantee that the returned item will have the same type! It only guarantees to prefer that type if there's ambiguity.
         """
         for reg in self._registries_to_try:
             reg_of_type = self._type_selector(reg)
@@ -1128,6 +1151,6 @@ class RegistriesOf[T: (type[_fetch.ListFetcher], type[_filter.Predicate], _attr.
                     return best_match
         
         # Use a smaller-than-default cutoff so that it finds matches even if you tried a name without the type (e.g. 'title' should closely match 'movies-title').
-        close_matches = difflib.get_close_matches(name, self, cutoff=0.45)
+        close_matches = difflib.get_close_matches(name, self.raw_iterate(), cutoff=0.45)
         suggestions = f' (did you mean: {", ".join(close_matches)}?)' if len(close_matches) > 0 else '.'
         raise _exc.CloseInputError(f"No registered item with the name: '{name}'{suggestions}", close_matches)

@@ -863,7 +863,7 @@ Read more about filters: {DOCS_URL}/filters.html.''')
             # We'll glob for matches.
             matches = []
 
-            for alias in ctx.attributes:
+            for alias in ctx.attributes.raw_iterate():
                 attr = ctx.attributes[alias]
 
                 # Only glob attributes that are applicable to this findable type.

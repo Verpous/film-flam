@@ -15,7 +15,7 @@ To use an extension, you must register it. There are two ways to register an ext
 #. **Global extension**
 
     Use :py:func:`~._reg.register`, and the extension will be automatically available from any :py:class:`~._ctx.FlamContext`.
-
+    
     .. code-block:: python
         
         @register
@@ -24,6 +24,7 @@ To use an extension, you must register it. There are two ways to register an ext
                 findable_type=FindableType.MOVIES):
             # ...
 
+    It's allowed to name your extension the same as an existing builtin. The builtin will be shadowed.
 #. **Context extension**
 
     Use :py:meth:`FlamContext.register() <._ctx.FlamContext.register>`, and the extension will be available to use only from that specific context.
@@ -37,6 +38,8 @@ To use an extension, you must register it. There are two ways to register an ext
 
         ctx = FlamContext()
         ctx.register(MyCustomPredicate)
+
+    It's allowed to name your extension the same as an existing builtin or global extension. They will be shadowed.
 
 Once registered, using an extension is just like using any builtin:
 

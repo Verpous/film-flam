@@ -4,7 +4,7 @@ FilmFlam (or just "flam") is a commandline tool and API for extracting insights 
 
 From the commandline, flam enables you to quickly answer questions like "where have I seen this actor?", or "which director have I seen the most movies from?", and so much more.
 
-For more powerful uses, you can ``import flam`` and use the underlying API to access all the data about the movies and people in your movie lists.
+For more powerful uses, you can `import flam` and use the underlying API to access all the data about the movies and people in your movie lists.
 
 ![find_movies.gif](docs/source/_static/find_movies.gif)
 
@@ -37,7 +37,7 @@ Read all about how to use flam in [the docs](https://verpous.github.io/film-flam
 
 Flam is written to be cross-platform so it should work on both Windows and Linux. However since I am using Windows, I never tested it on Linux. Please let me know if you encounter issues on Linux.
 
-Flam is better if you have ``less`` installed. If you're on Windows, it's recommended to install it. One easy way is to just install `git <https://git-scm.com/>`__.
+Flam is better if you have `less` installed. If you're on Windows, it's recommended to install it. One easy way is to just install [git](https://git-scm.com/).
 
 ## Getting help
 

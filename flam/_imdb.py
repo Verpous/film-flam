@@ -573,7 +573,8 @@ class _IMDbApiDev:
         # Import requests only here because it's actually a very expensive import so we don't wanna pay that price for every import of flam when most of them don't need it.
         import requests
 
-        NUM_RETRIES = 10
+        # Be very forgiving, this API can do some wild shit.
+        NUM_RETRIES = 20
         SLEEP_BETWEEN_RETRIES = 2
 
         for i in range(NUM_RETRIES):
@@ -584,8 +585,11 @@ class _IMDbApiDev:
             # but nothing seems as fast as just firing requests at our maximum pace and then sleeping when the API complains.
             # For the record, guy on telegram says that the counter is per endpoint, and limited to 5 requests per second for most endpoints,
             # but 20 requests per 10 seconds for batch endpoints.
+            # 
             # Sometimes we actually get status code 500 (server error), and the response text explains it was actually a 429, so we need to catch that case too..
-            if response.status_code == requests.codes.too_many_requests or '429' in response.text: # pylint: disable=no-member
+            # TODO: I'm an idiot and checked `'429' in response.text` for that, but that's obviously bad because the valid text can contain that too.
+            # When I get this error again, need to check the string with a more specific pattern.
+            if response.status_code == requests.codes.too_many_requests: # pylint: disable=no-member
                 time.sleep(SLEEP_BETWEEN_RETRIES)
                 _dbg.logger.warning(f"Request failed because of too many requests. Will try again in {SLEEP_BETWEEN_RETRIES} seconds (retry {i}/{NUM_RETRIES})")
                 continue

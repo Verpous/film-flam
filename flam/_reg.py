@@ -144,6 +144,8 @@ def register[T: (type[_fetch.ListFetcher], type[_filter.Predicate], _attr.Attrib
     """
     Register an predicate, attribute, or fetcher as a global extension. Global extensions are available to use from any context with ``import_extensions=True``.
 
+    You may register an item with the same name as that of a builtin, and it will shadow it.
+
     This function is meant to be used as a decorator (i.e. with ``@register``).
 
     :param item: the item to register.
