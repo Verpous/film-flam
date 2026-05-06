@@ -686,15 +686,15 @@ For a full list of supported attributes: {DOCS_URL}/attributes.html.
             'Set whether columns should be colored. Defaults to %(default)s.')
         parser.add_argument('-d', '--dsv', metavar='DELIM', default=None, action='store', help=
             "Output in delimiter-separated values format (DSV). I.e. if DELIM is ',' then that is CSV format.")
-        parser.add_argument('-v', '--verbose', default=False, action='store_true', help=
+        parser.add_argument('-v', '--verbose', action='store_true', help=
             'Use verbose output, where long strings are not truncated and some attributes may be printed in longer format.')
-        parser.add_argument('-r', '--reverse', default=False, action='store_true', help=
+        parser.add_argument('-r', '--reverse', action='store_true', help=
             'Reverse the sort order. By default some sort keys are ascending and some descending based on what makes sense. This reverses those defaults.')
-        parser.add_argument('-S', '--spacious', default=False, action='store_true', help=
+        parser.add_argument('-S', '--spacious', action='store_true', help=
             'Add an empty line between entries.')
         parser.add_argument('-P', '--paginate', choices=Choice.always_auto_never(), default=Choice.AUTO, action='store', help=
             'Choose whether to paginate with `less`. Defaults to %(default)s, which depends on the size of the output.')
-        parser.add_argument('-t', '--no-titles', default=False, action='store_true', help=
+        parser.add_argument('-t', '--no-titles', action='store_true', help=
             "Don't print a row with the column titles.")
 
         parser.add_argument('FINDABLE', type=cls.parse_findable, action='store', help=
@@ -1082,12 +1082,12 @@ class SubcommandDocs:
 
 #         parser.add_argument('-o', '--omit-zeroes', choices=Choice.always_auto_never(), default=Choice.AUTO, action='store', help=
 #             'Choose whether to omit buckets with 0 movies. Defaults to %(default)s, which uses a mode that depends on DISTRIBUTION')
-#         parser.add_argument('-v', '--value-sort', default=False, action='store_true', help='Sort based on the table values, not the keys')
-#         parser.add_argument('-n', '--no-number', default=False, action='store_true', help="Don't append the numerical value to each bar.")
-#         parser.add_argument('-S', '--spacious', default=False, action='store_true', help='Space out the table')
-#         parser.add_argument('-t', '--no-title', default=False, action='store_true', help="Don't print a title.")
-#         parser.add_argument('-k', '--no-prefix-key', default=False, action='store_true', help="Don't write the key at the start of each bar.")
-#         parser.add_argument('-K', '--suffix-key', default=False, action='store_true', help='Append the key to the end of each bar')
+#         parser.add_argument('-v', '--value-sort', action='store_true', help='Sort based on the table values, not the keys')
+#         parser.add_argument('-n', '--no-number', action='store_true', help="Don't append the numerical value to each bar.")
+#         parser.add_argument('-S', '--spacious', action='store_true', help='Space out the table')
+#         parser.add_argument('-t', '--no-title', action='store_true', help="Don't print a title.")
+#         parser.add_argument('-k', '--no-prefix-key', action='store_true', help="Don't write the key at the start of each bar.")
+#         parser.add_argument('-K', '--suffix-key', action='store_true', help='Append the key to the end of each bar')
         
 #         # '-c', '--crew-types',  CREWS      Comma-delimited list of crew types to count in crew-size distribution. Defaults to '*', which means all crew types.
 #     #     parser.add_argument('-f', '--factor', metavar='FACTOR', type=int, action='store', default=0, help=

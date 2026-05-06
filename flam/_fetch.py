@@ -73,6 +73,9 @@ class ListFetcher(abc.ABC):
         """
         super().__init_subclass__(**kwargs)
 
+        if list_type in _ldef.SpecialListType:
+            raise _exc.InputError(f"List type '{list_type}' is reserved for internal use, please use a different name.")
+
         # I like the name list_type better, but for registration it needs to be named "qualified_name".
         cls.qualified_name = list_type
         cls.qualified_aliases = [] if qualified_aliases is None else qualified_aliases

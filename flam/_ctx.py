@@ -683,27 +683,17 @@ class FlamContext:
             raise
 
         # For deleted simple lists, their fetch data is not deleted, just renamed to the concrete name.
-        # This means the files will linger on forever. I considered cleaning them up, but I think there's no need.
+        # This means the files will linger on forever. This is good because fetching can take hours and we shouldn't delete that lightly.
         for sl in deleted_sls:
-            concrete_filename = self._get_mlf_path(sl.concrete_listdef)
-            abstract_filename = self._get_mlf_path(sl.abstract_listdef)
-
-            # os.rename has platform-dependent behavior w.r.t. erroring out if the destination file already exists, so we must check ourselves.
             # Note: it's possible for users to add a list, then also fetch it under the concrete filename and have both files exist.
-            if os.path.isfile(abstract_filename) and not os.path.exists(concrete_filename):
-                _dbg.logger.info(f"Disowning the file of a deleted list: {abstract_filename=}, {concrete_filename=}")
-                os.rename(abstract_filename, concrete_filename)
+            _dbg.logger.info(f"Disowning the file of a deleted list: {sl.abstract_listdef}")
+            self._change_mlf_listdef(sl.abstract_listdef, sl.concrete_listdef)
 
         # Check if added simple lists are already fetched under their concrete filename, and "claim" the file.
         # Note that we intentionally place this below the deleted_sls handling.
         for sl in added_sls:
-            concrete_filename = self._get_mlf_path(sl.concrete_listdef)
-            abstract_filename = self._get_mlf_path(sl.abstract_listdef)
-            
-            # For the record, I don't think it's actually possible to create a case where both files exist.
-            if os.path.isfile(concrete_filename) and not os.path.exists(abstract_filename):
-                _dbg.logger.info(f"Claiming an existing file for a new list: {abstract_filename=}, {concrete_filename=}")
-                os.rename(concrete_filename, abstract_filename)
+            # For the record, I don't think it's actually possible to create a case the new MLF's path already exists.
+            self._change_mlf_listdef(sl.concrete_listdef, sl.abstract_listdef)
 
     def _find_added_deleted_modified[T: (_cfg.SimpleList, _cfg.CompositeList)](self, lists: _cfg.ConfigurationLists[T], old_lists: _cfg.ConfigurationLists[T]
             ) -> tuple[list[T], list[T], list[T]]:
@@ -735,6 +725,42 @@ class FlamContext:
 
         return added_lists, deleted_lists, modified_lists
         
+    def _change_mlf_listdef(self, old_cldef: _ldef.CanonListdef, new_cldef: _ldef.CanonListdef) -> None:
+        old_path = self._get_mlf_path(old_cldef)
+        new_path = self._get_mlf_path(new_cldef)
+
+        # If there is no MLF then there's nothing to do.
+        if not os.path.isfile(old_path):
+            return
+
+        # If the new name is already taken, we have no choice but to delete. We can't raise errors to the user in this flow.
+        if os.path.exists(new_path):
+            _dbg.logger.info(f"Can't rename MLF from {old_cldef} -> {new_cldef}, deleting it instead")
+            os.remove(old_path)
+            return
+
+        # os.rename has platform-dependent behavior w.r.t. erroring out if the destination file already exists, but we're safe because we verified it doesn't exist.
+        _dbg.logger.info(f"Renaming MLF from {old_cldef} -> {new_cldef}")
+        os.rename(old_path, new_path)
+
+        # Now we must change all references to the listdef inside the file.
+        try:
+            mlf = _mlf.MovieListFile._load(new_path)
+        except _exc.FileValidationError as e:
+            # Deleting the file because it failed to load may seem a bit harsh.
+            # My rationale is that if a file gets fucked up people will probably try to delete and reconfigure the list, so I think this is the result they'd expect.
+            _dbg.logger.warning(f'Failed to load renamed MLF with error: {e} Will delete it.')
+            os.remove(old_path)
+            return
+
+        # The listdef is referenced all over.
+        mlf.abstract_listdef = new_cldef
+        
+        for mlf_movie in mlf.movies_by_uid.values():
+            mlf_movie.per_src_data[0].canon_listdef = new_cldef
+
+        self._write_mlf(mlf)
+
     def _write_cfg(self) -> None:
         _dbg.logger.info(f"Writing configuration: {self._cfg=}")
         self._cfg._write(self._cfg_path)
@@ -956,9 +982,18 @@ class FlamContext:
             # Since we reached this file by globbing we have no idea what it is and we don't trust it - if it fails to load, we simply ignore it.
             try:
                 mlf = _mlf.MovieListFile._load(mlf_path)
-                canon_listdefs.append(mlf.abstract_listdef)
             except _exc.FileValidationError as e:
                 _dbg.logger.warning(f"Failed to load movie list file {mlf_path} due to error: {e} Skipping it")
+                continue
+
+            # We're not really supposed to get special lists here except the simple lists skipped above.
+            # But it's theoretically possible, if _find_changes_and_write_cfg crashes after saving the config but before _change_mlf_listdef.
+            # This would be an opportunity to delete the file, but that is risky, so I'd rather just skip it.
+            if mlf.abstract_listdef.is_special:
+                _dbg.logger.warning(f"Found orphaned configured movie list file {mlf_path} (listdef {mlf.abstract_listdef}). Skipping it")
+                continue
+
+            canon_listdefs.append(mlf.abstract_listdef)
 
         # Add composite lists only after the rest.
         canon_listdefs.extend(cl.abstract_listdef for cl in self._cfg.composite_lists)

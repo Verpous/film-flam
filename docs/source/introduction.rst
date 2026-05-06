@@ -77,6 +77,15 @@ Fetching can be quick or it may take several hours, depending on the size of you
     # Find people from any movie in the list whose average rating across those movies is at least 8.
     flam find people watched -avg-rating +8
 
+    # Find the tallest actors in the list.
+    flam find --sort height cast-people watched
+
+    # Find movies both written and directed by women.
+    flam find movies watched -every-role [ writer director ] -gender female
+
+    # Find people who share your birthday :)
+    flam find people watched -birth-month-day 07-25
+
 What's next
 -----------
 

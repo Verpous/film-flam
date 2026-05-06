@@ -464,6 +464,13 @@ class DateHandler(TypeHandler):
             # Day of week requires specifying the week of year.
             case "%u" | "%w":
                 return datetime.datetime.strptime(date_str + " 0", self._datefmt + " %W").date()
+            case "%m-%d":
+                # Python has a hilarious bug where they can't parse Feb 29 unless the current year is a leap year.
+                # We'll patch it by defaulting to 2000, which was a leap year. Call it the Year 2000 Solution!
+                if date_str == '02-29':
+                    return datetime.date(2000, 2, 29)
+
+                return datetime.datetime.strptime(date_str, self._datefmt).date()
             case _:
                 return datetime.datetime.strptime(date_str, self._datefmt).date()
 
@@ -501,12 +508,13 @@ DATE_HANDLERS = [
     #           name                    datefmt     is_ascending
     DateHandler('-date',                '%Y-%m-%d', False),
     DateHandler('-year',                '%Y',       False),
-    DateHandler('-month',               '%Y-%m',    False),
+    DateHandler('-year-month',          '%Y-%m',    False),
+    DateHandler('-month-day',           '%m-%d',    True),
     DateHandler('-week-of-year',        '%U',       True),
     DateHandler('-week-of-year-monday', '%W',       True),
     DateHandler('-day-of-year',         '%j',       True),
     DateHandler('-day-of-month',        '%d',       True),
-    DateHandler('-month-of-year',       '%m',       True,
+    DateHandler('-month',               '%m',       True,
         strmap={
             '01': 'January',
             '02': 'February',
