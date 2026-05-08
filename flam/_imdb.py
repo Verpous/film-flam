@@ -17,7 +17,6 @@ from __future__ import annotations
 
 import os
 import csv
-import imdb # type: ignore
 import typing
 import dataclasses
 import datetime
@@ -99,17 +98,35 @@ class _CsvRow:
                 pass
 
         raise ValueError(f'Invalid date: {date}')
+    
+@_reg._register_builtin
+class SeleniumApiDevFetcher(_fetch.ListFetcher, list_type='imdb-browser-apidev-listid', uid_family=_UID_FAMILY):
+    """IMDB_LIST_ID
 
-# NOTE: not registered because cinemagoer is broken so this fetcher is temporarily (permanently?) unsupported.
-# @_reg._register_builtin
-class SeleniumCinemagoerFetcher(_fetch.ListFetcher, list_type='imdb-browser-cinemagoer-listid', uid_family=_UID_FAMILY):
+    Takes an IMDb list ID as an input, and downloads information in two steps:
+
+    #. Export the list to CSV from the IMDb website - this will automatically launch your browser and click some buttons!
+    #. Fill in a bunch of additional information using this free API: https://imdbapi.dev/
+    
+    It's easy to check what is your list's ID. Just open it in the browser, and the URL should look like this: https://www.imdb.com/list/ls083886771. The list ID in this example is "083886771".
+
+    There are a few environment variables you can export to control the browser use:
+
+    * **FLAM_DOWNLOADS** - Path to the downloads folder on your computer so flam will know where to look for the downloaded CSV
+        
+        .. warning::
+        
+            If your browser doesn't download things to ~/Downloads, you must set this variable for this fetcher to work!
+    * **FLAM_BROWSER** - Which browser to use: 'chrome', 'edge', or 'firefox'. By default flam tries to detect your default browser
+    * **FLAM_BROWSER_PROFILE** - Path to your browser profile. This is only needed if your list is set to private, and you must use a profile where you're already logged in to IMDb
+    """
     exports_server: None | multiprocessing.Process = None
     requests_queue: multiprocessing.Queue = multiprocessing.Queue()
 
     def _fetch_into_file(self, movie_list_file: _mlf.MovieListFile) -> None:
-        _dbg.logger.info(f"Cinemagoer: Going to download the CSV for IMDb list id: {self.concrete_listdef.address}")
+        _dbg.logger.info(f"IMDbApiDev: Going to download the CSV for IMDb list id: {self.concrete_listdef.address}")
         movies_csv = self.download_csv(self.concrete_listdef)
-        _fetch_movies_in_csv(movies_csv, movie_list_file, self, _Cinemagoer.fetch_movies_from_api)
+        _fetch_movies_in_csv(movies_csv, movie_list_file, self, _IMDbApiDev.fetch_movies_from_api)
 
     @classmethod
     def download_csv(cls, concrete_listdef: _ldef.CanonListdef) -> list[_CsvRow]:
@@ -179,32 +196,36 @@ class SeleniumCinemagoerFetcher(_fetch.ListFetcher, list_type='imdb-browser-cine
         # TODO: Consider a mechanism that blocks until the server informs that the browser is running and it's ready to take requests.
         cls.exports_server = multiprocessing.Process(target=_export_lists_handler, name='ExportsServer', args=(cls.requests_queue, browser_type, profile), daemon=True)
         cls.exports_server.start()
-    
+
 # Python devs made a dumbass decision to terminate multiprocesses in a way that doesn't run exit handlers,
 # and we must kill it cleanly to kill the browser.
 # NOTE: I tried instead to make the child process terminate itself when it detects that it's orphaned,
 # but multiprocess doesn't actually let you orphan children, because fuck you that's why.
+# NOTE: for some reason if we define this function higher up in the file, it doesn't work (7_-)
 @atexit.register
 def _exports_server_cleanup() -> None:
-    if SeleniumCinemagoerFetcher.exports_server is not None and SeleniumCinemagoerFetcher.exports_server.is_alive():
+    if SeleniumApiDevFetcher.exports_server is not None and SeleniumApiDevFetcher.exports_server.is_alive():
         _dbg.logger.info("Sending QUIT message to server")
-        SeleniumCinemagoerFetcher.requests_queue.put_nowait(_REQUEST_QUIT)
+        SeleniumApiDevFetcher.requests_queue.put_nowait(_REQUEST_QUIT)
 
         # Join is needed because the subprocess is a daemon, which means it dies when we die,
         # and we don't want it to die before it handles this request.
-        SeleniumCinemagoerFetcher.exports_server.join()
+        SeleniumApiDevFetcher.exports_server.join()
         _dbg.logger.info("Server is dead")
     else:
         _dbg.logger.info("No need to do server cleanup")
 
-# NOTE: not registered because cinemagoer is broken so this fetcher is temporarily (permanently?) unsupported.
-# @_reg._register_builtin
-class CsvCinemagoerFetcher(_fetch.ListFetcher, list_type='imdb-csv-cinemagoer-path', uid_family=_UID_FAMILY):
+@_reg._register_builtin
+class CsvApiDevFetcher(_fetch.ListFetcher, list_type='imdb-csv-apidev-path', uid_family=_UID_FAMILY):
+    """CSV_PATH
+
+    Takes a CSV that was manually exported from an IMDb list, and downloads additional information using this free API: https://imdbapi.dev/.
+    """
     def _fetch_into_file(self, movie_list_file: _mlf.MovieListFile) -> None:
-        _dbg.logger.info(f"Cinemagoer: Fetching IMDb list by CSV: '{self.concrete_listdef.address}'")
+        _dbg.logger.info(f"IMDbApiDev: Fetching IMDb list by CSV: '{self.concrete_listdef.address}'")
         movies_csv = self.open_csv(self.concrete_listdef)
-        _fetch_movies_in_csv(movies_csv, movie_list_file, self, _Cinemagoer.fetch_movies_from_api)
-    
+        _fetch_movies_in_csv(movies_csv, movie_list_file, self, _IMDbApiDev.fetch_movies_from_api)
+
     @classmethod
     def open_csv(cls, concrete_listdef: _ldef.CanonListdef) -> list[_CsvRow]:
         try:
@@ -215,187 +236,8 @@ class CsvCinemagoerFetcher(_fetch.ListFetcher, list_type='imdb-csv-cinemagoer-pa
         with movies_csv_file:
             return _read_csv(movies_csv_file)
 
-@_reg._register_builtin
-class SeleniumApiDevFetcher(_fetch.ListFetcher, list_type='imdb-browser-apidev-listid', uid_family=_UID_FAMILY):
-    """IMDB_LIST_ID
-
-    Takes an IMDb list ID as an input, and downloads information in two steps:
-
-    #. Export the list to CSV from the IMDb website - this will automatically launch your browser and click some buttons!
-    #. Fill in a bunch of additional information using this free API: https://imdbapi.dev/
-    
-    It's easy to check what is your list's ID. Just open it in the browser, and the URL should look like this: https://www.imdb.com/list/ls083886771. The list ID in this example is "083886771".
-
-    There are a few environment variables you can export to control the browser use:
-
-    * **FLAM_DOWNLOADS** - Path to the downloads folder on your computer so flam will know where to look for the downloaded CSV
-        
-        .. warning::
-        
-            If your browser doesn't download things to ~/Downloads, you must set this variable for this fetcher to work!
-    * **FLAM_BROWSER** - Which browser to use: 'chrome', 'edge', or 'firefox'. By default flam tries to detect your default browser
-    * **FLAM_BROWSER_PROFILE** - Path to your browser profile. This is only needed if your list is set to private, and you must use a profile where you're already logged in to IMDb
-    """
-    def _fetch_into_file(self, movie_list_file: _mlf.MovieListFile) -> None:
-        _dbg.logger.info(f"IMDbApiDev: Going to download the CSV for IMDb list id: {self.concrete_listdef.address}")
-        movies_csv = SeleniumCinemagoerFetcher.download_csv(self.concrete_listdef)
-        _fetch_movies_in_csv(movies_csv, movie_list_file, self, _IMDbApiDev.fetch_movies_from_api)
-
-@_reg._register_builtin
-class CsvApiDevFetcher(_fetch.ListFetcher, list_type='imdb-csv-apidev-path', uid_family=_UID_FAMILY):
-    """CSV_PATH
-
-    Takes a CSV that was manually exported from an IMDb list, and downloads additional information using this free API: https://imdbapi.dev/.
-    """
-    def _fetch_into_file(self, movie_list_file: _mlf.MovieListFile) -> None:
-        _dbg.logger.info(f"IMDbApiDev: Fetching IMDb list by CSV: '{self.concrete_listdef.address}'")
-        movies_csv = CsvCinemagoerFetcher.open_csv(self.concrete_listdef)
-        _fetch_movies_in_csv(movies_csv, movie_list_file, self, _IMDbApiDev.fetch_movies_from_api)
-
-class _Cinemagoer:
-    @classmethod
-    def fetch_movies_from_api(cls, movies_csv: list[_CsvRow], mlf: _mlf.MovieListFile, fetcher: _fetch.ListFetcher) -> None:
-        ia = imdb.Cinemagoer()
-
-        # Now we do a pass where we fetch fields using Cinemagoer.
-        # Note that we not only skip movies that were previously fetched, but also duplicates in case the same movie appears in the CSV twice.
-        with utils.ProgressBar([m for m in movies_csv if m.uid not in mlf.movies_by_uid],
-                desc='Downloading',
-                keyfunc=lambda m: m.title) as bar:
-            for movie_csv in bar:
-                cls._fetch_movie(movie_csv, mlf, ia)
-                
-                # Checkpoint after each film I guess.
-                fetcher._checkpoint(mlf)
-
-        _dbg.logger.info("Done fetching movies")
-
-        # We have this "bad names" problem with cinemagoer, so here we refetch any people with bad names.
-        with utils.ProgressBar([p for p in mlf.people_by_uid.values() if _is_person_name_bad(p.name)],
-                desc='Cleansing data',
-                keyfunc=lambda p: p.uid) as bar:
-            for mlf_person in bar:
-                cls._refetch_person(mlf_person, ia)
-
-                # After each fixed person too..
-                fetcher._checkpoint(mlf)
-
-        _dbg.logger.info("Done fetching people")
-
-    @classmethod
-    def _fetch_movie(cls, movie_csv: _CsvRow, mlf: _mlf.MovieListFile, ia: imdb.Cinemagoer) -> None:
-        NUM_RETRIES = 5
-        info_to_fetch = (*imdb.Movie.Movie.default_info, 'critic reviews', 'full credits')
-        _dbg.logger.info(f"Fetching movie: {movie_csv}")
-
-        for i in range(NUM_RETRIES):
-            try:
-                movie_imdb = ia.get_movie(movie_csv.uid, info=info_to_fetch)
-                break
-            except imdb.IMDbError as e:
-                _dbg.logger.warning(f"Error while fetching movie: {e}. This is retry {i + 1} / {NUM_RETRIES}")
-
-                if i == NUM_RETRIES - 1:
-                    raise
-
-        # Build crews dictionary and also people.
-        crew = {}
-        
-        for crew_type in _ml.CrewType.iterate_except_any():
-            # I generally tried to choose the CrewType values to match imdb's, but this one goddamn type has a space in it and I don't like that.
-            imdb_crew_type = str(crew_type) if crew_type != _ml.CrewType.STUNTCAST else 'stunt performer'
-
-            # Building this list as a dictionary solves two problems:
-            # 1. Sometimes you get empty people, so those are discarded.
-            # 2. Sometimes you get the same person twice. Also discarded.
-            crew_imdb_by_uid = {p.getID(): p for p in _safe_get(movie_imdb, imdb_crew_type, default=[]) if p}
-
-            crew[crew_type] = _mlf.MLFCrew(
-                crew_type = crew_type,
-                roles_by_uid = {r.person_uid: r for r in cls._build_roles(crew_imdb_by_uid)},
-            )
-
-            # We are unafraid to add people to the file before the movie, because we "clean up" unused people before the file is written.
-            _update_people_by_uid(mlf.people_by_uid, ((p.uid, p) for p in cls._build_people(crew_imdb_by_uid)))
-
-        per_src_data = _mlf.MLFMoviePerSourceData(
-            canon_listdef = mlf.abstract_listdef,
-            **movie_csv.mlf_per_src_fields(),
-        )
-
-        mlf_movie = _mlf.MLFMovie(
-            uid = movie_csv.uid,
-            per_src_data = [per_src_data],
-
-            # I prefer to get the title from Cinemagoer because they have better titles for foreign language films, but it's good to have a fallback (not that we ever need it).
-            title = _safe_get(movie_imdb, 'title', default=movie_csv.title),
-            synopsis = None,
-            metascore = _safe_get(movie_imdb, 'metascore'),
-            metascore_votes = None,
-            languages = [],
-            countries = [],
-            crew = crew,
-
-            **movie_csv.mlf_universal_fields(),
-        )
-
-        mlf.movies_by_uid[mlf_movie.uid] = mlf_movie
-
-    @classmethod
-    def _refetch_person(cls, mlf_person: _mlf.MLFPerson, ia: imdb.Cinemagoer) -> None:
-        NUM_RETRIES = 5
-        _dbg.logger.info(f"Refetching person: {mlf_person.uid}")
-
-        for i in range(NUM_RETRIES):
-            try:
-                person_imdb = ia.get_person(mlf_person.uid)
-                break
-            except imdb.IMDbError as e:
-                _dbg.logger.warning(f"Error while fetching person: {e}. This is retry {i + 1} / {NUM_RETRIES}")
-
-                if i == NUM_RETRIES - 1:
-                    raise
-
-        new_name = _safe_get(person_imdb, 'name', mlf_person.name)
-        _dbg.logger.info(f"Replacing bad name: {mlf_person.name} with: {new_name}")
-        mlf_person.name = _safe_get(person_imdb, 'name', mlf_person.name)
-
-    # I don't know wtf current_role might be.
-    @classmethod
-    def _build_characters(cls, current_role: typing.Any) -> typing.Iterable[None | str]:
-        # Sometimes it's empty.
-        if not current_role:
-            return
-
-        if isinstance(current_role, imdb.Character.Character | imdb.Person.Person):
-            yield _safe_get(current_role, 'name')
-        elif isinstance(current_role, imdb.utils.RolesList):
-            yield from (_safe_get(role_imdb, 'name') for role_imdb in current_role)
-        else:
-            _dbg.logger.warning(f"Type is not recognized: {current_role=}, {type(current_role)=}")
-
-    @classmethod
-    def _build_roles(cls, crew_imdb_by_uid: dict[str, imdb.Person.Person]) -> typing.Iterable[_mlf.MLFRole]:
-        for person_imdb in crew_imdb_by_uid.values():
-            yield _mlf.MLFRole(
-                person_uid = person_imdb.getID(),
-                characters = [c for c in cls._build_characters(person_imdb.currentRole) if c is not None],
-                is_star = None,
-            )
-
-    @classmethod
-    def _build_people(cls, crew_imdb_by_uid: dict[str, imdb.Person.Person]) -> typing.Iterable[_mlf.MLFPerson]:
-        for person_imdb in crew_imdb_by_uid.values():
-            yield _mlf.MLFPerson(
-                uid = person_imdb.getID(),
-                name = _safe_get(person_imdb, 'name', person_imdb.getID()),
-                gender = None,
-                birthday = None,
-                height_cm = None,
-                countries = [],
-            )
-
-# As an alternative to Cinemagoer since Cinemagoer is dead, found this handy API: https://imdbapi.dev/.
+# We used to use Cinemagoer as our API (https://cinemagoer.github.io/), which was prefereable. But cinemagoer is dead, so found this nifty API instead: https://imdbapi.dev/.
+# The cinemagoer implementation is deleted so as not to include it as a dependency in the release, but this file still has remnants that there was once cinemagoer support.
 class _IMDbApiDev:
     @classmethod
     def fetch_movies_from_api(cls, movies_csv: list[_CsvRow], mlf: _mlf.MovieListFile, fetcher: _fetch.ListFetcher) -> None:
@@ -659,10 +501,8 @@ def _fetch_movies_in_csv(movies_csv: list[_CsvRow], mlf: _mlf.MovieListFile, fet
 
     try:
         fetch_from_api_func(movies_csv, mlf, fetcher)
-    # If _fetch_movie or _refetch_person raise an IMDb error, or we get a KeyboardInterrupt,
-    # it will break us out of that loop, seal the progress bar nicely, and then we'll handle the exception here by turning it into a FetchInterrupt.
-    # HACK: technically we shouldn't reference imdb here, it should be encapsulated. But whatever.
-    except (imdb.IMDbError, KeyboardInterrupt) as e:
+    # If we get a KeyboardInterrupt, gracefully end the fetching early.
+    except KeyboardInterrupt as e:
         raise _exc.FetchInterrupt(f"{type(e).__name__}: {e}") from e
 
 def _read_csv(movies_csv_file: typing.Iterable[str]) -> list[_CsvRow]:
@@ -688,30 +528,6 @@ def _refresh_csv_fields(movies_csv: list[_CsvRow], mlf: _mlf.MovieListFile) -> N
         mlf_movie = mlf.movies_by_uid[movie_csv.uid]
         mlf_movie.per_src_data[0] = mlf_movie.per_src_data[0].replace(**movie_csv.mlf_per_src_fields())
         mlf.movies_by_uid[movie_csv.uid] = mlf_movie.replace(**movie_csv.mlf_universal_fields())
-
-# Because of this deal with bad names, when we merge two people dictionaries we want to keep the person with the good name if there is one.
-def _update_people_by_uid(dst_people: dict[str, _mlf.MLFPerson], src_people: typing.Iterable[tuple[str, _mlf.MLFPerson]]) -> None:
-    # NOT src_people.items(). That's the responsibility of the callers.
-    dst_people.update((uid, p) for uid, p in src_people if uid not in dst_people or _is_person_name_bad(dst_people[uid].name))
-
-# There seems to be a bug in Cinemagoer, sometimes when you get a person from the cast list of a TV show,
-# his name goes something like "2011 Alan Tudyk\n          \n          \n          \n          1 episode".
-# We fix this by trying to find people with a name like that and replacing it with the correct name.
-# By doing this after everything is downloaded and not when the name was added to the dictionary,
-# we are able to optimize by using the same person's appearance in something else instead of doing the big download when possible.
-def _is_person_name_bad(name: None | str) -> bool:
-    assert name is not None
-    return '\n' in name or ' episode' in name.lower()
-
-def _safe_get(obj: typing.Any, key: str, default: typing.Any = None) -> typing.Any:
-    # I don't trust cinemagoer's __contains__ because it has given some weird results.
-    try:
-        val = obj[key]
-    except KeyError as e:
-        _dbg.logger.warning(f"{obj=} is missing {key=}. Defaulting to {default} (error: {e})")
-        val = default
-
-    return val
 
 #endregion
 
