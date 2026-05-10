@@ -27,7 +27,7 @@ from . import _exc
 from . import _ctx
 from . import _dbg
 
-class ListFetcher(abc.ABC):
+class Fetcher(abc.ABC):
     """
     Base class for all fetchers. Fetchers are in charge of actually downloading data about movie lists from some source like IMDb, Letterboxd, etc.
 
@@ -62,13 +62,13 @@ class ListFetcher(abc.ABC):
         """
         Defines parameters that subclasses can (or must) pass in as part of subclassing. Ex:
 
-        .. code-block::
+        .. code-block:: python
 
-            class MyCustomFetcher(ListFetcher, list_type='my-imdb-fetcher', uid_family='imdb'):
+            class MyCustomFetcher(Fetcher, list_type='my-imdb-fetcher', uid_family='imdb'):
                 # ...
 
         :param list_type: the name of this fetcher.
-        :param qualified_aliases: list of alises for this fetcher.
+        :param qualified_aliases: list of aliases for this fetcher.
         :param uid_family: which UID family this fetcher uses. Defaults to ``list_type``, indicating this fetcher is only compatible with itself.
         """
         super().__init_subclass__(**kwargs)

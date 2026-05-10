@@ -90,7 +90,7 @@ def print_table(table: list[list[str]],
         case Choice.NEVER:
             use_color = False
         case _:
-            raise RuntimeError(f"Unexpected {color_choice=}")
+            raise RuntimeError(f"Unexpected {color_choice=}.")
 
     match paginate_choice:
         case Choice.AUTO:
@@ -117,7 +117,7 @@ def print_table(table: list[list[str]],
         case Choice.NEVER:
             paginate = False
         case _:
-            raise RuntimeError(f"Unexpected {paginate_choice=}")
+            raise RuntimeError(f"Unexpected {paginate_choice=}.")
 
     # Pipe to less if requested. I tried a lot of variations including of course Popen(stdin=PIPE), this is the only one that works.
     # Note: This program hits a harmless 'OSError [Errno 22]' when piping to less.
@@ -230,9 +230,11 @@ Read more about extensions: {DOCS_URL}/extending.html.
         if args.IMPORT is None:
             raise flam.InputError("Must specify a IMPORT to delete an extension.")
 
+        extension = cls.abs_extension(args.IMPORT)
+
         with ctx.configure() as cfg:
             try:
-                cfg.extensions.remove(args.IMPORT)
+                cfg.extensions.remove(extension)
             except ValueError as e:
                 raise flam.InputError(f"No extension named '{args.IMPORT}'.") from e
 
@@ -247,14 +249,25 @@ Read more about extensions: {DOCS_URL}/extending.html.
         if args.IMPORT is None:
             raise flam.InputError("Must specify a IMPORT to add an extension.")
 
+        extension = cls.abs_extension(args.IMPORT)
+        
         # This is technically allowed at the API level but will probably cause an error when trying to register attributes/predicates/fetchers that are already registered.
         # When it happens it's problematic to delete the extension; you have to run flam with --no-extensions so it won't crash before you can remove it.
         # So we'll protect the user from potentially shooting themselves in the foot.
-        if args.IMPORT in ctx.cfg_readonly.extensions:
+        if extension in ctx.cfg_readonly.extensions:
             raise flam.InputError(f"IMPORT '{args.IMPORT}' is already a configured extension.")
 
         with ctx.configure() as cfg:
-            cfg.extensions.append(args.IMPORT)
+            cfg.extensions.append(extension)
+
+    @classmethod
+    def abs_extension(cls, extension: str) -> str:
+        # It's a pain to have to write the full path, so we'll turn relative paths into full paths.
+        # This is sneaky and could piss off users sometimes, but I think they'll thank me more than they'll curse me.
+        if os.path.isfile(extension):
+            return os.path.abspath(extension)
+
+        return extension
 
 class SubcommandConfigList:
     @classmethod
@@ -350,8 +363,7 @@ Read more about lists: {DOCS_URL}/lists.html.
                 simple_list.name = args.rename
 
             if args.LISTDEF is not None:
-                cldef = ctx.parse_listdef(args.LISTDEF)
-                simple_list.concrete_listdef = cldef
+                simple_list.concrete_listdef = cls.parse_listdef(args.LISTDEF, ctx)
 
             if args.default_fetch != Choice.AUTO:
                 simple_list.is_default_fetch = args.default_fetch == Choice.YES
@@ -367,18 +379,34 @@ Read more about lists: {DOCS_URL}/lists.html.
         if args.LISTDEF is None:
             raise flam.InputError(f"List '{args.NAME}' doesn't exist, so LISTDEF is required.")
 
-        cldef = ctx.parse_listdef(args.LISTDEF)
-
         simple_list = flam.SimpleList(
             uid = 'INITIALIZED LATER',
             name = args.NAME,
-            concrete_listdef = cldef,
+            concrete_listdef = cls.parse_listdef(args.LISTDEF, ctx),
             is_default_fetch = args.default_fetch != Choice.NO,
             is_default_find = args.default_find == Choice.YES,
         )
 
         with ctx.configure() as cfg:
             cfg.simple_lists_raw.append(simple_list)
+
+    @classmethod
+    def parse_listdef(cls, listdef: str, ctx: flam.FlamContext) -> flam.CanonListdef:
+        cldef = ctx.parse_listdef(listdef)
+
+        # Small protection to help users not make mistakes. Internally, we don't rely on this prevention to work.
+        if cldef.is_special:
+            raise flam.InputError(f"Invalid LISTDEF: '{listdef}': the list type '{cldef.list_type}' is special and cannot be used as a configured list's type.")
+
+        # Another protection, check if the fetcher exists. This also is only to help users, and internally is not something we rely on.
+        # Users could theoretically define a valid listdef based on an extension fetcher but then change the fetcher name.
+        try:
+            ctx.fetchers[cldef.list_type]
+        # Will actually be a CloseInputError.
+        except flam.InputError as e:
+            raise flam.InputError(f'Invalid LISTDEF: {e}') from e
+
+        return cldef
 
 class SubcommandConfigComposite:
     @classmethod
@@ -700,7 +728,7 @@ For a full list of supported attributes: {DOCS_URL}/attributes.html.
         parser.add_argument('FINDABLE', type=cls.parse_findable, action='store', help=
 f'''Choose what to find: movies, people, or roles.
 
-People and roles support limiting the search to a specific crew type and optionally also group mode, and support comma-delimited several types. Use 'crew' to catenate all types.
+People and roles support limiting the search to a specific crew type with an optional group mode, and support comma-delimited several types. Use 'crew' to catenate all types.
 For roles, it looks like: 'cast', 'director:group', 'composer:separate,stuntcast', 'crew', etc.
 For people, it looks like 'cast-people', 'director-people:group', etc.
 
@@ -764,12 +792,12 @@ Read more about filters: {DOCS_URL}/filters.html.''')
             if sample_findable is None:
                 sample_findable = findable_type
             elif sample_findable != findable_type:
-                raise ValueError('All FINDABLEs must have the same type')
+                raise ValueError('All FINDABLEs must have the same type.')
 
             ct_gms.extend((crew_type, group_mode) for crew_type in crew_types)
 
         if sample_findable is None:
-            raise ValueError('Must specify at least one FINDABLE')
+            raise ValueError('Must specify at least one FINDABLE.')
 
         return sample_findable, ct_gms
 
@@ -957,8 +985,18 @@ Read more about filters: {DOCS_URL}/filters.html.''')
                 uniq_insert(ctx.attributes['people-crew-type'], None, 0)
 
             # Add a column for the characters at the end if searching for actors.
-            if flam.FindableType.ROLES.is_applicable_to(findable_type) and any(crew_type == flam.CrewType.CAST for crew_type, _ in ct_gms):
+            # NOTE: for this and the other crew-type-based smart columns, we use `all` instead of `any` because when searching for all crew types it adds too much.
+            if flam.FindableType.ROLES.is_applicable_to(findable_type) and all(crew_type == flam.CrewType.CAST for crew_type, _ in ct_gms):
                 uniq_insert(ctx.attributes['roles-characters'], None, len(attributes))
+
+            # Add a column for the directors at the end if searching for assistant directors.
+            # I don't think also adding it the other way around is desirable.
+            if flam.FindableType.ROLES.is_applicable_to(findable_type) and all(crew_type == flam.CrewType.ASSISTANT_DIRECTOR for crew_type, _ in ct_gms):
+                uniq_insert(ctx.attributes['movies-director'], None, len(attributes))
+            
+            # Add a column for the jobs at the end if searching for additional crew.
+            if flam.FindableType.ROLES.is_applicable_to(findable_type) and all(crew_type == flam.CrewType.ADDITIONAL for crew_type, _ in ct_gms):
+                uniq_insert(ctx.attributes['roles-jobs'], None, len(attributes))
 
             # Add a column for the origin list at the end if we combined multiple lists. The way to check it is a little complicated.
             if cls.should_add_source_column(findable_type, movie_list, ctx):

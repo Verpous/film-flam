@@ -37,4 +37,4 @@ class _FlamMetadata(_file._FlamSerializable):
             if mlv_meta.abstract_listdef == abstract_listdef:
                 return mlv_meta
 
-        raise KeyError(f"No vault metadata for movie list '{abstract_listdef}'")
+        raise KeyError(f"No vault metadata for movie list '{abstract_listdef}'.")

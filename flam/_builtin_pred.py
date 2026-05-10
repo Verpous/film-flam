@@ -529,7 +529,7 @@ class AnyPersonPredicate(_filter.Predicate, name_without_type='any-person', find
 
                 return False
             case _:
-                raise RuntimeError(f"Unexpected {people.group_mode}")
+                raise RuntimeError(f"Unexpected {people.group_mode}.")
 
     def regurgitate(self) -> typing.Iterable[str]:
         yield from super().regurgitate()
@@ -570,7 +570,7 @@ class EveryPersonPredicate(_filter.Predicate, name_without_type='every-person', 
 
                 return True
             case _:
-                raise RuntimeError(f"Unexpected {people.group_mode}")
+                raise RuntimeError(f"Unexpected {people.group_mode}.")
 
     def regurgitate(self) -> typing.Iterable[str]:
         yield from super().regurgitate()

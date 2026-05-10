@@ -71,20 +71,21 @@ class _CsvRow:
     def mlf_universal_fields(self) -> dict[str, typing.Any]:
         # If any of the conversions fail we simply propagate the error.
         return dict(
-            rating              = float(self.rating) if self.rating != '' else None, # I've actually found shorts which have no rating.
-            runtime_minutes     = int(self.runtime_minutes),
-            genres              = self.genres.split(', '),
             votes               = int(self.votes),
+            rating              = float(self.rating) if self.rating != '' else None, # I've actually found shorts which have no rating.
             my_rating           = float(self.my_rating) if (self.my_rating is not None and self.my_rating != '') else None,
-            watch_dates         = [self._date(self.listing_date)], # Treat the listing date as the date the movie was watched, and we don't support multiple watch dates.
+            url                 = self.url,
+            runtime_minutes     = int(self.runtime_minutes),
             release_date        = self._date(self.release_date),
+            watch_dates         = [self._date(self.listing_date)], # Treat the listing date as the date the movie was watched, and we don't support multiple watch dates.
+            genres              = self.genres.split(', '),
         )
 
     def mlf_per_src_fields(self) -> dict[str, typing.Any]:
         # If any of the conversions fail we simply propagate the error.
         return dict(
             list_index          = int(self.list_index),
-            note                = self.note,
+            list_note           = self.note,
             listing_date        = self._date(self.listing_date),
         )
 
@@ -97,10 +98,10 @@ class _CsvRow:
             except ValueError:
                 pass
 
-        raise ValueError(f'Invalid date: {date}')
+        raise ValueError(f'Invalid date: {date}.')
     
 @_reg._register_builtin
-class SeleniumApiDevFetcher(_fetch.ListFetcher, list_type='imdb-browser-apidev-listid', uid_family=_UID_FAMILY):
+class SeleniumApiDevFetcher(_fetch.Fetcher, list_type='imdb-browser-apidev-listid', uid_family=_UID_FAMILY):
     """IMDB_LIST_ID
 
     Takes an IMDb list ID as an input, and downloads information in two steps:
@@ -108,17 +109,18 @@ class SeleniumApiDevFetcher(_fetch.ListFetcher, list_type='imdb-browser-apidev-l
     #. Export the list to CSV from the IMDb website - this will automatically launch your browser and click some buttons!
     #. Fill in a bunch of additional information using this free API: https://imdbapi.dev/
     
-    It's easy to check what is your list's ID. Just open it in the browser, and the URL should look like this: https://www.imdb.com/list/ls083886771. The list ID in this example is "083886771".
+    It's easy to check what is your list's ID. Just open it in the browser, and the URL should look like this: https://www.imdb.com/list/ls083886771.
+    The list ID in this example is "083886771".
 
     There are a few environment variables you can export to control the browser use:
 
-    * **FLAM_DOWNLOADS** - Path to the downloads folder on your computer so flam will know where to look for the downloaded CSV
+    * **FLAM_DOWNLOADS** - Path to the downloads folder on your computer so flam will know where to look for the downloaded CSV.
         
         .. warning::
         
             If your browser doesn't download things to ~/Downloads, you must set this variable for this fetcher to work!
     * **FLAM_BROWSER** - Which browser to use: 'chrome', 'edge', or 'firefox'. By default flam tries to detect your default browser
-    * **FLAM_BROWSER_PROFILE** - Path to your browser profile. This is only needed if your list is set to private, and you must use a profile where you're already logged in to IMDb
+    * **FLAM_BROWSER_PROFILE** - Path to your browser profile. This is only needed if your list is set to private so a profile is needed where you are expected to be already logged in.
     """
     exports_server: None | multiprocessing.Process = None
     requests_queue: multiprocessing.Queue = multiprocessing.Queue()
@@ -163,10 +165,7 @@ class SeleniumApiDevFetcher(_fetch.ListFetcher, list_type='imdb-browser-apidev-l
                     raise _exc.InputError(f"Timed out trying to download LISTDEF '{concrete_listdef}' from IMDb. Are you sure the address is valid?") from e
 
         _dbg.logger.info(f"Successfully downloaded CSV: '{latest_csv}'")
-
-        # CSV documentation says to use newline=''.
-        with open(latest_csv, 'r', newline='', encoding='utf-8') as movies_csv_file:
-            movies_csv = _read_csv(movies_csv_file)
+        movies_csv = _read_csv(latest_csv)
 
         # TODO: Instead of remove, mov it to the flam dir and figure out how the hell to support using the already-downloaded CSV to refetch?
         # Once the CSV is renamed, we can know from the abstract listdef of SeleniumFetcher where to get the CSV from.
@@ -216,31 +215,29 @@ def _exports_server_cleanup() -> None:
         _dbg.logger.info("No need to do server cleanup")
 
 @_reg._register_builtin
-class CsvApiDevFetcher(_fetch.ListFetcher, list_type='imdb-csv-apidev-path', uid_family=_UID_FAMILY):
+class CsvApiDevFetcher(_fetch.Fetcher, list_type='imdb-csv-apidev-path', uid_family=_UID_FAMILY):
     """CSV_PATH
 
     Takes a CSV that was manually exported from an IMDb list, and downloads additional information using this free API: https://imdbapi.dev/.
+    
+    CSV_PATH may contain environment variables (``%USERPROFILE%``, ``$HOME``, etc.).
+    
+    .. tip::
+
+        It's not fully automated so it's less ideal, but you can use this fetcher as a workaround
+        if you're having trouble with the automatic browser control of **imdb-browser-apidev-listid**.
     """
     def _fetch_into_file(self, movie_list_file: _mlf.MovieListFile) -> None:
         _dbg.logger.info(f"IMDbApiDev: Fetching IMDb list by CSV: '{self.concrete_listdef.address}'")
-        movies_csv = self.open_csv(self.concrete_listdef)
+        csv_path = os.path.expandvars(self.concrete_listdef.address)
+        movies_csv = _read_csv(csv_path)
         _fetch_movies_in_csv(movies_csv, movie_list_file, self, _IMDbApiDev.fetch_movies_from_api)
-
-    @classmethod
-    def open_csv(cls, concrete_listdef: _ldef.CanonListdef) -> list[_CsvRow]:
-        try:
-            movies_csv_file = open(concrete_listdef.address, 'r', newline='', encoding='utf-8')
-        except FileNotFoundError as e:
-            raise _exc.InputError(f"Invalid LISTDEF {concrete_listdef}: no such file.") from e
-
-        with movies_csv_file:
-            return _read_csv(movies_csv_file)
 
 # We used to use Cinemagoer as our API (https://cinemagoer.github.io/), which was prefereable. But cinemagoer is dead, so found this nifty API instead: https://imdbapi.dev/.
 # The cinemagoer implementation is deleted so as not to include it as a dependency in the release, but this file still has remnants that there was once cinemagoer support.
 class _IMDbApiDev:
     @classmethod
-    def fetch_movies_from_api(cls, movies_csv: list[_CsvRow], mlf: _mlf.MovieListFile, fetcher: _fetch.ListFetcher) -> None:
+    def fetch_movies_from_api(cls, movies_csv: list[_CsvRow], mlf: _mlf.MovieListFile, fetcher: _fetch.Fetcher) -> None:
         BATCH_SIZE = 5
         batch = []
         movies_to_fetch = [m for m in movies_csv if m.uid not in mlf.movies_by_uid]
@@ -302,12 +299,13 @@ class _IMDbApiDev:
                         is_star = person_uid in star_uids
                         gender = 'male' if person_json['category'] == 'actor' else 'female'
                     case _:
-                        raise RuntimeError(f'Unexpected {person_json["category"]=}')
+                        raise RuntimeError(f'Unexpected {person_json["category"]=}.')
 
                 crew[crew_type].roles_by_uid[person_uid] = _mlf.MLFRole(
                     person_uid = person_uid,
-                    characters = characters,
                     is_star = is_star,
+                    characters = characters,
+                    jobs = [],
                 )
 
                 people_to_add.append((person_uid, gender))
@@ -325,24 +323,29 @@ class _IMDbApiDev:
             metascore_votes = None
 
         per_src_data = _mlf.MLFMoviePerSourceData(
-            canon_listdef = mlf.abstract_listdef,
+            canon_listdef       = mlf.abstract_listdef,
             **movie_csv.mlf_per_src_fields(),
         )
 
         mlf_movie = _mlf.MLFMovie(
-            uid = movie_csv.uid,
-            per_src_data = [per_src_data],
+            uid                 = movie_csv.uid,
+            per_src_data        = [per_src_data],
 
             # I prefer to get the title not from the CSV because this API has better titles for foreign language films.
-            title = movie_json['primaryTitle'],
-            synopsis = movie_json['plot'],
-            metascore = metascore,
-            metascore_votes = metascore_votes,
-            
+            title               = movie_json['primaryTitle'],
+            tagline             = None,
+            synopsis            = movie_json['plot'],
+            metascore           = metascore,
+            metascore_votes     = metascore_votes,
+            likes               = None,
+            is_liked            = None,
+            my_notes            = [],
+            studios             = [],
+
             # Sometimes there's an empty lang object. For example if you query movie tt2177771 (the monuments men).
-            languages = [lang['name'] for lang in movie_json['spokenLanguages'] if 'name' in lang],
-            countries = [country['name'] for country in movie_json['originCountries']],
-            crew = crew,
+            languages           = [lang['name'] for lang in movie_json['spokenLanguages'] if 'name' in lang],
+            countries           = [country['name'] for country in movie_json['originCountries']],
+            crew                = crew,
 
             **movie_csv.mlf_universal_fields(),
         )
@@ -471,7 +474,7 @@ class _IMDbApiDev:
                     # Let it break out naturally after some time? Sweep it under the rug? FetchInterrupt? Crash?
                     # For now we raise FetchInterrupt.
                     if page_token is not None and page_token == response['nextPageToken']:
-                        raise _exc.FetchInterrupt(f"Got same page token: '{page_token}' twice in a row for endpoint: {endpoint}")
+                        raise _exc.FetchInterrupt(f"Got same page token: '{page_token}' twice in a row for endpoint: {endpoint}.")
 
                     page_token = response['nextPageToken']
                     response = cls._rest_call(endpoint, pageSize=PAGE_SIZE, pageToken=page_token, **kwargs)
@@ -484,8 +487,8 @@ class _IMDbApiDev:
 
         raise RuntimeError("Shouldn't get here!")
 
-def _fetch_movies_in_csv(movies_csv: list[_CsvRow], mlf: _mlf.MovieListFile, fetcher: _fetch.ListFetcher,
-        fetch_from_api_func: typing.Callable[[list[_CsvRow], _mlf.MovieListFile, _fetch.ListFetcher], None]) -> None:
+def _fetch_movies_in_csv(movies_csv: list[_CsvRow], mlf: _mlf.MovieListFile, fetcher: _fetch.Fetcher,
+        fetch_from_api_func: typing.Callable[[list[_CsvRow], _mlf.MovieListFile, _fetch.Fetcher], None]) -> None:
     _dbg.logger.info(f"MLF has {len(mlf.movies_by_uid)} movies from prior fetch")
 
     # First we will build the list of all movies that we already have fetched, and overwrite mlf with this immediately.
@@ -505,18 +508,23 @@ def _fetch_movies_in_csv(movies_csv: list[_CsvRow], mlf: _mlf.MovieListFile, fet
     except KeyboardInterrupt as e:
         raise _exc.FetchInterrupt(f"{type(e).__name__}: {e}") from e
 
-def _read_csv(movies_csv_file: typing.Iterable[str]) -> list[_CsvRow]:
-    reader = csv.reader(movies_csv_file)
+def _read_csv(csv_path: str) -> list[_CsvRow]:
+    try:
+        # CSV documentation says to use newline=''. Encoding is important to specify, from experience.
+        with open(csv_path, 'r', newline='', encoding='utf-8') as movies_csv_file:
+            reader = csv.reader(movies_csv_file)
 
-    # Drop the titles row. If the CSV format doesn't match up we should fail on creating one of the rows.
-    movies_csv = [_CsvRow(*row) for row in reader][1:]
-    
-    # The first 2 characters of the uid are a prefix that we wish to discard.
-    for movie in movies_csv:
-        movie.uid = movie.uid.removeprefix('tt')
+            # Drop the titles row. If the CSV format doesn't match up we should fail on creating one of the rows.
+            movies_csv = [_CsvRow(*row) for row in reader][1:]
 
-    _dbg.logger.info(f"Read CSV with {len(movies_csv)} rows (excluding the titles row)")
-    return movies_csv
+            # The first 2 characters of the uid are a prefix that we wish to discard.
+            for movie in movies_csv:
+                movie.uid = movie.uid.removeprefix('tt')
+
+            _dbg.logger.info(f"Read CSV with {len(movies_csv)} rows (excluding the titles row)")
+            return movies_csv
+    except FileNotFoundError as e:
+        raise _exc.InputError(f"No such file: {csv_path}.") from e
 
 def _refresh_csv_fields(movies_csv: list[_CsvRow], mlf: _mlf.MovieListFile) -> None:
     for movie_csv in movies_csv:
@@ -726,7 +734,7 @@ def _export_lists_handler(requests_queue: multiprocessing.Queue, browser_type: _
         case _BrowserType.FIREFOX:
             controller = _FirefoxController()
         case _:
-            raise RuntimeError(f"Unsupported browser type: {browser_type}")
+            raise RuntimeError(f"Unsupported browser type: {browser_type}.")
 
     _dbg.logger.info(f"Server will handle export requests for {browser_type=}, {browser_profile_path=}")
 
@@ -740,7 +748,13 @@ def _export_lists_handler(requests_queue: multiprocessing.Queue, browser_type: _
         _dbg.logger.info("Successful launch")
 
         while True:
-            assert _is_browser_alive(driver)
+            if not _is_browser_alive(driver):
+                # print instead of raising an exception because it doesn't look pretty.
+                # NOTE: when the browser dies it also prints this annoying "Tried to run command without establishing a connection" message.
+                # This is printed by selenium, and I tried silencing it but no luck.
+                print("Cannot export IMDb lists because the browser instance is dead. Please don't close the browser while it's in use.", file=sys.stderr)
+                _dbg.logger.warning("Browser unexpectedly dead - quitting server")
+                return
 
             try:
                 # We use a timeout so we can periodically check if the browser is still alive.
@@ -754,6 +768,10 @@ def _export_lists_handler(requests_queue: multiprocessing.Queue, browser_type: _
                 _dbg.logger.info("Quitting by request")
                 return
 
+            # NOTE: selenium will fail if the window is minimized. I tried to solve this issue, but it's a bitch:
+            # * We can maximize the window, but it will make it fullscreen which is undesirable, so we only want to call it if the window is minimized
+            # * There is no good way to check if the window is minimized..
+            # I also would've liked to minimize the window between uses, but again, not if it means we have to make it fullscreen when we maximize it.
             try:
                 # There are retries for specific steps within the exports process, and retries at the client side.
                 # But things go faster if we also have a retry for the entire flow at the server side.

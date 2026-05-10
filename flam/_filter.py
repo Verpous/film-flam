@@ -630,7 +630,7 @@ class Predicate(FilterMember):
         """
         Defines parameters that subclasses can (or must) pass in as part of subclassing. Ex:
 
-        .. code-block::
+        .. code-block:: python
 
             class MyCustomPredicate(Predicate, name_without_type='my-predicate', findable_type=FindableType.MOVIES):
                 # ...

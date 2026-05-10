@@ -54,6 +54,7 @@ pylint_ignore+=R0402, # consider-using-from-import
 pylint_ignore+=R0801, # duplicate-code
 pylint_ignore+=R0902, # too-many-instance-attributes
 pylint_ignore+=R0903, # too-few-public-methods
+pylint_ignore+=R0911, # too-many-return-statements
 pylint_ignore+=R0912, # too-many-branches
 pylint_ignore+=R0913, # too-many-arguments
 pylint_ignore+=R0914, # too-many-locals
@@ -62,7 +63,6 @@ pylint_ignore+=R0917, # too-many-positional-arguments
 pylint_ignore+=R1708, # stop-iteration-return
 pylint_ignore+=R1714, # consider-using-in
 pylint_ignore+=R1735, # use-dict-literal
-
 pylint_ignore+=W0124, # confusing-with-statement
 pylint_ignore+=W0212, # protected-access
 pylint_ignore+=W0511, # fixme
@@ -239,7 +239,9 @@ clean() {
 
 # Deletes the dev flam dir.
 clean-ctx() {
-    rm -rf "$flam_dir"
+    local confirm;
+    read -ep "About to delete the flam context. Are you sure? " confirm;
+    [[ "$confirm" == *([[:space:]])[yY]* ]] && rm -rf "$flam_dir"
 }
 
 # Deletes the dev flam dir cache files.
@@ -249,16 +251,22 @@ clean-vault() {
 
 # Reconfigures the dev flam dir with some test lists.
 cfg() {
-    $cli config list --default-fetch=no     testlist    imdb-browser-apidev-listid=540302193
-    $cli config list --default-fetch=yes    movies      imdb-browser-apidev-listid=083886771
-    $cli config list --default-fetch=yes    shows       imdb-browser-apidev-listid=560024227
-    $cli config list --default-fetch=yes    specials    imdb-browser-apidev-listid=560318295
-    $cli config list --default-fetch=no     mubi        imdb-browser-apidev-listid=571616524
-    $cli config list --default-fetch=no     netflix     imdb-browser-apidev-listid=560256455
-    $cli config list --default-fetch=no     disney      imdb-browser-apidev-listid=565212657
-    $cli config list --default-fetch=no     blurays     imdb-browser-apidev-listid=539518913
-    $cli config list --default-fetch=no     dvds        imdb-browser-apidev-listid=537497285
-    $cli config list --default-fetch=no     elsewhere   imdb-browser-apidev-listid=566138441
+    $cli config list --default-fetch=no     testlist        imdb-browser-apidev-listid=540302193
+    $cli config list --default-fetch=yes    movies          imdb-browser-apidev-listid=083886771
+    $cli config list --default-fetch=yes    shows           imdb-browser-apidev-listid=560024227
+    $cli config list --default-fetch=yes    specials        imdb-browser-apidev-listid=560318295
+    $cli config list --default-fetch=no     mubi            imdb-browser-apidev-listid=571616524
+    $cli config list --default-fetch=no     netflix         imdb-browser-apidev-listid=560256455
+    $cli config list --default-fetch=no     disney          imdb-browser-apidev-listid=565212657
+    $cli config list --default-fetch=no     blurays         imdb-browser-apidev-listid=539518913
+    $cli config list --default-fetch=no     dvds            imdb-browser-apidev-listid=537497285
+    $cli config list --default-fetch=no     elsewhere       imdb-browser-apidev-listid=566138441
+
+    $cli config list --default-fetch=no     lbox-movies     letterboxdpy-user-list=verpous/movies-ive-watched
+    $cli config list --default-fetch=no     lbox-films      letterboxdpy-user-list=verpous/films
+    $cli config list --default-fetch=no     lbox-likes      letterboxdpy-user-list=verpous/likes
+    $cli config list --default-fetch=no     lbox-reviews    letterboxdpy-user-list=verpous/reviews
+    $cli config list --default-fetch=no     lbox-watchlist  letterboxdpy-user-list=verpous/watchlist
 
     $cli config composite --default-find=yes    all         movies shows
     $cli config composite --default-find=no     rated       movies shows    -has my-rating
@@ -301,7 +309,7 @@ log() {
     fi
 
     # Use LOGLEVEL=critical so that this very action doesn't create new logs.
-    $cmd "$(echo "import $mdl; print($mdl.get_log_file_path())" | FLAM_LOGLEVEL=critical python)"
+    $cmd "$(FLAM_LOGLEVEL=critical python -c "import $mdl; print($mdl.get_log_file_path())")"
 }
 
 # A wrapper around running the flam CLI in a debug environment - with optional support for profiling.

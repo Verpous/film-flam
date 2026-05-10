@@ -208,16 +208,16 @@ Here's what it all looks like:
 Implementing a custom fetcher
 --------------------------------
 
-Fetchers are implemented by inheriting from :py:class:`~._fetch.ListFetcher`. You'll need to:
+Fetchers are implemented by inheriting from :py:class:`~._fetch.Fetcher`. You'll need to:
 
-* Fill in some parameters like the fetcher's name in the :py:meth:`class declaration <._fetch.ListFetcher.__init_subclass__>`
-* Implement :py:meth:`~._fetch.ListFetcher._fetch_into_file`
+* Fill in some parameters like the fetcher's name in the :py:meth:`class declaration <._fetch.Fetcher.__init_subclass__>`
+* Implement :py:meth:`~._fetch.Fetcher._fetch_into_file`
 
 .. code-block:: python
 
     @register
-    class MyCustomFetcher(ListFetcher, list_type='my-database'):
-        def fetch_into_file(self, movie_list_file: flam.MovieListFile) -> None:
+    class MyCustomFetcher(Fetcher, list_type='my-database'):
+        def fetch_into_file(self, movie_list_file: MovieListFile) -> None:
             # ...
 
 Fetchers require gentle care in their implementation:
@@ -226,7 +226,7 @@ Fetchers require gentle care in their implementation:
 * Remember to delete movies in the file that were removed from the list, and to avoid re-fetching movies already in the file
 * When deleting a movie, you don't need to delete its people. That's handled automatically
 * Don't add movies to the file until you've acquired all of their data, so that if fetch is interrupted at any point, the file will be in a good, saveable state
-* If your fetcher is slow, call :py:meth:`~._fetch.ListFetcher._checkpoint` from time to time so that a crash won't cause the data to be lost
+* If your fetcher is slow, call :py:meth:`~._fetch.Fetcher._checkpoint` from time to time so that a crash won't cause the data to be lost
 * Be sure to handle server errors from the API you're fetching from, and raise :py:exc:`~._exc.FetchInterrupt` as needed
 * It's also nice to handle ``KeyboardInterrupt`` by raising :py:exc:`~._exc.FetchInterrupt`
 
@@ -235,9 +235,9 @@ See it all in action:
 .. code-block:: python
 
     # This fetcher takes a size of a list to "fetch" and literally makes up a list with phony data.
-    @flam.register
-    class RandomDataFetcher(flam.ListFetcher, list_type='random-size'):
-        def _fetch_into_file(self, movie_list_file: flam.MovieListFile) -> None:
+    @register
+    class RandomDataFetcher(Fetcher, list_type='random-size'):
+        def _fetch_into_file(self, movie_list_file: MovieListFile) -> None:
             # Takes the address to mean the number of movies the random list should have.
             num_movies = int(self.concrete_listdef.address)
             
@@ -257,12 +257,12 @@ See it all in action:
                     try:
                         self.fetch_movie(movie_list_file, uid)
                     except KeyboardInterrupt as e:
-                        raise flam.FetchInterrupt("User interrupted fetch in the middle.") from e
+                        raise FetchInterrupt("User interrupted fetch in the middle.") from e
 
                     # Save what we've fetched so far, so that if we experience a crash, data won't have to be re-fetched.
                     self._checkpoint(movie_list_file)
 
-        def fetch_movie(self, movie_list_file: flam.MovieListFile, uid: str) -> None:
+        def fetch_movie(self, movie_list_file: MovieListFile, uid: str) -> None:
             TITLES_POOL = ['Star Wars', 'Inside Llewyn Davis', 'Lord of the Rings', 'Interstellar']
             CHARACTERS_POOL = ['Darth Vader', 'Llewyn Davis', 'Galadriel', 'Murph']
 
@@ -273,13 +273,13 @@ See it all in action:
             # So we'll start by building the movie's crews.
             crew = {}
 
-            for crew_type in flam.CrewType.iterate_except_any():
+            for crew_type in CrewType.iterate_except_any():
                 # Randomly decide how many people are in this movie in this crew type.
                 # For their uid, we'll add some random base so that you don't get the same people everywhere.
                 num_crewmembers = rng.randint(0, 10)
                 base_uid = rng.randint(0, 1000)
 
-                crew[crew_type] = flam.MLFCrew(
+                crew[crew_type] = MLFCrew(
                     crew_type = crew_type,
                     roles_by_uid = {},
                 )
@@ -290,10 +290,11 @@ See it all in action:
 
                     # For actors, we'll make up a bit of data about which character they played.
                     # We can always fill in None, or leave lists empty if we're missing that data.
-                    crew[crew_type].roles_by_uid[person_uid] = flam.MLFRole(
+                    crew[crew_type].roles_by_uid[person_uid] = MLFRole(
                         person_uid = person_uid,
-                        characters = [rng.choice(CHARACTERS_POOL)] if crew_type == flam.CrewType.CAST else [],
                         is_star = None,
+                        characters = [rng.choice(CHARACTERS_POOL)] if crew_type == CrewType.CAST else [],
+                        jobs = [],
                     )
 
                     # This person may have already been fetched because of their presence in another movie or another crew type in this movie.
@@ -302,27 +303,33 @@ See it all in action:
 
             # We support some data about movies which is actually specifically about that movie's presence in this list.
             # For example, the date it was added to this list.
-            per_src_data = flam.MLFMoviePerSourceData(
+            per_src_data = MLFMoviePerSourceData(
                 canon_listdef       = movie_list_file.abstract_listdef,
                 list_index          = int(uid),
-                note                = None,
+                list_note           = None,
                 listing_date        = None,
             )
 
-            mlf_movie = flam.MLFMovie(
+            mlf_movie = MLFMovie(
                 uid                 = uid,
                 per_src_data        = [per_src_data],
                 title               = rng.choice(TITLES_POOL),
+                tagline             = None,
                 synopsis            = None,
+                url                 = None,
                 runtime_minutes     = 145,
                 metascore_votes     = None,
                 metascore           = 82,
                 votes               = None,
                 rating              = 8.5,
                 my_rating           = None,
+                likes               = None,
+                is_liked            = None,
                 release_date        = datetime.date(1969, 7, 4),
                 watch_dates         = [],
+                my_notes            = [],
                 genres              = ['Drama', 'Western'],
+                studios             = ['Paramount Pictures', 'Rafran Cinematografica', 'San Marco'],
                 languages           = ['English', 'Italian', 'Spanish'],
                 countries           = ['Italy', 'United States'],
                 crew                = crew,
@@ -331,14 +338,14 @@ See it all in action:
             # Add the movie to the file only at the end, after all its data is acquired, and all the people from the movie are already added!
             movie_list_file.movies_by_uid[mlf_movie.uid] = mlf_movie
 
-        def fetch_person(self, movie_list_file: flam.MovieListFile, uid: str) -> None:
+        def fetch_person(self, movie_list_file: MovieListFile, uid: str) -> None:
             NAMES_POOL = ['James', 'Spencer', 'Hayden', 'David', 'Oscar', 'Cate', 'Jessica', 'Ellen']
             GENDERS_POOL = ['male', 'female', 'nonbinary']
 
             # We'll seed the person's RNG using its uid.
             rng = random.Random(uid)
 
-            movie_list_file.people_by_uid[uid] = flam.MLFPerson(
+            movie_list_file.people_by_uid[uid] = MLFPerson(
                 uid = uid,
                 name = rng.choice(NAMES_POOL),
                 gender = rng.choice(GENDERS_POOL),

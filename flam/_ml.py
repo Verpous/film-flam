@@ -62,14 +62,29 @@ class CrewType(enum.StrEnum):
     """
 
     # No need to have docstrings for each member, it's obvious what they mean. We won't document the default group mod either.
-    CAST                = 'cast'
-    STUNTCAST           = 'stuntcast'
     DIRECTOR            = 'director'
-    WRITER              = 'writer'
+    ASSISTANT_DIRECTOR  = 'assistant-director'
     PRODUCER            = 'producer'
+    EXECUTIVE_PRODUCER  = 'executive-producer'
     COMPOSER            = 'composer'
     CINEMATOGRAPHER     = 'cinematographer'
+    CHOREOGRAPHER       = 'choreographer'
     EDITOR              = 'editor'
+    WRITER              = 'writer'
+    CAST                = 'cast'
+    STUNTCAST           = 'stuntcast'
+    CASTING_DIRECTOR    = 'casting-director'
+    PRODUCTION_DESIGNER = 'production-designer'
+    SET_DECORATOR       = 'set-decorator'
+    SFX_ARTIST          = 'sfx-artist'
+    VFX_ARTIST          = 'vfx-artist'
+    MAKEUP_ARTIST       = 'makeup-artist'
+    COSTUME_DESIGNER    = 'costume-designer'
+    HAIRSTYLIST         = 'hairstylist'
+    ART_DIRECTOR        = 'art-director'
+    ADDITIONAL          = 'additional'
+    """Catch-all category for crew types not listed above."""
+    
     ANY                 = 'any'
     """No crew type in particular, only care about if the person was in the movie in any capacity."""
 
@@ -108,12 +123,12 @@ def parse_ct_gm(ct_gm_str: str) -> tuple[CrewType, GroupMode]:
     try:
         crew_type = CrewType(crew_type_str)
     except ValueError as e:
-        raise _exc.InputError(f"Invalid crew type: '{crew_type_str}'") from e
+        raise _exc.InputError(f"Invalid crew type: '{crew_type_str}'.") from e
 
     try:
         group_mode = GroupMode(group_mode_str)
     except ValueError as e:
-        raise _exc.InputError(f"Invalid group mode: '{group_mode_str}'") from e
+        raise _exc.InputError(f"Invalid group mode: '{group_mode_str}'.") from e
 
     return crew_type, group_mode
 
@@ -127,15 +142,28 @@ def ct_gm_to_str(crew_type: CrewType, group_mode: GroupMode) -> str:
     return f'{crew_type}:{group_mode}'
 
 _default_group_modes = {
-    CrewType.CAST:              GroupMode.SEPARATE,
-    CrewType.STUNTCAST:         GroupMode.SEPARATE,
-    CrewType.DIRECTOR:          GroupMode.GROUP,
-    CrewType.WRITER:            GroupMode.GROUP,
-    CrewType.PRODUCER:          GroupMode.SEPARATE,
-    CrewType.COMPOSER:          GroupMode.GROUP,
-    CrewType.CINEMATOGRAPHER:   GroupMode.GROUP,
-    CrewType.EDITOR:            GroupMode.GROUP,
-    CrewType.ANY:               GroupMode.SEPARATE,
+    CrewType.DIRECTOR:              GroupMode.GROUP,
+    CrewType.ASSISTANT_DIRECTOR:    GroupMode.SEPARATE,
+    CrewType.PRODUCER:              GroupMode.SEPARATE,
+    CrewType.EXECUTIVE_PRODUCER:    GroupMode.GROUP,
+    CrewType.COMPOSER:              GroupMode.GROUP,
+    CrewType.CINEMATOGRAPHER:       GroupMode.GROUP,
+    CrewType.CHOREOGRAPHER:         GroupMode.GROUP,
+    CrewType.EDITOR:                GroupMode.GROUP,
+    CrewType.WRITER:                GroupMode.GROUP,
+    CrewType.CAST:                  GroupMode.SEPARATE,
+    CrewType.STUNTCAST:             GroupMode.SEPARATE,
+    CrewType.CASTING_DIRECTOR:      GroupMode.SEPARATE,
+    CrewType.PRODUCTION_DESIGNER:   GroupMode.SEPARATE,
+    CrewType.SET_DECORATOR:         GroupMode.SEPARATE,
+    CrewType.SFX_ARTIST:            GroupMode.SEPARATE,
+    CrewType.VFX_ARTIST:            GroupMode.SEPARATE,
+    CrewType.MAKEUP_ARTIST:         GroupMode.SEPARATE,
+    CrewType.COSTUME_DESIGNER:      GroupMode.SEPARATE,
+    CrewType.HAIRSTYLIST:           GroupMode.SEPARATE,
+    CrewType.ART_DIRECTOR:          GroupMode.SEPARATE,
+    CrewType.ADDITIONAL:            GroupMode.SEPARATE,
+    CrewType.ANY:                   GroupMode.SEPARATE,
 }
 
 _crew_types_except_any = [ct for ct in CrewType if ct != CrewType.ANY]
@@ -261,7 +289,7 @@ class _PeopleComputation(_MLVComputation):
             case (_, GroupMode.GROUP):
                 yield from self._group_people(movie_list)
             case _:
-                raise RuntimeError(f"Unexpected {ct_gm=}")
+                raise RuntimeError(f"Unexpected {ct_gm=}.")
 
     def _group_people(self, movie_list: MovieList) -> typing.Iterable[People]:
         # High level, the algorithm is as follows:
@@ -417,7 +445,7 @@ class _AssocPeopleComputation(_MLVComputation):
                     if people.are_in_movie(movie):
                         yield people
             case _:
-                raise RuntimeError(f"Unexpected {ct_gm=}")
+                raise RuntimeError(f"Unexpected {ct_gm=}.")
 
 class _AssocMoviesComputation(_MLVComputation):
     def __init__(self, crew_type: CrewType, group_mode: GroupMode):
@@ -956,7 +984,7 @@ class People(Findable):
             group_mode = GroupMode(split[1])
             return PeopleUidParts(mlf_people_uids=split[2:], crew_type=crew_type, group_mode=group_mode)
         except Exception as e:
-            raise _exc.InputError(f"Invalid People uid: '{uid}'") from e
+            raise _exc.InputError(f"Invalid People uid: '{uid}'.") from e
 
 class RoleUidParts(typing.NamedTuple):
     """
@@ -1075,7 +1103,7 @@ class Role(Findable):
         if attribute.findable_type == FindableType.PEOPLE:
             return self.people._extract_internal(attribute)
         
-        raise RuntimeError(f"Unexpected {attribute.findable_type=}")
+        raise RuntimeError(f"Unexpected {attribute.findable_type=}.")
 
     def _excrete(self, predicate: _filter.Predicate) -> bool:
         # Support optionally implementing _excrete_from_role on any type of predicate, for custom behavior on how to extract them from roles.
@@ -1089,7 +1117,7 @@ class Role(Findable):
         if predicate.findable_type == FindableType.PEOPLE:
             return self.people._excrete(predicate)
         
-        raise RuntimeError(f"Unexpected {predicate.findable_type=}")
+        raise RuntimeError(f"Unexpected {predicate.findable_type=}.")
 
     @classmethod
     def compose_uid(cls, movie: Movie, people: People) -> str:
@@ -1110,7 +1138,7 @@ class Role(Findable):
             split = uid.split('::', maxsplit=1)
             return RoleUidParts(movie_uid=split[0], people_uid=split[1])
         except Exception as e:
-            raise _exc.InputError(f"Invalid Role uid: '{uid}'") from e
+            raise _exc.InputError(f"Invalid Role uid: '{uid}'.") from e
 
 class MovieList:
     """
@@ -1211,7 +1239,7 @@ class MovieList:
 
                 findables = self._generate_roles(crew_type, group_mode)
             case _:
-                raise RuntimeError(f"Unexpected {what=}")
+                raise RuntimeError(f"Unexpected {what=}.")
 
         if filter is None or filter.is_empty:
             yield from findables.values()
@@ -1265,7 +1293,7 @@ class MovieList:
             case FindableType.ROLES:
                 return self.get_role_by_uid(uid)
             case _:
-                raise RuntimeError(f"Unexpected {findable_type=}")
+                raise RuntimeError(f"Unexpected {findable_type=}.")
 
     def get_movie_by_uid(self, uid: str) -> None | Movie:
         """

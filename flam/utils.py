@@ -238,7 +238,7 @@ def import_file(file: str) -> types.ModuleType:
     spec = importlib.util.spec_from_file_location(module_name, file)
 
     if spec is None:
-        raise ModuleNotFoundError(f"No module in path '{file}'")
+        raise ModuleNotFoundError(f"No module in path '{file}'.")
 
     assert spec.loader is not None
     module = importlib.util.module_from_spec(spec)
@@ -389,7 +389,7 @@ def truncate(s: str, max_len: int, ellipsis: str = '...', truncation_style: Trun
             take_from_start = max_len - len(ellipsis) - take_from_end
             return f"{s[:take_from_start]}{ellipsis}{s[len(s) - take_from_end:]}"
         case _:
-            raise RuntimeError(f'Unexpected {truncation_style=}')
+            raise RuntimeError(f'Unexpected {truncation_style=}.')
 
 _magnitudes = ['', 'K', 'M', 'B', 'T']
 

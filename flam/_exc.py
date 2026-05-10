@@ -37,7 +37,7 @@ class InputError(FlamError):
     Base class for errors raised by flam because of bad input from the user.
     """
 
-class CloseInputError(FlamError):
+class CloseInputError(InputError):
     """
     Input error with suggestions for similar values to help with typos.
     """

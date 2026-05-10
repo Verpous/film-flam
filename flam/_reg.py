@@ -27,7 +27,7 @@ from . import _ml
 _BUILTIN_NAME = 'builtin'
 _GLOBAL_NAME = 'global'
 
-class _RegistryOf[T: (type[_fetch.ListFetcher], type[_filter.Predicate], _attr.Attribute)]:
+class _RegistryOf[T: (type[_fetch.Fetcher], type[_filter.Predicate], _attr.Attribute)]:
     def __init__(self, reg: _Registry, name: str) -> None:
         self._registered_items: dict[str, None | T] = {}
         self._parent_reg = reg
@@ -118,12 +118,12 @@ class _RegistryOfPredicates(_RegistryOf[type[_filter.Predicate]]):
 class _Registry:
     def __init__(self, name: str) -> None:
         self._name = name
-        self._fetchers: _RegistryOf[type[_fetch.ListFetcher]] = _RegistryOf(self, 'fetcher')
+        self._fetchers: _RegistryOf[type[_fetch.Fetcher]] = _RegistryOf(self, 'fetcher')
         self._predicates: _RegistryOf[type[_filter.Predicate]] = _RegistryOfPredicates(self, 'predicate')
         self._attributes: _RegistryOf[_attr.Attribute] = _RegistryOfAttributes(self, 'attribute')
 
-    def register(self, item: type[_fetch.ListFetcher] | type[_filter.Predicate] | _attr.Attribute) -> None:
-        if isinstance(item, type) and issubclass(item, _fetch.ListFetcher):
+    def register(self, item: type[_fetch.Fetcher] | type[_filter.Predicate] | _attr.Attribute) -> None:
+        if isinstance(item, type) and issubclass(item, _fetch.Fetcher):
             self._fetchers.register(item)
         elif isinstance(item, type) and issubclass(item, _filter.Predicate):
             self._predicates.register(item)
@@ -136,11 +136,11 @@ class _Registry:
 _builtins = _Registry(_BUILTIN_NAME)
 _global_extensions = _Registry(_GLOBAL_NAME)
 
-def _register_builtin[T: (type[_fetch.ListFetcher], type[_filter.Predicate], _attr.Attribute)](item: T) -> T:
+def _register_builtin[T: (type[_fetch.Fetcher], type[_filter.Predicate], _attr.Attribute)](item: T) -> T:
     _builtins.register(item)
     return item
 
-def register[T: (type[_fetch.ListFetcher], type[_filter.Predicate], _attr.Attribute)](item: T) -> T:
+def register[T: (type[_fetch.Fetcher], type[_filter.Predicate], _attr.Attribute)](item: T) -> T:
     """
     Register an predicate, attribute, or fetcher as a global extension. Global extensions are available to use from any context with ``import_extensions=True``.
 
@@ -157,7 +157,7 @@ def compose_qualified_attr_or_pred_name(findable_type: _ml.FindableType, name_wi
     """
     Compose an attribute or predicate qualified name from its parts. For example:
 
-    .. code-block::
+    .. code-block:: python
 
         compose_qualified_attr_or_pred_name(FindableType.MOVIES, 'title') # Returns 'movies-title'.
 
@@ -173,12 +173,13 @@ def decompose_qualified_attr_or_pred_name(qualified_name: str) -> tuple[_ml.Find
     split = qualified_name.split('-', maxsplit=1)
 
     if len(split) != 2:
-        raise _exc.InputError(f"Invalid qualified_name: '{qualified_name}'")
+        raise _exc.InputError(f"Invalid qualified_name: '{qualified_name}'.")
 
     return _ml.FindableType(split[0]), split[1]
 
 # Import builtin extensions only here to avoid cyclic dependency issues.
 from . import _imdb # pylint: disable=unused-import
+from . import _letterboxd # pylint: disable=unused-import
 from . import _builtin_attr # pylint: disable=unused-import
 from . import _builtin_pred # pylint: disable=unused-import
 

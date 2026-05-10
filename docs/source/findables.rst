@@ -28,7 +28,7 @@ Crew type
 
 Flam supports the following crew types:
 
-    cast, stuntcast, director, writer, producer, composer, cinematographer, editor, any
+    .. program-output:: python -c 'import flam; print(", ".join(flam.CrewType))'
 
 The same person can have different properties when presented as different crew types.
 For example, Quentin Tarantino will have a different 'num-movies' attribute as a director than as a cast member.

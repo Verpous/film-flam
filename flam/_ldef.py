@@ -108,7 +108,7 @@ class CanonListdef(typing.NamedTuple):
                         # Only simple lists support default_fetch because it makes no sense for composites.
                         yield from (sl.abstract_listdef for sl in ctx.cfg_readonly.simple_lists if sl.is_default_fetch)
                     case _:
-                        raise RuntimeError(f"Unexpected {flavor=}")
+                        raise RuntimeError(f"Unexpected {flavor=}.")
             case SpecialListType.COMPOSITE:
                 match flavor:
                     case _ExpandFlavor.FIND:
@@ -118,7 +118,7 @@ class CanonListdef(typing.NamedTuple):
                         composite_list = ctx.cfg_readonly.composite_lists.get_by_uid(self.address)
                         yield from (CanonListdef(SpecialListType.SIMPLE, sl_uid) for sl_uid in composite_list.simple_list_uids)
                     case _:
-                        raise RuntimeError(f"Unexpected {flavor=}")
+                        raise RuntimeError(f"Unexpected {flavor=}.")
             case SpecialListType.ANONYMOUS:
                 # Fully supporting anonymous lists is both unneeded and will require complicating a lot of code with recursion.
                 # This list type is only meant for internal use and we'll assume that it's made up of already expanded parts.
@@ -145,7 +145,7 @@ class CanonListdef(typing.NamedTuple):
             case _:
                 return False
 
-    # "Concrete" listdefs have a type that directly corresponds to a ListFetcher.
+    # "Concrete" listdefs have a type that directly corresponds to a Fetcher.
     @property
     def is_concrete(self) -> bool:
         """

@@ -121,6 +121,19 @@ def _movie_source_extractor(self: attrutils.EasyAttribute, movie: _ml.Movie, mlf
     return sources
 
 @_register_easy_attribute(attrutils.EasyAttributeParams(
+    name_without_type = 'tagline',
+    aliases_without_type = ['slogan'],
+    findable_type = _ml.FindableType.MOVIES,
+    type_handler = attrutils.STR_HANDLER,
+    is_ascending = True,
+    truncation_style = utils.TruncationStyle.NO_TRIM, # No trimming taglines.
+    default_max_len = _STR_LEN_DONTCARE,
+))
+def _movie_tagline_extractor(self: attrutils.EasyAttribute, movie: _ml.Movie, mlf_movie: _mlf.MLFMovie) -> None | str:
+    """the movie's tagline."""
+    return mlf_movie.tagline
+
+@_register_easy_attribute(attrutils.EasyAttributeParams(
     name_without_type = 'synopsis',
     aliases_without_type = ['plot', 'summary', 'description', 'desc'],
     findable_type = _ml.FindableType.MOVIES,
@@ -132,6 +145,19 @@ def _movie_source_extractor(self: attrutils.EasyAttribute, movie: _ml.Movie, mlf
 def _movie_synopsis_extractor(self: attrutils.EasyAttribute, movie: _ml.Movie, mlf_movie: _mlf.MLFMovie) -> None | str:
     """the movie's synopsis."""
     return mlf_movie.synopsis
+
+@_register_easy_attribute(attrutils.EasyAttributeParams(
+    name_without_type = 'url',
+    aliases_without_type = ['link', 'page'],
+    findable_type = _ml.FindableType.MOVIES,
+    type_handler = attrutils.STR_HANDLER,
+    is_ascending = True,
+    truncation_style = utils.TruncationStyle.NO_TRIM, # Trimmed urls are worthless.
+    default_max_len = _STR_LEN_DONTCARE,
+))
+def _movie_url_extractor(self: attrutils.EasyAttribute, movie: _ml.Movie, mlf_movie: _mlf.MLFMovie) -> None | str:
+    """link to the movie's page on the website it was fetched from."""
+    return mlf_movie.url
 
 def _make_date_aliases(name: str) -> list[str]:
     aliases = []
@@ -196,17 +222,30 @@ for handler in attrutils.DATE_HANDLERS:
         ]
 
 @_register_easy_attribute(attrutils.EasyAttributeParams(
-    name_without_type = 'note',
-    aliases_without_type = ['comment', 'notes', 'comments'],
+    name_without_type = 'list-note',
+    aliases_without_type = ['list-comment', 'list-notes', 'list-comments'],
     findable_type = _ml.FindableType.MOVIES,
     type_handler = attrutils.STR_HANDLER,
     is_ascending = True,
     truncation_style = utils.TruncationStyle.TRIM_MIDDLE,
     default_max_len = _STR_LEN_LONG,
 ))
-def _movie_note_extractor(self: attrutils.EasyAttribute, movie: _ml.Movie, mlf_movie: _mlf.MLFMovie) -> list[None | str]:
-    """a personal note you left on this movie."""
-    return [per_src_data.note for per_src_data in mlf_movie.per_src_data]
+def _movie_list_note_extractor(self: attrutils.EasyAttribute, movie: _ml.Movie, mlf_movie: _mlf.MLFMovie) -> list[None | str]:
+    """list of notes left on this movie in this list."""
+    return [per_src_data.list_note for per_src_data in mlf_movie.per_src_data]
+
+@_register_easy_attribute(attrutils.EasyAttributeParams(
+    name_without_type = 'my-notes',
+    aliases_without_type = ['my-note', 'my-comment', 'my-comments'],
+    findable_type = _ml.FindableType.MOVIES,
+    type_handler = attrutils.STR_HANDLER,
+    is_ascending = True,
+    truncation_style = utils.TruncationStyle.TRIM_MIDDLE,
+    default_max_len = _STR_LEN_LONG,
+))
+def _movie_my_notes_extractor(self: attrutils.EasyAttribute, movie: _ml.Movie, mlf_movie: _mlf.MLFMovie) -> list[str]:
+    """list of notes left on this movie by you in general."""
+    return list(mlf_movie.my_notes)
 
 # 'index' only as an alias because there's a predicate by the same name.
 @_register_easy_attribute(attrutils.EasyAttributeParams(
@@ -301,6 +340,32 @@ def _movie_my_rating_extractor(self: attrutils.EasyAttribute, movie: _ml.Movie, 
     return mlf_movie.my_rating
 
 @_register_easy_attribute(attrutils.EasyAttributeParams(
+    name_without_type = 'likes',
+    aliases_without_type = ['like-count'],
+    findable_type = _ml.FindableType.MOVIES,
+    type_handler = attrutils.BIG_INT_HANDLER,
+    is_ascending = False,
+    truncation_style = utils.TruncationStyle.NO_TRIM,
+    default_max_len = _STR_LEN_DONTCARE,
+), create_numericals = True)
+def _movie_likes_extractor(self: attrutils.EasyAttribute, movie: _ml.Movie, mlf_movie: _mlf.MLFMovie) -> None | int:
+    """how many people liked the film."""
+    return mlf_movie.likes
+
+@_register_easy_attribute(attrutils.EasyAttributeParams(
+    name_without_type = 'is-liked',
+    aliases_without_type = ['liked', 'my-like'],
+    findable_type = _ml.FindableType.MOVIES,
+    type_handler = attrutils.BOOL_HANDLER,
+    is_ascending = False,
+    truncation_style = utils.TruncationStyle.NO_TRIM,
+    default_max_len = _STR_LEN_DONTCARE,
+))
+def _movie_is_liked_extractor(self: attrutils.EasyAttribute, movie: _ml.Movie, mlf_movie: _mlf.MLFMovie) -> None | bool:
+    """whether you user gave the film a like."""
+    return mlf_movie.is_liked
+
+@_register_easy_attribute(attrutils.EasyAttributeParams(
     name_without_type = 'genres',
     aliases_without_type = ['genre', 'category', 'categories'],
     findable_type = _ml.FindableType.MOVIES,
@@ -316,6 +381,19 @@ def _movie_genres_extractor(self: attrutils.EasyAttribute, movie: _ml.Movie, mlf
     return list(mlf_movie.genres)
 
 @_register_easy_attribute(attrutils.EasyAttributeParams(
+    name_without_type = 'studios',
+    aliases_without_type = ['studio'],
+    findable_type = _ml.FindableType.MOVIES,
+    type_handler = attrutils.STR_HANDLER,
+    is_ascending = True,
+    truncation_style = utils.TruncationStyle.TRIM_MIDDLE,
+    default_max_len = _STR_LEN_LONG,
+))
+def _movie_studios_extractor(self: attrutils.EasyAttribute, movie: _ml.Movie, mlf_movie: _mlf.MLFMovie) -> list[str]:
+    """list of the movie's producing studios."""
+    return list(mlf_movie.studios)
+
+@_register_easy_attribute(attrutils.EasyAttributeParams(
     name_without_type = 'languages',
     aliases_without_type = ['language'],
     findable_type = _ml.FindableType.MOVIES,
@@ -326,8 +404,6 @@ def _movie_genres_extractor(self: attrutils.EasyAttribute, movie: _ml.Movie, mlf
 ))
 def _movie_languages_extractor(self: attrutils.EasyAttribute, movie: _ml.Movie, mlf_movie: _mlf.MLFMovie) -> list[str]:
     """list of the movie's languages."""
-    # Assume lists are sorted at the source, because of canonicalization. So we won't sort them here.
-    # However we do have to copy the list to prevent giving the user access to memory he shouldn't have.
     return list(mlf_movie.languages)
 
 @_register_easy_attribute(attrutils.EasyAttributeParams(
@@ -341,8 +417,6 @@ def _movie_languages_extractor(self: attrutils.EasyAttribute, movie: _ml.Movie, 
 ))
 def _movie_countries_extractor(self: attrutils.EasyAttribute, movie: _ml.Movie, mlf_movie: _mlf.MLFMovie) -> list[str]:
     """list of the movie's producing countries."""
-    # Assume lists are sorted at the source, because of canonicalization. So we won't sort them here.
-    # However we do have to copy the list to prevent giving the user access to memory he shouldn't have.
     return list(mlf_movie.countries)
 
 # Returns the names of all people in a certain crew type. Supports CrewType.ANY, but an attribute named 'any' will be very unclear, so we name that one 'people' instead.
@@ -376,7 +450,7 @@ def _get_only_value[TKey, TVal](d: dict[TKey, TVal]) -> TVal:
     for k in d:
         return d[k] # Donkey-Kong!
 
-    raise RuntimeError('Unexpected non-empty dictionary')
+    raise RuntimeError('Unexpected non-empty dictionary.')
 
 @_register_easy_attribute(attrutils.EasyAttributeParams(
     name_without_type = 'stars',
@@ -592,16 +666,16 @@ def _people_professions_extractor(self: attrutils.EasyAttribute, people: _ml.Peo
 ))
 def _people_top_genres_extractor(self: attrutils.EasyAttribute, people: _ml.People, mlf_people: list[_mlf.MLFPerson]) -> list[str]:
     """list of up to 3 genres these people appear in the most."""
-    genre_occurences: dict[str, int] = collections.defaultdict(lambda : 0)
+    genre_occurrences: dict[str, int] = collections.defaultdict(lambda : 0)
 
-    # Count occurences of each genre these people were in.
+    # Count occurrences of each genre these people were in.
     for movie in people.associated_movies():
         for genre in movie.underlying_file_movie_readonly.genres:
-            genre_occurences[genre] += 1
+            genre_occurrences[genre] += 1
 
-    # Sort the items() so it sorts both by the num occurences as the primary sort key, but the genre string lexicographically as a tiebreaker. This guarantees stable ordering.
+    # Sort the items() so it sorts both by the num occurrences as the primary sort key, but the genre string lexicographically as a tiebreaker. This guarantees stable ordering.
     # Will take only the 3 top genres.
-    return [k for k, v in sorted(genre_occurences.items())][:3]
+    return [k for k, v in sorted(genre_occurrences.items())][:3]
 
 for handler in attrutils.DATE_HANDLERS:
     name_without_type = 'birth' + handler.name
@@ -683,6 +757,28 @@ def _role_star_extractor(self: attrutils.EasyAttribute, role: _ml.Role, mlf_role
         mlf_role.is_star
         for mlf_person in mlf_people
         for ct, mlf_role in mlf_roles[mlf_person.uid].items()
+    ]
+
+@_register_easy_attribute(attrutils.EasyAttributeParams(
+    name_without_type = 'jobs',
+    aliases_without_type = ['job'],
+    findable_type = _ml.FindableType.ROLES,
+    type_handler = attrutils.STR_HANDLER,
+    is_ascending = True,
+    truncation_style = utils.TruncationStyle.TRIM_MIDDLE,
+    default_max_len = _STR_LEN_SHORT,
+))
+def _role_jobs_extractor(self: attrutils.EasyAttribute, role: _ml.Role, mlf_roles: _ml.MLFRolesDict, mlf_movie: _mlf.MLFMovie, mlf_people: list[_mlf.MLFPerson]) -> list[str]:
+    """list of jobs performed by this role (for crew type :py:attr:`~._ml.CrewType.ADDITIONAL`)."""
+    # Guaranteed consistent ordering because:
+    # * mlf_people is sorted by uids
+    # * python preserves dictionary order and crew types were added to mlf_roles[mlf_people] in the same order everytime
+    # * mlf_role.jobs is sorted by canonicalization
+    return [
+        job
+        for mlf_person in mlf_people
+        for ct, mlf_role in mlf_roles[mlf_person.uid].items()
+        for job in mlf_role.jobs
     ]
 
 #endregion role attributes

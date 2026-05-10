@@ -1,3 +1,18 @@
+# Copyright (C) 2026 Aviv Edery.
+
+# This program is free software: you can redistribute it and/or modify
+# it under the terms of the GNU General Public License as published by
+# the Free Software Foundation, either version 3 of the License, or
+# (at your option) any later version.
+
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# GNU General Public License for more details.
+
+# You should have received a copy of the GNU General Public License
+# along with this program. If not, see <https://www.gnu.org/licenses/>.
+
 # pylint: disable=unused-argument
 
 import typing
@@ -11,7 +26,7 @@ from flam import attrutils
 
 # This fetcher takes a size of a list to "fetch" and literally makes up a list with phony data.
 @flam.register
-class RandomDataFetcher(flam.ListFetcher, list_type='random-size'):
+class RandomDataFetcher(flam.Fetcher, list_type='random-size'):
     def _fetch_into_file(self, movie_list_file: flam.MovieListFile) -> None:
         # Takes the address to mean the number of movies the random list should have.
         num_movies = int(self.concrete_listdef.address)
@@ -67,8 +82,9 @@ class RandomDataFetcher(flam.ListFetcher, list_type='random-size'):
                 # We can always fill in None, or leave lists empty if we're missing that data.
                 crew[crew_type].roles_by_uid[person_uid] = flam.MLFRole(
                     person_uid = person_uid,
-                    characters = [rng.choice(CHARACTERS_POOL)] if crew_type == flam.CrewType.CAST else [],
                     is_star = None,
+                    characters = [rng.choice(CHARACTERS_POOL)] if crew_type == flam.CrewType.CAST else [],
+                    jobs = [],
                 )
 
                 # This person may have already been fetched because of their presence in another movie or another crew type in this movie.
@@ -80,7 +96,7 @@ class RandomDataFetcher(flam.ListFetcher, list_type='random-size'):
         per_src_data = flam.MLFMoviePerSourceData(
             canon_listdef       = movie_list_file.abstract_listdef,
             list_index          = int(uid),
-            note                = None,
+            list_note           = None,
             listing_date        = None,
         )
 
@@ -88,16 +104,22 @@ class RandomDataFetcher(flam.ListFetcher, list_type='random-size'):
             uid                 = uid,
             per_src_data        = [per_src_data],
             title               = rng.choice(TITLES_POOL),
+            tagline             = None,
             synopsis            = None,
+            url                 = None,
             runtime_minutes     = 145,
             metascore_votes     = None,
             metascore           = 82,
             votes               = None,
             rating              = 8.5,
             my_rating           = None,
+            likes               = None,
+            is_liked            = None,
             release_date        = datetime.date(1969, 7, 4),
             watch_dates         = [],
+            my_notes            = [],
             genres              = ['Drama', 'Western'],
+            studios             = ['Paramount Pictures', 'Rafran Cinematografica', 'San Marco'],
             languages           = ['English', 'Italian', 'Spanish'],
             countries           = ['Italy', 'United States'],
             crew                = crew,

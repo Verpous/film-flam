@@ -41,7 +41,7 @@ Formal syntax
 
 Below is the formal syntax for filters. Note that filters are case-sensitive!
 
-.. code-block::
+.. code-block:: text
 
     FILTER    := PIPELINE | <epsilon>
     PIPELINE  := SINGLE JOINABLE*

@@ -195,7 +195,7 @@ class FlamContext:
         return self._cfg
 
     @property
-    def fetchers(self) -> RegistriesOf[type[_fetch.ListFetcher]]:
+    def fetchers(self) -> RegistriesOf[type[_fetch.Fetcher]]:
         """
         A registry object with all registered fetchers.
         """
@@ -257,7 +257,7 @@ class FlamContext:
         # This code really belongs in _ldef, but as an interface it's nicer for users if it's through the context.
         return _ldef.CanonListdef._parse(listdef, self)
 
-    def register[T: (type[_fetch.ListFetcher], type[_filter.Predicate], _attr.Attribute)](self, item: T) -> T:
+    def register[T: (type[_fetch.Fetcher], type[_filter.Predicate], _attr.Attribute)](self, item: T) -> T:
         """
         Register a context-level extension. Context extensions are only available from the specific context to which they were registered.
 
@@ -267,7 +267,7 @@ class FlamContext:
         """
 
         # Yes, this is a copy paste from _reg.register. I don't think it's worth the effort to avoid it.
-        if isinstance(item, type) and issubclass(item, _fetch.ListFetcher):
+        if isinstance(item, type) and issubclass(item, _fetch.Fetcher):
             self._fetchers._register(item)
         elif isinstance(item, type) and issubclass(item, _filter.Predicate):
             self._predicates._register(item)
@@ -461,7 +461,7 @@ class FlamContext:
 
         match abstract_listdef.list_type:
             case _ldef.SpecialListType.ANONYMOUS:
-                raise RuntimeError(f"Unexpected {abstract_listdef.list_type=}")
+                raise RuntimeError(f"Unexpected {abstract_listdef.list_type=}.")
             case _ldef.SpecialListType.COMPOSITE:
                 # Everything that can be easily regenerated should go under cache so it's easy to delete them all at once.
                 return os.path.join(self._flam_dir, self._CACHE_DIR, self._MLF_DIR, filename)
@@ -802,6 +802,10 @@ class FlamContext:
         for fetcher in fetchers:
             mlf = None
 
+            # Use this to indicate that the file should be persisted even if the fetcher wrote nothing new, because it's the first time we're creating the file.
+            # Otherwise there was a bug where fetching an empty list for the first time doesn't actually save it.
+            from_scratch = False
+
             # Secret feature: if refetch pattern is '.*', we'll go a little extra and start the entire file from scratch.
             # This lets you overcome (im)possible cases where the file is fucked and you cannot run fetch because of it.
             if refetch_re is None or refetch_re.pattern != '.*':
@@ -815,6 +819,7 @@ class FlamContext:
             # This silent handling of uid mismatch makes handling LISTDEF configuration changes much simpler,
             # and it also makes sense because uid families are mostly meant for checking composite list compatiblity, not fetch compatibility.
             if mlf is None or mlf.uid_family != fetcher.uid_family:
+                from_scratch = True
                 mlf = _mlf.MovieListFile(
                     version = _gen_version.__version__,
                     uid_family = fetcher.uid_family,
@@ -833,10 +838,10 @@ class FlamContext:
                 fetcher._fetch(new_mlf, refetch_re, quiet)
             except _exc.FetchInterrupt:
                 _dbg.logger.info(f"Partially fetched {fetcher.abstract_listdef} due to an interrupt")
-                self._close_fetch(mlf, new_mlf)
+                self._close_fetch(mlf if not from_scratch else None, new_mlf)
                 raise
 
-            self._close_fetch(mlf, new_mlf)
+            self._close_fetch(mlf if not from_scratch else None, new_mlf)
             _dbg.logger.info(f"Fetched {fetcher.abstract_listdef} with no interrupts")
 
     def _close_fetch(self, old_mlf: None | _mlf.MovieListFile, new_mlf: _mlf.MovieListFile) -> None:
@@ -848,7 +853,7 @@ class FlamContext:
         if old_mlf is None or old_mlf != new_mlf:
             self._write_mlf(new_mlf)
 
-    def _get_fetcher(self, canon_listdef: _ldef.CanonListdef) -> _fetch.ListFetcher:
+    def _get_fetcher(self, canon_listdef: _ldef.CanonListdef) -> _fetch.Fetcher:
         if canon_listdef.is_abstract:
             # Assume it's a SimpleList.
             abstract_listdef = canon_listdef
@@ -909,7 +914,7 @@ class FlamContext:
                 *(_ml._MinSupersetPeopleComputation(ct1, ct2, _ml.GroupMode.GROUP) for ct1 in _ml.CrewType for ct2 in _ml.CrewType if ct1 != ct2),
             ]
         else:
-            raise RuntimeError(f'Unexpected {preference=}')
+            raise RuntimeError(f'Unexpected {preference=}.')
 
         # Handling for DEFAULTS/EVERYTHING is very similar.
         all_listdefs = self._get_all_listdefs()
@@ -1041,11 +1046,11 @@ class FlamContext:
 
 # Utility for "inverting" registries: instead of first the registration level then the item type, it's first the item type then the levels.
 # Has to be implemented this way because some of the registries are contextual, some global.
-class RegistriesOf[T: (type[_fetch.ListFetcher], type[_filter.Predicate], _attr.Attribute)]:
+class RegistriesOf[T: (type[_fetch.Fetcher], type[_filter.Predicate], _attr.Attribute)]:
     # Don't link the possibles values of T because it's impossible without using internal module name.
     """
     Object representing everything that is registered in a :py:class:`FlamContext` of type ``T``.
-    ``T`` may be either :py:class:`~._attr.Attribute`, :py:class:`type[Predicate] <._filter.Predicate>`, or :py:class:`type[ListFetcher] <._fetch.ListFetcher>`.
+    ``T`` may be either :py:class:`~._attr.Attribute`, :py:class:`type[Predicate] <._filter.Predicate>`, or :py:class:`type[Fetcher] <._fetch.Fetcher>`.
     """
     __no_init_doc__ = True
     

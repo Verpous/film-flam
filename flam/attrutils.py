@@ -125,7 +125,7 @@ class EasyAttribute(_attr.Attribute):
         try:
             return self._params.type_handler.parse(primitive_str)
         except ValueError as e:
-            raise _exc.InputError(f"Invalid {self.qualified_name}: '{primitive_str}'.") from e
+            raise _exc.InputError(f"Invalid {self.qualified_name}: '{primitive_str}': {e}") from e
 
     def _str_of_primitive_not_none(self, primitive: _attr.AttributePrimitive, abbreviate: bool, extras: dict[str, typing.Any]) -> str:
         """
@@ -319,7 +319,7 @@ class BoolHandler(TypeHandler):
         try:
             return self._str_reps[primitive_str.lower()]
         except KeyError as e:
-            raise ValueError(f"Invalid boolean string: '{primitive_str}'") from e
+            raise ValueError(f"Invalid boolean string: '{primitive_str}'.") from e
 
     def str_of(self, primitive: _attr.AttributePrimitive, abbreviate: bool, extras: dict[str, typing.Any]) -> str:
         """
@@ -509,7 +509,7 @@ DATE_HANDLERS = [
     DateHandler('-date',                '%Y-%m-%d', False),
     DateHandler('-year',                '%Y',       False),
     DateHandler('-year-month',          '%Y-%m',    False),
-    DateHandler('-month-day',           '%m-%d',    True),
+    DateHandler('-month-day',           '%m-%d',    True), # NOTE: I don't like these too-specific handlers, but flam chart may need them some day, so for now we keep them.
     DateHandler('-week-of-year',        '%U',       True),
     DateHandler('-week-of-year-monday', '%W',       True),
     DateHandler('-day-of-year',         '%j',       True),
@@ -709,7 +709,7 @@ class AverageAttribute(EasyAttribute):
             case _ml.FindableType.MOVIES:
                 return _ml.FindableType.PEOPLE
             case _:
-                raise RuntimeError(f'Unexpected {findable_type=}')
+                raise RuntimeError(f'Unexpected {findable_type=}.')
 
 class SumAttribute(EasyAttribute):
     """
