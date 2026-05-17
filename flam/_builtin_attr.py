@@ -82,6 +82,19 @@ def _movie_origin_uid_extractor(self: attrutils.EasyAttribute, movie: _ml.Movie,
     """the movie's UID in the source from which the data is fetched."""
     return mlf_movie.uid
 
+@_register_easy_attribute(attrutils.EasyAttributeParams(
+    name_without_type = 'media-type',
+    aliases_without_type = ['type', 'title-type'],
+    findable_type = _ml.FindableType.MOVIES,
+    type_handler = attrutils.STR_HANDLER,
+    is_ascending = True,
+    truncation_style = utils.TruncationStyle.NO_TRIM,
+    default_max_len = _STR_LEN_DONTCARE,
+))
+def _movie_media_type_extractor(self: attrutils.EasyAttribute, movie: _ml.Movie, mlf_movie: _mlf.MLFMovie) -> None | str:
+    """whether this "movie" is actually a movie, or a TV series, etc."""
+    return mlf_movie.media_type
+
 # Primary name should be 'title' because People have an attribute named 'name'.
 @_register_easy_attribute(attrutils.EasyAttributeParams(
     name_without_type = 'title',
@@ -95,6 +108,19 @@ def _movie_origin_uid_extractor(self: attrutils.EasyAttribute, movie: _ml.Movie,
 def _movie_title_extractor(self: attrutils.EasyAttribute, movie: _ml.Movie, mlf_movie: _mlf.MLFMovie) -> None | str:
     """the movie's title."""
     return mlf_movie.title
+
+@_register_easy_attribute(attrutils.EasyAttributeParams(
+    name_without_type = 'original-title',
+    aliases_without_type = ['original-name', 'native-title', 'native-name'],
+    findable_type = _ml.FindableType.MOVIES,
+    type_handler = attrutils.STR_HANDLER,
+    is_ascending = True,
+    truncation_style = utils.TruncationStyle.TRIM_END,
+    default_max_len = _STR_LEN_LONG,
+))
+def _movie_original_title_extractor(self: attrutils.EasyAttribute, movie: _ml.Movie, mlf_movie: _mlf.MLFMovie) -> None | str:
+    """the movie's original title in its native language."""
+    return mlf_movie.original_title
 
 @_register_easy_attribute(attrutils.EasyAttributeParams(
     name_without_type = 'source',
@@ -135,7 +161,7 @@ def _movie_tagline_extractor(self: attrutils.EasyAttribute, movie: _ml.Movie, ml
 
 @_register_easy_attribute(attrutils.EasyAttributeParams(
     name_without_type = 'synopsis',
-    aliases_without_type = ['plot', 'summary', 'description', 'desc'],
+    aliases_without_type = ['plot', 'summary', 'description', 'desc', 'overview'],
     findable_type = _ml.FindableType.MOVIES,
     type_handler = attrutils.STR_HANDLER,
     is_ascending = True,
@@ -181,8 +207,8 @@ for handler in attrutils.DATE_HANDLERS:
         findable_type = _ml.FindableType.MOVIES,
         type_handler = handler, # pylint: disable=cell-var-from-loop
         is_ascending = handler.is_ascending, # pylint: disable=cell-var-from-loop
-        truncation_style = utils.TruncationStyle.NO_TRIM,
-        default_max_len = _STR_LEN_DONTCARE,
+        truncation_style = utils.TruncationStyle.TRIM_MIDDLE,
+        default_max_len = _STR_LEN_SHORT,
     ))
     def _movie_watch_date_extractor(self: attrutils.EasyAttribute, movie: _ml.Movie, mlf_movie: _mlf.MLFMovie) -> list[datetime.date]:
         """list of dates that you watched the film in this date format."""
@@ -202,6 +228,21 @@ for handler in attrutils.DATE_HANDLERS:
     def _movie_release_date_extractor(self: attrutils.EasyAttribute, movie: _ml.Movie, mlf_movie: _mlf.MLFMovie) -> None | datetime.date:
         """the movie's release date in this date format."""
         return None if mlf_movie.release_date is None else typing.cast(attrutils.DateHandler, self._params.type_handler).strip(mlf_movie.release_date)
+
+    name_without_type = 'end' + handler.name
+
+    @_register_easy_attribute(attrutils.EasyAttributeParams(
+        name_without_type = name_without_type, # pylint: disable=cell-var-from-loop
+        aliases_without_type = _make_date_aliases(name_without_type), # pylint: disable=cell-var-from-loop
+        findable_type = _ml.FindableType.MOVIES,
+        type_handler = handler, # pylint: disable=cell-var-from-loop
+        is_ascending = handler.is_ascending, # pylint: disable=cell-var-from-loop
+        truncation_style = utils.TruncationStyle.NO_TRIM,
+        default_max_len = _STR_LEN_DONTCARE,
+    ))
+    def _movie_end_date_extractor(self: attrutils.EasyAttribute, movie: _ml.Movie, mlf_movie: _mlf.MLFMovie) -> None | datetime.date:
+        """the TV show's final air date in this date format."""
+        return None if mlf_movie.end_date is None else typing.cast(attrutils.DateHandler, self._params.type_handler).strip(mlf_movie.end_date)
 
     name_without_type = 'listing' + handler.name
 
@@ -246,6 +287,32 @@ def _movie_list_note_extractor(self: attrutils.EasyAttribute, movie: _ml.Movie, 
 def _movie_my_notes_extractor(self: attrutils.EasyAttribute, movie: _ml.Movie, mlf_movie: _mlf.MLFMovie) -> list[str]:
     """list of notes left on this movie by you in general."""
     return list(mlf_movie.my_notes)
+
+@_register_easy_attribute(attrutils.EasyAttributeParams(
+    name_without_type = 'episodes-num',
+    aliases_without_type = ['episodes'],
+    findable_type = _ml.FindableType.MOVIES,
+    type_handler = attrutils.SMALL_INT_HANDLER,
+    is_ascending = False,
+    truncation_style = utils.TruncationStyle.NO_TRIM,
+    default_max_len = _STR_LEN_DONTCARE,
+), create_numericals = True)
+def _movie_episodes_num_extractor(self: attrutils.EasyAttribute, movie: _ml.Movie, mlf_movie: _mlf.MLFMovie) -> None | int:
+    """the number of episodes in this TV show."""
+    return mlf_movie.episodes_num
+
+@_register_easy_attribute(attrutils.EasyAttributeParams(
+    name_without_type = 'seasons-num',
+    aliases_without_type = ['seasons'],
+    findable_type = _ml.FindableType.MOVIES,
+    type_handler = attrutils.SMALL_INT_HANDLER,
+    is_ascending = False,
+    truncation_style = utils.TruncationStyle.NO_TRIM,
+    default_max_len = _STR_LEN_DONTCARE,
+), create_numericals = True)
+def _movie_seasons_num_extractor(self: attrutils.EasyAttribute, movie: _ml.Movie, mlf_movie: _mlf.MLFMovie) -> None | int:
+    """the number of seasons in this TV show."""
+    return mlf_movie.seasons_num
 
 # 'index' only as an alias because there's a predicate by the same name.
 @_register_easy_attribute(attrutils.EasyAttributeParams(
@@ -366,6 +433,45 @@ def _movie_is_liked_extractor(self: attrutils.EasyAttribute, movie: _ml.Movie, m
     return mlf_movie.is_liked
 
 @_register_easy_attribute(attrutils.EasyAttributeParams(
+    name_without_type = 'budget-usd',
+    aliases_without_type = ['budget'],
+    findable_type = _ml.FindableType.MOVIES,
+    type_handler = attrutils.BIG_INT_HANDLER,
+    is_ascending = False,
+    truncation_style = utils.TruncationStyle.NO_TRIM,
+    default_max_len = _STR_LEN_DONTCARE,
+), create_numericals = True)
+def _movie_budget_extractor(self: attrutils.EasyAttribute, movie: _ml.Movie, mlf_movie: _mlf.MLFMovie) -> None | int:
+    """the movie's budget in US dollars."""
+    return mlf_movie.budget_usd
+
+@_register_easy_attribute(attrutils.EasyAttributeParams(
+    name_without_type = 'revenue-usd',
+    aliases_without_type = ['revenue'],
+    findable_type = _ml.FindableType.MOVIES,
+    type_handler = attrutils.BIG_INT_HANDLER,
+    is_ascending = False,
+    truncation_style = utils.TruncationStyle.NO_TRIM,
+    default_max_len = _STR_LEN_DONTCARE,
+), create_numericals = True)
+def _movie_revenue_extractor(self: attrutils.EasyAttribute, movie: _ml.Movie, mlf_movie: _mlf.MLFMovie) -> None | int:
+    """the movie's revenue in US dollars."""
+    return mlf_movie.revenue_usd
+
+@_register_easy_attribute(attrutils.EasyAttributeParams(
+    name_without_type = 'content-rating',
+    aliases_without_type = [],
+    findable_type = _ml.FindableType.MOVIES,
+    type_handler = attrutils.STR_HANDLER,
+    is_ascending = True,
+    truncation_style = utils.TruncationStyle.TRIM_MIDDLE,
+    default_max_len = _STR_LEN_SHORT,
+))
+def _movie_content_rating_extractor(self: attrutils.EasyAttribute, movie: _ml.Movie, mlf_movie: _mlf.MLFMovie) -> None | str:
+    """the movie's content rating."""
+    return mlf_movie.content_rating
+
+@_register_easy_attribute(attrutils.EasyAttributeParams(
     name_without_type = 'genres',
     aliases_without_type = ['genre', 'category', 'categories'],
     findable_type = _ml.FindableType.MOVIES,
@@ -469,6 +575,43 @@ def _movie_stars_extractor(self: attrutils.EasyAttribute, movie: _ml.Movie, mlf_
         for role in movie.associated_roles(_ml.CrewType.CAST, _ml.GroupMode.SEPARATE)
         if _get_only_value(role.underlying_file_roles_readonly)[_ml.CrewType.CAST].is_star
     ]
+
+@_register_easy_attribute(attrutils.EasyAttributeParams(
+    name_without_type = 'oscar-noms',
+    aliases_without_type = ['oscar-nominations', 'noms', 'nominations'],
+    findable_type = _ml.FindableType.MOVIES,
+    type_handler = attrutils.STR_HANDLER,
+    is_ascending = True,
+    truncation_style = utils.TruncationStyle.TRIM_MIDDLE,
+    default_max_len = _STR_LEN_LONG,
+))
+def _movie_oscar_noms_extractor(self: attrutils.EasyAttribute, movie: _ml.Movie, mlf_movie: _mlf.MLFMovie) -> list[str]:
+    """list of Oscar nominations received by this movie."""
+    # The same oscar can appear under many crew members so we have to find unique oscars.
+    return sorted(set(
+        oscar
+        for crew in mlf_movie.crew.values()
+            for mlf_role in crew.roles_by_uid.values()
+                for oscar in mlf_role.oscar_noms
+    ))
+
+@_register_easy_attribute(attrutils.EasyAttributeParams(
+    name_without_type = 'oscar-wins',
+    aliases_without_type = ['oscars', 'awards'],
+    findable_type = _ml.FindableType.MOVIES,
+    type_handler = attrutils.STR_HANDLER,
+    is_ascending = True,
+    truncation_style = utils.TruncationStyle.TRIM_MIDDLE,
+    default_max_len = _STR_LEN_LONG,
+))
+def _movie_oscar_wins_extractor(self: attrutils.EasyAttribute, movie: _ml.Movie, mlf_movie: _mlf.MLFMovie) -> list[str]:
+    """list of Oscars won by this movie."""
+    return sorted(set(
+        oscar
+        for crew in mlf_movie.crew.values()
+            for mlf_role in crew.roles_by_uid.values()
+                for oscar in mlf_role.oscar_wins
+    ))
 
 #endregion movie attributes
 
@@ -699,6 +842,120 @@ for handler in attrutils.DATE_HANDLERS:
             for mlf_person in mlf_people
         ]
 
+    name_without_type = 'death' + handler.name
+    
+    @_register_easy_attribute(attrutils.EasyAttributeParams(
+        name_without_type = name_without_type, # pylint: disable=cell-var-from-loop
+        aliases_without_type = _make_date_aliases(name_without_type), # pylint: disable=cell-var-from-loop
+        findable_type = _ml.FindableType.PEOPLE,
+        type_handler = handler, # pylint: disable=cell-var-from-loop
+        is_ascending = handler.is_ascending, # pylint: disable=cell-var-from-loop
+        truncation_style = utils.TruncationStyle.TRIM_MIDDLE,
+        default_max_len = _STR_LEN_SHORT,
+    ))
+    def _people_deathday_extractor(self: attrutils.EasyAttribute, people: _ml.People, mlf_people: list[_mlf.MLFPerson]) -> list[None | datetime.date]:
+        """list of every person's deathday in this date format."""
+        hnd = typing.cast(attrutils.DateHandler, self._params.type_handler)
+
+        # Guaranteed consistent ordering because mlf_people should already be sorted by uid.
+        return [
+            None if mlf_person.deathday is None else hnd.strip(mlf_person.deathday)
+            for mlf_person in mlf_people
+        ]
+
+@_register_easy_attribute(attrutils.EasyAttributeParams(
+    name_without_type = 'death-reason',
+    aliases_without_type = [],
+    findable_type = _ml.FindableType.PEOPLE,
+    type_handler = attrutils.STR_HANDLER,
+    is_ascending = True,
+    truncation_style = utils.TruncationStyle.TRIM_MIDDLE,
+    default_max_len = _STR_LEN_LONG,
+))
+def _people_death_reason_extractor(self: attrutils.EasyAttribute, people: _ml.People, mlf_people: list[_mlf.MLFPerson]) -> list[None | str]:
+    """list of every person's death reason."""
+    return [mlf_person.death_reason for mlf_person in mlf_people]
+
+@_register_easy_attribute(attrutils.EasyAttributeParams(
+    name_without_type = 'oscar-noms',
+    aliases_without_type = ['oscar-nominations', 'noms', 'nominations'],
+    findable_type = _ml.FindableType.PEOPLE,
+    type_handler = attrutils.STR_HANDLER,
+    is_ascending = True,
+    truncation_style = utils.TruncationStyle.TRIM_MIDDLE,
+    default_max_len = _STR_LEN_LONG,
+))
+def _people_oscar_noms_extractor(self: attrutils.EasyAttribute, people: _ml.People, mlf_people: list[_mlf.MLFPerson]) -> list[str]:
+    """list of Oscar nominations received by these people."""
+
+    # This is a little complicated. A role is usually only one crew type, except in the ANY case.
+    # Our fetcher doesn't even try to sort out awards by crew type. It hands it to the person in every crew type.
+    # So there are 3 levels of oscars to compute:
+    # * Oscars won jointly by this group in a specific crew type in a specific movie (intersection of oscar sets).
+    # * Oscars won by this group across all crew types in a specific movie (union of oscar sets).
+    # * Oscars won by this group across all movies (list of oscars, allows duplicates).
+    oscars: list[str] = []
+
+    for role in people.associated_roles():
+        role_oscars: set[str] = set()
+
+        for ct in role.underlying_file_roles_readonly[mlf_people[0].uid]:
+            # Find oscars nominated jointly for all people in this role.
+            crew_oscars = None
+
+            for mlf_person in mlf_people:
+                mlf_role = role.underlying_file_roles_readonly[mlf_person.uid][ct]
+
+                if crew_oscars is None:
+                    crew_oscars = set(mlf_role.oscar_noms)
+                else:
+                    crew_oscars.intersection_update(mlf_role.oscar_noms)
+
+            assert crew_oscars is not None
+            role_oscars.update(crew_oscars)
+
+        oscars.extend(role_oscars)
+
+    oscars.sort()
+    return oscars
+
+@_register_easy_attribute(attrutils.EasyAttributeParams(
+    name_without_type = 'oscar-wins',
+    aliases_without_type = ['oscars', 'awards'],
+    findable_type = _ml.FindableType.PEOPLE,
+    type_handler = attrutils.STR_HANDLER,
+    is_ascending = True,
+    truncation_style = utils.TruncationStyle.TRIM_MIDDLE,
+    default_max_len = _STR_LEN_LONG,
+))
+def _people_oscar_wins_extractor(self: attrutils.EasyAttribute, people: _ml.People, mlf_people: list[_mlf.MLFPerson]) -> list[str]:
+    """list of Oscars won by these people."""
+
+    oscars: list[str] = []
+    
+    for role in people.associated_roles():
+        role_oscars: set[str] = set()
+
+        for ct in role.underlying_file_roles_readonly[mlf_people[0].uid]:
+            # Find oscars nominated jointly for all people in this role.
+            crew_oscars = None
+
+            for mlf_person in mlf_people:
+                mlf_role = role.underlying_file_roles_readonly[mlf_person.uid][ct]
+
+                if crew_oscars is None:
+                    crew_oscars = set(mlf_role.oscar_wins)
+                else:
+                    crew_oscars.intersection_update(mlf_role.oscar_wins)
+
+            assert crew_oscars is not None
+            role_oscars.update(crew_oscars)
+
+        oscars.extend(role_oscars)
+
+    oscars.sort()
+    return oscars
+
 #endregion person attributes
 
 #region role attributes
@@ -715,6 +972,59 @@ for handler in attrutils.DATE_HANDLERS:
 def _role_uid_extractor(self: attrutils.EasyAttribute, role: _ml.Role, mlf_roles: _ml.MLFRolesDict, mlf_movie: _mlf.MLFMovie, mlf_people: list[_mlf.MLFPerson]) -> str:
     """the role's UID in flam."""
     return role.uid
+
+@_register_easy_attribute(attrutils.EasyAttributeParams(
+    name_without_type = 'episodes-num',
+    aliases_without_type = ['episodes'],
+    findable_type = _ml.FindableType.ROLES,
+    type_handler = attrutils.SMALL_INT_HANDLER,
+    is_ascending = False,
+    truncation_style = utils.TruncationStyle.NO_TRIM,
+    default_max_len = _STR_LEN_DONTCARE,
+))
+def _role_episodes_num_extractor(self: attrutils.EasyAttribute, role: _ml.Role, mlf_roles: _ml.MLFRolesDict, mlf_movie: _mlf.MLFMovie, mlf_people: list[_mlf.MLFPerson]) -> list[None | int]:
+    """the number of episodes this role appeared in."""
+    return [
+        mlf_role.episodes_num
+        for mlf_person in mlf_people
+        for ct, mlf_role in mlf_roles[mlf_person.uid].items()
+    ]
+
+@_register_easy_attribute(attrutils.EasyAttributeParams(
+    name_without_type = 'oscar-noms',
+    aliases_without_type = ['oscar-nominations', 'noms', 'nominations'],
+    findable_type = _ml.FindableType.ROLES,
+    type_handler = attrutils.STR_HANDLER,
+    is_ascending = True,
+    truncation_style = utils.TruncationStyle.TRIM_MIDDLE,
+    default_max_len = _STR_LEN_LONG,
+))
+def _role_oscar_noms_extractor(self: attrutils.EasyAttribute, role: _ml.Role, mlf_roles: _ml.MLFRolesDict, mlf_movie: _mlf.MLFMovie, mlf_people: list[_mlf.MLFPerson]) -> list[str]:
+    """list of Oscar nominations received by this role."""
+    return [
+        oscar
+        for mlf_person in mlf_people
+            for ct, mlf_role in mlf_roles[mlf_person.uid].items()
+                for oscar in mlf_role.oscar_noms
+    ]
+
+@_register_easy_attribute(attrutils.EasyAttributeParams(
+    name_without_type = 'oscar-wins',
+    aliases_without_type = ['oscars', 'awards'],
+    findable_type = _ml.FindableType.ROLES,
+    type_handler = attrutils.STR_HANDLER,
+    is_ascending = True,
+    truncation_style = utils.TruncationStyle.TRIM_MIDDLE,
+    default_max_len = _STR_LEN_LONG,
+))
+def _role_oscar_wins_extractor(self: attrutils.EasyAttribute, role: _ml.Role, mlf_roles: _ml.MLFRolesDict, mlf_movie: _mlf.MLFMovie, mlf_people: list[_mlf.MLFPerson]) -> list[str]:
+    """list of Oscar nominations received by this role."""
+    return [
+        oscar
+        for mlf_person in mlf_people
+            for ct, mlf_role in mlf_roles[mlf_person.uid].items()
+                for oscar in mlf_role.oscar_wins
+    ]
 
 @_register_easy_attribute(attrutils.EasyAttributeParams(
     name_without_type = 'characters',
@@ -734,8 +1044,8 @@ def _role_characters_extractor(self: attrutils.EasyAttribute, role: _ml.Role, ml
     return [
         char
         for mlf_person in mlf_people
-        for ct, mlf_role in mlf_roles[mlf_person.uid].items()
-        for char in mlf_role.characters
+            for ct, mlf_role in mlf_roles[mlf_person.uid].items()
+                for char in mlf_role.characters
     ]
 
 @_register_easy_attribute(attrutils.EasyAttributeParams(
@@ -756,7 +1066,7 @@ def _role_star_extractor(self: attrutils.EasyAttribute, role: _ml.Role, mlf_role
     return [
         mlf_role.is_star
         for mlf_person in mlf_people
-        for ct, mlf_role in mlf_roles[mlf_person.uid].items()
+            for ct, mlf_role in mlf_roles[mlf_person.uid].items()
     ]
 
 @_register_easy_attribute(attrutils.EasyAttributeParams(
@@ -777,8 +1087,8 @@ def _role_jobs_extractor(self: attrutils.EasyAttribute, role: _ml.Role, mlf_role
     return [
         job
         for mlf_person in mlf_people
-        for ct, mlf_role in mlf_roles[mlf_person.uid].items()
-        for job in mlf_role.jobs
+            for ct, mlf_role in mlf_roles[mlf_person.uid].items()
+                for job in mlf_role.jobs
     ]
 
 #endregion role attributes

@@ -178,8 +178,10 @@ def decompose_qualified_attr_or_pred_name(qualified_name: str) -> tuple[_ml.Find
     return _ml.FindableType(split[0]), split[1]
 
 # Import builtin extensions only here to avoid cyclic dependency issues.
+# The import order of fetchers is important for showing up in the docs in that order.
 from . import _imdb # pylint: disable=unused-import
 from . import _letterboxd # pylint: disable=unused-import
+from . import _tmdb # pylint: disable=unused-import
 from . import _builtin_attr # pylint: disable=unused-import
 from . import _builtin_pred # pylint: disable=unused-import
 

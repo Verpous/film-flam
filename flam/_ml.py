@@ -56,33 +56,28 @@ class GroupMode(enum.StrEnum):
         """
         yield from _group_modes_except_default
 
+# NOTE: We could expand the crew types that we support. As a rule I think it makes sense to support any crew type that people win an oscar for.
+# For now we don't support some of those (costume designer, sound, etc.) because it's just damn hard to figure out which TMDB / letterboxd crew types to map to the flam crew type.
 class CrewType(enum.StrEnum):
     """
     A job on a movie set.
     """
 
     # No need to have docstrings for each member, it's obvious what they mean. We won't document the default group mod either.
-    DIRECTOR            = 'director'
-    ASSISTANT_DIRECTOR  = 'assistant-director'
-    PRODUCER            = 'producer'
-    EXECUTIVE_PRODUCER  = 'executive-producer'
-    COMPOSER            = 'composer'
-    CINEMATOGRAPHER     = 'cinematographer'
-    CHOREOGRAPHER       = 'choreographer'
-    EDITOR              = 'editor'
-    WRITER              = 'writer'
-    CAST                = 'cast'
-    STUNTCAST           = 'stuntcast'
-    CASTING_DIRECTOR    = 'casting-director'
-    PRODUCTION_DESIGNER = 'production-designer'
-    SET_DECORATOR       = 'set-decorator'
-    SFX_ARTIST          = 'sfx-artist'
-    VFX_ARTIST          = 'vfx-artist'
-    MAKEUP_ARTIST       = 'makeup-artist'
-    COSTUME_DESIGNER    = 'costume-designer'
-    HAIRSTYLIST         = 'hairstylist'
-    ART_DIRECTOR        = 'art-director'
-    ADDITIONAL          = 'additional'
+    DIRECTOR                = 'director'
+    ASSISTANT_DIRECTOR      = 'assistant-director'
+    PRODUCER                = 'producer'
+    EXECUTIVE_PRODUCER      = 'executive-producer'
+    COMPOSER                = 'composer'
+    CINEMATOGRAPHER         = 'cinematographer'
+    CHOREOGRAPHER           = 'choreographer'
+    EDITOR                  = 'editor'
+    WRITER                  = 'writer'
+    CAST                    = 'cast'
+    STUNTCAST               = 'stuntcast'
+    CASTING_DIRECTOR        = 'casting-director'
+    ART_DIRECTOR            = 'art-director'
+    ADDITIONAL              = 'additional'
     """Catch-all category for crew types not listed above."""
     
     ANY                 = 'any'
@@ -142,28 +137,21 @@ def ct_gm_to_str(crew_type: CrewType, group_mode: GroupMode) -> str:
     return f'{crew_type}:{group_mode}'
 
 _default_group_modes = {
-    CrewType.DIRECTOR:              GroupMode.GROUP,
-    CrewType.ASSISTANT_DIRECTOR:    GroupMode.SEPARATE,
-    CrewType.PRODUCER:              GroupMode.SEPARATE,
-    CrewType.EXECUTIVE_PRODUCER:    GroupMode.GROUP,
-    CrewType.COMPOSER:              GroupMode.GROUP,
-    CrewType.CINEMATOGRAPHER:       GroupMode.GROUP,
-    CrewType.CHOREOGRAPHER:         GroupMode.GROUP,
-    CrewType.EDITOR:                GroupMode.GROUP,
-    CrewType.WRITER:                GroupMode.GROUP,
-    CrewType.CAST:                  GroupMode.SEPARATE,
-    CrewType.STUNTCAST:             GroupMode.SEPARATE,
-    CrewType.CASTING_DIRECTOR:      GroupMode.SEPARATE,
-    CrewType.PRODUCTION_DESIGNER:   GroupMode.SEPARATE,
-    CrewType.SET_DECORATOR:         GroupMode.SEPARATE,
-    CrewType.SFX_ARTIST:            GroupMode.SEPARATE,
-    CrewType.VFX_ARTIST:            GroupMode.SEPARATE,
-    CrewType.MAKEUP_ARTIST:         GroupMode.SEPARATE,
-    CrewType.COSTUME_DESIGNER:      GroupMode.SEPARATE,
-    CrewType.HAIRSTYLIST:           GroupMode.SEPARATE,
-    CrewType.ART_DIRECTOR:          GroupMode.SEPARATE,
-    CrewType.ADDITIONAL:            GroupMode.SEPARATE,
-    CrewType.ANY:                   GroupMode.SEPARATE,
+    CrewType.DIRECTOR:                  GroupMode.GROUP,
+    CrewType.ASSISTANT_DIRECTOR:        GroupMode.SEPARATE,
+    CrewType.PRODUCER:                  GroupMode.SEPARATE,
+    CrewType.EXECUTIVE_PRODUCER:        GroupMode.GROUP,
+    CrewType.COMPOSER:                  GroupMode.GROUP,
+    CrewType.CINEMATOGRAPHER:           GroupMode.GROUP,
+    CrewType.CHOREOGRAPHER:             GroupMode.GROUP,
+    CrewType.EDITOR:                    GroupMode.GROUP,
+    CrewType.WRITER:                    GroupMode.GROUP,
+    CrewType.CAST:                      GroupMode.SEPARATE,
+    CrewType.STUNTCAST:                 GroupMode.SEPARATE,
+    CrewType.CASTING_DIRECTOR:          GroupMode.SEPARATE,
+    CrewType.ART_DIRECTOR:              GroupMode.SEPARATE,
+    CrewType.ADDITIONAL:                GroupMode.SEPARATE,
+    CrewType.ANY:                       GroupMode.SEPARATE,
 }
 
 _crew_types_except_any = [ct for ct in CrewType if ct != CrewType.ANY]

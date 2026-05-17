@@ -21,14 +21,15 @@ from . import _file
 from . import _ldef
 from . import _ml
 
-# TODO: would be really interesting to add accolades.. for people and movies.
-
 class MLFRole(_file._FlamSerializable):
     """
     Serializable object with data about a role in a movie.
     """
     person_uid:             str
     is_star:                None | bool
+    episodes_num:           None | int
+    oscar_noms:             list[str]
+    oscar_wins:             list[str]
     characters:             list[str]
     jobs:                   list[str]
     """
@@ -55,6 +56,8 @@ class MLFPerson(_file._FlamSerializable):
 
     height_cm:              None | float
     birthday:               None | datetime.date
+    deathday:               None | datetime.date
+    death_reason:           None | str
     countries:              list[str]
 
 # When building a composite list, we'll retain data from all the composite's parts if that data is expected to be different for the same movie when coming from a different list.
@@ -99,7 +102,9 @@ class MLFMovie(_file._FlamSerializable):
     Data about a movie which is specific to the list from which it came. Fetchers should build this list with only one element.
     """
 
+    media_type:             None | str
     title:                  None | str
+    original_title:         None | str
     tagline:                None | str
     synopsis:               None | str
     url:                    None | str
@@ -111,6 +116,9 @@ class MLFMovie(_file._FlamSerializable):
     my_rating:              None | float
     likes:                  None | int
     is_liked:               None | bool
+    budget_usd:             None | int
+    revenue_usd:            None | int
+    content_rating:         None | str
     release_date:           None | datetime.date
     watch_dates:            list[datetime.date]
     """
@@ -121,6 +129,11 @@ class MLFMovie(_file._FlamSerializable):
     """
     What constitutes a "note" is up to the fetcher. For instance, in Letterboxd fetcher it's the user's reviews of the film.
     """
+
+    # Better to call these "x_num" and not "num_X" because we have num-X attributes for everything.
+    episodes_num:           None | int
+    seasons_num:            None | int
+    end_date:               None | datetime.date
 
     genres:                 list[str]
     studios:                list[str]

@@ -28,6 +28,7 @@ import abc
 import atexit
 import enum
 import sys
+import currency_converter # type: ignore
 
 from . import _reg
 from . import _fetch
@@ -54,7 +55,7 @@ class _CsvRow:
     title:              str
     original_title:     str
     url:                str
-    _type:              str
+    title_type:         str
     rating:             str
     runtime_minutes:    str
     year:               str
@@ -71,6 +72,8 @@ class _CsvRow:
     def mlf_universal_fields(self) -> dict[str, typing.Any]:
         # If any of the conversions fail we simply propagate the error.
         return dict(
+            media_type          = self.title_type,
+            original_title      = self.original_title,
             votes               = int(self.votes),
             rating              = float(self.rating) if self.rating != '' else None, # I've actually found shorts which have no rating.
             my_rating           = float(self.my_rating) if (self.my_rating is not None and self.my_rating != '') else None,
@@ -162,7 +165,7 @@ class SeleniumApiDevFetcher(_fetch.Fetcher, list_type='imdb-browser-apidev-listi
                 _dbg.logger.warning(f"Download timed out after {CSV_DOWNLOAD_TIMEOUT_SECS} seconds. This is retry {i + 1} / {NUM_RETRIES}")
 
                 if i == NUM_RETRIES - 1:
-                    raise _exc.InputError(f"Timed out trying to download LISTDEF '{concrete_listdef}' from IMDb. Are you sure the address is valid?") from e
+                    raise _exc.InputError(f"Timed out trying to download LISTDEF '{concrete_listdef}' from IMDb. Did you close the browser window?") from e
 
         _dbg.logger.info(f"Successfully downloaded CSV: '{latest_csv}'")
         movies_csv = _read_csv(latest_csv)
@@ -233,17 +236,63 @@ class CsvApiDevFetcher(_fetch.Fetcher, list_type='imdb-csv-apidev-path', uid_fam
         movies_csv = _read_csv(csv_path)
         _fetch_movies_in_csv(movies_csv, movie_list_file, self, _IMDbApiDev.fetch_movies_from_api)
 
+@_reg._register_builtin
+class SeleniumTmdbFetcher(_fetch.Fetcher, list_type='imdb-browser-tmdb-listid', uid_family=_UID_FAMILY):
+    """IMDB_LIST_ID
+
+    Like **imdb-browser-apidev-listid**, but data is fetched using the `TMDB API <https://developer.themoviedb.org/docs/getting-started>`__.
+
+    This fetcher requires you to have TMDB API access. Read more about that in the **tmdb-list** documentation.
+
+    TMDB is a rich database so this fetcher is able to gather more information than the "pure" IMDb fetchers. The downside is that it's more complicated to set up.
+    """
+    def _fetch_into_file(self, movie_list_file: _mlf.MovieListFile) -> None:
+        # Import lazily because I want IMDb fetchers to show up first in the docs.
+        from . import _tmdb
+
+        _dbg.logger.info(f"IMDbTMDB: Going to download the CSV for IMDb list id: {self.concrete_listdef.address}")
+        movies_csv = SeleniumApiDevFetcher.download_csv(self.concrete_listdef)
+
+        mexs = [
+            _tmdb.MovieExternalInfo(
+                uid             = f'tt{movie_csv.uid}',
+                loading_title   = movie_csv.title,
+
+                # The CSV does have media types, but it's hard to map them to TMDB media types and we don't have to.
+                media_type      = None,
+
+                list_index      = int(movie_csv.list_index),
+                list_note       = movie_csv.note,
+                listing_date    = _CsvRow._date(movie_csv.listing_date),
+
+                my_rating       = float(movie_csv.my_rating) if (movie_csv.my_rating is not None and movie_csv.my_rating != '') else None,
+                is_liked        = None,
+                watch_dates     = [_CsvRow._date(movie_csv.listing_date)],
+                my_notes        = [],
+            )
+            for movie_csv in movies_csv
+        ]
+
+        _tmdb.TMDBFetcher._fetch_external_movies_into_file(mexs, 'imdb_id', self, movie_list_file)
+
 # We used to use Cinemagoer as our API (https://cinemagoer.github.io/), which was prefereable. But cinemagoer is dead, so found this nifty API instead: https://imdbapi.dev/.
 # The cinemagoer implementation is deleted so as not to include it as a dependency in the release, but this file still has remnants that there was once cinemagoer support.
 class _IMDbApiDev:
+    _converter = None
+
     @classmethod
     def fetch_movies_from_api(cls, movies_csv: list[_CsvRow], mlf: _mlf.MovieListFile, fetcher: _fetch.Fetcher) -> None:
         BATCH_SIZE = 5
         batch = []
         movies_to_fetch = [m for m in movies_csv if m.uid not in mlf.movies_by_uid]
 
-        # Now we do a pass where we fetch fields using imdbapi.dev.
-        # Note that we not only skip movies that were previously fetched, but also duplicates in case the same movie appears in the CSV twice.
+        # Only fetch movies not already in the list, and also if the same movie appears multiple times in the list, fetch it only once.
+        # Multiple appearances of the same movie are not supported.
+        movies_to_fetch = list(utils.stable_dedup(
+            (m for m in movies_csv if m.uid not in mlf.movies_by_uid),
+            key = lambda m: m.uid
+        ))
+
         with utils.ProgressBar(movies_to_fetch,
                 desc='Downloading',
                 keyfunc=lambda m: m.title) as bar:
@@ -269,6 +318,44 @@ class _IMDbApiDev:
     def _fetch_movie(cls, movie_csv: _CsvRow, mlf: _mlf.MovieListFile, movie_json: dict[str, typing.Any]) -> None:
         _dbg.logger.info(f"Fetching movie: {movie_csv}")
 
+        is_show = movie_csv.title_type == 'TV Series'
+        last_episode = None
+
+        # If it's a show, we're interested in the seasons & episodes count, and also in the very last episode for its release date.
+        if is_show:
+            # Ex: https://api.imdbapi.dev/titles/tt0098904/seasons
+            seasons = cls._rest_call(f'titles/tt{movie_csv.uid}/seasons')['seasons']
+
+            # To avoid wasting time on many paged queries, we'll limit the episodes search to only the last season.
+            try:
+                # Ex: https://api.imdbapi.dev/titles/tt0098904/episodes?season=9
+                last_episodes_pages = cls._paginated_rest_call(f'titles/tt{movie_csv.uid}/episodes', season=seasons[-1]['season'])
+                last_episode = last_episodes_pages[-1]['episodes'][-1]
+            except (IndexError, KeyError) as e:
+                _dbg.logger.warning(f'Failed to find last episode for show: {movie_csv.uid}: {e}')
+        else:
+            seasons = []
+
+        # Ex: https://api.imdbapi.dev/titles/tt0118715/boxOffice
+        box_office = cls._rest_call(f'titles/tt{movie_csv.uid}/boxOffice')
+
+        # Ex: https://api.imdbapi.dev/titles/tt0118715/certificates
+        certificates = cls._rest_call(f'titles/tt{movie_csv.uid}/certificates')
+
+        # Ex: https://api.imdbapi.dev/titles/tt0118715/companyCredits?categories=production
+        studios_pages = cls._paginated_rest_call(f'titles/tt{movie_csv.uid}/companyCredits', categories='production')
+
+        # Ex: https://api.imdbapi.dev/titles/tt0118715/awardNominations
+        awards_pages = cls._paginated_rest_call(f'titles/tt{movie_csv.uid}/awardNominations')
+
+        # There's lots of awards here that aren't oscars. We only care about oscars.
+        oscar_noms = [
+            nomination
+            for awards in awards_pages
+                for nomination in awards.get('awardNominations', [])
+                if nomination['text'].lower() == 'oscar'
+        ]
+
         # Build crews dictionary and also people.
         crew = {
             crew_type: _mlf.MLFCrew(crew_type=crew_type, roles_by_uid={})
@@ -279,7 +366,7 @@ class _IMDbApiDev:
         star_uids = {star['id'].removeprefix('nm') for star in movie_json.get('stars', [])}
         people_to_add = []
 
-        # Ex: https://api.imdbapi.dev/titles/tt0054331/credits?pageSize=50
+        # Ex: https://api.imdbapi.dev/titles/tt0054331/credits
         for credits_json in cls._paginated_rest_call(f'titles/tt{movie_csv.uid}/credits'):
             # Actually had an instance of receiving no credits key in the response, for the Netflix movie Troll.
             for person_json in credits_json.get('credits', []):
@@ -299,16 +386,52 @@ class _IMDbApiDev:
                         is_star = person_uid in star_uids
                         gender = 'male' if person_json['category'] == 'actor' else 'female'
                     case _:
-                        raise RuntimeError(f'Unexpected {person_json["category"]=}.')
+                        raise RuntimeError(f"Unexpected {person_json['category']=}.")
+
+                role_oscar_noms = [
+                    nom
+                    for nom in oscar_noms
+                    if any(nominee['id'] == f'nm{person_uid}' for nominee in nom['nominees'])
+                ]
 
                 crew[crew_type].roles_by_uid[person_uid] = _mlf.MLFRole(
-                    person_uid = person_uid,
-                    is_star = is_star,
-                    characters = characters,
-                    jobs = [],
+                    person_uid      = person_uid,
+                    is_star         = is_star,
+                    episodes_num    = None,
+                    oscar_noms      = [n['category'] for n in role_oscar_noms],
+                    oscar_wins      = [n['category'] for n in role_oscar_noms if n.get('isWinner', False)],
+                    characters      = characters,
+                    jobs            = [],
                 )
 
                 people_to_add.append((person_uid, gender))
+
+        # To get a complete picture of the movie's oscar noms/wins, we don't want to be missing any people in the movie's crew who won oscars.
+        # So the ones that weren't returned by the credits endpoint will be added as ADDITIONAL crew.
+        for nomination in oscar_noms:
+            for nominee in nomination['nominees']:
+                person_uid = nominee['id'].removeprefix('nm')
+
+                if any(person_uid in crew[crew_type].roles_by_uid for crew_type in crew):
+                    continue
+
+                role_oscar_noms = [
+                    nom
+                    for nom in oscar_noms
+                    if any(nee['id'] == f'nm{person_uid}' for nee in nom['nominees'])
+                ]
+
+                crew[_ml.CrewType.ADDITIONAL].roles_by_uid[person_uid] = _mlf.MLFRole(
+                    person_uid      = person_uid,
+                    is_star         = None,
+                    episodes_num    = None,
+                    oscar_noms      = [n['category'] for n in role_oscar_noms],
+                    oscar_wins      = [n['category'] for n in role_oscar_noms if n.get('isWinner', False)],
+                    characters      = [],
+                    jobs            = nominee['primaryProfessions'],
+                )
+
+                people_to_add.append((person_uid, None))
 
         # Have to add the people before we add the movie, because otherwise we run the risk that we get an interrupt after adding the movie,
         # and on the next retry this movie will be skipped due to already being in the list.
@@ -322,6 +445,15 @@ class _IMDbApiDev:
             metascore = None
             metascore_votes = None
 
+        # There's loads of certificates and we have to pick one. We have a system.
+        try:
+            content_cert = max(certificates['certificates'], key=cls._rank_certificate)
+        except ValueError:
+            _dbg.logger.warning(f"Movie '{movie_csv.uid}' has no certificates")
+            content_cert = None
+
+        release_date = _CsvRow._date(movie_csv.release_date)
+        
         per_src_data = _mlf.MLFMoviePerSourceData(
             canon_listdef       = mlf.abstract_listdef,
             **movie_csv.mlf_per_src_fields(),
@@ -339,8 +471,16 @@ class _IMDbApiDev:
             metascore_votes     = metascore_votes,
             likes               = None,
             is_liked            = None,
+            budget_usd          = cls._get_usd(box_office, 'productionBudget', release_date),
+            revenue_usd         = cls._get_usd(box_office, 'worldwideGross', release_date),
+            content_rating      = content_cert['rating'],
             my_notes            = [],
-            studios             = [],
+
+            episodes_num        = sum(s['episodeCount'] for s in seasons) if is_show else None,
+            seasons_num         = len(seasons) if is_show else None,
+            end_date            = cls._parse_date(last_episode, 'releaseDate') if last_episode is not None else None,
+
+            studios             = [s['company']['name'] for p in studios_pages for s in p['companyCredits']],
 
             # Sometimes there's an empty lang object. For example if you query movie tt2177771 (the monuments men).
             languages           = [lang['name'] for lang in movie_json['spokenLanguages'] if 'name' in lang],
@@ -351,13 +491,13 @@ class _IMDbApiDev:
         )
 
         mlf.movies_by_uid[mlf_movie.uid] = mlf_movie
-
+        
     @classmethod
     def _fetch_people(cls, mlf: _mlf.MovieListFile, people_to_add: list[tuple[str, None | str]]) -> None:
         BATCH_SIZE = 5
         batch = []
 
-        new_uids = list(set(uid for uid, _ in people_to_add if uid not in mlf.people_by_uid))
+        new_uids = sorted(set(uid for uid, _ in people_to_add if uid not in mlf.people_by_uid))
 
         for i, uid in enumerate(new_uids):
             if i % BATCH_SIZE == 0:
@@ -380,24 +520,15 @@ class _IMDbApiDev:
                 except (KeyError, ValueError):
                     name = None
 
-            try:
-                birthday_year = person_json['birthDate']['year']
-            except KeyError:
-                # If there isn't even a year then we'll consider the birthday unknown.
-                birthday = None
-            else:
-                # If there is a year there may still not be the rest, but then we'll round it.
-                birthday_month = person_json['birthDate'].get('month', 1)
-                birthday_day = person_json['birthDate'].get('day', 1)
-                birthday = datetime.date(birthday_year, birthday_month, birthday_day)
-            
             mlf.people_by_uid[uid] = _mlf.MLFPerson(
-                uid = uid,
-                name = name,
-                gender = None,
-                birthday = birthday,
-                height_cm = float(person_json['heightCm']) if 'heightCm' in person_json else None,
-                countries = [person_json['birthLocation']] if 'birthLocation' in person_json else [],
+                uid                 = uid,
+                name                = name,
+                gender              = None,
+                birthday            = cls._parse_date(person_json, 'birthDate'),
+                deathday            = cls._parse_date(person_json, 'deathDate'),
+                death_reason        = person_json.get('deathReason', None),
+                height_cm           = float(person_json['heightCm']) if 'heightCm' in person_json else None,
+                countries           = [person_json['birthLocation']] if 'birthLocation' in person_json else [],
             )
 
         # There is no gender information in the people query but for 'actors' and 'actresses' we can distinguish it based on their crew type in the movie information.
@@ -414,6 +545,69 @@ class _IMDbApiDev:
             mlf_person.gender = gender
 
     @classmethod
+    def _get_usd(cls, box_office: dict, money_key: str, date: datetime.date) -> None | int:
+        if money_key not in box_office:
+            return None
+
+        budget = int(box_office[money_key]['amount'])
+        currency = box_office[money_key]['currency']
+
+        if currency == 'USD':
+            return budget
+
+        if cls._converter is None:
+            cls._converter = currency_converter.CurrencyConverter(fallback_on_missing_rate=True, fallback_on_wrong_date=True)
+
+        return int(cls._converter.convert(budget, currency, 'USD', date=date))
+
+    @classmethod
+    def _rank_certificate(cls, cert: dict) -> int:
+        country_code = cert['country']['code']
+        attributes = cert.get('attributes', [])
+        rank = 0
+
+        # We always prefer the US rating. Next we'll take the UK rating, otherwise whatever.
+        match country_code:
+            case 'US':
+                rank += 500
+            case 'GB':
+                rank += 400
+            case _:
+                pass
+
+        # We most want the MPAA rating. It looks like this.
+        if any('certificate #' in a for a in attributes):
+            rank += 500
+
+        # Some movies (ex: Clockwork Orange) have been re-rated.
+        if any('re-rating' in a for a in attributes):
+            rank += 50
+
+        # Too many attributes is sus, suggests that it's a rating with caveats.
+        rank -= len(attributes)
+
+        # For TV shows it won't be MPAA. There's sometimes occurrences with a "some episodes" attribute, so we want the one without attributes.
+        if len(attributes) == 0:
+            rank += 400
+
+        # No tiebreakers. If we didn't find a good one we'll just pick whatever.
+        # Theoretically we could add a preference for movie's country of origin but that's complicated.
+        return rank
+
+    @classmethod
+    def _parse_date(cls, person_json: dict, date_key: str) -> None | datetime.date:
+        try:
+            date_year = person_json[date_key]['year']
+        except KeyError:
+            # If there isn't even a year then we'll consider the date unknown.
+            return None
+
+        # If there is a year there may still not be the rest, but then we'll round it.
+        date_month = person_json[date_key].get('month', 1)
+        date_day = person_json[date_key].get('day', 1)
+        return datetime.date(date_year, date_month, date_day)
+
+    @classmethod
     def _rest_call(cls, endpoint: str, **kwargs: typing.Any) -> dict:
         # Import requests only here because it's actually a very expensive import so we don't wanna pay that price for every import of flam when most of them don't need it.
         import requests
@@ -426,35 +620,34 @@ class _IMDbApiDev:
             response = requests.get(f'https://api.imdbapi.dev/{endpoint}', timeout=30, params=kwargs)
             _dbg.logger.info(f"Requested: {response.url} with res: {response.status_code}")
 
-            # We actually get this a lot when doing names:batchGet and it reaaaally slows us down. I tried to space out requests by like a second to preempt this warning,
-            # but nothing seems as fast as just firing requests at our maximum pace and then sleeping when the API complains.
-            # For the record, guy on telegram says that the counter is per endpoint, and limited to 5 requests per second for most endpoints,
-            # but 20 requests per 10 seconds for batch endpoints.
-            # 
-            # Sometimes we actually get status code 500 (server error), and the response text explains it was actually a 429, so we need to catch that case too..
-            # TODO: I'm an idiot and checked `'429' in response.text` for that, but that's obviously bad because the valid text can contain that too.
-            # When I get this error again, need to check the string with a more specific pattern.
-            if response.status_code == requests.codes.too_many_requests: # pylint: disable=no-member
-                time.sleep(SLEEP_BETWEEN_RETRIES)
-                _dbg.logger.warning(f"Request failed because of too many requests. Will try again in {SLEEP_BETWEEN_RETRIES} seconds (retry {i}/{NUM_RETRIES})")
-                continue
-
-            # Retries are only for too_many_requests - not for other errors.
             try:
                 response.raise_for_status()
             except requests.HTTPError as e:
-                # Server errors are fetch-interrupts.
-                if 500 <= response.status_code < 600:
-                    # The response text sometimes contains additional information.
-                    _dbg.logger.error(f'Got this response alongside server error: {response.text}')
-                    raise _exc.FetchInterrupt(f"{type(e).__name__}: {e}") from e
+                # We actually get 429's a lot when doing names:batchGet and it reaaaally slows us down. I tried to space out requests by like a second to preempt this warning,
+                # but nothing seems as fast as just firing requests at our maximum pace and then sleeping when the API complains.
+                # For the record, guy on telegram says that the counter is per endpoint, and limited to 5 requests per second for most endpoints,
+                # but 20 requests per 10 seconds for batch endpoints.
+                should_retry = (
+                   response.status_code == requests.codes.too_many_requests # pylint: disable=no-member
+                   or 500 <= response.status_code < 600
+                )
+                
+                # Everything not known to be retry-worthy is a crash.
+                if not should_retry:
+                    raise
 
-                # Everything else is a crash.
-                raise
+                # Known errors that failed every retry are fetch-interrupts.
+                if i == NUM_RETRIES - 1:
+                    raise _exc.FetchInterrupt(f"TMDB error: {type(e).__name__}: {e}") from e
+
+                # The response text sometimes contains additional information.
+                _dbg.logger.warning(f"RETRY {i}/{NUM_RETRIES}: request failed with status code: {response.status_code}, text: {response.text}.")
+                time.sleep(SLEEP_BETWEEN_RETRIES)
+                continue
 
             return response.json()
 
-        raise _exc.FlamError('imdbapi.dev is refusing our requests due to sending too many. Try again later.')
+        raise RuntimeError("Shouldn't get here!")
 
     @classmethod
     def _paginated_rest_call(cls, endpoint: str, **kwargs: typing.Any) -> list[dict]:
@@ -749,10 +942,9 @@ def _export_lists_handler(requests_queue: multiprocessing.Queue, browser_type: _
 
         while True:
             if not _is_browser_alive(driver):
-                # print instead of raising an exception because it doesn't look pretty.
-                # NOTE: when the browser dies it also prints this annoying "Tried to run command without establishing a connection" message.
+                # DON'T print anything or raise an exception because it doesn't look pretty.
+                # NOTE: when the browser dies it does still print this annoying "Tried to run command without establishing a connection" message.
                 # This is printed by selenium, and I tried silencing it but no luck.
-                print("Cannot export IMDb lists because the browser instance is dead. Please don't close the browser while it's in use.", file=sys.stderr)
                 _dbg.logger.warning("Browser unexpectedly dead - quitting server")
                 return
 

@@ -42,3 +42,7 @@ Flam is better if you have `less` installed. If you're on Windows, it's recommen
 ## Getting help
 
 If you encounter issues or have questions, please open an issue, or email me at ederyaviv2@gmail.com.
+
+## Disclaimer
+
+I am not affiliated with IMDb, Letterboxd, TMDb, or any such website in any way.

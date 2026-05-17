@@ -19,11 +19,6 @@ import dataclasses
 import datetime
 import warnings
 
-# I hate from imports, but letterboxdpy is too verbose and divided into little submodules with names we don't want taken.
-from letterboxdpy.movie import Movie # type: ignore
-from letterboxdpy.user import User # type: ignore
-from letterboxdpy.core.exceptions import AccessDeniedError, ResourceNotFoundError # type: ignore
-
 from . import _reg
 from . import _fetch
 from . import _exc
@@ -64,8 +59,11 @@ class LetterboxdpyFetcher(_fetch.Fetcher, list_type='letterboxdpy-user-list', ui
     Note that Letterboxd provides us a lot of information about movies, but not so much about people. So this fetcher has a blindspot there.
     """
     def _fetch_into_file(self, movie_list_file: _mlf.MovieListFile) -> None:
+        # Expensive import so do it lazily.
+        from letterboxdpy.user import User # type: ignore
+        from letterboxdpy.core.exceptions import AccessDeniedError, ResourceNotFoundError # type: ignore
+
         _dbg.logger.info(f"Going to download Letterboxd list: {self.concrete_listdef.address}")
-        import sys; sys.unraisablehook = lambda u: None
 
         try:
             username, list_slug = self.concrete_listdef.address.split('/', maxsplit=1)
@@ -170,20 +168,19 @@ class LetterboxdpyFetcher(_fetch.Fetcher, list_type='letterboxdpy-user-list', ui
         
         _dbg.logger.info(f"MLF has {len(movie_list_file.movies_by_uid)} movies after omitting ones no longer in the list")
 
+        # Only fetch movies not already in the list, and also if the same movie appears multiple times in the list, fetch it only once.
+        # Multiple appearances of the same movie are not supported.
+        movies_to_fetch = list(utils.stable_dedup(
+            (m for m in movie_basic_infos if m.slug not in movie_list_file.movies_by_uid),
+            key=lambda m: m.slug
+        ))
+
+        _dbg.logger.info(f"There are {len(movies_to_fetch)} new movies to fetch")
+        
         try:
-            # Only fetch movies not already in the list, and also if the same movie appears multiple times in the list, fetch it only once.
-            # Multiple appearances of the same movie are not supported.
-            movies_to_fetch = list(utils.stable_dedup(
-                (m for m in movie_basic_infos if m.slug not in movie_list_file.movies_by_uid),
-                key = lambda m: m.slug
-            ))
-
-            _dbg.logger.info(f"There are {len(movies_to_fetch)} new movies to fetch")
-
             with utils.ProgressBar(movies_to_fetch,
                     desc='Downloading',
                     keyfunc=lambda m: m.title) as bar:
-                # He'll carry you down the stairs for 25 shmeckles!
                 for i, movie_basic_info in enumerate(bar):
                     self._fetch_movie(movie_basic_info, watched_films, reviewed_films, diary, movie_list_file)
 
@@ -191,13 +188,16 @@ class LetterboxdpyFetcher(_fetch.Fetcher, list_type='letterboxdpy-user-list', ui
                     if i % 10 == 0:
                         self._checkpoint(movie_list_file)
         # If we get a KeyboardInterrupt, gracefully end the fetching early.
-        # TODO: letterboxdpy actually raises some crash for keyboard interrupt?? wtf
+        # NOTE: Letterboxdpy actually creates an error popup and doesn't propagate the interrupt when the user Ctrl+C's, so this doesn't really work.
+        # It's horrible, and I've tried opening an issue and investigating it a bunch, but it's too much: https://github.com/nmcassa/letterboxdpy/issues/173.
         except KeyboardInterrupt as e:
             raise _exc.FetchInterrupt(f"{type(e).__name__}: {e}") from e
         
         _dbg.logger.info("Done fetching movies")
 
     def _fetch_movie(self, movie_basic_info: _MovieBasicInfo, watched_films: dict, reviewed_films: dict, diary: dict, mlf: _mlf.MovieListFile) -> None:
+        from letterboxdpy.movie import Movie # type: ignore
+
         _dbg.logger.info(f"Fetching movie: {movie_basic_info}")
         lbox_movie = Movie(movie_basic_info.slug)
         lbox_watched_movie = watched_films['movies'].get(movie_basic_info.slug, None)
@@ -224,21 +224,26 @@ class LetterboxdpyFetcher(_fetch.Fetcher, list_type='letterboxdpy-user-list', ui
                 # ADDITIONAL can stand in for multiple crew types so the same person can appear multiple times.
                 if person_uid not in mlf_crew[crew_type].roles_by_uid:
                     mlf_crew[crew_type].roles_by_uid[person_uid] = _mlf.MLFRole(
-                        person_uid = person_uid,
-                        is_star = None,
-                        characters = [],
-                        jobs = [],
+                        person_uid          = person_uid,
+                        is_star             = None,
+                        episodes_num        = None,
+                        oscar_noms          = [],
+                        oscar_wins          = [],
+                        characters          = [],
+                        jobs                = [],
                     )
 
                     # Might overwrite an already existing person.
                     # NOTE: Letterboxdpy is really slim on people information. If it hurts, we might be able to fill it in with tmdb..
                     mlf.people_by_uid[person_uid] = _mlf.MLFPerson(
-                        uid = person_uid,
-                        name = lbox_role['name'],
-                        gender = None,
-                        birthday = None,
-                        height_cm = None,
-                        countries = [],
+                        uid                 = person_uid,
+                        name                = lbox_role['name'],
+                        gender              = None,
+                        birthday            = None,
+                        deathday            = None,
+                        death_reason        = None,
+                        height_cm           = None,
+                        countries           = [],
                     )
                 else:
                     assert crew_type == _ml.CrewType.ADDITIONAL
@@ -257,20 +262,25 @@ class LetterboxdpyFetcher(_fetch.Fetcher, list_type='letterboxdpy-user-list', ui
             characters = [castmember['role_name']] if castmember['role_name'] is not None else []
 
             mlf_crew[_ml.CrewType.CAST].roles_by_uid[person_uid] = _mlf.MLFRole(
-                person_uid = person_uid,
-                is_star = None,
-                characters = characters,
-                jobs = [],
+                person_uid              = person_uid,
+                is_star                 = None,
+                episodes_num            = None,
+                oscar_noms              = [],
+                oscar_wins              = [],
+                characters              = characters,
+                jobs                    = [],
             )
 
             # Might overwrite an already existing person.
             mlf.people_by_uid[person_uid] = _mlf.MLFPerson(
-                uid = person_uid,
-                name = castmember['name'],
-                gender = None,
-                birthday = None,
-                height_cm = None,
-                countries = [],
+                uid                     = person_uid,
+                name                    = castmember['name'],
+                gender                  = None,
+                birthday                = None,
+                deathday                = None,
+                death_reason            = None,
+                height_cm               = None,
+                countries               = [],
             )
 
         # {'type': 'studio', 'name': 'PolyGram Filmed Entertainment', 'slug': 'polygram-filmed-entertainment', 'url': 'https://letterboxd.com/studio/polygram-filmed-entertainment/'}
@@ -294,7 +304,9 @@ class LetterboxdpyFetcher(_fetch.Fetcher, list_type='letterboxdpy-user-list', ui
         mlf_movie = _mlf.MLFMovie(
             uid                 = movie_basic_info.slug,
             per_src_data        = [per_src_data],
+            media_type          = 'movie',
             title               = lbox_movie.get_title(),
+            original_title      = lbox_movie.get_original_title(),
             tagline             = lbox_movie.get_tagline(),
             synopsis            = lbox_movie.get_description(),
             url                 = lbox_movie.get_url(),
@@ -306,9 +318,15 @@ class LetterboxdpyFetcher(_fetch.Fetcher, list_type='letterboxdpy-user-list', ui
             my_rating           = lbox_watched_movie['rating'] if lbox_watched_movie is not None else None,
             likes               = watchers['likes'],
             is_liked            = lbox_watched_movie['liked'] if lbox_watched_movie is not None else None,
+            budget_usd          = None,
+            revenue_usd         = None,
+            content_rating      = None,
             release_date        = datetime.date(lbox_movie.get_year(), 1, 1),
             watch_dates         = [datetime.datetime.fromisoformat(d['date']).date() for d in lbox_diary_movie],
             my_notes            = [r['review']['content'] for r in lbox_reviews],
+            episodes_num        = None,
+            seasons_num         = None,
+            end_date            = None,
             genres              = [g['name'] for g in genres if g['type'] == 'genre'],
             studios             = [d['name'] for d in details if d['type'] == 'studio'],
             languages           = [d['name'] for d in details if d['type'] == 'language'],
@@ -322,65 +340,37 @@ class LetterboxdpyFetcher(_fetch.Fetcher, list_type='letterboxdpy-user-list', ui
     def crew_type_lbox2flam(cls, lbox_crew_type: str) -> _ml.CrewType:
         # Performance doesn't matter here, and we won't turn this into a dictionary.
         match lbox_crew_type:
-            case 'director':
-                return _ml.CrewType.DIRECTOR
-            case 'co_director':
-                return _ml.CrewType.ADDITIONAL
-            case 'additional_directing':
-                return _ml.CrewType.ADDITIONAL
-            case 'producer':
-                return _ml.CrewType.PRODUCER
-            case 'writer':
-                return _ml.CrewType.WRITER
-            case 'original_writer':
-                return _ml.CrewType.ADDITIONAL
-            case 'story':
-                return _ml.CrewType.ADDITIONAL
-            case 'casting':
-                return _ml.CrewType.CASTING_DIRECTOR
-            case 'editor':
-                return _ml.CrewType.EDITOR
-            case 'cinematography':
-                return _ml.CrewType.CINEMATOGRAPHER
-            case 'assistant_director':
-                return _ml.CrewType.ASSISTANT_DIRECTOR
-            case 'executive_producer':
-                return _ml.CrewType.EXECUTIVE_PRODUCER
-            case 'lighting':
-                return _ml.CrewType.ADDITIONAL
-            case 'camera_operator':
-                return _ml.CrewType.ADDITIONAL
-            case 'production_design':
-                return _ml.CrewType.PRODUCTION_DESIGNER
-            case 'set_decoration':
-                return _ml.CrewType.SET_DECORATOR
-            case 'special_effects':
-                return _ml.CrewType.SFX_ARTIST
-            case 'composer':
-                return _ml.CrewType.COMPOSER
-            case 'songs':
-                return _ml.CrewType.ADDITIONAL
-            case 'sound':
-                # NOTE: If sound is worthy of an oscar, it's surely worthy of its own crew type. But 'sound' is too broad: there are sound engineers, sound mixers, sound editors..
-                # I'll need another API with support for sound crew to understand how to categorize sound people.
-                return _ml.CrewType.ADDITIONAL
-            case 'makeup':
-                return _ml.CrewType.MAKEUP_ARTIST
-            case 'additional_photography':
-                return _ml.CrewType.ADDITIONAL
-            case 'art_direction':
-                return _ml.CrewType.ART_DIRECTOR
-            case 'visual_effects':
-                return _ml.CrewType.VFX_ARTIST
-            case 'title_design':
-                return _ml.CrewType.ADDITIONAL
-            case 'stunts':
-                return _ml.CrewType.STUNTCAST
-            case 'choreography':
-                return _ml.CrewType.CHOREOGRAPHER
-            case 'costume_design':
-                return _ml.CrewType.COSTUME_DESIGNER
-            case 'hairstyling':
-                return _ml.CrewType.HAIRSTYLIST
+            case 'director':                    return _ml.CrewType.DIRECTOR
+            case 'co_director':                 return _ml.CrewType.ADDITIONAL
+            case 'additional_directing':        return _ml.CrewType.ADDITIONAL
+            case 'producer':                    return _ml.CrewType.PRODUCER
+            case 'writer':                      return _ml.CrewType.WRITER
+            case 'original_writer':             return _ml.CrewType.ADDITIONAL
+            case 'story':                       return _ml.CrewType.ADDITIONAL
+            case 'casting':                     return _ml.CrewType.CASTING_DIRECTOR
+            case 'editor':                      return _ml.CrewType.EDITOR
+            case 'cinematography':              return _ml.CrewType.CINEMATOGRAPHER
+            case 'assistant_director':          return _ml.CrewType.ASSISTANT_DIRECTOR
+            case 'executive_producer':          return _ml.CrewType.EXECUTIVE_PRODUCER
+            case 'lighting':                    return _ml.CrewType.ADDITIONAL
+            case 'camera_operator':             return _ml.CrewType.ADDITIONAL
+            case 'production_design':           return _ml.CrewType.ADDITIONAL
+            case 'set_decoration':              return _ml.CrewType.ADDITIONAL
+            case 'special_effects':             return _ml.CrewType.ADDITIONAL
+            case 'composer':                    return _ml.CrewType.COMPOSER
+            case 'songs':                       return _ml.CrewType.ADDITIONAL
+            
+            # NOTE: If sound is worthy of an oscar, it's surely worthy of its own crew type. But 'sound' is too broad: there are sound engineers, sound mixers, sound editors..
+            # I'll need another API with support for sound crew to understand how to categorize sound people.
+            case 'sound':                       return _ml.CrewType.ADDITIONAL
+            case 'makeup':                      return _ml.CrewType.ADDITIONAL
+            case 'additional_photography':      return _ml.CrewType.ADDITIONAL
+            case 'art_direction':               return _ml.CrewType.ART_DIRECTOR
+            case 'visual_effects':              return _ml.CrewType.ADDITIONAL
+            case 'title_design':                return _ml.CrewType.ADDITIONAL
+            case 'stunts':                      return _ml.CrewType.STUNTCAST
+            case 'choreography':                return _ml.CrewType.CHOREOGRAPHER
+            case 'costume_design':              return _ml.CrewType.ADDITIONAL
+            case 'hairstyling':                 return _ml.CrewType.ADDITIONAL
             case _:
                 raise RuntimeError(f'Unexpected {lbox_crew_type=}.')

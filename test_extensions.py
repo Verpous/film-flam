@@ -81,10 +81,13 @@ class RandomDataFetcher(flam.Fetcher, list_type='random-size'):
                 # For actors, we'll make up a bit of data about which character they played.
                 # We can always fill in None, or leave lists empty if we're missing that data.
                 crew[crew_type].roles_by_uid[person_uid] = flam.MLFRole(
-                    person_uid = person_uid,
-                    is_star = None,
-                    characters = [rng.choice(CHARACTERS_POOL)] if crew_type == flam.CrewType.CAST else [],
-                    jobs = [],
+                    person_uid          = person_uid,
+                    is_star             = None,
+                    episodes_num        = None,
+                    oscar_noms          = [],
+                    oscar_wins          = [],
+                    characters          = [rng.choice(CHARACTERS_POOL)] if crew_type == flam.CrewType.CAST else [],
+                    jobs                = [],
                 )
 
                 # This person may have already been fetched because of their presence in another movie or another crew type in this movie.
@@ -103,7 +106,9 @@ class RandomDataFetcher(flam.Fetcher, list_type='random-size'):
         mlf_movie = flam.MLFMovie(
             uid                 = uid,
             per_src_data        = [per_src_data],
+            media_type          = 'movie',
             title               = rng.choice(TITLES_POOL),
+            original_title      = None,
             tagline             = None,
             synopsis            = None,
             url                 = None,
@@ -115,9 +120,15 @@ class RandomDataFetcher(flam.Fetcher, list_type='random-size'):
             my_rating           = None,
             likes               = None,
             is_liked            = None,
+            budget_usd          = None,
+            revenue_usd         = None,
+            content_rating      = None,
             release_date        = datetime.date(1969, 7, 4),
             watch_dates         = [],
             my_notes            = [],
+            episodes_num        = None,
+            seasons_num         = None,
+            end_date            = None,
             genres              = ['Drama', 'Western'],
             studios             = ['Paramount Pictures', 'Rafran Cinematografica', 'San Marco'],
             languages           = ['English', 'Italian', 'Spanish'],
@@ -136,12 +147,14 @@ class RandomDataFetcher(flam.Fetcher, list_type='random-size'):
         rng = random.Random(uid)
 
         movie_list_file.people_by_uid[uid] = flam.MLFPerson(
-            uid = uid,
-            name = rng.choice(NAMES_POOL),
-            gender = rng.choice(GENDERS_POOL),
-            birthday = datetime.date(1989, 2, 24),
-            height_cm = 174.0,
-            countries = ['England'],
+            uid                 = uid,
+            name                = rng.choice(NAMES_POOL),
+            gender              = rng.choice(GENDERS_POOL),
+            birthday            = datetime.date(1989, 2, 24),
+            deathday            = None,
+            death_reason        = None,
+            height_cm           = 174.0,
+            countries           = ['England'],
         )
 
 # People predicate which checks if no movies the people were in pass the subfilter.

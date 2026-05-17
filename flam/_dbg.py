@@ -41,6 +41,11 @@ class FlamEnv(enum.StrEnum):
     If :py:attr:`is_truthy`, logs will be printed not just to their log file but also to the console.
     """
 
+    LOGLEVEL            = 'FLAM_LOGLEVEL'
+    """
+    Suppresses logs below this level. See the `python docs on logging levels <https://docs.python.org/3/library/logging.html#levels>`__.
+    """
+    
     CTX_DIR             = 'FLAM_DIR'
     """
     Overrides the default path used to store files.
@@ -63,9 +68,9 @@ class FlamEnv(enum.StrEnum):
     This is only needed if your list is set to private so a profile is needed where you are expected to be already logged in.
     """
 
-    LOGLEVEL            = 'FLAM_LOGLEVEL'
+    TMDB_API_TOKEN      = 'FLAM_TMDB_API_TOKEN'
     """
-    Suppresses logs below this level. See the `python docs on logging levels <https://docs.python.org/3/library/logging.html#levels>`__.
+    The API read access token granted to you by TMDB for using their API.
     """
 
     @property

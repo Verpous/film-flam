@@ -251,22 +251,30 @@ clean-vault() {
 
 # Reconfigures the dev flam dir with some test lists.
 cfg() {
-    $cli config list --default-fetch=no     testlist        imdb-browser-apidev-listid=540302193
-    $cli config list --default-fetch=yes    movies          imdb-browser-apidev-listid=083886771
-    $cli config list --default-fetch=yes    shows           imdb-browser-apidev-listid=560024227
-    $cli config list --default-fetch=yes    specials        imdb-browser-apidev-listid=560318295
-    $cli config list --default-fetch=no     mubi            imdb-browser-apidev-listid=571616524
-    $cli config list --default-fetch=no     netflix         imdb-browser-apidev-listid=560256455
-    $cli config list --default-fetch=no     disney          imdb-browser-apidev-listid=565212657
-    $cli config list --default-fetch=no     blurays         imdb-browser-apidev-listid=539518913
-    $cli config list --default-fetch=no     dvds            imdb-browser-apidev-listid=537497285
-    $cli config list --default-fetch=no     elsewhere       imdb-browser-apidev-listid=566138441
+    $cli config list --default-fetch=no     testlist                    imdb-browser-apidev-listid=540302193
+    $cli config list --default-fetch=yes    movies                      imdb-browser-apidev-listid=083886771
+    $cli config list --default-fetch=yes    shows                       imdb-browser-apidev-listid=560024227
+    $cli config list --default-fetch=yes    specials                    imdb-browser-apidev-listid=560318295
+    $cli config list --default-fetch=no     mubi                        imdb-browser-apidev-listid=571616524
+    $cli config list --default-fetch=no     netflix                     imdb-browser-apidev-listid=560256455
+    $cli config list --default-fetch=no     disney                      imdb-browser-apidev-listid=565212657
+    $cli config list --default-fetch=no     blurays                     imdb-browser-apidev-listid=539518913
+    $cli config list --default-fetch=no     dvds                        imdb-browser-apidev-listid=537497285
+    $cli config list --default-fetch=no     elsewhere                   imdb-browser-apidev-listid=566138441
 
-    $cli config list --default-fetch=no     lbox-movies     letterboxdpy-user-list=verpous/movies-ive-watched
-    $cli config list --default-fetch=no     lbox-films      letterboxdpy-user-list=verpous/films
-    $cli config list --default-fetch=no     lbox-likes      letterboxdpy-user-list=verpous/likes
-    $cli config list --default-fetch=no     lbox-reviews    letterboxdpy-user-list=verpous/reviews
-    $cli config list --default-fetch=no     lbox-watchlist  letterboxdpy-user-list=verpous/watchlist
+    $cli config list --default-fetch=no     lbox-movies                 letterboxdpy-user-list=verpous/movies-ive-watched
+    $cli config list --default-fetch=no     lbox-films                  letterboxdpy-user-list=verpous/films
+    $cli config list --default-fetch=no     lbox-likes                  letterboxdpy-user-list=verpous/likes
+    $cli config list --default-fetch=no     lbox-reviews                letterboxdpy-user-list=verpous/reviews
+    $cli config list --default-fetch=no     lbox-watchlist              letterboxdpy-user-list=verpous/watchlist
+    
+    $cli config list --default-fetch=no     tmdb-movies                 tmdb-list=7103008
+    $cli config list --default-fetch=no     tmdb-fav-movies             tmdb-list=favorite-movies
+    $cli config list --default-fetch=no     tmdb-fav-shows              tmdb-list=favorite-shows
+    $cli config list --default-fetch=no     tmdb-rated-movies           tmdb-list=rated-movies
+    $cli config list --default-fetch=no     tmdb-rated-shows            tmdb-list=rated-shows
+    $cli config list --default-fetch=no     tmdb-watchlist-movies       tmdb-list=watchlist-movies
+    $cli config list --default-fetch=no     tmdb-watchlist-shows        tmdb-list=watchlist-shows
 
     $cli config composite --default-find=yes    all         movies shows
     $cli config composite --default-find=no     rated       movies shows    -has my-rating

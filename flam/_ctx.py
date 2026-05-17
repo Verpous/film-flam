@@ -48,7 +48,7 @@ from . import utils
 # Without hide-value this would've shown a local path on my machine in the documentation.
 DEFAULT_FLAM_DIR = _dbg.FlamEnv.CTX_DIR.get_or_default(os.path.join(os.path.expanduser('~'), '.film_flam'))
 """
-The default path where flam stores all your movie lists and configuration. Equal to the environment variable FLAM_DIR, or ~/.film_flam if it's not defined.
+The default path where flam stores all your movie lists and configuration. Equal to the environment variable **FLAM_DIR**, or ~/.film_flam if it's not defined.
 
 :meta hide-value:
 """
