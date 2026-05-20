@@ -167,6 +167,11 @@ class MovieListFile(_file._FlamSerializable):
     Fetchers are free to choose one occurrence to keep at random.
     """
 
+    expiration_date:        None | datetime.date
+    """
+    Some APIs legally require us to not cache data forever. When this date hits, the file will be deleted and everything will have to be re-fetched.
+    """
+
     people_by_uid:          dict[str, MLFPerson]
 
     def _sanity_checks(self) -> None:

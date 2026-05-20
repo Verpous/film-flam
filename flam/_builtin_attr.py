@@ -429,7 +429,7 @@ def _movie_likes_extractor(self: attrutils.EasyAttribute, movie: _ml.Movie, mlf_
     default_max_len = _STR_LEN_DONTCARE,
 ))
 def _movie_is_liked_extractor(self: attrutils.EasyAttribute, movie: _ml.Movie, mlf_movie: _mlf.MLFMovie) -> None | bool:
-    """whether you user gave the film a like."""
+    """whether you gave the film a like."""
     return mlf_movie.is_liked
 
 @_register_easy_attribute(attrutils.EasyAttributeParams(
@@ -854,7 +854,7 @@ for handler in attrutils.DATE_HANDLERS:
         default_max_len = _STR_LEN_SHORT,
     ))
     def _people_deathday_extractor(self: attrutils.EasyAttribute, people: _ml.People, mlf_people: list[_mlf.MLFPerson]) -> list[None | datetime.date]:
-        """list of every person's deathday in this date format."""
+        """list of every person's death date in this date format."""
         hnd = typing.cast(attrutils.DateHandler, self._params.type_handler)
 
         # Guaranteed consistent ordering because mlf_people should already be sorted by uid.

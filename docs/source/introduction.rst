@@ -101,7 +101,7 @@ What's next
 Supported platforms
 -------------------
 
-Flam is written to be cross-platform so it should work on both Windows and Linux. However since I am using Windows, I never tested it on Linux. Please let me know if you encounter issues on Linux.
+Flam is cross-platform and should work on Windows, Linux, and macOS. However, it's only well-tested on Windows, since that is what I am using. Please let me know if you encounter issues.
 
 Flam is better if you have ``less`` installed. If you're on Windows, it's recommended to install it. One easy way is to just install `git <https://git-scm.com/>`__.
 
@@ -109,3 +109,12 @@ Getting help
 ------------
 
 If you encounter issues or have questions, you can `open a GitHub issue <https://github.com/Verpous/film-flam/issues>`__, or email me at ederyaviv2@gmail.com.
+
+Disclaimer
+----------
+
+This program uses TMDB and the TMDB APIs but is not endorsed, certified, or otherwise approved by TMDB.
+
+Likewise for IMDb, Letterboxd, or what-have-you.
+
+.. image:: _static/tmdb.svg

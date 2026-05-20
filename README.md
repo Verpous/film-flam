@@ -35,7 +35,7 @@ Read all about how to use flam in [the docs](https://verpous.github.io/film-flam
 
 ## Supported platforms
 
-Flam is written to be cross-platform so it should work on both Windows and Linux. However since I am using Windows, I never tested it on Linux. Please let me know if you encounter issues on Linux.
+Flam is cross-platform and should work on Windows, Linux, and macOS. However, it's only well-tested on Windows, since that is what I am using. Please let me know if you encounter issues.
 
 Flam is better if you have `less` installed. If you're on Windows, it's recommended to install it. One easy way is to just install [git](https://git-scm.com/).
 
@@ -45,4 +45,8 @@ If you encounter issues or have questions, please open an issue, or email me at 
 
 ## Disclaimer
 
-I am not affiliated with IMDb, Letterboxd, TMDb, or any such website in any way.
+This program uses TMDB and the TMDB APIs but is not endorsed, certified, or otherwise approved by TMDB.
+
+Likewise for IMDb, Letterboxd, or what-have-you.
+
+![tmdb.svg](docs/source/_static/tmdb.svg)

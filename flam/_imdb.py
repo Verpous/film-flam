@@ -236,45 +236,6 @@ class CsvApiDevFetcher(_fetch.Fetcher, list_type='imdb-csv-apidev-path', uid_fam
         movies_csv = _read_csv(csv_path)
         _fetch_movies_in_csv(movies_csv, movie_list_file, self, _IMDbApiDev.fetch_movies_from_api)
 
-@_reg._register_builtin
-class SeleniumTmdbFetcher(_fetch.Fetcher, list_type='imdb-browser-tmdb-listid', uid_family=_UID_FAMILY):
-    """IMDB_LIST_ID
-
-    Like **imdb-browser-apidev-listid**, but data is fetched using the `TMDB API <https://developer.themoviedb.org/docs/getting-started>`__.
-
-    This fetcher requires you to have TMDB API access. Read more about that in the **tmdb-list** documentation.
-
-    TMDB is a rich database so this fetcher is able to gather more information than the "pure" IMDb fetchers. The downside is that it's more complicated to set up.
-    """
-    def _fetch_into_file(self, movie_list_file: _mlf.MovieListFile) -> None:
-        # Import lazily because I want IMDb fetchers to show up first in the docs.
-        from . import _tmdb
-
-        _dbg.logger.info(f"IMDbTMDB: Going to download the CSV for IMDb list id: {self.concrete_listdef.address}")
-        movies_csv = SeleniumApiDevFetcher.download_csv(self.concrete_listdef)
-
-        mexs = [
-            _tmdb.MovieExternalInfo(
-                uid             = f'tt{movie_csv.uid}',
-                loading_title   = movie_csv.title,
-
-                # The CSV does have media types, but it's hard to map them to TMDB media types and we don't have to.
-                media_type      = None,
-
-                list_index      = int(movie_csv.list_index),
-                list_note       = movie_csv.note,
-                listing_date    = _CsvRow._date(movie_csv.listing_date),
-
-                my_rating       = float(movie_csv.my_rating) if (movie_csv.my_rating is not None and movie_csv.my_rating != '') else None,
-                is_liked        = None,
-                watch_dates     = [_CsvRow._date(movie_csv.listing_date)],
-                my_notes        = [],
-            )
-            for movie_csv in movies_csv
-        ]
-
-        _tmdb.TMDBFetcher._fetch_external_movies_into_file(mexs, 'imdb_id', self, movie_list_file)
-
 # We used to use Cinemagoer as our API (https://cinemagoer.github.io/), which was prefereable. But cinemagoer is dead, so found this nifty API instead: https://imdbapi.dev/.
 # The cinemagoer implementation is deleted so as not to include it as a dependency in the release, but this file still has remnants that there was once cinemagoer support.
 class _IMDbApiDev:

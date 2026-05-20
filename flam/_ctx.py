@@ -29,6 +29,7 @@ import contextlib
 import enum
 import glob
 import shutil
+import datetime
 
 from . import _cfg
 from . import _exc
@@ -310,19 +311,29 @@ class FlamContext:
 
     # This is for getting MLFs that are not anonymous - anything that is saved on disk or should be saved to disk once generated.
     def _get_persistable_mlf(self, abstract_listdef: _ldef.CanonListdef) -> _mlf.MovieListFile:
+        mlf_path = self._get_mlf_path(abstract_listdef)
+
         # Special flow for composite lists because they are classified as cache files which should always be prepared to be regenerated.
         if abstract_listdef.list_type == _ldef.SpecialListType.COMPOSITE:
             mlf = None
 
             if not self._should_regenerate_composite_list(abstract_listdef.address):
                 try:
-                    mlf = _mlf.MovieListFile._load(self._get_mlf_path(abstract_listdef))
+                    mlf = _mlf.MovieListFile._load(mlf_path)
                 except (FileNotFoundError, _exc.FileValidationError) as e:
                     # Simply regenerate if we failed to load it.
                     _dbg.logger.info(f"Composite list {abstract_listdef.address=} failed to load from disk due to error: {e}")
 
+            regen_reason = None
+
             if mlf is None:
-                _dbg.logger.info(f"Regenerating composite list: '{abstract_listdef}'")
+                regen_reason = 'it was not previously generated'
+            elif mlf.expiration_date is not None and datetime.date.today() > mlf.expiration_date:
+                regen_reason = 'the file expired'
+                
+            # If there is a regen reason, we must regenerate the list.
+            if regen_reason is not None:
+                _dbg.logger.info(f"Regenerating composite list: '{abstract_listdef}' ({regen_reason})")
 
                 # First generate it.
                 composite_list = self._cfg.composite_lists.get_by_uid(abstract_listdef.address)
@@ -343,11 +354,16 @@ class FlamContext:
                 self._write_metadata()
         else:
             try:
-                mlf = _mlf.MovieListFile._load(self._get_mlf_path(abstract_listdef))
+                mlf = _mlf.MovieListFile._load(mlf_path)
             except FileNotFoundError as e:
                 raise _exc.InputError(f"LISTDEF '{abstract_listdef.pretty(self)}' isn't fetched.") from e
 
+            if mlf.expiration_date is not None and datetime.date.today() > mlf.expiration_date:
+                os.remove(mlf_path)
+                raise _exc.InputError(f"LISTDEF '{abstract_listdef.pretty(self)}' was first fetched a long time ago and had to be deleted for legal reasons. Please refetch it.")
+
         _dbg.logger.info(f"Got movie list file: '{abstract_listdef}'")
+        assert mlf is not None
         return mlf
     
     # Note that this function doesn't check if the composite list file exists. In normal circumstances we should never hit that case,
@@ -391,10 +407,17 @@ class FlamContext:
             list_type = _ldef.SpecialListType.COMPOSITE
             address = composite_uid
 
+        # Pick the nearest of the expiration dates, for legal reasons.
+        try:
+            expiration_date = min(dep_mlf.expiration_date for dep_mlf in dependency_mlfs if dep_mlf.expiration_date is not None)
+        except ValueError:
+            expiration_date = None
+
         merged_mlf = _mlf.MovieListFile(
             version = _gen_version.__version__,
             uid_family = dependency_mlfs[0].uid_family,
             abstract_listdef = _ldef.CanonListdef(list_type, address),
+            expiration_date = expiration_date,
             movies_by_uid = {},
             people_by_uid = {},
         )
@@ -824,6 +847,7 @@ class FlamContext:
                     version = _gen_version.__version__,
                     uid_family = fetcher.uid_family,
                     abstract_listdef = fetcher.abstract_listdef,
+                    expiration_date = None,
                     movies_by_uid = {},
                     people_by_uid = {},
                 )

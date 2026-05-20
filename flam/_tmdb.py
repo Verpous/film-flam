@@ -88,6 +88,10 @@ class TMDBFetcher(_fetch.Fetcher, list_type='tmdb-list', uid_family=_UID_FAMILY)
         mexs = []
         _dbg.logger.info(f"Going to download TMDB list: {list_id}")
 
+        # TMDB legally requires us to not cache data for more than 6 months.
+        if len(movie_list_file.movies_by_uid) == 0:
+            movie_list_file.expiration_date = datetime.date.today() + datetime.timedelta(days=6 * 30)
+
         match list_id:
             case 'favorite-movies':
                 # https://developer.themoviedb.org/reference/account-get-favorites
@@ -706,7 +710,7 @@ class TMDBFetcher(_fetch.Fetcher, list_type='tmdb-list', uid_family=_UID_FAMILY)
 # This is a complete list of possible credits in TMDB acquired from this endpoint: https://developer.themoviedb.org/reference/configuration-jobs.
 # There are some credits not returned by TMDB which we've gathered ourselves over time.
 # NOTE: TMDB can actually have the same crew type in several departments. We've gotten rid of duplicates here, but this note is in case it'll be important someday.
-# NOTE: we could have this dictionary in a separate file and import it lazily if needed.
+# NOTE: python imports this blazing quick so there's no need to lazy-load it.
 _crew_type_tmdb2flam_mapping = {
     # Department: Production.
     "casting":                                              _ml.CrewType.CASTING_DIRECTOR, # Often there's no "Casting Director" but there is this.
