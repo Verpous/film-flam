@@ -752,6 +752,8 @@ Supports globbing (e.g. '*-date' for all date attributes).
 For a full list of supported attributes: {DOCS_URL}/attributes.html.
 ''')
 
+        parser.add_argument('-l', '--split', metavar='ATTRIBUTES', default=None, action='store', help=
+            'Comma-delimited list of attributes. If their type is a list, each element will be split into a separate entry.')
         parser.add_argument('-C', '--color', choices=Choice.always_auto_never(), default=Choice.AUTO, action='store', help=
             'Set whether columns should be colored. Defaults to %(default)s.')
         parser.add_argument('-d', '--dsv', metavar='DELIM', default=None, action='store', help=
@@ -853,8 +855,9 @@ Read more about filters: {DOCS_URL}/filters.html.''')
 
         sort_attrs = cls.parse_sortkeys(args, findable_type, ct_gms, ctx)
         column_attrs = cls.parse_columns(args, findable_type, ct_gms, sort_attrs, movie_list, filter, ctx)
+        split_indices = cls.parse_splits(args, findable_type, column_attrs, ctx)
 
-        flam.logger.info("Building findables list")
+        flam.logger.info('Building findables list')
 
         # It's very important that we apply the filter here and not at get_movie_list.
         # 1. Unless the filter is a movie filter, it's not even possible to apply it anywhere else
@@ -866,16 +869,21 @@ Read more about filters: {DOCS_URL}/filters.html.''')
                 for findable in movie_list.find(findable_type, crew_type=crew_type, group_mode=group_mode, filter=filter)
         ]
 
-        flam.logger.info(f"Sorting findables list of {len(findables)} items")
+        flam.logger.info(f'Sorting findables list of {len(findables)} items')
         cls.sort_findables(sort_attrs, findables, args)
 
-        flam.logger.info("Extracting columns from findables")
+        flam.logger.info('Extracting columns from findables')
         values_table = [[findable.extract(attr) for attr, _ in column_attrs] for findable in findables]
 
-        flam.logger.info("Stringifying the table")
+        # Function doesn't support being called with empty list, and also it would be a waste of time.
+        if len(split_indices) > 0:
+            flam.logger.info(f'Splitting entries based on indices: {split_indices}')
+            values_table = list(cls.split_values(split_indices, values_table))
+
+        flam.logger.info('Stringifying the table')
         strs_table = list(cls.build_strs_table(column_attrs, values_table, args))
 
-        flam.logger.info("Printing the table")
+        flam.logger.info('Printing the table')
         print_table(strs_table, args.color, args.paginate, args.spacious, args.no_titles, args.dsv)
 
     # Can't do this at argparse time because it depends on the context.
@@ -1083,12 +1091,70 @@ Read more about filters: {DOCS_URL}/filters.html.''')
         return attributes
 
     @classmethod
+    def parse_splits(cls, args: argparse.Namespace, findable_type: flam.FindableType, column_attrs: list[tuple[flam.Attribute, None | str]], ctx: flam.FlamContext) -> list[int]:
+        # Waste of compute but the caller won't call this in the None case. The '' case is the user's fault.
+        if args.split is None or args.split == '':
+            return []
+
+        attribute_names = args.split.split(',')
+        attributes = [ctx.attributes.get(a, type_hint=findable_type) for a in attribute_names]
+        column_indices = []
+
+        for attr_name, attr in zip(attribute_names, attributes):
+            # Find the attribute's index in the columns list. We only care about the index.
+            column_index = None
+
+            for i, tup in enumerate(column_attrs):
+                cattr, _ = tup
+
+                if attr.qualified_name == cattr.qualified_name:
+                    column_index = i
+                    break
+
+            if column_index is None:
+                raise flam.InputError(f"ATTRIBUTE '{attr_name}' is not in the columns list so it can't be a --split option.")
+
+            column_indices.append(column_index)
+
+        flam.logger.info(f"Got split attributes: {', '.join(attr.qualified_name for attr in attributes)}")
+        return column_indices
+
+    @classmethod
     def sort_findables(cls, sort_attrs: list[tuple[flam.Attribute, None | str]], findables: list[flam.Findable], args: argparse.Namespace) -> None:
         for attr, _ in reversed(sort_attrs):
             # Use functools.partial to silence "cell-var-from-loop" warning by pylint.
             # NOTE: python guarantees that the key func is applied only once per obj so we won't be extracting the attribute multiple times.
             key = functools.partial(lambda a, f: a.sort_key(f.extract(a)), attr)
             findables.sort(key=key, reverse=(not attr.is_ascending) ^ args.reverse)
+
+    @classmethod
+    def split_values(cls, split_indices: list[int], values_table: typing.Iterable[list[flam.AttributeValue]]) -> typing.Iterable[list[flam.AttributeValue]]:
+        # Recursion baby. Splitting all indices is the same as splitting the first one and then the rest.
+        # This is how we achieve doing N passes (one for each split) without creating a list after each iteration.
+        split_index = split_indices[0]
+        split = cls.split_single_value(split_index, values_table)
+
+        if len(split_indices) == 1:
+            yield from split
+        else:
+            yield from cls.split_values(split_indices[1:], split)
+
+    @classmethod
+    def split_single_value(cls, split_index: int, values_table: typing.Iterable[list[flam.AttributeValue]]) -> typing.Iterable[list[flam.AttributeValue]]:
+        for entry in values_table:
+            value_to_split = entry[split_index]
+
+            # Technically we could get away with the len == 1 case too but it feels wrong.
+            if not isinstance(value_to_split, list) or len(value_to_split) == 0:
+                yield entry
+                continue
+
+            # This function is called after the findables are already sorted. We don't busy ourselves with sorting the split values.
+            # All attributes which return a list return it in some sorted order anyway. All we must care about is that this split should be "stable".
+            for elem in value_to_split:
+                split_entry = list(entry)
+                split_entry[split_index] = elem
+                yield split_entry
 
     @classmethod
     def build_strs_table(cls, attributes: list[tuple[flam.Attribute, None | str]], values_table: list[list[flam.AttributeValue]], args: argparse.Namespace) -> typing.Iterable[list[str]]:

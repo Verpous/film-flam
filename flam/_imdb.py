@@ -133,7 +133,7 @@ class SeleniumApiDevFetcher(_fetch.Fetcher, list_type='imdb-listid', uid_family=
 
     This fetcher also supports one ``--fetch-param``:
 
-    * **csv-path** - Skip exporting the list to CSV in the browser and instead use this path to an already downloaded file.
+    * **csv-path** - Skip exporting the list to CSV in the browser and instead use this path to an already downloaded file. Path may contain environment variables (``%USERPROFILE%``, ``$HOME``, etc.).
 
         .. tip::
 
