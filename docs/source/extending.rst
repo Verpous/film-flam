@@ -216,7 +216,7 @@ Fetchers are implemented by inheriting from :py:class:`~._fetch.Fetcher`. You'll
 .. code-block:: python
 
     @register
-    class MyCustomFetcher(Fetcher, list_type='my-database'):
+    class MyCustomFetcher(Fetcher, list_type='my-database-list'):
         def fetch_into_file(self, movie_list_file: MovieListFile) -> None:
             # ...
 

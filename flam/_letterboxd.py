@@ -28,6 +28,7 @@ from . import _dbg
 from . import utils
 
 _UID_FAMILY = 'letterboxd'
+_PARAM_MAX = 'max'
 
 # Letterboxd has an official API but they're currently only handing out API keys on special request and they won't approve it for a personal project.
 # Letterboxd doesn't have a way to export a list to CSV, unless that list is your list,
@@ -41,7 +42,7 @@ class _MovieBasicInfo:
 # The only unofficial API I can find is letterboxdpy, so we'll be using that.
 # They have a shit documentation but here it is: https://github.com/nmcassa/letterboxdpy/tree/main/docs.
 @_reg._register_builtin
-class LetterboxdpyFetcher(_fetch.Fetcher, list_type='letterboxdpy-user-list', uid_family=_UID_FAMILY):
+class LetterboxdpyFetcher(_fetch.Fetcher, list_type='letterboxd-user-list', uid_family=_UID_FAMILY):
     """LETTERBOXD_USER_LIST
         
     Takes a Letterboxd user and list name in the form ``<username>/<list_slug>`` as an input, and downloads the list using `letterboxdpy <https://github.com/nmcassa/letterboxdpy>`__.
@@ -64,6 +65,14 @@ class LetterboxdpyFetcher(_fetch.Fetcher, list_type='letterboxdpy-user-list', ui
         from letterboxdpy.core.exceptions import AccessDeniedError, ResourceNotFoundError # type: ignore
 
         _dbg.logger.info(f"Going to download Letterboxd list: {self.concrete_listdef.address}")
+
+        # For debugging, support limiting to only a few movies fetched.
+        try:
+            max_movies = int(self.get_param(_PARAM_MAX))
+        except _exc.InputError:
+            max_movies = None
+        except ValueError as e:
+            raise _exc.InputError(f"Invalid param '{_PARAM_MAX}': {e}") from e
 
         try:
             username, list_slug = self.concrete_listdef.address.split('/', maxsplit=1)
@@ -176,7 +185,11 @@ class LetterboxdpyFetcher(_fetch.Fetcher, list_type='letterboxdpy-user-list', ui
         ))
 
         _dbg.logger.info(f"There are {len(movies_to_fetch)} new movies to fetch")
-        
+
+        if max_movies is not None:
+            _dbg.logger.info(f"Limiting fetch to a maximum of {max_movies} movies.")
+            movies_to_fetch = movies_to_fetch[:max_movies]
+
         try:
             with utils.ProgressBar(movies_to_fetch,
                     desc='Downloading',

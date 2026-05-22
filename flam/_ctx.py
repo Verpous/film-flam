@@ -794,7 +794,7 @@ class FlamContext:
         self._metadata._write(self._metadata_path)
 
     # Fetching.
-    def fetch(self, listdefs: typing.Iterable[str], refetch_pattern: None | str = None, quiet: bool = True) -> None:
+    def fetch(self, listdefs: typing.Iterable[str], refetch_pattern: None | str = None, quiet: bool = True, **fetch_params: str) -> None:
         """
         Fetch movie lists, i.e. download all their data from some external source and store it locally.
         Depending on the fetcher and the size of the list, this may run for a long time - even hours.
@@ -813,7 +813,7 @@ class FlamContext:
         # Get all fetchers before using any so that if one of the listdefs doesn't parse good we will raise an error now and not before fetching a few.
         # We use stable_dedup to not fetch the same thing twice but in a way which preserves the requested fetch order.
         fetchers = [
-            self._get_fetcher(cldef)
+            self._get_fetcher(cldef, fetch_params)
             for cldef in utils.stable_dedup((_ldef.CanonListdef._parse_and_expand(listdefs, self, _ldef._ExpandFlavor.FETCH)))
         ]
 
@@ -877,18 +877,25 @@ class FlamContext:
         if old_mlf is None or old_mlf != new_mlf:
             self._write_mlf(new_mlf)
 
-    def _get_fetcher(self, canon_listdef: _ldef.CanonListdef) -> _fetch.Fetcher:
+    def _get_fetcher(self, canon_listdef: _ldef.CanonListdef, fetch_params: dict[str, str]) -> _fetch.Fetcher:
         if canon_listdef.is_abstract:
             # Assume it's a SimpleList.
             abstract_listdef = canon_listdef
-            concrete_listdef = self._cfg.simple_lists.get_by_uid(abstract_listdef.address).concrete_listdef
+            simple_list = self._cfg.simple_lists.get_by_uid(abstract_listdef.address)
+            concrete_listdef = simple_list.concrete_listdef
+            
+            # Must not modify the dict for the caller and also pass the fetcher something it won't have to worry might change.
+            # The order here is important because we want params passed to this function to override the same params configured in the list.
+            fetch_params_copy = dict(simple_list.fetch_params)
+            fetch_params_copy.update(fetch_params)
         else:
             # If fetching a totally raw list, it's easiest to lie and call the concrete listdef also "abstract".
             abstract_listdef = concrete_listdef = canon_listdef
+            fetch_params_copy = dict(fetch_params)
 
         fetcher_cls = self.fetchers[concrete_listdef.list_type]
-        _dbg.logger.info(f"Created fetcher of type {fetcher_cls} for {concrete_listdef=}, {abstract_listdef=}")
-        return fetcher_cls(concrete_listdef, abstract_listdef, self)
+        _dbg.logger.info(f"Created fetcher of type {fetcher_cls} for {concrete_listdef=}, {abstract_listdef=}, {fetch_params_copy=}")
+        return fetcher_cls(concrete_listdef, abstract_listdef, fetch_params_copy, self)
 
     def precache(self, preference: PrecachePreference = PrecachePreference.DEFAULTS, quiet: bool = True) -> None:
         """

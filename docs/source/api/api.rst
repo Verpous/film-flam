@@ -16,7 +16,7 @@ Flam is not just a commandline tool, it's also a python API for using from your 
         simple_list = flam.SimpleList(
             uid = "what you set here doesn't matter, it will be overwritten anyway",
             name = 'watched',
-            concrete_listdef = ctx.parse_listdef('imdb-browser-apidev-listid=083886771'),
+            concrete_listdef = ctx.parse_listdef('imdb-listid=083886771'),
             is_default_fetch = False,
             is_default_find = False,
         )

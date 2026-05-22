@@ -38,7 +38,7 @@ class CanonListdef(typing.NamedTuple):
     
     Concrete and abstract canon listdefs:
 
-    * Canon listdefs are "concrete" when they describe the raw address from which the data was fetched. E.g., "imdb-browser-apidev-listid=083886771"
+    * Canon listdefs are "concrete" when they describe the raw address from which the data was fetched. E.g., "imdb-listid=083886771"
     * Canon listdefs are "abstract" when they describe a configured list. E.g., "list=watched"
     """
 
@@ -149,7 +149,7 @@ class CanonListdef(typing.NamedTuple):
     @property
     def is_concrete(self) -> bool:
         """
-        Whether this listdef is "concrete", meaning it describes a raw address from which the data was fetched. E.g., "imdb-browser-apidev-listid=083886771".
+        Whether this listdef is "concrete", meaning it describes a raw address from which the data was fetched. E.g., "imdb-listid=083886771".
         """
         return not self.is_special
 

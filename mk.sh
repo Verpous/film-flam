@@ -251,22 +251,22 @@ clean-vault() {
 
 # Reconfigures the dev flam dir with some test lists.
 cfg() {
-    $cli config list --default-fetch=no     testlist                    imdb-browser-apidev-listid=540302193
-    $cli config list --default-fetch=yes    movies                      imdb-browser-apidev-listid=083886771
-    $cli config list --default-fetch=yes    shows                       imdb-browser-apidev-listid=560024227
-    $cli config list --default-fetch=yes    specials                    imdb-browser-apidev-listid=560318295
-    $cli config list --default-fetch=no     mubi                        imdb-browser-apidev-listid=571616524
-    $cli config list --default-fetch=no     netflix                     imdb-browser-apidev-listid=560256455
-    $cli config list --default-fetch=no     disney                      imdb-browser-apidev-listid=565212657
-    $cli config list --default-fetch=no     blurays                     imdb-browser-apidev-listid=539518913
-    $cli config list --default-fetch=no     dvds                        imdb-browser-apidev-listid=537497285
-    $cli config list --default-fetch=no     elsewhere                   imdb-browser-apidev-listid=566138441
+    $cli config list --default-fetch=no     testlist                    imdb-listid=540302193
+    $cli config list --default-fetch=yes    movies                      imdb-listid=083886771
+    $cli config list --default-fetch=yes    shows                       imdb-listid=560024227
+    $cli config list --default-fetch=yes    specials                    imdb-listid=560318295
+    $cli config list --default-fetch=no     mubi                        imdb-listid=571616524
+    $cli config list --default-fetch=no     netflix                     imdb-listid=560256455
+    $cli config list --default-fetch=no     disney                      imdb-listid=565212657
+    $cli config list --default-fetch=no     blurays                     imdb-listid=539518913
+    $cli config list --default-fetch=no     dvds                        imdb-listid=537497285
+    $cli config list --default-fetch=no     elsewhere                   imdb-listid=566138441
 
-    $cli config list --default-fetch=no     lbox-movies                 letterboxdpy-user-list=verpous/movies-ive-watched
-    $cli config list --default-fetch=no     lbox-films                  letterboxdpy-user-list=verpous/films
-    $cli config list --default-fetch=no     lbox-likes                  letterboxdpy-user-list=verpous/likes
-    $cli config list --default-fetch=no     lbox-reviews                letterboxdpy-user-list=verpous/reviews
-    $cli config list --default-fetch=no     lbox-watchlist              letterboxdpy-user-list=verpous/watchlist
+    $cli config list --default-fetch=no     lbox-movies                 letterboxd-user-list=verpous/movies-ive-watched
+    $cli config list --default-fetch=no     lbox-films                  letterboxd-user-list=verpous/films
+    $cli config list --default-fetch=no     lbox-likes                  letterboxd-user-list=verpous/likes
+    $cli config list --default-fetch=no     lbox-reviews                letterboxd-user-list=verpous/reviews
+    $cli config list --default-fetch=no     lbox-watchlist              letterboxd-user-list=verpous/watchlist
     
     $cli config list --default-fetch=no     tmdb-movies                 tmdb-list=7103008
     $cli config list --default-fetch=no     tmdb-fav-movies             tmdb-list=favorite-movies
@@ -391,8 +391,8 @@ coverage() {
         time "$cmd" config extension
         time "$cmd" config extension -D "$PWD"/test_extensions.py
 
-        time "$cmd" config list cov imdb-browser-apidev-listid=540302193
-        time "$cmd" config list --rename coverage cov imdb-browser-apidev-listid=083886771
+        time "$cmd" config list cov imdb-listid=540302193
+        time "$cmd" config list --rename coverage cov imdb-listid=083886771
         time "$cmd" config list
         time "$cmd" config list -D coverage
 

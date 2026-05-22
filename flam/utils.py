@@ -438,3 +438,23 @@ def stable_dedup[TElem, TKey](elements: typing.Iterable[TElem], key: None | typi
         yield from {e: None for e in elements}
     else:
         yield from {key(e): e for e in elements}.values()
+
+_bool_str_reps = {
+    'true':     True,
+    't':        True,
+    'yes':      True,
+    'y':        True,
+    'false':    False,
+    'f':        False,
+    'no':       False,
+    'n':        False,
+}
+
+def str2bool(s: str) -> bool:
+    """
+    Parse some common, case-insensitive string representations of a boolean ('true', 'yes', 'no', 'n', etc.).
+    """
+    try:
+        return _bool_str_reps[s.lower()]
+    except KeyError as e:
+        raise ValueError(f"Invalid boolean string: '{s}'.") from e

@@ -32,6 +32,7 @@ class SimpleList(_file._FlamSerializable):
     concrete_listdef:       _ldef.CanonListdef
     is_default_fetch:       bool
     is_default_find:        bool
+    fetch_params:           dict[str, str]
 
     @property
     def abstract_listdef(self) -> _ldef.CanonListdef:

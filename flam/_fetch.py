@@ -81,9 +81,10 @@ class Fetcher(abc.ABC):
         cls.qualified_aliases = [] if qualified_aliases is None else qualified_aliases
         cls.uid_family = uid_family if uid_family is not None else list_type
 
-    def __init__(self, concrete_listdef: _ldef.CanonListdef, abstract_listdef: _ldef.CanonListdef, ctx: _ctx.FlamContext) -> None:
+    def __init__(self, concrete_listdef: _ldef.CanonListdef, abstract_listdef: _ldef.CanonListdef, fetch_params: dict[str, str], ctx: _ctx.FlamContext) -> None:
         self._concrete_listdef = concrete_listdef
         self._abstract_listdef = abstract_listdef
+        self._fetch_params = fetch_params
         self._ctx = ctx
 
     @property
@@ -99,6 +100,27 @@ class Fetcher(abc.ABC):
         The simple list being fetched, if it is a simple list. Otherwise same as :py:attr:`concrete_listdef`.
         """
         return self._abstract_listdef
+
+    def get_param(self, param_name: str) -> str:
+        """
+        Get the value of a fetch parameter.
+        """
+        try:
+            return self._fetch_params[param_name]
+        except KeyError as e:
+            # Try case insensitive if not found easily.
+            for k, v in self._fetch_params.items():
+                if param_name.lower() == k.lower():
+                    return v
+
+            raise _exc.InputError(f"No such parameter: '{param_name}'.") from e
+
+    def has_param(self, param_name: str) -> bool:
+        """
+        Check if fetcher has been passed this parameter.
+        """
+        # Try case insensitive if not found easily.
+        return param_name in self._fetch_params or any(param_name.lower() == k.lower() for k in self._fetch_params)
 
     def _fetch(self, movie_list_file: _mlf.MovieListFile, refetch_re: None | re.Pattern, quiet: bool) -> None:
         _dbg.logger.info(f"Running fetcher {type(self)=}, abstract={self.abstract_listdef}, concrete={self.concrete_listdef}")

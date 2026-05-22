@@ -48,9 +48,9 @@ So in this case the list ID is 083886771. Let's configure it:
 
 .. code-block:: bash
 
-    flam config list watched imdb-browser-apidev-listid=083886771
+    flam config list watched imdb-listid=083886771
     
-Now flam will know this list by the name "watched", and it knows that this list can be downloaded using the "fetcher" imdb-browser-apidev-listid.
+Now flam will know this list by the name "watched", and it knows that this list can be downloaded using the "fetcher" imdb-listid.
 
 .. tip::
 

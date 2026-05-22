@@ -29,6 +29,8 @@ import atexit
 import enum
 import sys
 import currency_converter # type: ignore
+import tempfile
+import shutil
 
 from . import _reg
 from . import _fetch
@@ -41,6 +43,10 @@ from . import utils
 
 _UID_FAMILY = 'imdb'
 _REQUEST_QUIT = 'quit'
+
+_PARAM_RESUME = 'resume'
+_PARAM_CSV = 'csv-path'
+_PARAM_MAX = 'max'
 
 #region Fetching
 
@@ -104,7 +110,7 @@ class _CsvRow:
         raise ValueError(f'Invalid date: {date}.')
     
 @_reg._register_builtin
-class SeleniumApiDevFetcher(_fetch.Fetcher, list_type='imdb-browser-apidev-listid', uid_family=_UID_FAMILY):
+class SeleniumApiDevFetcher(_fetch.Fetcher, list_type='imdb-listid', uid_family=_UID_FAMILY):
     """IMDB_LIST_ID
 
     Takes an IMDb list ID as an input, and downloads information in two steps:
@@ -124,14 +130,57 @@ class SeleniumApiDevFetcher(_fetch.Fetcher, list_type='imdb-browser-apidev-listi
             If your browser doesn't download things to ~/Downloads, you must set this variable for this fetcher to work!
     * **FLAM_BROWSER** - Which browser to use: 'chrome', 'edge', or 'firefox'. By default flam tries to detect your default browser
     * **FLAM_BROWSER_PROFILE** - Path to your browser profile. This is only needed if your list is set to private so a profile is needed where you are expected to be already logged in.
+
+    This fetcher also supports one ``--fetch-param``:
+
+    * **csv-path** - Skip exporting the list to CSV in the browser and instead use this path to an already downloaded file.
+
+        .. tip::
+
+            Use this option as a workaround if you're having trouble with the automatic browser control feature. You will have to export the list manually.
     """
     exports_server: None | multiprocessing.Process = None
     requests_queue: multiprocessing.Queue = multiprocessing.Queue()
 
     def _fetch_into_file(self, movie_list_file: _mlf.MovieListFile) -> None:
-        _dbg.logger.info(f"IMDbApiDev: Going to download the CSV for IMDb list id: {self.concrete_listdef.address}")
-        movies_csv = self.download_csv(self.concrete_listdef)
-        _fetch_movies_in_csv(movies_csv, movie_list_file, self, _IMDbApiDev.fetch_movies_from_api)
+        _dbg.logger.info(f"Going to download the IMDb list id: {self.concrete_listdef.address}")
+
+        # Parse all parameters before doing anything so that if the user did something wrong he'll get instant feedback.
+        try:
+            is_resume_flow = utils.str2bool(self.get_param(_PARAM_RESUME))
+        except _exc.InputError:
+            # If resume isn't given the default is to not resume.
+            is_resume_flow = False
+        except ValueError as e:
+            raise _exc.InputError(f"Invalid param '{_PARAM_RESUME}': {e}") from e
+
+        try:
+            csv_path_override = os.path.expandvars(self.get_param(_PARAM_CSV))
+        except _exc.InputError:
+            # Indicate that no override is given.
+            csv_path_override = None
+
+        # For debugging, support limiting to only a few movies fetched.
+        try:
+            max_movies = int(self.get_param(_PARAM_MAX))
+        except _exc.InputError:
+            max_movies = None
+        except ValueError as e:
+            raise _exc.InputError(f"Invalid param '{_PARAM_MAX}': {e}") from e
+
+        if is_resume_flow:
+            _dbg.logger.info("This is resume flow, using the last downloaded CSV.")
+            movies_csv = _read_csv(self._get_csv_cache_path(self.concrete_listdef))
+        elif csv_path_override is not None:
+            _dbg.logger.info(f"This is CSV override flow, using CSV: '{csv_path_override}'.")
+            movies_csv = _read_csv(csv_path_override)
+        else:
+            _dbg.logger.info("This is normal flow, going to download a fresh CSV.")
+
+            # It's tempting but I think we shouldn't make it so download_csv returns the path and leaves it up to us to read it.
+            movies_csv = self.download_csv(self.concrete_listdef)
+
+        _fetch_movies_in_csv(movies_csv, movie_list_file, self, max_movies, _IMDbApiDev.fetch_movies_from_api)
 
     @classmethod
     def download_csv(cls, concrete_listdef: _ldef.CanonListdef) -> list[_CsvRow]:
@@ -170,10 +219,22 @@ class SeleniumApiDevFetcher(_fetch.Fetcher, list_type='imdb-browser-apidev-listi
         _dbg.logger.info(f"Successfully downloaded CSV: '{latest_csv}'")
         movies_csv = _read_csv(latest_csv)
 
-        # TODO: Instead of remove, mov it to the flam dir and figure out how the hell to support using the already-downloaded CSV to refetch?
-        # Once the CSV is renamed, we can know from the abstract listdef of SeleniumFetcher where to get the CSV from.
-        os.remove(latest_csv)
+        # Don't delete the CSV, instead move it to tmp so that if fetch is interrupted we'll be able to resume it without redownloading the CSV.
+        csv_cache_path = cls._get_csv_cache_path(concrete_listdef)
+
+        # We'll have to first delete the file already there because there is no python function which guarantees mv with clobber.
+        try:
+            os.remove(csv_cache_path)
+        except FileNotFoundError:
+            pass
+
+        shutil.move(latest_csv, csv_cache_path)
+        _dbg.logger.info(f"Moved CSV to: '{csv_cache_path}'")
         return movies_csv
+    
+    @classmethod
+    def _get_csv_cache_path(cls, concrete_listdef: _ldef.CanonListdef) -> str:
+        return os.path.join(tempfile.gettempdir(), utils.slugify(f'{concrete_listdef.list_type}_{concrete_listdef.address}.csv'))
 
     @classmethod
     def _spin_server_if_needed(cls) -> None:
@@ -217,49 +278,22 @@ def _exports_server_cleanup() -> None:
     else:
         _dbg.logger.info("No need to do server cleanup")
 
-@_reg._register_builtin
-class CsvApiDevFetcher(_fetch.Fetcher, list_type='imdb-csv-apidev-path', uid_family=_UID_FAMILY):
-    """CSV_PATH
-
-    Takes a CSV that was manually exported from an IMDb list, and downloads additional information using this free API: https://imdbapi.dev/.
-    
-    CSV_PATH may contain environment variables (``%USERPROFILE%``, ``$HOME``, etc.).
-    
-    .. tip::
-
-        It's not fully automated so it's less ideal, but you can use this fetcher as a workaround
-        if you're having trouble with the automatic browser control of **imdb-browser-apidev-listid**.
-    """
-    def _fetch_into_file(self, movie_list_file: _mlf.MovieListFile) -> None:
-        _dbg.logger.info(f"IMDbApiDev: Fetching IMDb list by CSV: '{self.concrete_listdef.address}'")
-        csv_path = os.path.expandvars(self.concrete_listdef.address)
-        movies_csv = _read_csv(csv_path)
-        _fetch_movies_in_csv(movies_csv, movie_list_file, self, _IMDbApiDev.fetch_movies_from_api)
-
 # We used to use Cinemagoer as our API (https://cinemagoer.github.io/), which was prefereable. But cinemagoer is dead, so found this nifty API instead: https://imdbapi.dev/.
 # The cinemagoer implementation is deleted so as not to include it as a dependency in the release, but this file still has remnants that there was once cinemagoer support.
 class _IMDbApiDev:
     _converter = None
 
     @classmethod
-    def fetch_movies_from_api(cls, movies_csv: list[_CsvRow], mlf: _mlf.MovieListFile, fetcher: _fetch.Fetcher) -> None:
+    def fetch_movies_from_api(cls, movies_csv_to_fetch: list[_CsvRow], mlf: _mlf.MovieListFile, fetcher: _fetch.Fetcher) -> None:
         BATCH_SIZE = 5
         batch = []
-        movies_to_fetch = [m for m in movies_csv if m.uid not in mlf.movies_by_uid]
 
-        # Only fetch movies not already in the list, and also if the same movie appears multiple times in the list, fetch it only once.
-        # Multiple appearances of the same movie are not supported.
-        movies_to_fetch = list(utils.stable_dedup(
-            (m for m in movies_csv if m.uid not in mlf.movies_by_uid),
-            key = lambda m: m.uid
-        ))
-
-        with utils.ProgressBar(movies_to_fetch,
+        with utils.ProgressBar(movies_csv_to_fetch,
                 desc='Downloading',
                 keyfunc=lambda m: m.title) as bar:
             for i, movie_csv in enumerate(bar):
                 if i % BATCH_SIZE == 0:
-                    batch = movies_to_fetch[i:i + BATCH_SIZE]
+                    batch = movies_csv_to_fetch[i:i + BATCH_SIZE]
 
                     # Ex: https://api.imdbapi.dev/titles:batchGet?titleIds=tt0054331&titleIds=tt0110200&titleIds=tt0405422&titleIds=tt0047437&titleIds=tt27847051
                     # I kind of want to actually make the 'tt' prefix part of the uid, but that's kind of an annoying refactor, and also it's less convenient for Cinemagoer fetchers,
@@ -352,7 +386,7 @@ class _IMDbApiDev:
                 role_oscar_noms = [
                     nom
                     for nom in oscar_noms
-                    if any(nominee['id'] == f'nm{person_uid}' for nominee in nom['nominees'])
+                    if any(nominee['id'] == f'nm{person_uid}' for nominee in nom.get('nominees', []))
                 ]
 
                 crew[crew_type].roles_by_uid[person_uid] = _mlf.MLFRole(
@@ -370,7 +404,7 @@ class _IMDbApiDev:
         # To get a complete picture of the movie's oscar noms/wins, we don't want to be missing any people in the movie's crew who won oscars.
         # So the ones that weren't returned by the credits endpoint will be added as ADDITIONAL crew.
         for nomination in oscar_noms:
-            for nominee in nomination['nominees']:
+            for nominee in nomination.get('nominees', []):
                 person_uid = nominee['id'].removeprefix('nm')
 
                 if any(person_uid in crew[crew_type].roles_by_uid for crew_type in crew):
@@ -379,7 +413,7 @@ class _IMDbApiDev:
                 role_oscar_noms = [
                     nom
                     for nom in oscar_noms
-                    if any(nee['id'] == f'nm{person_uid}' for nee in nom['nominees'])
+                    if any(nee['id'] == f'nm{person_uid}' for nee in nom.get('nominees', []))
                 ]
 
                 crew[_ml.CrewType.ADDITIONAL].roles_by_uid[person_uid] = _mlf.MLFRole(
@@ -510,16 +544,23 @@ class _IMDbApiDev:
         if money_key not in box_office:
             return None
 
-        budget = int(box_office[money_key]['amount'])
+        money = int(box_office[money_key]['amount'])
         currency = box_office[money_key]['currency']
 
         if currency == 'USD':
-            return budget
+            return money
 
         if cls._converter is None:
             cls._converter = currency_converter.CurrencyConverter(fallback_on_missing_rate=True, fallback_on_wrong_date=True)
 
-        return int(cls._converter.convert(budget, currency, 'USD', date=date))
+        try:
+            converted = cls._converter.convert(money, currency, 'USD', date=date) 
+        except ValueError as e:
+            # Probably failed because the currency is not supported - for example Das Boot's budget is in DEM.
+            _dbg.logger.warning(f'Failed to convert {money} {currency} to USD: {e}')
+            return None
+
+        return int(converted)
 
     @classmethod
     def _rank_certificate(cls, cert: dict) -> int:
@@ -597,12 +638,13 @@ class _IMDbApiDev:
                 if not should_retry:
                     raise
 
-                # Known errors that failed every retry are fetch-interrupts.
+                # Known errors that failed every retry are fetch-interrupts. Also log the text though because it contains useful information.
                 if i == NUM_RETRIES - 1:
-                    raise _exc.FetchInterrupt(f"TMDB error: {type(e).__name__}: {e}") from e
+                    _dbg.logger.warning(f"Failed every retry with status code: {response.status_code}, text: {response.text}.")
+                    raise _exc.FetchInterrupt(f"imdbapi.dev error: {type(e).__name__}: {e}") from e
 
-                # The response text sometimes contains additional information.
-                _dbg.logger.warning(f"RETRY {i}/{NUM_RETRIES}: request failed with status code: {response.status_code}, text: {response.text}.")
+                # Don't log the response text here because it spams too much.
+                _dbg.logger.warning(f"RETRY {i}/{NUM_RETRIES}: request failed with status code: {response.status_code}.")
                 time.sleep(SLEEP_BETWEEN_RETRIES)
                 continue
 
@@ -641,7 +683,7 @@ class _IMDbApiDev:
 
         raise RuntimeError("Shouldn't get here!")
 
-def _fetch_movies_in_csv(movies_csv: list[_CsvRow], mlf: _mlf.MovieListFile, fetcher: _fetch.Fetcher,
+def _fetch_movies_in_csv(movies_csv: list[_CsvRow], mlf: _mlf.MovieListFile, fetcher: _fetch.Fetcher, max_movies: None | int,
         fetch_from_api_func: typing.Callable[[list[_CsvRow], _mlf.MovieListFile, _fetch.Fetcher], None]) -> None:
     _dbg.logger.info(f"MLF has {len(mlf.movies_by_uid)} movies from prior fetch")
 
@@ -656,8 +698,23 @@ def _fetch_movies_in_csv(movies_csv: list[_CsvRow], mlf: _mlf.MovieListFile, fet
     # Better to do this before fetching new movies so that we'll already have that data in when checkpointing.
     _refresh_csv_fields(movies_csv, mlf)
 
+    movies_to_fetch = [m for m in movies_csv if m.uid not in mlf.movies_by_uid]
+
+    # Only fetch movies not already in the list, and also if the same movie appears multiple times in the list, fetch it only once.
+    # Multiple appearances of the same movie are not supported.
+    movies_to_fetch = list(utils.stable_dedup(
+        (m for m in movies_csv if m.uid not in mlf.movies_by_uid),
+        key = lambda m: m.uid
+    ))
+
+    _dbg.logger.info(f"There are {len(movies_to_fetch)} new movies to fetch")
+
+    if max_movies is not None:
+        _dbg.logger.info(f"Limiting fetch to a maximum of {max_movies} movies.")
+        movies_to_fetch = movies_to_fetch[:max_movies]
+
     try:
-        fetch_from_api_func(movies_csv, mlf, fetcher)
+        fetch_from_api_func(movies_to_fetch, mlf, fetcher)
     # If we get a KeyboardInterrupt, gracefully end the fetching early.
     except KeyboardInterrupt as e:
         raise _exc.FetchInterrupt(f"{type(e).__name__}: {e}") from e

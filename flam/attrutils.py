@@ -292,19 +292,8 @@ class FloatHandler(TypeHandler):
 
 class BoolHandler(TypeHandler):
     """
-    Type handler for booleans with support for various, case-insensitive ways you might describe a boolean (e.g., 'true', 'yes', 'no', 'n', etc.).
+    Type handler for booleans with support for various, case-insensitive ways you might describe them ('true', 'yes', 'no', 'n', etc.).
     """
-    _str_reps = {
-        'true':     True,
-        't':        True,
-        'yes':      True,
-        'y':        True,
-        'false':    False,
-        'f':        False,
-        'no':       False,
-        'n':        False,
-    }
-
     @property
     def default_op(self) -> _attr.ComparisonOp:
         """
@@ -316,10 +305,7 @@ class BoolHandler(TypeHandler):
         """
         :meta private:
         """
-        try:
-            return self._str_reps[primitive_str.lower()]
-        except KeyError as e:
-            raise ValueError(f"Invalid boolean string: '{primitive_str}'.") from e
+        return utils.str2bool(primitive_str)
 
     def str_of(self, primitive: _attr.AttributePrimitive, abbreviate: bool, extras: dict[str, typing.Any]) -> str:
         """

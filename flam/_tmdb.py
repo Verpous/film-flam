@@ -29,6 +29,7 @@ from . import _dbg
 from . import utils
 
 _UID_FAMILY = 'tmdb'
+_PARAM_MAX = 'max'
 
 # These are the names TMDB uses specifically. I hate to put this inside a class but it's necessary for match statements to work with it.
 # Note I don't think there's a reason to turn this class into an enum.
@@ -91,6 +92,15 @@ class TMDBFetcher(_fetch.Fetcher, list_type='tmdb-list', uid_family=_UID_FAMILY)
         # TMDB legally requires us to not cache data for more than 6 months.
         if len(movie_list_file.movies_by_uid) == 0:
             movie_list_file.expiration_date = datetime.date.today() + datetime.timedelta(days=6 * 30)
+
+        # Parse all parameters before doing anything so that if the user did something wrong he'll get instant feedback.
+        # For debugging, support limiting to only a few movies fetched.
+        try:
+            max_movies = int(self.get_param(_PARAM_MAX))
+        except _exc.InputError:
+            max_movies = None
+        except ValueError as e:
+            raise _exc.InputError(f"Invalid param '{_PARAM_MAX}': {e}") from e
 
         match list_id:
             case 'favorite-movies':
@@ -238,12 +248,13 @@ class TMDBFetcher(_fetch.Fetcher, list_type='tmdb-list', uid_family=_UID_FAMILY)
                         # Easier and safer than knowing TMDB's page size and calculating the index.
                         list_index += 1
 
-        self._fetch_external_movies_into_file(mexs, None, self, movie_list_file)
+        self._fetch_external_movies_into_file(mexs, None, self, movie_list_file, max_movies)
         _dbg.logger.info("Done fetching movies")
 
     # Valid external_sources: imdb_id, facebook_id, instagram_id, instagram_id, tvdb_id, tiktok_id, twitter_id, wikidata_id, youtube_id.
     @classmethod
-    def _fetch_external_movies_into_file(cls, movie_external_infos: list[MovieExternalInfo], external_source: None | str, fetcher: _fetch.Fetcher, mlf: _mlf.MovieListFile) -> None:
+    def _fetch_external_movies_into_file(cls, movie_external_infos: list[MovieExternalInfo], external_source: None | str, fetcher: _fetch.Fetcher, mlf: _mlf.MovieListFile,
+            max_movies: None | int) -> None:
         _dbg.logger.info(f"MLF has {len(mlf.movies_by_uid)} movies from prior fetch")
 
         # Only fetch movies not already in the list, and also if the same movie appears multiple times in the list, fetch it only once.
@@ -255,6 +266,10 @@ class TMDBFetcher(_fetch.Fetcher, list_type='tmdb-list', uid_family=_UID_FAMILY)
         ))
 
         _dbg.logger.info(f"There are {len(movies_to_fetch)} new movies to fetch")
+
+        if max_movies is not None:
+            _dbg.logger.info(f"Limiting fetch to a maximum of {max_movies} movies.")
+            movies_to_fetch = movies_to_fetch[:max_movies]
 
         try:
             # NOTE: I prefer a single pass where you convert the UIDs and fetch the movie details rather than two passes.
@@ -655,6 +670,9 @@ class TMDBFetcher(_fetch.Fetcher, list_type='tmdb-list', uid_family=_UID_FAMILY)
             try:
                 response.raise_for_status()
             except requests.HTTPError as e:
+                if response.status_code == requests.codes.unauthorized: # pylint: disable=no-member
+                    raise _exc.InputError(f"Can't fetch from TMDB: your API read access token held in {_dbg.FlamEnv.TMDB_API_TOKEN} isn't valid.")
+
                 should_retry = (
                    response.status_code == requests.codes.too_many_requests # pylint: disable=no-member
                    or 500 <= response.status_code < 600
@@ -666,10 +684,11 @@ class TMDBFetcher(_fetch.Fetcher, list_type='tmdb-list', uid_family=_UID_FAMILY)
 
                 # Known errors that failed every retry are fetch-interrupts.
                 if i == NUM_RETRIES - 1:
-                    raise _exc.FetchInterrupt(f"TMDB error: {type(e).__name__}: {e}") from e
+                    _dbg.logger.warning(f"Failed every retry with status code: {response.status_code}, text: {response.text}.")
+                    raise _exc.FetchInterrupt(f"TMDB API error: {type(e).__name__}: {e}") from e
 
-                # The response text sometimes contains additional information.
-                _dbg.logger.warning(f"RETRY {i}/{NUM_RETRIES}: request failed with status code: {response.status_code}, text: {response.text}.")
+                # Don't log the response text here because it spams too much.
+                _dbg.logger.warning(f"RETRY {i}/{NUM_RETRIES}: request failed with status code: {response.status_code}.")
                 time.sleep(SLEEP_BETWEEN_RETRIES)
                 continue
 

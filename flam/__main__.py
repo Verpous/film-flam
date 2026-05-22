@@ -74,6 +74,19 @@ def split_at_filter(strs: list[str]) -> tuple[list[str], list[str]]:
     filter_begin = next((i for i, s in enumerate(strs) if flam.looks_like_filter_token(s)), len(strs))
     return strs[:filter_begin], strs[filter_begin:]
 
+def parse_fetch_params(fetch_params: list[str]) -> dict[str, str]:
+    as_dict = {}
+
+    for param in fetch_params:
+        try:
+            name, value = param.split('=', maxsplit=1)
+        except ValueError as e:
+            raise flam.InputError(f"Invalid PARAM: '{param}': should have the form '<name>=<value>'.") from e
+
+        as_dict[name] = value
+
+    return as_dict
+
 def print_table(table: list[list[str]],
         color_choice: Choice = Choice.AUTO,
         paginate_choice: Choice = Choice.AUTO,
@@ -283,7 +296,7 @@ Read more about lists: {DOCS_URL}/lists.html.
 '''),
             epilog = (
 '''Examples:
-    %(prog)s mylist imdb-browser-apidev-listid=083886771
+    %(prog)s mylist imdb-listid=083886771
         (Create a list 'mylist'. It's a local copy of the IMDb list '083886771' - https://www.imdb.com/list/ls083886771/)
     %(prog)s mylist --default-fetch=yes --default-find=yes
         (Modify 'mylist' to be default for fetch and find, so `flam fetch`, `flam find` with no arguments will use this list)
@@ -304,8 +317,14 @@ Read more about lists: {DOCS_URL}/lists.html.
         action_group.add_argument('-P', '--print', action='store_true', help='Print the list NAME, or if NAME not provided, print all lists. The default if NAME is not provided.')
 
         parser.add_argument('-n', '--rename', metavar='NEW_NAME', default=None, action='store', help='In --edit, rename the list to %(metavar)s.')
-        parser.add_argument('-i', '--default-find', choices=Choice.yes_no_auto(), default=Choice.AUTO, action='store', help='In --edit, decide if the list should be default for `flam find`.')
-        parser.add_argument('-e', '--default-fetch', choices=Choice.yes_no_auto(), default=Choice.AUTO, action='store', help='In --edit, decide if the list should be default for `flam fetch`.')
+        parser.add_argument('-i', '--default-find', choices=Choice.yes_no_auto(), default=Choice.AUTO, action='store', help=
+            'In --edit, decide if the list should be default for `flam find`.')
+        parser.add_argument('-e', '--default-fetch', choices=Choice.yes_no_auto(), default=Choice.AUTO, action='store', help=
+            'In --edit, decide if the list should be default for `flam fetch`.')
+        parser.add_argument('-p', '--fetch-param', metavar='PARAM=VALUE', action='append', default=[], help=
+            'In --edit, set a parameter for controlling how this list is fetched.')
+        parser.add_argument('-d', '--delete-param', metavar='PARAM', action='append', default=[], help=
+            "In --edit, delete a parameter configured with --fetch-param ('*' to delete all).")
         parser.add_argument('NAME', action='store', nargs='?', default=None, help='Operate on the list named %(dest)s.')
         parser.add_argument('LISTDEF', action='store', nargs='?', default=None, help='In --edit, set the list type and address to %(dest)s.')
         return parser
@@ -338,15 +357,19 @@ Read more about lists: {DOCS_URL}/lists.html.
     def print(cls, ctx: flam.FlamContext, args: argparse.Namespace) -> None:
         simple_lists = list(ctx.cfg_readonly.simple_lists) if args.NAME is None else [ctx.cfg_readonly.simple_lists.get_by_name(args.NAME)]
 
-        table = [['uid', 'name', 'type', 'address', 'default-fetch?', 'default-find?']]
+        # Name before uid because otherwise the sort order feels a bit chaotic.
+        table = [['name', 'uid', 'type', 'address', 'default-fetch?', 'default-find?', 'fetch params']]
         table.extend(sorted(
             [
-                sl.uid.split('-')[0],
                 sl.name,
+                sl.uid.split('-')[0],
                 sl.concrete_listdef.list_type,
                 sl.concrete_listdef.address,
                 Choice.bool2yesno(sl.is_default_fetch),
                 Choice.bool2yesno(sl.is_default_find),
+
+                # Better to not truncate even long strings here.
+                ', '.join(f'{k}={v}' for k, v in sl.fetch_params.items()) if len(sl.fetch_params) != 0 else '-',
             ]
             for sl in simple_lists
         ))
@@ -371,6 +394,18 @@ Read more about lists: {DOCS_URL}/lists.html.
             if args.default_find != Choice.AUTO:
                 simple_list.is_default_find = args.default_find == Choice.YES
 
+            simple_list.fetch_params.update(parse_fetch_params(args.fetch_param))
+            
+            for param in args.delete_param:
+                if param == '*':
+                    simple_list.fetch_params = {}
+                    continue
+
+                try:
+                    del simple_list.fetch_params[param]
+                except KeyError as e:
+                    raise flam.InputError(f"Invalid PARAM: '{param}': list has no fetch parameter with that name.") from e
+
     @classmethod
     def create(cls, ctx: flam.FlamContext, args: argparse.Namespace) -> None:
         if args.NAME is None:
@@ -385,6 +420,7 @@ Read more about lists: {DOCS_URL}/lists.html.
             concrete_listdef = cls.parse_listdef(args.LISTDEF, ctx),
             is_default_fetch = args.default_fetch != Choice.NO,
             is_default_find = args.default_find == Choice.YES,
+            fetch_params = parse_fetch_params(args.fetch_param),
         )
 
         with ctx.configure() as cfg:
@@ -438,10 +474,12 @@ Read more about composite lists: {DOCS_URL}/lists.html.
         action_group = parser.add_mutually_exclusive_group(required=False)
         action_group.add_argument('-E', '--edit', action='store_true', help='Edit or create the composite list NAME. The default if NAME is provided.')
         action_group.add_argument('-D', '--delete', action='store_true', help='Delete the composite list named NAME.')
-        action_group.add_argument('-P', '--print', action='store_true', help='Print the composite list NAME, or if NAME not provided, print all lists. The default if NAME is not provided.')
+        action_group.add_argument('-P', '--print', action='store_true',
+            help='Print the composite list NAME, or if NAME not provided, print all lists. The default if NAME is not provided.')
 
         parser.add_argument('-n', '--rename', metavar='NEW_NAME', default=None, action='store', help='In --edit, rename the list to %(metavar)s.')
-        parser.add_argument('-i', '--default-find', choices=Choice.yes_no_auto(), default=Choice.AUTO, action='store', help='In --edit, decide if the list should be default for `flam find`.')
+        parser.add_argument('-i', '--default-find', choices=Choice.yes_no_auto(), default=Choice.AUTO, action='store',
+            help='In --edit, decide if the list should be default for `flam find`.')
         parser.add_argument('NAME', nargs='?', action='store', default=None, help='Operate on the composite list named %(dest)s.')
         parser.add_argument('SIMPLE_LIST', nargs='*', action='store', help='In --edit, merge %(dest)ss to form this composite list.')
         parser.add_argument('MOVIE_FILTER', nargs='*', action='store', help=
@@ -481,11 +519,11 @@ See the full documentation for filter syntax.''')
     def print(cls, ctx: flam.FlamContext, args: argparse.Namespace) -> None:
         composite_lists = list(ctx.cfg_readonly.composite_lists) if args.NAME is None else [ctx.cfg_readonly.composite_lists.get_by_name(args.NAME)]
 
-        table = [['uid', 'name', 'lists', 'filter', 'default-find?']]
+        table = [['name', 'uid', 'lists', 'filter', 'default-find?']]
         table.extend(sorted(
             [
-                cl.uid.split('-')[0],
                 cl.name,
+                cl.uid.split('-')[0],
                 ', '.join(ctx.cfg_readonly.simple_lists.get_by_uid(sl_uid).name for sl_uid in cl.simple_list_uids),
                 ' '.join(cl.filter_tokens) if len(cl.filter_tokens) > 0 else '-',
                 Choice.bool2yesno(cl.is_default_find),
@@ -569,6 +607,8 @@ You can rerun this to undo up to the last {cls.UNDO_HISTORY} fetches.''')
 '''Forces titles that match %(metavar)s (case-insensitive regular expression) to be redownloaded even if they are already locally stored.
 It's enough for %(metavar)s to match any part of the title, not necessarily the whole title.
 This feature is intended for redownloading shows after a new season has come out.''')
+        parser.add_argument('-p', '--fetch-param', metavar='PARAM=VALUE', action='append', default=[], help=
+            'Set a parameter for controlling how the lists are fetched.')
 
         # Secret argument useful for debugging, to run precache without fetch.
         parser.add_argument('--nothing', action='store_true', help=argparse.SUPPRESS)
@@ -600,9 +640,11 @@ Read more about supported LISTDEFs: {DOCS_URL}/lists.html.''')
             listdefs = []
         else:
             listdefs = [flam.SpecialListType.DEFAULTS]
+
+        fetch_params = parse_fetch_params(args.fetch_param)
         
         try:
-            ctx.fetch(listdefs, refetch_pattern=args.refetch, quiet=False)
+            ctx.fetch(listdefs, refetch_pattern=args.refetch, quiet=False, **fetch_params)
         except flam.FetchInterrupt:
             print('Precaching heavy computations...')
             ctx.precache(quiet=False)
@@ -1168,7 +1210,7 @@ I strongly recommend reading the docs! {DOCS_URL}/introduction.html
 '''),
         epilog = (
 '''Examples:
-    %(prog)s config list --default-fetch=yes --default-find=yes mylist imdb-browser-apidev-listid=083886771
+    %(prog)s config list --default-fetch=yes --default-find=yes mylist imdb-listid=083886771
         (Create a list 'mylist' with the IMDb list address)
     %(prog)s fetch
         (Fetch all lists configured with --default-fetch)

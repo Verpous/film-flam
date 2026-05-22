@@ -24,7 +24,7 @@ Listdefs
 
 "Listdefs" are how you describe which list you're talking about to flam. They have a number of forms:
 
-* ``"<fetcher>=<address>"`` (ex: "imdb-browser-apidev-listid=083886771")
+* ``"<fetcher>=<address>"`` (ex: "imdb-listid=083886771")
     
     A raw form for lists which haven't been given a name. The kind of address it expects depends on the :ref:`fetcher <Fetchers>`.
 * ``"<name>"`` (ex: "watched")
