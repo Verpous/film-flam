@@ -672,7 +672,7 @@ class TMDBFetcher(_fetch.Fetcher, list_type='tmdb-list', uid_family=_UID_FAMILY)
             except requests.HTTPError as e:
                 if response.status_code == requests.codes.unauthorized: # pylint: disable=no-member
                     raise _exc.InputError(f"Can't fetch from TMDB: your API read access token held in {_dbg.FlamEnv.TMDB_API_TOKEN} isn't valid.")
-
+                
                 should_retry = (
                    response.status_code == requests.codes.too_many_requests # pylint: disable=no-member
                    or 500 <= response.status_code < 600
@@ -684,7 +684,7 @@ class TMDBFetcher(_fetch.Fetcher, list_type='tmdb-list', uid_family=_UID_FAMILY)
 
                 # Known errors that failed every retry are fetch-interrupts.
                 if i == NUM_RETRIES - 1:
-                    _dbg.logger.warning(f"Failed every retry with status code: {response.status_code}, text: {response.text}.")
+                    _dbg.logger.error(f"Failed every retry with status code: {response.status_code}, text: {response.text}.")
                     raise _exc.FetchInterrupt(f"TMDB API error: {type(e).__name__}: {e}") from e
 
                 # Don't log the response text here because it spams too much.
@@ -692,7 +692,17 @@ class TMDBFetcher(_fetch.Fetcher, list_type='tmdb-list', uid_family=_UID_FAMILY)
                 time.sleep(SLEEP_BETWEEN_RETRIES)
                 continue
 
-            return response.json()
+            try:
+                return response.json()
+            except requests.exceptions.JSONDecodeError:
+                # Got this bizarre issue where TMDB persistently returns a bad JSON for some endpoints, namely this one: 'https://api.themoviedb.org/3/person/114000.
+                # The issue doesn't reproduce with curl, only with python requests, but I can't see how it's a requests issue.
+                # It doesn't seem to have to do with caching either. Whatever, here's an ugly, horrible, ugly fix.
+                _dbg.logger.warning(f"JSON failed to decode, trying to hack a fix. JSON: {response.text}")
+                assert response._content is not None
+                response._content = response._content.removeprefix(b'__ng_jsonp__.__req1.finished(')
+                response._content = response._content.removesuffix(b')')
+                return response.json()
 
         raise RuntimeError("Shouldn't get here!")
 

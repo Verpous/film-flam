@@ -458,3 +458,18 @@ def str2bool(s: str) -> bool:
         return _bool_str_reps[s.lower()]
     except KeyError as e:
         raise ValueError(f"Invalid boolean string: '{s}'.") from e
+
+def move_clobber(src: str, dst: str, must_exist: bool = True) -> None:
+    """
+    Rename a file without caring if a different file by that name already exists.
+    """
+    try:
+        os.remove(dst)
+    except FileNotFoundError:
+        pass
+    
+    try:
+        shutil.move(src, dst)
+    except FileNotFoundError:
+        if must_exist:
+            raise

@@ -459,6 +459,22 @@ def _movie_revenue_extractor(self: attrutils.EasyAttribute, movie: _ml.Movie, ml
     return mlf_movie.revenue_usd
 
 @_register_easy_attribute(attrutils.EasyAttributeParams(
+    name_without_type = 'profit-usd',
+    aliases_without_type = ['profit'],
+    findable_type = _ml.FindableType.MOVIES,
+    type_handler = attrutils.BIG_INT_HANDLER,
+    is_ascending = False,
+    truncation_style = utils.TruncationStyle.NO_TRIM,
+    default_max_len = _STR_LEN_DONTCARE,
+), create_numericals = True)
+def _movie_profit_extractor(self: attrutils.EasyAttribute, movie: _ml.Movie, mlf_movie: _mlf.MLFMovie) -> None | int:
+    """the movie's profit in US dollars."""
+    if mlf_movie.revenue_usd is None or mlf_movie.budget_usd is None:
+        return None
+        
+    return mlf_movie.revenue_usd - mlf_movie.budget_usd
+
+@_register_easy_attribute(attrutils.EasyAttributeParams(
     name_without_type = 'content-rating',
     aliases_without_type = [],
     findable_type = _ml.FindableType.MOVIES,
@@ -519,7 +535,7 @@ def _movie_languages_extractor(self: attrutils.EasyAttribute, movie: _ml.Movie, 
     type_handler = attrutils.STR_HANDLER,
     is_ascending = True,
     truncation_style = utils.TruncationStyle.TRIM_MIDDLE,
-    default_max_len = _STR_LEN_SHORT,
+    default_max_len = _STR_LEN_LONG,
 ))
 def _movie_countries_extractor(self: attrutils.EasyAttribute, movie: _ml.Movie, mlf_movie: _mlf.MLFMovie) -> list[str]:
     """list of the movie's producing countries."""

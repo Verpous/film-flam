@@ -30,7 +30,6 @@ import enum
 import sys
 import currency_converter # type: ignore
 import tempfile
-import shutil
 
 from . import _reg
 from . import _fetch
@@ -221,14 +220,7 @@ class SeleniumApiDevFetcher(_fetch.Fetcher, list_type='imdb-listid', uid_family=
 
         # Don't delete the CSV, instead move it to tmp so that if fetch is interrupted we'll be able to resume it without redownloading the CSV.
         csv_cache_path = cls._get_csv_cache_path(concrete_listdef)
-
-        # We'll have to first delete the file already there because there is no python function which guarantees mv with clobber.
-        try:
-            os.remove(csv_cache_path)
-        except FileNotFoundError:
-            pass
-
-        shutil.move(latest_csv, csv_cache_path)
+        utils.move_clobber(latest_csv, csv_cache_path)
         _dbg.logger.info(f"Moved CSV to: '{csv_cache_path}'")
         return movies_csv
     
@@ -423,7 +415,7 @@ class _IMDbApiDev:
                     oscar_noms      = [n['category'] for n in role_oscar_noms],
                     oscar_wins      = [n['category'] for n in role_oscar_noms if n.get('isWinner', False)],
                     characters      = [],
-                    jobs            = nominee['primaryProfessions'],
+                    jobs            = nominee.get('primaryProfessions', ['misc. Oscar nominee']),
                 )
 
                 people_to_add.append((person_uid, None))
@@ -441,8 +433,9 @@ class _IMDbApiDev:
             metascore_votes = None
 
         # There's loads of certificates and we have to pick one. We have a system.
+        # Default to empty certificates because some films (ex: Saint Clara) don't have any.
         try:
-            content_cert = max(certificates['certificates'], key=cls._rank_certificate)
+            content_cert = max(certificates.get('certificates', []), key=cls._rank_certificate)
         except ValueError:
             _dbg.logger.warning(f"Movie '{movie_csv.uid}' has no certificates")
             content_cert = None
@@ -468,14 +461,15 @@ class _IMDbApiDev:
             is_liked            = None,
             budget_usd          = cls._get_usd(box_office, 'productionBudget', release_date),
             revenue_usd         = cls._get_usd(box_office, 'worldwideGross', release_date),
-            content_rating      = content_cert['rating'],
+            content_rating      = content_cert['rating'] if content_cert is not None else None,
             my_notes            = [],
 
             episodes_num        = sum(s['episodeCount'] for s in seasons) if is_show else None,
             seasons_num         = len(seasons) if is_show else None,
             end_date            = cls._parse_date(last_episode, 'releaseDate') if last_episode is not None else None,
 
-            studios             = [s['company']['name'] for p in studios_pages for s in p['companyCredits']],
+            # Got empty credits for very niche films like PVT Chat.
+            studios             = [s['company']['name'] for p in studios_pages for s in p.get('companyCredits', [])],
 
             # Sometimes there's an empty lang object. For example if you query movie tt2177771 (the monuments men).
             languages           = [lang['name'] for lang in movie_json['spokenLanguages'] if 'name' in lang],
@@ -578,7 +572,7 @@ class _IMDbApiDev:
                 pass
 
         # We most want the MPAA rating. It looks like this.
-        if any('certificate #' in a for a in attributes):
+        if any('certificate #' in a or 'cert#' in a for a in attributes):
             rank += 500
 
         # Some movies (ex: Clockwork Orange) have been re-rated.
@@ -640,7 +634,7 @@ class _IMDbApiDev:
 
                 # Known errors that failed every retry are fetch-interrupts. Also log the text though because it contains useful information.
                 if i == NUM_RETRIES - 1:
-                    _dbg.logger.warning(f"Failed every retry with status code: {response.status_code}, text: {response.text}.")
+                    _dbg.logger.error(f"Failed every retry with status code: {response.status_code}, text: {response.text}.")
                     raise _exc.FetchInterrupt(f"imdbapi.dev error: {type(e).__name__}: {e}") from e
 
                 # Don't log the response text here because it spams too much.

@@ -18,10 +18,13 @@ from __future__ import annotations
 import msgspec
 import typing
 import json
+import shutil
+import os
 
 from . import _exc
 from . import _dbg
 from . import _gen_version
+from . import utils
 
 _VERSION_KEY = 'version'
 
@@ -125,10 +128,34 @@ class _FlamSerializable(msgspec.Struct,
             raise self._validation_error(f'{e}.') from e
 
         formatted = msgspec.json.format(encoded)
+
+        # To avoid data corruption or data loss we'll be very careful:
+        # * Write the file to a .partial
+        # * Move the current file to a .old
+        # * Move the (now complete) .partial to the desired path
+        # * Cleanup the .old
+        partial_path = f'{path}.partial'
+        old_path = f'{path}.old'
         
-        with open(path, 'wb') as f:
+        with open(partial_path, 'wb') as f:
             f.write(formatted)
 
+        # Path might not exist if this is the first time writing this file.
+        utils.move_clobber(path, old_path, must_exist=False)
+        
+        try:
+            shutil.move(partial_path, path)
+        except:
+            # Rollback on failure. If old_path doesn't exist then this must be the first time creating this file, so there is no backup.
+            utils.move_clobber(old_path, path, must_exist=False)
+            os.remove(partial_path)
+            raise
+        
+        try:
+            os.remove(old_path)
+        except FileNotFoundError:
+            pass
+        
         _dbg.logger.info(f'Successfully wrote a {type(self)} of size {len(formatted)}B')
 
     # Subclasses can override this to add file validity checks beyond what msgspec already does.

@@ -743,13 +743,10 @@ Each findable type has its own default:
 For a full list of supported attributes: {DOCS_URL}/attributes.html.
 ''')
         
+        # Globbing is undocumented because it's mostly a debugging feature. Smart columns are undocumented because what for.
         parser.add_argument('-c', '--columns', metavar='ATTRIBUTES', default=None, action='store', help=
-f'''Comma-delimited list of attributes of FINDABLE to print.
-Each findable type has its own defaults. There are also "smart" defaults which are printed only if certain conditions are met.
+'''Comma-delimited list of attributes of FINDABLE to print.
 If %(metavar)s starts with a '+' then they will be printed in addition to the defaults instead of instead.
-Supports globbing (e.g. '*-date' for all date attributes).
-
-For a full list of supported attributes: {DOCS_URL}/attributes.html.
 ''')
 
         parser.add_argument('-l', '--split', metavar='ATTRIBUTES', default=None, action='store', help=
@@ -772,7 +769,7 @@ For a full list of supported attributes: {DOCS_URL}/attributes.html.
         parser.add_argument('FINDABLE', type=cls.parse_findable, action='store', help=
 f'''Choose what to find: movies, people, or roles.
 
-People and roles support limiting the search to a specific crew type with an optional group mode, and support comma-delimited several types. Use 'crew' to catenate all types.
+People and roles support limiting the search to a specific crew type with an optional group mode, or comma-delimited several types. Use 'crew' to catenate all types.
 For roles, it looks like: 'cast', 'director:group', 'composer:separate,stuntcast', 'crew', etc.
 For people, it looks like 'cast-people', 'director-people:group', etc.
 
@@ -875,7 +872,7 @@ Read more about filters: {DOCS_URL}/filters.html.''')
         flam.logger.info('Extracting columns from findables')
         values_table = [[findable.extract(attr) for attr, _ in column_attrs] for findable in findables]
 
-        # Function doesn't support being called with empty list, and also it would be a waste of time.
+        # Calling it when there's nothing to split on would be a waste of time to rebuild the same list.
         if len(split_indices) > 0:
             flam.logger.info(f'Splitting entries based on indices: {split_indices}')
             values_table = list(cls.split_values(split_indices, values_table))
@@ -1129,15 +1126,11 @@ Read more about filters: {DOCS_URL}/filters.html.''')
 
     @classmethod
     def split_values(cls, split_indices: list[int], values_table: typing.Iterable[list[flam.AttributeValue]]) -> typing.Iterable[list[flam.AttributeValue]]:
-        # Recursion baby. Splitting all indices is the same as splitting the first one and then the rest.
-        # This is how we achieve doing N passes (one for each split) without creating a list after each iteration.
-        split_index = split_indices[0]
-        split = cls.split_single_value(split_index, values_table)
+        # Split the column at a specific index, then split the rest. Do it in the order the user requested, while NOT creating a list for each iteration.
+        for split_index in split_indices:
+            values_table = cls.split_single_value(split_index, values_table)
 
-        if len(split_indices) == 1:
-            yield from split
-        else:
-            yield from cls.split_values(split_indices[1:], split)
+        yield from values_table
 
     @classmethod
     def split_single_value(cls, split_index: int, values_table: typing.Iterable[list[flam.AttributeValue]]) -> typing.Iterable[list[flam.AttributeValue]]:
@@ -1263,14 +1256,14 @@ f'''Gain insights on your movie lists. Quickly answer questions like "Where have
 3. Download all the information about the movies in those lists with `%(prog)s fetch`
 4. Gain insights on the movies in those lists with `%(prog)s find`
 
-A bit of information on each subcommand:
+Subcommands:
 
     config      View or change the configuration - configure lists, custom extensions, etc.
     fetch       Download movie lists locally so they can be used
     find        Query for movies, people, or roles in your movie lists
     docs        Read the complete documentation
 
-The default subcommand is `find`. See `%(prog)s find --help` to know which arguments it accepts. There is a help option for all subcommands.
+The default subcommand is `find`. See `%(prog)s find --help` to know which arguments it accepts.
 
 I strongly recommend reading the docs! {DOCS_URL}/introduction.html
 '''),
