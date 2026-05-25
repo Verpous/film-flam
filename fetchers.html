@@ -6,21 +6,21 @@
   <meta charset="utf-8" /><meta name="viewport" content="width=device-width, initial-scale=1" />
 
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Fetchers &mdash; FilmFlam 2026.4.28.dev1777409694 documentation</title>
+  <title>Fetchers &mdash; FilmFlam 2026.5.25.dev1779735591 documentation</title>
       <link rel="stylesheet" type="text/css" href="_static/pygments.css?v=80d5e7a1" />
       <link rel="stylesheet" type="text/css" href="_static/css/theme.css?v=9edc463e" />
 
   
       <script src="_static/jquery.js?v=5d32c60e"></script>
       <script src="_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
-      <script src="_static/documentation_options.js?v=11d3572e"></script>
+      <script src="_static/documentation_options.js?v=9950e6dc"></script>
       <script src="_static/doctools.js?v=fd6eb6e6"></script>
       <script src="_static/sphinx_highlight.js?v=6ffebe34"></script>
     <script src="_static/js/theme.js"></script>
     <link rel="index" title="Index" href="genindex.html" />
     <link rel="search" title="Search" href="search.html" />
-    <link rel="next" title="Commandline tool" href="cli/cli.html" />
-    <link rel="prev" title="Predicates" href="predicates.html" /> 
+    <link rel="next" title="Commandline" href="cli/cli.html" />
+    <link rel="prev" title="Lists" href="lists.html" /> 
 </head>
 
 <body class="wy-body-for-nav"> 
@@ -42,21 +42,25 @@
   </form>
 </div>
         </div><div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
-              <p class="caption" role="heading"><span class="caption-text">Contents:</span></p>
+              <p class="caption" role="heading"><span class="caption-text">Getting started</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="introduction.html">Introduction</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">Basic concepts</span></p>
 <ul class="current">
-<li class="toctree-l1"><a class="reference internal" href="install.html">Setup</a></li>
-<li class="toctree-l1"><a class="reference internal" href="examples.html">Examples</a></li>
 <li class="toctree-l1"><a class="reference internal" href="findables.html">Findables</a></li>
-<li class="toctree-l1"><a class="reference internal" href="listdefs.html">Listdefs</a></li>
-<li class="toctree-l1"><a class="reference internal" href="filters.html">Filters</a></li>
 <li class="toctree-l1"><a class="reference internal" href="attributes.html">Attributes</a></li>
+<li class="toctree-l1"><a class="reference internal" href="filters.html">Filters</a></li>
 <li class="toctree-l1"><a class="reference internal" href="predicates.html">Predicates</a></li>
+<li class="toctree-l1"><a class="reference internal" href="lists.html">Lists</a></li>
 <li class="toctree-l1 current"><a class="current reference internal" href="#">Fetchers</a><ul>
 <li class="toctree-l2"><a class="reference internal" href="#list-of-builtin-fetchers">List of builtin fetchers</a></li>
-<li class="toctree-l2"><a class="reference internal" href="#implementing-a-custom-fetcher">Implementing a custom fetcher</a></li>
 </ul>
 </li>
-<li class="toctree-l1"><a class="reference internal" href="cli/cli.html">Commandline tool</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">Advanced</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="cli/cli.html">Commandline</a></li>
 <li class="toctree-l1"><a class="reference internal" href="api/api.html">API</a></li>
 <li class="toctree-l1"><a class="reference internal" href="extending.html">Extending Flam</a></li>
 </ul>
@@ -87,31 +91,88 @@
              
   <section id="fetchers">
 <h1>Fetchers<a class="headerlink" href="#fetchers" title="Link to this heading"></a></h1>
-<p>TODO</p>
+<p>Fetchers are how you download data about a movie list from some external source.</p>
+<p>When you configure a list, you will need to configure it with a <a class="reference internal" href="lists.html#listdefs"><span class="std std-ref">listdef</span></a> describing which fetcher to use, and the address of the list to download.</p>
+<p>Some fetchers allow you to control additional fetch settings using <code class="docutils literal notranslate"><span class="pre">--fetch-param</span></code>.</p>
+<div class="admonition tip">
+<p class="admonition-title">Tip</p>
+<p>Flam supports implementing <a class="reference internal" href="extending.html#implementing-a-custom-fetcher"><span class="std std-ref">custom fetchers</span></a>.</p>
+</div>
 <section id="list-of-builtin-fetchers">
 <h2>List of builtin fetchers<a class="headerlink" href="#list-of-builtin-fetchers" title="Link to this heading"></a></h2>
-<p><strong>imdb-browser-apidev-listid</strong>=IMDB_LIST_ID</p>
+<p><strong>imdb-listid</strong>=IMDB_LIST_ID</p>
 <blockquote>
 <div><p>Takes an IMDb list ID as an input, and downloads information in two steps:</p>
 <ol class="arabic simple">
 <li><p>Export the list to CSV from the IMDb website - this will automatically launch your browser and click some buttons!</p></li>
 <li><p>Fill in a bunch of additional information using this free API: <a class="reference external" href="https://imdbapi.dev/">https://imdbapi.dev/</a></p></li>
 </ol>
-<p>It’s easy to check what is your list’s ID. Just open it in the browser, and the URL should look like this: <a class="reference external" href="https://www.imdb.com/list/ls083886771">https://www.imdb.com/list/ls083886771</a>. The list ID in this example is “083886771”.</p>
+<p>It’s easy to check what is your list’s ID. Just open it in the browser, and the URL should look like this: <a class="reference external" href="https://www.imdb.com/list/ls083886771">https://www.imdb.com/list/ls083886771</a>.
+The list ID in this example is “083886771”.</p>
 <p>There are a few environment variables you can export to control the browser use:</p>
-<ul class="simple">
-<li><p><strong>FLAM_DOWNLOADS</strong> - Path to the downloads folder on your computer so flam will know where to look for the downloaded CSV. If your browser doesn’t download things to ~/Downloads, you must set this variable for this fetcher to work</p></li>
+<ul>
+<li><p><strong>FLAM_DOWNLOADS</strong> - Path to the downloads folder on your computer so flam will know where to look for the downloaded CSV.</p>
+<blockquote>
+<div><div class="admonition warning">
+<p class="admonition-title">Warning</p>
+<p>If your browser doesn’t download things to ~/Downloads, you must set this variable for this fetcher to work!</p>
+</div>
+</div></blockquote>
+</li>
 <li><p><strong>FLAM_BROWSER</strong> - Which browser to use: ‘chrome’, ‘edge’, or ‘firefox’. By default flam tries to detect your default browser</p></li>
-<li><p><strong>FLAM_BROWSER_PROFILE</strong> - Path to your browser profile. This is only needed if your list is set to private so a profile is needed where you are expected to be already logged in</p></li>
+<li><p><strong>FLAM_BROWSER_PROFILE</strong> - Path to your browser profile. This is only needed if your list is set to private so a profile is needed where you are expected to be already logged in.</p></li>
+</ul>
+<p>This fetcher also supports one <code class="docutils literal notranslate"><span class="pre">--fetch-param</span></code>:</p>
+<ul>
+<li><p><strong>csv-path</strong> - Skip exporting the list to CSV in the browser and instead use this path to an already downloaded file. Path may contain environment variables (<code class="docutils literal notranslate"><span class="pre">%USERPROFILE%</span></code>, <code class="docutils literal notranslate"><span class="pre">$HOME</span></code>, etc.).</p>
+<blockquote>
+<div><div class="admonition tip">
+<p class="admonition-title">Tip</p>
+<p>Use this option as a workaround if you’re having trouble with the automatic browser control feature. You will have to export the list manually.</p>
+</div>
+</div></blockquote>
+</li>
 </ul>
 </div></blockquote>
-<p><strong>imdb-csv-apidev-path</strong>=CSV_PATH</p>
+<p><strong>letterboxd-user-list</strong>=LETTERBOXD_USER_LIST</p>
 <blockquote>
-<div><p>Takes a CSV that was manually exported from an IMDb list, and downloads additional information using this free API: <a class="reference external" href="https://imdbapi.dev/">https://imdbapi.dev/</a>.</p>
+<div><p>Takes a Letterboxd user and list name in the form <code class="docutils literal notranslate"><span class="pre">&lt;username&gt;/&lt;list_slug&gt;</span></code> as an input, and downloads the list using <a class="reference external" href="https://github.com/nmcassa/letterboxdpy">letterboxdpy</a>.</p>
+<p>List slugs are just the list name as it appears in the list URL. Just open it in the browser, and the URL should look like this: <a class="reference external" href="https://letterboxd.com/verpous/list/movies-ive-watched/">https://letterboxd.com/verpous/list/movies-ive-watched/</a>.
+The <code class="docutils literal notranslate"><span class="pre">&lt;username&gt;/&lt;list_slug&gt;</span></code> in this example is “verpous/movies-ive-watched”.</p>
+<p>A few special lists are also supported:</p>
+<blockquote>
+<div><ul class="simple">
+<li><p><code class="docutils literal notranslate"><span class="pre">&lt;username&gt;/films</span></code> - the user’s watched films</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">&lt;username&gt;/likes</span></code> - the user’s liked films</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">&lt;username&gt;/reviews</span></code> - the user’s reviewed films</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">&lt;username&gt;/watchlist</span></code> - the user’s watchlist</p></li>
+</ul>
 </div></blockquote>
-</section>
-<section id="implementing-a-custom-fetcher">
-<h2>Implementing a custom fetcher<a class="headerlink" href="#implementing-a-custom-fetcher" title="Link to this heading"></a></h2>
+<p>Note that Letterboxd provides us a lot of information about movies, but not so much about people. So this fetcher has a blindspot there.</p>
+</div></blockquote>
+<p><strong>tmdb-list</strong>=TMDB_LIST_ID</p>
+<blockquote>
+<div><p>Takes a TMDB list ID as an input, and downloads the list using the <a class="reference external" href="https://developer.themoviedb.org/docs/getting-started">TMDB API</a>.</p>
+<p>It’s easy to check what is your list’s ID. Just open it in the browser, and the URL should look like this: <a class="reference external" href="https://www.themoviedb.org/list/7103008-movies-i-ve-watched">https://www.themoviedb.org/list/7103008-movies-i-ve-watched</a>.
+The list ID in this example is “7103008”.</p>
+<p>A few special list IDs are also supported:</p>
+<blockquote>
+<div><ul class="simple">
+<li><p><code class="docutils literal notranslate"><span class="pre">favorite-movies</span></code></p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">favorite-shows</span></code></p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">rated-movies</span></code></p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">rated-shows</span></code></p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">watchlist-movies</span></code></p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">watchlist-shows</span></code></p></li>
+</ul>
+</div></blockquote>
+<p>In order to use this fetcher, you <strong>MUST</strong> have a TMDB API token, and export it to the environment.
+You can request an API token from your <a class="reference external" href="https://www.themoviedb.org/settings/api">profile settings on TMDB</a>.</p>
+<p>Once you’ve been granted access, take the “API Read Access Token” from your profile page and assign it to an environment variable named <strong>FLAM_TMDB_API_TOKEN</strong>:</p>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span><span class="nb">export</span><span class="w"> </span><span class="nv">FLAM_TMDB_API_TOKEN</span><span class="o">=</span><span class="s2">&quot;abcdefgverylongstringofrandomcharacters&quot;</span>
+</pre></div>
+</div>
+</div></blockquote>
 </section>
 </section>
 
@@ -119,8 +180,8 @@
            </div>
           </div>
           <footer><div class="rst-footer-buttons" role="navigation" aria-label="Footer">
-        <a href="predicates.html" class="btn btn-neutral float-left" title="Predicates" accesskey="p" rel="prev"><span class="fa fa-arrow-circle-left" aria-hidden="true"></span> Previous</a>
-        <a href="cli/cli.html" class="btn btn-neutral float-right" title="Commandline tool" accesskey="n" rel="next">Next <span class="fa fa-arrow-circle-right" aria-hidden="true"></span></a>
+        <a href="lists.html" class="btn btn-neutral float-left" title="Lists" accesskey="p" rel="prev"><span class="fa fa-arrow-circle-left" aria-hidden="true"></span> Previous</a>
+        <a href="cli/cli.html" class="btn btn-neutral float-right" title="Commandline" accesskey="n" rel="next">Next <span class="fa fa-arrow-circle-right" aria-hidden="true"></span></a>
     </div>
 
   <hr/>

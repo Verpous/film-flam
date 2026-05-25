@@ -6,21 +6,21 @@
   <meta charset="utf-8" /><meta name="viewport" content="width=device-width, initial-scale=1" />
 
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Findables &mdash; FilmFlam 2026.4.28.dev1777409694 documentation</title>
+  <title>Findables &mdash; FilmFlam 2026.5.25.dev1779735591 documentation</title>
       <link rel="stylesheet" type="text/css" href="_static/pygments.css?v=80d5e7a1" />
       <link rel="stylesheet" type="text/css" href="_static/css/theme.css?v=9edc463e" />
 
   
       <script src="_static/jquery.js?v=5d32c60e"></script>
       <script src="_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
-      <script src="_static/documentation_options.js?v=11d3572e"></script>
+      <script src="_static/documentation_options.js?v=9950e6dc"></script>
       <script src="_static/doctools.js?v=fd6eb6e6"></script>
       <script src="_static/sphinx_highlight.js?v=6ffebe34"></script>
     <script src="_static/js/theme.js"></script>
     <link rel="index" title="Index" href="genindex.html" />
     <link rel="search" title="Search" href="search.html" />
-    <link rel="next" title="Listdefs" href="listdefs.html" />
-    <link rel="prev" title="Examples" href="examples.html" /> 
+    <link rel="next" title="Attributes" href="attributes.html" />
+    <link rel="prev" title="Introduction" href="introduction.html" /> 
 </head>
 
 <body class="wy-body-for-nav"> 
@@ -42,17 +42,31 @@
   </form>
 </div>
         </div><div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
-              <p class="caption" role="heading"><span class="caption-text">Contents:</span></p>
+              <p class="caption" role="heading"><span class="caption-text">Getting started</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="introduction.html">Introduction</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">Basic concepts</span></p>
 <ul class="current">
-<li class="toctree-l1"><a class="reference internal" href="install.html">Setup</a></li>
-<li class="toctree-l1"><a class="reference internal" href="examples.html">Examples</a></li>
-<li class="toctree-l1 current"><a class="current reference internal" href="#">Findables</a></li>
-<li class="toctree-l1"><a class="reference internal" href="listdefs.html">Listdefs</a></li>
-<li class="toctree-l1"><a class="reference internal" href="filters.html">Filters</a></li>
+<li class="toctree-l1 current"><a class="current reference internal" href="#">Findables</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="#movies">Movies</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#people">People</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="#crew-type">Crew type</a></li>
+<li class="toctree-l3"><a class="reference internal" href="#group-mode">Group mode</a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="#roles">Roles</a></li>
+</ul>
+</li>
 <li class="toctree-l1"><a class="reference internal" href="attributes.html">Attributes</a></li>
+<li class="toctree-l1"><a class="reference internal" href="filters.html">Filters</a></li>
 <li class="toctree-l1"><a class="reference internal" href="predicates.html">Predicates</a></li>
+<li class="toctree-l1"><a class="reference internal" href="lists.html">Lists</a></li>
 <li class="toctree-l1"><a class="reference internal" href="fetchers.html">Fetchers</a></li>
-<li class="toctree-l1"><a class="reference internal" href="cli/cli.html">Commandline tool</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">Advanced</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="cli/cli.html">Commandline</a></li>
 <li class="toctree-l1"><a class="reference internal" href="api/api.html">API</a></li>
 <li class="toctree-l1"><a class="reference internal" href="extending.html">Extending Flam</a></li>
 </ul>
@@ -83,15 +97,65 @@
              
   <section id="findables">
 <h1>Findables<a class="headerlink" href="#findables" title="Link to this heading"></a></h1>
-<p>TODO</p>
+<p>It’s good to understand the “findable” objects in flam - objects that can be found in a movie list. There are three findable types: <strong>movies</strong>, <strong>people</strong>, or <strong>roles</strong>.</p>
+<p>Findable objects have many <strong>attributes</strong>. For example, ‘title’ is a movie attribute, and ‘birthday’ is a people’s attribute.
+Click <a class="reference internal" href="attributes.html#attributes"><span class="std std-ref">here</span></a> to read more about attributes and see a list of all builtin attributes.</p>
+<section id="movies">
+<h2>Movies<a class="headerlink" href="#movies" title="Link to this heading"></a></h2>
+<p>Movies are exactly what you think - movies. You can browse all the movies in your list:</p>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>flam<span class="w"> </span>find<span class="w"> </span>movies
+</pre></div>
+</div>
+</section>
+<section id="people">
+<h2>People<a class="headerlink" href="#people" title="Link to this heading"></a></h2>
+<p>In the simplest case, you can find all the people in any of the movies in the list.
+But people can also be confined to a specific <strong>crew type</strong> (e.g. director, cast, etc.), and they can also be <strong>grouped</strong> by collaborators.</p>
+<p>Formally, when finding people, each object is a list of people (could be more than 1) + a crew type + a group mode.</p>
+<section id="crew-type">
+<h3>Crew type<a class="headerlink" href="#crew-type" title="Link to this heading"></a></h3>
+<p>Flam supports the following crew types:</p>
+<blockquote>
+<div><div class="highlight-text notranslate"><div class="highlight"><pre><span></span>director, assistant-director, producer, executive-producer, composer, cinematographer, choreographer, editor, writer, cast, stuntcast, casting-director, art-director, additional, any
+</pre></div>
+</div>
+</div></blockquote>
+<p>The same person can have different properties when presented as different crew types.
+For example, Quentin Tarantino will have a different ‘num-movies’ attribute as a director than as a cast member.</p>
+<p>The ‘any’ crew type is special - it means you don’t care about the crew type, you just want to find the people who were in the movies regardless of what they did in those movies.</p>
+</section>
+<section id="group-mode">
+<h3>Group mode<a class="headerlink" href="#group-mode" title="Link to this heading"></a></h3>
+<p>Grouping lets you turn collaborators into a single entity - when you search for directors, you might want to see the Coen brothers as a single director.</p>
+<p>People objects are always attached to a group mode: ‘separate’ or ‘group’.</p>
+<p>When separate, each returned object represents a single person.</p>
+<p>When grouped, flam will find people who’ve collaborated on movies together and return them as a single object.</p>
+<p>Every crew type has a default group mode that makes sense for it. Directors are grouped by default, actors are separate. This means that if you:</p>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>flam<span class="w"> </span>find<span class="w"> </span>director-people
+</pre></div>
+</div>
+<p>The Coen brothers will be shown as a single entry.</p>
+</section>
+</section>
+<section id="roles">
+<h2>Roles<a class="headerlink" href="#roles" title="Link to this heading"></a></h2>
+<p>A role is an appearance of some people in some movie. Think “Cristoph Waltz as a castmember in Inglorious Basterds”.
+So when searching for roles, you will see an entry per people per movie.</p>
+<p>Roles also have a crew type and a group mode like people do.</p>
+<p>Since they combine a people and a movie, <strong>roles support any movie attribute, people attribute, and also their own role attributes</strong>.</p>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span><span class="c1"># Browse directors and also the movies they directed from the list.</span>
+flam<span class="w"> </span>find<span class="w"> </span>director
+</pre></div>
+</div>
+</section>
 </section>
 
 
            </div>
           </div>
           <footer><div class="rst-footer-buttons" role="navigation" aria-label="Footer">
-        <a href="examples.html" class="btn btn-neutral float-left" title="Examples" accesskey="p" rel="prev"><span class="fa fa-arrow-circle-left" aria-hidden="true"></span> Previous</a>
-        <a href="listdefs.html" class="btn btn-neutral float-right" title="Listdefs" accesskey="n" rel="next">Next <span class="fa fa-arrow-circle-right" aria-hidden="true"></span></a>
+        <a href="introduction.html" class="btn btn-neutral float-left" title="Introduction" accesskey="p" rel="prev"><span class="fa fa-arrow-circle-left" aria-hidden="true"></span> Previous</a>
+        <a href="attributes.html" class="btn btn-neutral float-right" title="Attributes" accesskey="n" rel="next">Next <span class="fa fa-arrow-circle-right" aria-hidden="true"></span></a>
     </div>
 
   <hr/>

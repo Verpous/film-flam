@@ -6,14 +6,14 @@
   <meta charset="utf-8" /><meta name="viewport" content="width=device-width, initial-scale=1" />
 
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>API &mdash; FilmFlam 2026.4.28.dev1777409694 documentation</title>
+  <title>API &mdash; FilmFlam 2026.5.25.dev1779735591 documentation</title>
       <link rel="stylesheet" type="text/css" href="../_static/pygments.css?v=80d5e7a1" />
       <link rel="stylesheet" type="text/css" href="../_static/css/theme.css?v=9edc463e" />
 
   
       <script src="../_static/jquery.js?v=5d32c60e"></script>
       <script src="../_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
-      <script src="../_static/documentation_options.js?v=11d3572e"></script>
+      <script src="../_static/documentation_options.js?v=9950e6dc"></script>
       <script src="../_static/doctools.js?v=fd6eb6e6"></script>
       <script src="../_static/sphinx_highlight.js?v=6ffebe34"></script>
     <script src="../_static/js/theme.js"></script>
@@ -42,17 +42,22 @@
   </form>
 </div>
         </div><div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
-              <p class="caption" role="heading"><span class="caption-text">Contents:</span></p>
-<ul class="current">
-<li class="toctree-l1"><a class="reference internal" href="../install.html">Setup</a></li>
-<li class="toctree-l1"><a class="reference internal" href="../examples.html">Examples</a></li>
+              <p class="caption" role="heading"><span class="caption-text">Getting started</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../introduction.html">Introduction</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">Basic concepts</span></p>
+<ul>
 <li class="toctree-l1"><a class="reference internal" href="../findables.html">Findables</a></li>
-<li class="toctree-l1"><a class="reference internal" href="../listdefs.html">Listdefs</a></li>
-<li class="toctree-l1"><a class="reference internal" href="../filters.html">Filters</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../attributes.html">Attributes</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../filters.html">Filters</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../predicates.html">Predicates</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../lists.html">Lists</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../fetchers.html">Fetchers</a></li>
-<li class="toctree-l1"><a class="reference internal" href="../cli/cli.html">Commandline tool</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">Advanced</span></p>
+<ul class="current">
+<li class="toctree-l1"><a class="reference internal" href="../cli/cli.html">Commandline</a></li>
 <li class="toctree-l1 current"><a class="current reference internal" href="#">API</a><ul>
 <li class="toctree-l2"><a class="reference internal" href="flam.html">flam</a></li>
 <li class="toctree-l2"><a class="reference internal" href="flam.utils.html">flam.utils</a></li>
@@ -88,7 +93,35 @@
              
   <section id="api">
 <h1>API<a class="headerlink" href="#api" title="Link to this heading"></a></h1>
-<p>To use FilmFlam as an API,</p>
+<p>Flam is not just a commandline tool, it’s also a python API for using from your scripts:</p>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="kn">import</span> <span class="nn">flam</span>
+
+<span class="c1"># Most interfacing with flam happens through a FlamContext. Create one then start using it.</span>
+<span class="n">ctx</span> <span class="o">=</span> <span class="n">flam</span><span class="o">.</span><span class="n">FlamContext</span><span class="p">()</span>
+
+<span class="c1"># Configure a list &#39;watched&#39; based on your IMDb list of movies you&#39;ve watched.</span>
+<span class="k">with</span> <span class="n">ctx</span><span class="o">.</span><span class="n">configure</span><span class="p">()</span> <span class="k">as</span> <span class="n">cfg</span><span class="p">:</span>
+    <span class="n">simple_list</span> <span class="o">=</span> <span class="n">flam</span><span class="o">.</span><span class="n">SimpleList</span><span class="p">(</span>
+        <span class="n">uid</span> <span class="o">=</span> <span class="s2">&quot;what you set here doesn&#39;t matter, it will be overwritten anyway&quot;</span><span class="p">,</span>
+        <span class="n">name</span> <span class="o">=</span> <span class="s1">&#39;watched&#39;</span><span class="p">,</span>
+        <span class="n">concrete_listdef</span> <span class="o">=</span> <span class="n">ctx</span><span class="o">.</span><span class="n">parse_listdef</span><span class="p">(</span><span class="s1">&#39;imdb-listid=083886771&#39;</span><span class="p">),</span>
+        <span class="n">is_default_fetch</span> <span class="o">=</span> <span class="kc">False</span><span class="p">,</span>
+        <span class="n">is_default_find</span> <span class="o">=</span> <span class="kc">False</span><span class="p">,</span>
+    <span class="p">)</span>
+
+    <span class="n">cfg</span><span class="o">.</span><span class="n">simple_lists_raw</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">simple_list</span><span class="p">)</span>
+
+<span class="c1"># Download the list and store it persistently. Next time you won&#39;t have to fetch it again.</span>
+<span class="n">ctx</span><span class="o">.</span><span class="n">fetch</span><span class="p">([</span><span class="s1">&#39;watched&#39;</span><span class="p">])</span>
+
+<span class="c1"># Print the titles of watched movies from the year 1999.</span>
+<span class="n">watched_movies</span> <span class="o">=</span> <span class="n">ctx</span><span class="o">.</span><span class="n">get_movie_list</span><span class="p">(</span><span class="s1">&#39;watched&#39;</span><span class="p">)</span>
+<span class="nb">filter</span> <span class="o">=</span> <span class="n">ctx</span><span class="o">.</span><span class="n">compile_movies_filter</span><span class="p">([</span><span class="s1">&#39;-release-year&#39;</span><span class="p">,</span> <span class="s1">&#39;1999&#39;</span><span class="p">])</span>
+
+<span class="k">for</span> <span class="n">movie</span> <span class="ow">in</span> <span class="n">watched_movies</span><span class="o">.</span><span class="n">find_movies</span><span class="p">(</span><span class="nb">filter</span><span class="p">):</span>
+    <span class="nb">print</span><span class="p">(</span><span class="n">movie</span><span class="p">[</span><span class="s1">&#39;title&#39;</span><span class="p">])</span>
+</pre></div>
+</div>
 <div class="toctree-wrapper compound">
 <p class="caption" role="heading"><span class="caption-text">Contents:</span></p>
 <ul>
@@ -107,18 +140,23 @@
 <li class="toctree-l3"><a class="reference internal" href="flam.html#flam._ctx.FlamContext.fetchers"><code class="docutils literal notranslate"><span class="pre">FlamContext.fetchers</span></code></a></li>
 <li class="toctree-l3"><a class="reference internal" href="flam.html#flam._ctx.FlamContext.predicates"><code class="docutils literal notranslate"><span class="pre">FlamContext.predicates</span></code></a></li>
 <li class="toctree-l3"><a class="reference internal" href="flam.html#flam._ctx.FlamContext.attributes"><code class="docutils literal notranslate"><span class="pre">FlamContext.attributes</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="flam.html#flam._ctx.FlamContext.parse_listdef"><code class="docutils literal notranslate"><span class="pre">FlamContext.parse_listdef()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="flam.html#flam._ctx.FlamContext.register"><code class="docutils literal notranslate"><span class="pre">FlamContext.register()</span></code></a></li>
 <li class="toctree-l3"><a class="reference internal" href="flam.html#flam._ctx.FlamContext.get_movie_list"><code class="docutils literal notranslate"><span class="pre">FlamContext.get_movie_list()</span></code></a></li>
 <li class="toctree-l3"><a class="reference internal" href="flam.html#flam._ctx.FlamContext.configure"><code class="docutils literal notranslate"><span class="pre">FlamContext.configure()</span></code></a></li>
 <li class="toctree-l3"><a class="reference internal" href="flam.html#flam._ctx.FlamContext.fetch"><code class="docutils literal notranslate"><span class="pre">FlamContext.fetch()</span></code></a></li>
 <li class="toctree-l3"><a class="reference internal" href="flam.html#flam._ctx.FlamContext.precache"><code class="docutils literal notranslate"><span class="pre">FlamContext.precache()</span></code></a></li>
 <li class="toctree-l3"><a class="reference internal" href="flam.html#flam._ctx.FlamContext.compile_filter"><code class="docutils literal notranslate"><span class="pre">FlamContext.compile_filter()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="flam.html#flam._ctx.FlamContext.compile_movies_filter"><code class="docutils literal notranslate"><span class="pre">FlamContext.compile_movies_filter()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="flam.html#flam._ctx.FlamContext.compile_people_filter"><code class="docutils literal notranslate"><span class="pre">FlamContext.compile_people_filter()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="flam.html#flam._ctx.FlamContext.compile_roles_filter"><code class="docutils literal notranslate"><span class="pre">FlamContext.compile_roles_filter()</span></code></a></li>
 </ul>
 </li>
 <li class="toctree-l2"><a class="reference internal" href="flam.html#flam._ctx.RegistriesOf"><code class="docutils literal notranslate"><span class="pre">RegistriesOf</span></code></a><ul>
 <li class="toctree-l3"><a class="reference internal" href="flam.html#flam._ctx.RegistriesOf.__getitem__"><code class="docutils literal notranslate"><span class="pre">RegistriesOf.__getitem__()</span></code></a></li>
 <li class="toctree-l3"><a class="reference internal" href="flam.html#flam._ctx.RegistriesOf.__contains__"><code class="docutils literal notranslate"><span class="pre">RegistriesOf.__contains__()</span></code></a></li>
 <li class="toctree-l3"><a class="reference internal" href="flam.html#flam._ctx.RegistriesOf.__iter__"><code class="docutils literal notranslate"><span class="pre">RegistriesOf.__iter__()</span></code></a></li>
-<li class="toctree-l3"><a class="reference internal" href="flam.html#flam._ctx.RegistriesOf.register"><code class="docutils literal notranslate"><span class="pre">RegistriesOf.register()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="flam.html#flam._ctx.RegistriesOf.raw_iterate"><code class="docutils literal notranslate"><span class="pre">RegistriesOf.raw_iterate()</span></code></a></li>
 <li class="toctree-l3"><a class="reference internal" href="flam.html#flam._ctx.RegistriesOf.get"><code class="docutils literal notranslate"><span class="pre">RegistriesOf.get()</span></code></a></li>
 </ul>
 </li>
@@ -130,14 +168,20 @@
 </ul>
 </li>
 <li class="toctree-l2"><a class="reference internal" href="flam.html#flam._ml.CrewType"><code class="docutils literal notranslate"><span class="pre">CrewType</span></code></a><ul>
-<li class="toctree-l3"><a class="reference internal" href="flam.html#flam._ml.CrewType.CAST"><code class="docutils literal notranslate"><span class="pre">CrewType.CAST</span></code></a></li>
-<li class="toctree-l3"><a class="reference internal" href="flam.html#flam._ml.CrewType.STUNTCAST"><code class="docutils literal notranslate"><span class="pre">CrewType.STUNTCAST</span></code></a></li>
 <li class="toctree-l3"><a class="reference internal" href="flam.html#flam._ml.CrewType.DIRECTOR"><code class="docutils literal notranslate"><span class="pre">CrewType.DIRECTOR</span></code></a></li>
-<li class="toctree-l3"><a class="reference internal" href="flam.html#flam._ml.CrewType.WRITER"><code class="docutils literal notranslate"><span class="pre">CrewType.WRITER</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="flam.html#flam._ml.CrewType.ASSISTANT_DIRECTOR"><code class="docutils literal notranslate"><span class="pre">CrewType.ASSISTANT_DIRECTOR</span></code></a></li>
 <li class="toctree-l3"><a class="reference internal" href="flam.html#flam._ml.CrewType.PRODUCER"><code class="docutils literal notranslate"><span class="pre">CrewType.PRODUCER</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="flam.html#flam._ml.CrewType.EXECUTIVE_PRODUCER"><code class="docutils literal notranslate"><span class="pre">CrewType.EXECUTIVE_PRODUCER</span></code></a></li>
 <li class="toctree-l3"><a class="reference internal" href="flam.html#flam._ml.CrewType.COMPOSER"><code class="docutils literal notranslate"><span class="pre">CrewType.COMPOSER</span></code></a></li>
 <li class="toctree-l3"><a class="reference internal" href="flam.html#flam._ml.CrewType.CINEMATOGRAPHER"><code class="docutils literal notranslate"><span class="pre">CrewType.CINEMATOGRAPHER</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="flam.html#flam._ml.CrewType.CHOREOGRAPHER"><code class="docutils literal notranslate"><span class="pre">CrewType.CHOREOGRAPHER</span></code></a></li>
 <li class="toctree-l3"><a class="reference internal" href="flam.html#flam._ml.CrewType.EDITOR"><code class="docutils literal notranslate"><span class="pre">CrewType.EDITOR</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="flam.html#flam._ml.CrewType.WRITER"><code class="docutils literal notranslate"><span class="pre">CrewType.WRITER</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="flam.html#flam._ml.CrewType.CAST"><code class="docutils literal notranslate"><span class="pre">CrewType.CAST</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="flam.html#flam._ml.CrewType.STUNTCAST"><code class="docutils literal notranslate"><span class="pre">CrewType.STUNTCAST</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="flam.html#flam._ml.CrewType.CASTING_DIRECTOR"><code class="docutils literal notranslate"><span class="pre">CrewType.CASTING_DIRECTOR</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="flam.html#flam._ml.CrewType.ART_DIRECTOR"><code class="docutils literal notranslate"><span class="pre">CrewType.ART_DIRECTOR</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="flam.html#flam._ml.CrewType.ADDITIONAL"><code class="docutils literal notranslate"><span class="pre">CrewType.ADDITIONAL</span></code></a></li>
 <li class="toctree-l3"><a class="reference internal" href="flam.html#flam._ml.CrewType.ANY"><code class="docutils literal notranslate"><span class="pre">CrewType.ANY</span></code></a></li>
 <li class="toctree-l3"><a class="reference internal" href="flam.html#flam._ml.CrewType.default_group_mode"><code class="docutils literal notranslate"><span class="pre">CrewType.default_group_mode</span></code></a></li>
 <li class="toctree-l3"><a class="reference internal" href="flam.html#flam._ml.CrewType.iterate_except_any"><code class="docutils literal notranslate"><span class="pre">CrewType.iterate_except_any()</span></code></a></li>
@@ -259,7 +303,6 @@
 <li class="toctree-l2"><a class="reference internal" href="flam.html#flam._ldef.CanonListdef"><code class="docutils literal notranslate"><span class="pre">CanonListdef</span></code></a><ul>
 <li class="toctree-l3"><a class="reference internal" href="flam.html#flam._ldef.CanonListdef.list_type"><code class="docutils literal notranslate"><span class="pre">CanonListdef.list_type</span></code></a></li>
 <li class="toctree-l3"><a class="reference internal" href="flam.html#flam._ldef.CanonListdef.address"><code class="docutils literal notranslate"><span class="pre">CanonListdef.address</span></code></a></li>
-<li class="toctree-l3"><a class="reference internal" href="flam.html#flam._ldef.CanonListdef.parse"><code class="docutils literal notranslate"><span class="pre">CanonListdef.parse()</span></code></a></li>
 <li class="toctree-l3"><a class="reference internal" href="flam.html#flam._ldef.CanonListdef.is_special"><code class="docutils literal notranslate"><span class="pre">CanonListdef.is_special</span></code></a></li>
 <li class="toctree-l3"><a class="reference internal" href="flam.html#flam._ldef.CanonListdef.is_abstract"><code class="docutils literal notranslate"><span class="pre">CanonListdef.is_abstract</span></code></a></li>
 <li class="toctree-l3"><a class="reference internal" href="flam.html#flam._ldef.CanonListdef.is_concrete"><code class="docutils literal notranslate"><span class="pre">CanonListdef.is_concrete</span></code></a></li>
@@ -277,16 +320,18 @@
 <li class="toctree-l2"><a class="reference internal" href="flam.html#flam._reg.register"><code class="docutils literal notranslate"><span class="pre">register()</span></code></a></li>
 <li class="toctree-l2"><a class="reference internal" href="flam.html#flam._reg.compose_qualified_attr_or_pred_name"><code class="docutils literal notranslate"><span class="pre">compose_qualified_attr_or_pred_name()</span></code></a></li>
 <li class="toctree-l2"><a class="reference internal" href="flam.html#flam._reg.decompose_qualified_attr_or_pred_name"><code class="docutils literal notranslate"><span class="pre">decompose_qualified_attr_or_pred_name()</span></code></a></li>
-<li class="toctree-l2"><a class="reference internal" href="flam.html#flam._fetch.ListFetcher"><code class="docutils literal notranslate"><span class="pre">ListFetcher</span></code></a><ul>
-<li class="toctree-l3"><a class="reference internal" href="flam.html#flam._fetch.ListFetcher.qualified_name"><code class="docutils literal notranslate"><span class="pre">ListFetcher.qualified_name</span></code></a></li>
-<li class="toctree-l3"><a class="reference internal" href="flam.html#flam._fetch.ListFetcher.qualified_aliases"><code class="docutils literal notranslate"><span class="pre">ListFetcher.qualified_aliases</span></code></a></li>
-<li class="toctree-l3"><a class="reference internal" href="flam.html#flam._fetch.ListFetcher.uid_family"><code class="docutils literal notranslate"><span class="pre">ListFetcher.uid_family</span></code></a></li>
-<li class="toctree-l3"><a class="reference internal" href="flam.html#flam._fetch.ListFetcher.__init_subclass__"><code class="docutils literal notranslate"><span class="pre">ListFetcher.__init_subclass__()</span></code></a></li>
-<li class="toctree-l3"><a class="reference internal" href="flam.html#flam._fetch.ListFetcher.__init__"><code class="docutils literal notranslate"><span class="pre">ListFetcher.__init__()</span></code></a></li>
-<li class="toctree-l3"><a class="reference internal" href="flam.html#flam._fetch.ListFetcher.concrete_listdef"><code class="docutils literal notranslate"><span class="pre">ListFetcher.concrete_listdef</span></code></a></li>
-<li class="toctree-l3"><a class="reference internal" href="flam.html#flam._fetch.ListFetcher.abstract_listdef"><code class="docutils literal notranslate"><span class="pre">ListFetcher.abstract_listdef</span></code></a></li>
-<li class="toctree-l3"><a class="reference internal" href="flam.html#flam._fetch.ListFetcher._fetch_into_file"><code class="docutils literal notranslate"><span class="pre">ListFetcher._fetch_into_file()</span></code></a></li>
-<li class="toctree-l3"><a class="reference internal" href="flam.html#flam._fetch.ListFetcher._checkpoint"><code class="docutils literal notranslate"><span class="pre">ListFetcher._checkpoint()</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="flam.html#flam._fetch.Fetcher"><code class="docutils literal notranslate"><span class="pre">Fetcher</span></code></a><ul>
+<li class="toctree-l3"><a class="reference internal" href="flam.html#flam._fetch.Fetcher.qualified_name"><code class="docutils literal notranslate"><span class="pre">Fetcher.qualified_name</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="flam.html#flam._fetch.Fetcher.qualified_aliases"><code class="docutils literal notranslate"><span class="pre">Fetcher.qualified_aliases</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="flam.html#flam._fetch.Fetcher.uid_family"><code class="docutils literal notranslate"><span class="pre">Fetcher.uid_family</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="flam.html#flam._fetch.Fetcher.__init_subclass__"><code class="docutils literal notranslate"><span class="pre">Fetcher.__init_subclass__()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="flam.html#flam._fetch.Fetcher.__init__"><code class="docutils literal notranslate"><span class="pre">Fetcher.__init__()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="flam.html#flam._fetch.Fetcher.concrete_listdef"><code class="docutils literal notranslate"><span class="pre">Fetcher.concrete_listdef</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="flam.html#flam._fetch.Fetcher.abstract_listdef"><code class="docutils literal notranslate"><span class="pre">Fetcher.abstract_listdef</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="flam.html#flam._fetch.Fetcher.get_param"><code class="docutils literal notranslate"><span class="pre">Fetcher.get_param()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="flam.html#flam._fetch.Fetcher.has_param"><code class="docutils literal notranslate"><span class="pre">Fetcher.has_param()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="flam.html#flam._fetch.Fetcher._fetch_into_file"><code class="docutils literal notranslate"><span class="pre">Fetcher._fetch_into_file()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="flam.html#flam._fetch.Fetcher._checkpoint"><code class="docutils literal notranslate"><span class="pre">Fetcher._checkpoint()</span></code></a></li>
 </ul>
 </li>
 <li class="toctree-l2"><a class="reference internal" href="flam.html#flam._filter.EatParams"><code class="docutils literal notranslate"><span class="pre">EatParams</span></code></a><ul>
@@ -308,7 +353,7 @@
 <li class="toctree-l3"><a class="reference internal" href="flam.html#flam._filter.FilterMember.eat_type"><code class="docutils literal notranslate"><span class="pre">FilterMember.eat_type()</span></code></a></li>
 <li class="toctree-l3"><a class="reference internal" href="flam.html#flam._filter.FilterMember.eat_movie_list"><code class="docutils literal notranslate"><span class="pre">FilterMember.eat_movie_list()</span></code></a></li>
 <li class="toctree-l3"><a class="reference internal" href="flam.html#flam._filter.FilterMember.eat_ct_gm"><code class="docutils literal notranslate"><span class="pre">FilterMember.eat_ct_gm()</span></code></a></li>
-<li class="toctree-l3"><a class="reference internal" href="flam.html#flam._filter.FilterMember.eat_single"><code class="docutils literal notranslate"><span class="pre">FilterMember.eat_single()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="flam.html#flam._filter.FilterMember.eat_subfilter"><code class="docutils literal notranslate"><span class="pre">FilterMember.eat_subfilter()</span></code></a></li>
 </ul>
 </li>
 <li class="toctree-l2"><a class="reference internal" href="flam.html#flam._filter.Filter"><code class="docutils literal notranslate"><span class="pre">Filter</span></code></a><ul>
@@ -366,6 +411,7 @@
 <li class="toctree-l3"><a class="reference internal" href="flam.html#flam._cfg.SimpleList.concrete_listdef"><code class="docutils literal notranslate"><span class="pre">SimpleList.concrete_listdef</span></code></a></li>
 <li class="toctree-l3"><a class="reference internal" href="flam.html#flam._cfg.SimpleList.is_default_fetch"><code class="docutils literal notranslate"><span class="pre">SimpleList.is_default_fetch</span></code></a></li>
 <li class="toctree-l3"><a class="reference internal" href="flam.html#flam._cfg.SimpleList.is_default_find"><code class="docutils literal notranslate"><span class="pre">SimpleList.is_default_find</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="flam.html#flam._cfg.SimpleList.fetch_params"><code class="docutils literal notranslate"><span class="pre">SimpleList.fetch_params</span></code></a></li>
 <li class="toctree-l3"><a class="reference internal" href="flam.html#flam._cfg.SimpleList.abstract_listdef"><code class="docutils literal notranslate"><span class="pre">SimpleList.abstract_listdef</span></code></a></li>
 </ul>
 </li>
@@ -399,8 +445,12 @@
 </li>
 <li class="toctree-l2"><a class="reference internal" href="flam.html#flam._mlf.MLFRole"><code class="docutils literal notranslate"><span class="pre">MLFRole</span></code></a><ul>
 <li class="toctree-l3"><a class="reference internal" href="flam.html#flam._mlf.MLFRole.person_uid"><code class="docutils literal notranslate"><span class="pre">MLFRole.person_uid</span></code></a></li>
-<li class="toctree-l3"><a class="reference internal" href="flam.html#flam._mlf.MLFRole.characters"><code class="docutils literal notranslate"><span class="pre">MLFRole.characters</span></code></a></li>
 <li class="toctree-l3"><a class="reference internal" href="flam.html#flam._mlf.MLFRole.is_star"><code class="docutils literal notranslate"><span class="pre">MLFRole.is_star</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="flam.html#flam._mlf.MLFRole.episodes_num"><code class="docutils literal notranslate"><span class="pre">MLFRole.episodes_num</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="flam.html#flam._mlf.MLFRole.oscar_noms"><code class="docutils literal notranslate"><span class="pre">MLFRole.oscar_noms</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="flam.html#flam._mlf.MLFRole.oscar_wins"><code class="docutils literal notranslate"><span class="pre">MLFRole.oscar_wins</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="flam.html#flam._mlf.MLFRole.characters"><code class="docutils literal notranslate"><span class="pre">MLFRole.characters</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="flam.html#flam._mlf.MLFRole.jobs"><code class="docutils literal notranslate"><span class="pre">MLFRole.jobs</span></code></a></li>
 </ul>
 </li>
 <li class="toctree-l2"><a class="reference internal" href="flam.html#flam._mlf.MLFCrew"><code class="docutils literal notranslate"><span class="pre">MLFCrew</span></code></a><ul>
@@ -414,30 +464,46 @@
 <li class="toctree-l3"><a class="reference internal" href="flam.html#flam._mlf.MLFPerson.gender"><code class="docutils literal notranslate"><span class="pre">MLFPerson.gender</span></code></a></li>
 <li class="toctree-l3"><a class="reference internal" href="flam.html#flam._mlf.MLFPerson.height_cm"><code class="docutils literal notranslate"><span class="pre">MLFPerson.height_cm</span></code></a></li>
 <li class="toctree-l3"><a class="reference internal" href="flam.html#flam._mlf.MLFPerson.birthday"><code class="docutils literal notranslate"><span class="pre">MLFPerson.birthday</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="flam.html#flam._mlf.MLFPerson.deathday"><code class="docutils literal notranslate"><span class="pre">MLFPerson.deathday</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="flam.html#flam._mlf.MLFPerson.death_reason"><code class="docutils literal notranslate"><span class="pre">MLFPerson.death_reason</span></code></a></li>
 <li class="toctree-l3"><a class="reference internal" href="flam.html#flam._mlf.MLFPerson.countries"><code class="docutils literal notranslate"><span class="pre">MLFPerson.countries</span></code></a></li>
 </ul>
 </li>
 <li class="toctree-l2"><a class="reference internal" href="flam.html#flam._mlf.MLFMoviePerSourceData"><code class="docutils literal notranslate"><span class="pre">MLFMoviePerSourceData</span></code></a><ul>
 <li class="toctree-l3"><a class="reference internal" href="flam.html#flam._mlf.MLFMoviePerSourceData.canon_listdef"><code class="docutils literal notranslate"><span class="pre">MLFMoviePerSourceData.canon_listdef</span></code></a></li>
 <li class="toctree-l3"><a class="reference internal" href="flam.html#flam._mlf.MLFMoviePerSourceData.list_index"><code class="docutils literal notranslate"><span class="pre">MLFMoviePerSourceData.list_index</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="flam.html#flam._mlf.MLFMoviePerSourceData.list_note"><code class="docutils literal notranslate"><span class="pre">MLFMoviePerSourceData.list_note</span></code></a></li>
 <li class="toctree-l3"><a class="reference internal" href="flam.html#flam._mlf.MLFMoviePerSourceData.listing_date"><code class="docutils literal notranslate"><span class="pre">MLFMoviePerSourceData.listing_date</span></code></a></li>
-<li class="toctree-l3"><a class="reference internal" href="flam.html#flam._mlf.MLFMoviePerSourceData.note"><code class="docutils literal notranslate"><span class="pre">MLFMoviePerSourceData.note</span></code></a></li>
 </ul>
 </li>
 <li class="toctree-l2"><a class="reference internal" href="flam.html#flam._mlf.MLFMovie"><code class="docutils literal notranslate"><span class="pre">MLFMovie</span></code></a><ul>
 <li class="toctree-l3"><a class="reference internal" href="flam.html#flam._mlf.MLFMovie.uid"><code class="docutils literal notranslate"><span class="pre">MLFMovie.uid</span></code></a></li>
 <li class="toctree-l3"><a class="reference internal" href="flam.html#flam._mlf.MLFMovie.per_src_data"><code class="docutils literal notranslate"><span class="pre">MLFMovie.per_src_data</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="flam.html#flam._mlf.MLFMovie.media_type"><code class="docutils literal notranslate"><span class="pre">MLFMovie.media_type</span></code></a></li>
 <li class="toctree-l3"><a class="reference internal" href="flam.html#flam._mlf.MLFMovie.title"><code class="docutils literal notranslate"><span class="pre">MLFMovie.title</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="flam.html#flam._mlf.MLFMovie.original_title"><code class="docutils literal notranslate"><span class="pre">MLFMovie.original_title</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="flam.html#flam._mlf.MLFMovie.tagline"><code class="docutils literal notranslate"><span class="pre">MLFMovie.tagline</span></code></a></li>
 <li class="toctree-l3"><a class="reference internal" href="flam.html#flam._mlf.MLFMovie.synopsis"><code class="docutils literal notranslate"><span class="pre">MLFMovie.synopsis</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="flam.html#flam._mlf.MLFMovie.url"><code class="docutils literal notranslate"><span class="pre">MLFMovie.url</span></code></a></li>
 <li class="toctree-l3"><a class="reference internal" href="flam.html#flam._mlf.MLFMovie.runtime_minutes"><code class="docutils literal notranslate"><span class="pre">MLFMovie.runtime_minutes</span></code></a></li>
 <li class="toctree-l3"><a class="reference internal" href="flam.html#flam._mlf.MLFMovie.metascore_votes"><code class="docutils literal notranslate"><span class="pre">MLFMovie.metascore_votes</span></code></a></li>
 <li class="toctree-l3"><a class="reference internal" href="flam.html#flam._mlf.MLFMovie.metascore"><code class="docutils literal notranslate"><span class="pre">MLFMovie.metascore</span></code></a></li>
 <li class="toctree-l3"><a class="reference internal" href="flam.html#flam._mlf.MLFMovie.votes"><code class="docutils literal notranslate"><span class="pre">MLFMovie.votes</span></code></a></li>
 <li class="toctree-l3"><a class="reference internal" href="flam.html#flam._mlf.MLFMovie.rating"><code class="docutils literal notranslate"><span class="pre">MLFMovie.rating</span></code></a></li>
 <li class="toctree-l3"><a class="reference internal" href="flam.html#flam._mlf.MLFMovie.my_rating"><code class="docutils literal notranslate"><span class="pre">MLFMovie.my_rating</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="flam.html#flam._mlf.MLFMovie.likes"><code class="docutils literal notranslate"><span class="pre">MLFMovie.likes</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="flam.html#flam._mlf.MLFMovie.is_liked"><code class="docutils literal notranslate"><span class="pre">MLFMovie.is_liked</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="flam.html#flam._mlf.MLFMovie.budget_usd"><code class="docutils literal notranslate"><span class="pre">MLFMovie.budget_usd</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="flam.html#flam._mlf.MLFMovie.revenue_usd"><code class="docutils literal notranslate"><span class="pre">MLFMovie.revenue_usd</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="flam.html#flam._mlf.MLFMovie.content_rating"><code class="docutils literal notranslate"><span class="pre">MLFMovie.content_rating</span></code></a></li>
 <li class="toctree-l3"><a class="reference internal" href="flam.html#flam._mlf.MLFMovie.release_date"><code class="docutils literal notranslate"><span class="pre">MLFMovie.release_date</span></code></a></li>
 <li class="toctree-l3"><a class="reference internal" href="flam.html#flam._mlf.MLFMovie.watch_dates"><code class="docutils literal notranslate"><span class="pre">MLFMovie.watch_dates</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="flam.html#flam._mlf.MLFMovie.my_notes"><code class="docutils literal notranslate"><span class="pre">MLFMovie.my_notes</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="flam.html#flam._mlf.MLFMovie.episodes_num"><code class="docutils literal notranslate"><span class="pre">MLFMovie.episodes_num</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="flam.html#flam._mlf.MLFMovie.seasons_num"><code class="docutils literal notranslate"><span class="pre">MLFMovie.seasons_num</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="flam.html#flam._mlf.MLFMovie.end_date"><code class="docutils literal notranslate"><span class="pre">MLFMovie.end_date</span></code></a></li>
 <li class="toctree-l3"><a class="reference internal" href="flam.html#flam._mlf.MLFMovie.genres"><code class="docutils literal notranslate"><span class="pre">MLFMovie.genres</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="flam.html#flam._mlf.MLFMovie.studios"><code class="docutils literal notranslate"><span class="pre">MLFMovie.studios</span></code></a></li>
 <li class="toctree-l3"><a class="reference internal" href="flam.html#flam._mlf.MLFMovie.languages"><code class="docutils literal notranslate"><span class="pre">MLFMovie.languages</span></code></a></li>
 <li class="toctree-l3"><a class="reference internal" href="flam.html#flam._mlf.MLFMovie.countries"><code class="docutils literal notranslate"><span class="pre">MLFMovie.countries</span></code></a></li>
 <li class="toctree-l3"><a class="reference internal" href="flam.html#flam._mlf.MLFMovie.crew"><code class="docutils literal notranslate"><span class="pre">MLFMovie.crew</span></code></a></li>
@@ -448,17 +514,19 @@
 <li class="toctree-l3"><a class="reference internal" href="flam.html#flam._mlf.MovieListFile.abstract_listdef"><code class="docutils literal notranslate"><span class="pre">MovieListFile.abstract_listdef</span></code></a></li>
 <li class="toctree-l3"><a class="reference internal" href="flam.html#flam._mlf.MovieListFile.uid_family"><code class="docutils literal notranslate"><span class="pre">MovieListFile.uid_family</span></code></a></li>
 <li class="toctree-l3"><a class="reference internal" href="flam.html#flam._mlf.MovieListFile.movies_by_uid"><code class="docutils literal notranslate"><span class="pre">MovieListFile.movies_by_uid</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="flam.html#flam._mlf.MovieListFile.expiration_date"><code class="docutils literal notranslate"><span class="pre">MovieListFile.expiration_date</span></code></a></li>
 <li class="toctree-l3"><a class="reference internal" href="flam.html#flam._mlf.MovieListFile.people_by_uid"><code class="docutils literal notranslate"><span class="pre">MovieListFile.people_by_uid</span></code></a></li>
 </ul>
 </li>
 <li class="toctree-l2"><a class="reference internal" href="flam.html#flam._dbg.FlamEnv"><code class="docutils literal notranslate"><span class="pre">FlamEnv</span></code></a><ul>
 <li class="toctree-l3"><a class="reference internal" href="flam.html#flam._dbg.FlamEnv.DEBUG"><code class="docutils literal notranslate"><span class="pre">FlamEnv.DEBUG</span></code></a></li>
 <li class="toctree-l3"><a class="reference internal" href="flam.html#flam._dbg.FlamEnv.LOG2CONSOLE"><code class="docutils literal notranslate"><span class="pre">FlamEnv.LOG2CONSOLE</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="flam.html#flam._dbg.FlamEnv.LOGLEVEL"><code class="docutils literal notranslate"><span class="pre">FlamEnv.LOGLEVEL</span></code></a></li>
 <li class="toctree-l3"><a class="reference internal" href="flam.html#flam._dbg.FlamEnv.CTX_DIR"><code class="docutils literal notranslate"><span class="pre">FlamEnv.CTX_DIR</span></code></a></li>
 <li class="toctree-l3"><a class="reference internal" href="flam.html#flam._dbg.FlamEnv.DOWNLOADS_DIR"><code class="docutils literal notranslate"><span class="pre">FlamEnv.DOWNLOADS_DIR</span></code></a></li>
 <li class="toctree-l3"><a class="reference internal" href="flam.html#flam._dbg.FlamEnv.BROWSER"><code class="docutils literal notranslate"><span class="pre">FlamEnv.BROWSER</span></code></a></li>
 <li class="toctree-l3"><a class="reference internal" href="flam.html#flam._dbg.FlamEnv.BROWSER_PROFILE"><code class="docutils literal notranslate"><span class="pre">FlamEnv.BROWSER_PROFILE</span></code></a></li>
-<li class="toctree-l3"><a class="reference internal" href="flam.html#flam._dbg.FlamEnv.LOGLEVEL"><code class="docutils literal notranslate"><span class="pre">FlamEnv.LOGLEVEL</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="flam.html#flam._dbg.FlamEnv.TMDB_API_TOKEN"><code class="docutils literal notranslate"><span class="pre">FlamEnv.TMDB_API_TOKEN</span></code></a></li>
 <li class="toctree-l3"><a class="reference internal" href="flam.html#flam._dbg.FlamEnv.is_defined"><code class="docutils literal notranslate"><span class="pre">FlamEnv.is_defined</span></code></a></li>
 <li class="toctree-l3"><a class="reference internal" href="flam.html#flam._dbg.FlamEnv.is_truthy"><code class="docutils literal notranslate"><span class="pre">FlamEnv.is_truthy</span></code></a></li>
 <li class="toctree-l3"><a class="reference internal" href="flam.html#flam._dbg.FlamEnv.get_or_default"><code class="docutils literal notranslate"><span class="pre">FlamEnv.get_or_default()</span></code></a></li>
@@ -510,6 +578,8 @@
 <li class="toctree-l2"><a class="reference internal" href="flam.utils.html#flam.utils.num_pretty"><code class="docutils literal notranslate"><span class="pre">num_pretty()</span></code></a></li>
 <li class="toctree-l2"><a class="reference internal" href="flam.utils.html#flam.utils.parse_num_pretty"><code class="docutils literal notranslate"><span class="pre">parse_num_pretty()</span></code></a></li>
 <li class="toctree-l2"><a class="reference internal" href="flam.utils.html#flam.utils.stable_dedup"><code class="docutils literal notranslate"><span class="pre">stable_dedup()</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="flam.utils.html#flam.utils.str2bool"><code class="docutils literal notranslate"><span class="pre">str2bool()</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="flam.utils.html#flam.utils.move_clobber"><code class="docutils literal notranslate"><span class="pre">move_clobber()</span></code></a></li>
 </ul>
 </li>
 <li class="toctree-l1"><a class="reference internal" href="flam.attrutils.html">flam.attrutils</a><ul>

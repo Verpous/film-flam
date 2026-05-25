@@ -6,14 +6,14 @@
   <meta charset="utf-8" /><meta name="viewport" content="width=device-width, initial-scale=1" />
 
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>flam.attrutils &mdash; FilmFlam 2026.4.28.dev1777409694 documentation</title>
+  <title>flam.attrutils &mdash; FilmFlam 2026.5.25.dev1779735591 documentation</title>
       <link rel="stylesheet" type="text/css" href="../_static/pygments.css?v=80d5e7a1" />
       <link rel="stylesheet" type="text/css" href="../_static/css/theme.css?v=9edc463e" />
 
   
       <script src="../_static/jquery.js?v=5d32c60e"></script>
       <script src="../_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
-      <script src="../_static/documentation_options.js?v=11d3572e"></script>
+      <script src="../_static/documentation_options.js?v=9950e6dc"></script>
       <script src="../_static/doctools.js?v=fd6eb6e6"></script>
       <script src="../_static/sphinx_highlight.js?v=6ffebe34"></script>
     <script src="../_static/js/theme.js"></script>
@@ -42,17 +42,22 @@
   </form>
 </div>
         </div><div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
-              <p class="caption" role="heading"><span class="caption-text">Contents:</span></p>
-<ul class="current">
-<li class="toctree-l1"><a class="reference internal" href="../install.html">Setup</a></li>
-<li class="toctree-l1"><a class="reference internal" href="../examples.html">Examples</a></li>
+              <p class="caption" role="heading"><span class="caption-text">Getting started</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../introduction.html">Introduction</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">Basic concepts</span></p>
+<ul>
 <li class="toctree-l1"><a class="reference internal" href="../findables.html">Findables</a></li>
-<li class="toctree-l1"><a class="reference internal" href="../listdefs.html">Listdefs</a></li>
-<li class="toctree-l1"><a class="reference internal" href="../filters.html">Filters</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../attributes.html">Attributes</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../filters.html">Filters</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../predicates.html">Predicates</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../lists.html">Lists</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../fetchers.html">Fetchers</a></li>
-<li class="toctree-l1"><a class="reference internal" href="../cli/cli.html">Commandline tool</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">Advanced</span></p>
+<ul class="current">
+<li class="toctree-l1"><a class="reference internal" href="../cli/cli.html">Commandline</a></li>
 <li class="toctree-l1 current"><a class="reference internal" href="api.html">API</a><ul class="current">
 <li class="toctree-l2"><a class="reference internal" href="flam.html">flam</a></li>
 <li class="toctree-l2"><a class="reference internal" href="flam.utils.html">flam.utils</a></li>
@@ -303,7 +308,7 @@ but if you inherit from this instead you will have to do a lot less work. You on
 <dt class="sig sig-object py" id="flam.attrutils.easy_attribute">
 <span class="sig-name descname"><span class="pre">easy_attribute</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">params</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference internal" href="#flam.attrutils.EasyAttributeParams" title="flam.attrutils.EasyAttributeParams"><span class="pre">EasyAttributeParams</span></a></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">Callable</span><span class="p"><span class="pre">[</span></span><span class="p"><span class="pre">[</span></span><a class="reference internal" href="#flam.attrutils.Extractor" title="flam.attrutils.Extractor"><span class="pre">Extractor</span></a><span class="p"><span class="pre">[</span></span><span class="pre">TRet</span><span class="p"><span class="pre">]</span></span><span class="p"><span class="pre">]</span></span><span class="p"><span class="pre">,</span></span><span class="w"> </span><a class="reference internal" href="#flam.attrutils.EasyAttribute" title="flam.attrutils.EasyAttribute"><span class="pre">EasyAttribute</span></a><span class="p"><span class="pre">]</span></span></span></span><a class="headerlink" href="#flam.attrutils.easy_attribute" title="Link to this definition"></a></dt>
 <dd><p>Decorator you can apply to an extractor function to create an <a class="reference internal" href="#flam.attrutils.EasyAttribute" title="flam.attrutils.EasyAttribute"><code class="xref py py-class docutils literal notranslate"><span class="pre">EasyAttribute</span></code></a> from it and return an instance of that class.
-This is an extra layer of convenience so you don’t even have to explicitly inherit from EasyAttribute or instantiate it. For example:</p>
+This is an extra layer of convenience so you don’t even have to explicitly inherit from EasyAttribute or instantiate it:</p>
 <div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="nd">@register</span>
 <span class="nd">@easy_attribute</span><span class="p">(</span><span class="n">EasyAttributeParams</span><span class="p">(</span>
     <span class="n">name_without_type</span> <span class="o">=</span> <span class="s1">&#39;title&#39;</span><span class="p">,</span>
@@ -390,7 +395,7 @@ So even if your attribute returns <code class="docutils literal notranslate"><sp
 <dl class="py class">
 <dt class="sig sig-object py" id="flam.attrutils.BoolHandler">
 <span class="property"><span class="k"><span class="pre">class</span></span><span class="w"> </span></span><span class="sig-name descname"><span class="pre">BoolHandler</span></span><a class="headerlink" href="#flam.attrutils.BoolHandler" title="Link to this definition"></a></dt>
-<dd><p>Type handler for booleans with support for various, case-insensitive ways you might describe a boolean (e.g., ‘true’, ‘yes’, ‘no’, ‘n’, etc.).</p>
+<dd><p>Type handler for booleans with support for various, case-insensitive ways you might describe them (‘true’, ‘yes’, ‘no’, ‘n’, etc.).</p>
 </dd></dl>
 
 <dl class="py class">
@@ -536,9 +541,10 @@ So by stripping those out, dates which have the same year but different days and
 <dt class="sig sig-object py" id="flam.attrutils.AverageAttribute">
 <span class="property"><span class="k"><span class="pre">class</span></span><span class="w"> </span></span><span class="sig-name descname"><span class="pre">AverageAttribute</span></span><a class="headerlink" href="#flam.attrutils.AverageAttribute" title="Link to this definition"></a></dt>
 <dd><p>Attribute which returns the average of another attribute’s value.</p>
-<p>For movie attributes, this will be a people attribute with the average across all movies those people were in.</p>
-<p>For people attributes, this will be a movie attribute with the average across all people in the movie with the same crew type.</p>
-<p>Example usage:</p>
+<ul class="simple">
+<li><p>For movie attributes, this will be a people attribute with the average across all movies those people were in.</p></li>
+<li><p>For people attributes, this will be a movie attribute with the average across all people in the movie with the same crew type.</p></li>
+</ul>
 <div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="n">register</span><span class="p">(</span><span class="n">AverageAttribute</span><span class="p">(</span><span class="n">my_attr</span><span class="p">))</span>
 
 <span class="k">for</span> <span class="n">ct</span> <span class="ow">in</span> <span class="n">CrewType</span><span class="p">:</span>
@@ -554,8 +560,10 @@ So by stripping those out, dates which have the same year but different days and
 <dd class="field-odd"><ul class="simple">
 <li><p><strong>wrapped_attr</strong> (<a class="reference internal" href="flam.html#flam._attr.Attribute" title="flam._attr.Attribute"><em>Attribute</em></a>) – the attribute whose average will be returned.</p></li>
 <li><p><strong>as_crew_type</strong> (<em>None</em><em> | </em><a class="reference internal" href="flam.html#flam._ml.CrewType" title="flam._ml.CrewType"><em>CrewType</em></a>) – <p>optional modifier for this attribute. If provided, the attribute’s name will be ‘avg-&lt;wrapped_attr.name_without_type&gt;-as-&lt;crew_type&gt;’:</p>
-<p>For movie attributes, this will be a people attribute with the average across all movies those people were in as this crew type.</p>
-<p>For people attributes, this will be a movie attribute with the average across all people in the movie with this crew type.</p>
+<ul>
+<li><p>For movie attributes, this will be a people attribute with the average across all movies those people were in as this crew type.</p></li>
+<li><p>For people attributes, this will be a movie attribute with the average across all people in the movie with this crew type.</p></li>
+</ul>
 </p></li>
 </ul>
 </dd>
@@ -571,8 +579,10 @@ So by stripping those out, dates which have the same year but different days and
 <dt class="sig sig-object py" id="flam.attrutils.SumAttribute">
 <span class="property"><span class="k"><span class="pre">class</span></span><span class="w"> </span></span><span class="sig-name descname"><span class="pre">SumAttribute</span></span><a class="headerlink" href="#flam.attrutils.SumAttribute" title="Link to this definition"></a></dt>
 <dd><p>Attribute which returns the sum of another attribute’s value.</p>
-<p>For movie attributes, this will be a people attribute with the sum across all movies those people were in.</p>
-<p>For people attributes, this will be a movie attribute with the sum across all people in the movie with the same crew type.</p>
+<ul class="simple">
+<li><p>For movie attributes, this will be a people attribute with the sum across all movies those people were in.</p></li>
+<li><p>For people attributes, this will be a movie attribute with the sum across all people in the movie with the same crew type.</p></li>
+</ul>
 <dl class="py method">
 <dt class="sig sig-object py" id="flam.attrutils.SumAttribute.__init__">
 <span class="sig-name descname"><span class="pre">__init__</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">wrapped_attr</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference internal" href="flam.html#flam._attr.Attribute" title="flam._attr.Attribute"><span class="pre">Attribute</span></a></span></em>, <em class="sig-param"><span class="n"><span class="pre">type_handler</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference internal" href="#flam.attrutils.TypeHandler" title="flam.attrutils.TypeHandler"><span class="pre">TypeHandler</span></a></span></em>, <em class="sig-param"><span class="n"><span class="pre">as_crew_type</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">None</span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><a class="reference internal" href="flam.html#flam._ml.CrewType" title="flam._ml.CrewType"><span class="pre">CrewType</span></a></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">None</span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">None</span></span></span><a class="headerlink" href="#flam.attrutils.SumAttribute.__init__" title="Link to this definition"></a></dt>
@@ -582,8 +592,10 @@ So by stripping those out, dates which have the same year but different days and
 <dd class="field-odd"><ul class="simple">
 <li><p><strong>wrapped_attr</strong> (<a class="reference internal" href="flam.html#flam._attr.Attribute" title="flam._attr.Attribute"><em>Attribute</em></a>) – the attribute whose sum will be returned.</p></li>
 <li><p><strong>as_crew_type</strong> (<em>None</em><em> | </em><a class="reference internal" href="flam.html#flam._ml.CrewType" title="flam._ml.CrewType"><em>CrewType</em></a>) – <p>optional modifier for this attribute. If provided, the attribute’s name will be ‘sum-&lt;wrapped_attr.name_without_type&gt;-as-&lt;crew_type&gt;’:</p>
-<p>For movie attributes, this will be a people attribute with the sum across all movies those people were in as this crew type.</p>
-<p>For people attributes, this will be a movie attribute with the sum across all people in the movie with this crew type.</p>
+<ul>
+<li><p>For movie attributes, this will be a people attribute with the sum across all movies those people were in as this crew type.</p></li>
+<li><p>For people attributes, this will be a movie attribute with the sum across all people in the movie with this crew type.</p></li>
+</ul>
 </p></li>
 <li><p><strong>type_handler</strong> (<a class="reference internal" href="#flam.attrutils.TypeHandler" title="flam.attrutils.TypeHandler"><em>TypeHandler</em></a>)</p></li>
 </ul>

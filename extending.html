@@ -6,14 +6,14 @@
   <meta charset="utf-8" /><meta name="viewport" content="width=device-width, initial-scale=1" />
 
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Extending Flam &mdash; FilmFlam 2026.4.28.dev1777409694 documentation</title>
+  <title>Extending Flam &mdash; FilmFlam 2026.5.25.dev1779735591 documentation</title>
       <link rel="stylesheet" type="text/css" href="_static/pygments.css?v=80d5e7a1" />
       <link rel="stylesheet" type="text/css" href="_static/css/theme.css?v=9edc463e" />
 
   
       <script src="_static/jquery.js?v=5d32c60e"></script>
       <script src="_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
-      <script src="_static/documentation_options.js?v=11d3572e"></script>
+      <script src="_static/documentation_options.js?v=9950e6dc"></script>
       <script src="_static/doctools.js?v=fd6eb6e6"></script>
       <script src="_static/sphinx_highlight.js?v=6ffebe34"></script>
     <script src="_static/js/theme.js"></script>
@@ -41,19 +41,31 @@
   </form>
 </div>
         </div><div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
-              <p class="caption" role="heading"><span class="caption-text">Contents:</span></p>
-<ul class="current">
-<li class="toctree-l1"><a class="reference internal" href="install.html">Setup</a></li>
-<li class="toctree-l1"><a class="reference internal" href="examples.html">Examples</a></li>
+              <p class="caption" role="heading"><span class="caption-text">Getting started</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="introduction.html">Introduction</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">Basic concepts</span></p>
+<ul>
 <li class="toctree-l1"><a class="reference internal" href="findables.html">Findables</a></li>
-<li class="toctree-l1"><a class="reference internal" href="listdefs.html">Listdefs</a></li>
-<li class="toctree-l1"><a class="reference internal" href="filters.html">Filters</a></li>
 <li class="toctree-l1"><a class="reference internal" href="attributes.html">Attributes</a></li>
+<li class="toctree-l1"><a class="reference internal" href="filters.html">Filters</a></li>
 <li class="toctree-l1"><a class="reference internal" href="predicates.html">Predicates</a></li>
+<li class="toctree-l1"><a class="reference internal" href="lists.html">Lists</a></li>
 <li class="toctree-l1"><a class="reference internal" href="fetchers.html">Fetchers</a></li>
-<li class="toctree-l1"><a class="reference internal" href="cli/cli.html">Commandline tool</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">Advanced</span></p>
+<ul class="current">
+<li class="toctree-l1"><a class="reference internal" href="cli/cli.html">Commandline</a></li>
 <li class="toctree-l1"><a class="reference internal" href="api/api.html">API</a></li>
-<li class="toctree-l1 current"><a class="current reference internal" href="#">Extending Flam</a></li>
+<li class="toctree-l1 current"><a class="current reference internal" href="#">Extending Flam</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="#registering-an-extension">Registering an extension</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#importing-extensions-automatically">Importing extensions automatically</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#implementing-a-custom-attribute">Implementing a custom attribute</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#implementing-a-custom-predicate">Implementing a custom predicate</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#implementing-a-custom-fetcher">Implementing a custom fetcher</a></li>
+</ul>
+</li>
 </ul>
 
         </div>
@@ -82,7 +94,362 @@
              
   <section id="extending-flam">
 <h1>Extending Flam<a class="headerlink" href="#extending-flam" title="Link to this heading"></a></h1>
-<p>TODO</p>
+<p>You can extend flam with custom <a class="reference internal" href="attributes.html#attributes"><span class="std std-ref">attributes</span></a>, <a class="reference internal" href="predicates.html#predicates"><span class="std std-ref">predicates</span></a>, and <a class="reference internal" href="fetchers.html#fetchers"><span class="std std-ref">fetchers</span></a>.</p>
+<div class="admonition tip">
+<p class="admonition-title">Tip</p>
+<p>The repository includes an <a class="reference external" href="https://github.com/Verpous/film-flam/blob/master/test_extensions.py">example file</a> demonstrating how to implement custom extensions.</p>
+</div>
+<section id="registering-an-extension">
+<h2>Registering an extension<a class="headerlink" href="#registering-an-extension" title="Link to this heading"></a></h2>
+<p>To use an extension, you must register it. There are two ways to register an extension:</p>
+<ol class="arabic">
+<li><p><strong>Global extension</strong></p>
+<blockquote>
+<div><p>Use <a class="reference internal" href="api/flam.html#flam._reg.register" title="flam._reg.register"><code class="xref py py-func docutils literal notranslate"><span class="pre">register()</span></code></a>, and the extension will be automatically available from any <a class="reference internal" href="api/flam.html#flam._ctx.FlamContext" title="flam._ctx.FlamContext"><code class="xref py py-class docutils literal notranslate"><span class="pre">FlamContext</span></code></a>.</p>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="nd">@register</span>
+<span class="k">class</span> <span class="nc">MyCustomPredicate</span><span class="p">(</span><span class="n">Predicate</span><span class="p">,</span>
+        <span class="n">name_without_type</span><span class="o">=</span><span class="s1">&#39;is-movie-dope&#39;</span><span class="p">,</span>
+        <span class="n">findable_type</span><span class="o">=</span><span class="n">FindableType</span><span class="o">.</span><span class="n">MOVIES</span><span class="p">):</span>
+    <span class="c1"># ...</span>
+</pre></div>
+</div>
+<p>It’s allowed to name your extension the same as an existing builtin. The builtin will be shadowed.</p>
+</div></blockquote>
+</li>
+<li><p><strong>Context extension</strong></p>
+<blockquote>
+<div><p>Use <a class="reference internal" href="api/flam.html#flam._ctx.FlamContext.register" title="flam._ctx.FlamContext.register"><code class="xref py py-meth docutils literal notranslate"><span class="pre">FlamContext.register()</span></code></a>, and the extension will be available to use only from that specific context.</p>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="k">class</span> <span class="nc">MyCustomPredicate</span><span class="p">(</span><span class="n">Predicate</span><span class="p">,</span>
+        <span class="n">name_without_type</span><span class="o">=</span><span class="s1">&#39;is-movie-dope&#39;</span><span class="p">,</span>
+        <span class="n">findable_type</span><span class="o">=</span><span class="n">FindableType</span><span class="o">.</span><span class="n">MOVIES</span><span class="p">):</span>
+    <span class="c1"># ...</span>
+
+<span class="n">ctx</span> <span class="o">=</span> <span class="n">FlamContext</span><span class="p">()</span>
+<span class="n">ctx</span><span class="o">.</span><span class="n">register</span><span class="p">(</span><span class="n">MyCustomPredicate</span><span class="p">)</span>
+</pre></div>
+</div>
+<p>It’s allowed to name your extension the same as an existing builtin or global extension. They will be shadowed.</p>
+</div></blockquote>
+</li>
+</ol>
+<p>Once registered, using an extension is just like using any builtin:</p>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="nb">filter</span> <span class="o">=</span> <span class="n">ctx</span><span class="o">.</span><span class="n">compile_movies_filter</span><span class="p">([</span><span class="s1">&#39;-is-movie-dope&#39;</span><span class="p">])</span>
+</pre></div>
+</div>
+<div class="admonition note">
+<p class="admonition-title">Note</p>
+<p>For predicates and fetchers, you need to register <strong>the class itself</strong>. For attributes, you must register <strong>an instance of the class!</strong></p>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="c1"># DO:</span>
+<span class="n">ctx</span><span class="o">.</span><span class="n">register</span><span class="p">(</span><span class="n">MyCustomPredicate</span><span class="p">)</span>
+<span class="n">ctx</span><span class="o">.</span><span class="n">register</span><span class="p">(</span><span class="n">MyCustomFetcher</span><span class="p">)</span>
+<span class="n">ctx</span><span class="o">.</span><span class="n">register</span><span class="p">(</span><span class="n">MyCustomAttribute</span><span class="p">())</span>
+
+<span class="c1"># DON&#39;T:</span>
+<span class="n">ctx</span><span class="o">.</span><span class="n">register</span><span class="p">(</span><span class="n">MyCustomPredicate</span><span class="p">())</span>
+<span class="n">ctx</span><span class="o">.</span><span class="n">register</span><span class="p">(</span><span class="n">MyCustomFetcher</span><span class="p">())</span>
+<span class="n">ctx</span><span class="o">.</span><span class="n">register</span><span class="p">(</span><span class="n">MyCustomAttribute</span><span class="p">)</span>
+</pre></div>
+</div>
+</div>
+</section>
+<section id="importing-extensions-automatically">
+<h2>Importing extensions automatically<a class="headerlink" href="#importing-extensions-automatically" title="Link to this heading"></a></h2>
+<p>You can configure flam to automatically import your extensions module:</p>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>flam<span class="w"> </span>config<span class="w"> </span>extension<span class="w"> </span>my_extensions.py
+</pre></div>
+</div>
+<p>The file must register its extensions <strong>globally</strong>. Now they will be automatically available from any <a class="reference internal" href="api/flam.html#flam._ctx.FlamContext" title="flam._ctx.FlamContext"><code class="xref py py-class docutils literal notranslate"><span class="pre">FlamContext</span></code></a> created with <code class="docutils literal notranslate"><span class="pre">import_extensions=True</span></code>.</p>
+</section>
+<section id="implementing-a-custom-attribute">
+<h2>Implementing a custom attribute<a class="headerlink" href="#implementing-a-custom-attribute" title="Link to this heading"></a></h2>
+<p>Attributes are implemented by inheriting from <a class="reference internal" href="api/flam.html#flam._attr.Attribute" title="flam._attr.Attribute"><code class="xref py py-class docutils literal notranslate"><span class="pre">Attribute</span></code></a> and implementing all its abstract members.</p>
+<p>However, there is an easier way. The <a class="reference internal" href="api/flam.attrutils.html#flam-attrutils"><span class="std std-ref">flam.attrutils</span></a> module provides a suite of utilities to help you implement attributes easily. You only need to provide:</p>
+<ul class="simple">
+<li><p>Your attribute’s parameters</p></li>
+<li><p>A <a class="reference internal" href="api/flam.attrutils.html#flam.attrutils.TypeHandler" title="flam.attrutils.TypeHandler"><code class="xref py py-class docutils literal notranslate"><span class="pre">TypeHandler</span></code></a> which corresponds to your attribute’s return value (we probably already have the one you need)</p></li>
+<li><p>An “extractor” function, which returns your attribute’s value from the “MLF” (Movie List File) objects. These objects contain the all the raw fetch data about your findable.</p></li>
+</ul>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="nd">@register</span>
+<span class="nd">@easy_attribute</span><span class="p">(</span><span class="n">EasyAttributeParams</span><span class="p">(</span>
+    <span class="n">name_without_type</span> <span class="o">=</span> <span class="s1">&#39;title&#39;</span><span class="p">,</span>
+    <span class="n">aliases_without_type</span> <span class="o">=</span> <span class="p">[</span><span class="s1">&#39;name&#39;</span><span class="p">,</span> <span class="s1">&#39;movie&#39;</span><span class="p">],</span>
+    <span class="n">findable_type</span> <span class="o">=</span> <span class="n">FindableType</span><span class="o">.</span><span class="n">MOVIES</span><span class="p">,</span>
+    <span class="n">type_handler</span> <span class="o">=</span> <span class="n">STR_HANDLER</span><span class="p">,</span>
+    <span class="n">is_ascending</span> <span class="o">=</span> <span class="kc">True</span><span class="p">,</span>
+    <span class="n">truncation_style</span> <span class="o">=</span> <span class="n">TruncationStyle</span><span class="o">.</span><span class="n">TRIM_END</span><span class="p">,</span>
+    <span class="n">default_max_len</span> <span class="o">=</span> <span class="mi">45</span><span class="p">,</span>
+<span class="p">))</span>
+<span class="k">def</span> <span class="nf">movie_title_extractor</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">movie</span><span class="p">:</span> <span class="n">Movie</span><span class="p">,</span> <span class="n">mlf_movie</span><span class="p">:</span> <span class="n">MLFMovie</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span> <span class="o">|</span> <span class="nb">str</span><span class="p">:</span>
+    <span class="k">return</span> <span class="n">mlf_movie</span><span class="o">.</span><span class="n">title</span>
+</pre></div>
+</div>
+<p>The extractor function should have a different signature based on the findable type:</p>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="c1"># Extractor for movie attributes.</span>
+<span class="k">def</span> <span class="nf">movie_title_extractor</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">movie</span><span class="p">:</span> <span class="n">Movie</span><span class="p">,</span> <span class="n">mlf_movie</span><span class="p">:</span> <span class="n">MLFMovie</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span> <span class="o">|</span> <span class="nb">str</span><span class="p">:</span>
+    <span class="k">return</span> <span class="n">mlf_movie</span><span class="o">.</span><span class="n">title</span>
+
+<span class="c1"># Extractor for people attributes.</span>
+<span class="c1"># mlf_people is sorted by uid. People attributes should return the attribute for each person a list with the same order.</span>
+<span class="k">def</span> <span class="nf">people_name_extractor</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">people</span><span class="p">:</span> <span class="n">People</span><span class="p">,</span> <span class="n">mlf_people</span><span class="p">:</span> <span class="nb">list</span><span class="p">[</span><span class="n">MLFPerson</span><span class="p">])</span> <span class="o">-&gt;</span> <span class="nb">list</span><span class="p">[</span><span class="kc">None</span> <span class="o">|</span> <span class="nb">str</span><span class="p">]:</span>
+    <span class="k">return</span> <span class="p">[</span><span class="n">mlf_person</span><span class="o">.</span><span class="n">name</span> <span class="k">for</span> <span class="n">mlf_person</span> <span class="ow">in</span> <span class="n">mlf_people</span><span class="p">]</span>
+
+<span class="c1"># Extractor for role attributes.</span>
+<span class="k">def</span> <span class="nf">role_characters_extractor</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">role</span><span class="p">:</span> <span class="n">Role</span><span class="p">,</span> <span class="n">mlf_roles</span><span class="p">:</span> <span class="n">MLFRolesDict</span><span class="p">,</span> <span class="n">mlf_movie</span><span class="p">:</span> <span class="n">MLFMovie</span><span class="p">,</span> <span class="n">mlf_people</span><span class="p">:</span> <span class="nb">list</span><span class="p">[</span><span class="n">MLFPerson</span><span class="p">])</span> <span class="o">-&gt;</span> <span class="nb">list</span><span class="p">[</span><span class="nb">str</span><span class="p">]:</span>
+    <span class="k">return</span> <span class="p">[</span>
+        <span class="n">char</span>
+        <span class="k">for</span> <span class="n">mlf_person</span> <span class="ow">in</span> <span class="n">mlf_people</span>
+        <span class="k">for</span> <span class="n">ct</span><span class="p">,</span> <span class="n">mlf_role</span> <span class="ow">in</span> <span class="n">mlf_roles</span><span class="p">[</span><span class="n">mlf_person</span><span class="o">.</span><span class="n">uid</span><span class="p">]</span><span class="o">.</span><span class="n">items</span><span class="p">()</span>
+        <span class="k">for</span> <span class="n">char</span> <span class="ow">in</span> <span class="n">mlf_role</span><span class="o">.</span><span class="n">characters</span>
+    <span class="p">]</span>
+</pre></div>
+</div>
+<div class="admonition note">
+<p class="admonition-title">Note</p>
+<ul>
+<li><p>Flam has special handling for attributes with return a <code class="docutils literal notranslate"><span class="pre">list</span></code></p></li>
+<li><p>Flam has special handling for attributes which return <code class="docutils literal notranslate"><span class="pre">None</span></code>. MLF data can often be <code class="docutils literal notranslate"><span class="pre">None</span></code>, so most attributes should be prepared to return it</p></li>
+<li><p>The MLF objects you get are <strong>readonly!</strong> Don’t modify them</p></li>
+<li><p>Always create a copy if your attribute returns a mutable internal object:</p>
+<blockquote>
+<div><div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="k">def</span> <span class="nf">_movie_genres_extractor</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">movie</span><span class="p">:</span> <span class="n">Movie</span><span class="p">,</span> <span class="n">mlf_movie</span><span class="p">:</span> <span class="n">MLFMovie</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">list</span><span class="p">[</span><span class="nb">str</span><span class="p">]:</span>
+    <span class="c1"># GOOD: caller gets a copy of the list.</span>
+    <span class="k">return</span> <span class="nb">list</span><span class="p">(</span><span class="n">mlf_movie</span><span class="o">.</span><span class="n">genres</span><span class="p">)</span>
+
+    <span class="c1"># BAD: caller gets the same list and might accidentally modify the MLF, which is not allowed.</span>
+    <span class="k">return</span> <span class="n">mlf_movie</span><span class="o">.</span><span class="n">genres</span>
+</pre></div>
+</div>
+</div></blockquote>
+</li>
+</ul>
+</div>
+</section>
+<section id="implementing-a-custom-predicate">
+<h2>Implementing a custom predicate<a class="headerlink" href="#implementing-a-custom-predicate" title="Link to this heading"></a></h2>
+<p>Predicates are implemented by inheriting from <a class="reference internal" href="api/flam.html#flam._filter.Predicate" title="flam._filter.Predicate"><code class="xref py py-class docutils literal notranslate"><span class="pre">Predicate</span></code></a>. You’ll need to:</p>
+<ul>
+<li><p>Fill in some parameters like the predicate’s name and type in the <a class="reference internal" href="api/flam.html#flam._filter.Predicate.__init_subclass__" title="flam._filter.Predicate.__init_subclass__"><code class="xref py py-meth docutils literal notranslate"><span class="pre">class</span> <span class="pre">declaration</span></code></a></p></li>
+<li><p>Implement <a class="reference internal" href="api/flam.html#flam._filter.Predicate.eat" title="flam._filter.Predicate.eat"><code class="xref py py-meth docutils literal notranslate"><span class="pre">eat()</span></code></a>, a classmethod for parsing your predicate</p></li>
+<li><p>Implement some <code class="docutils literal notranslate"><span class="pre">excrete</span></code> function, for checking if the predicate holds true. The exact signature depends on the predicate’s findable type:</p>
+<blockquote>
+<div><div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="c1"># Excrete for general predicates (predicates without a specific findable type).</span>
+<span class="c1"># General predicates also have the choice of implement all 3 of the type-specific excretes instead.</span>
+<span class="k">def</span> <span class="nf">excrete</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">findable</span><span class="p">:</span> <span class="n">Findable</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">bool</span><span class="p">:</span>
+
+<span class="c1"># Excrete for movie predicates.</span>
+<span class="k">def</span> <span class="nf">_excrete_from_movie</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">movie</span><span class="p">:</span> <span class="n">Movie</span><span class="p">,</span> <span class="n">mlf_movie</span><span class="p">:</span> <span class="n">MLFMovie</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">bool</span><span class="p">:</span>
+
+<span class="c1"># Excrete for people predicates.</span>
+<span class="k">def</span> <span class="nf">_excrete_from_people</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">people</span><span class="p">:</span> <span class="n">People</span><span class="p">,</span> <span class="n">mlf_people</span><span class="p">:</span> <span class="nb">list</span><span class="p">[</span><span class="n">MLFPerson</span><span class="p">])</span> <span class="o">-&gt;</span> <span class="nb">bool</span><span class="p">:</span>
+
+<span class="c1"># Excrete for role predicates.</span>
+<span class="k">def</span> <span class="nf">_excrete_from_role</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">role</span><span class="p">:</span> <span class="n">Role</span><span class="p">,</span> <span class="n">mlf_roles</span><span class="p">:</span> <span class="n">MLFRolesDict</span><span class="p">,</span> <span class="n">mlf_movie</span><span class="p">:</span> <span class="n">MLFMovie</span><span class="p">,</span> <span class="n">mlf_people</span><span class="p">:</span> <span class="nb">list</span><span class="p">[</span><span class="n">MLFPerson</span><span class="p">])</span> <span class="o">-&gt;</span> <span class="nb">bool</span><span class="p">:</span>
+</pre></div>
+</div>
+</div></blockquote>
+</li>
+<li><p>Optionally implement <a class="reference internal" href="api/flam.html#flam._filter.FilterMember.regurgitate" title="flam._filter.FilterMember.regurgitate"><code class="xref py py-meth docutils literal notranslate"><span class="pre">regurgitate()</span></code></a>, for decompiling your predicate</p></li>
+<li><p>Optionally implement <a class="reference internal" href="api/flam.html#flam._filter.FilterMember.colonoscopy" title="flam._filter.FilterMember.colonoscopy"><code class="xref py py-meth docutils literal notranslate"><span class="pre">colonoscopy()</span></code></a>, for inspecting subfilters in your predicate</p></li>
+</ul>
+<p>Here’s what it all looks like:</p>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="c1"># Movie predicate which takes a list of CTGMs and a subfilter for roles, and checks if any role with any of those CTGMs passes the subfilter.</span>
+<span class="nd">@register</span>
+<span class="k">class</span> <span class="nc">AnyRolePredicate</span><span class="p">(</span><span class="n">Predicate</span><span class="p">,</span> <span class="n">name_without_type</span><span class="o">=</span><span class="s1">&#39;any-role&#39;</span><span class="p">,</span> <span class="n">findable_type</span><span class="o">=</span><span class="n">FindableType</span><span class="o">.</span><span class="n">MOVIES</span><span class="p">):</span>
+    <span class="k">def</span> <span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">ct_gms</span><span class="p">:</span> <span class="nb">list</span><span class="p">[</span><span class="nb">tuple</span><span class="p">[</span><span class="n">CrewType</span><span class="p">,</span> <span class="n">GroupMode</span><span class="p">]],</span> <span class="nb">filter</span><span class="p">:</span> <span class="n">Filter</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_ct_gms</span> <span class="o">=</span> <span class="n">ct_gms</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_filter</span> <span class="o">=</span> <span class="nb">filter</span>
+
+    <span class="nd">@classmethod</span>
+    <span class="k">def</span> <span class="nf">eat</span><span class="p">(</span><span class="bp">cls</span><span class="p">,</span> <span class="n">params</span><span class="p">:</span> <span class="n">EatParams</span><span class="p">,</span> <span class="n">at</span><span class="p">:</span> <span class="nb">int</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">tuple</span><span class="p">[</span><span class="n">Predicate</span><span class="p">,</span> <span class="nb">int</span><span class="p">]:</span>
+        <span class="c1"># Functions which &quot;eat&quot; actually read a few tokens from index `at` and parse them into a result.</span>
+        <span class="c1"># They return the result and which index they stopped parsing at.</span>
+        <span class="c1"># We have a number of handy &quot;eat&quot; utils from our parent class.</span>
+        <span class="n">ct_gms</span><span class="p">,</span> <span class="n">filter_idx</span> <span class="o">=</span> <span class="bp">cls</span><span class="o">.</span><span class="n">eat_listof</span><span class="p">(</span><span class="bp">cls</span><span class="o">.</span><span class="n">eat_ct_gm</span><span class="p">,</span> <span class="n">params</span><span class="p">,</span> <span class="n">at</span><span class="p">)</span>
+        <span class="n">sub_params</span> <span class="o">=</span> <span class="n">dataclasses</span><span class="o">.</span><span class="n">replace</span><span class="p">(</span><span class="n">params</span><span class="p">,</span> <span class="n">find</span><span class="o">=</span><span class="n">FindableType</span><span class="o">.</span><span class="n">ROLES</span><span class="p">)</span>
+        <span class="nb">filter</span><span class="p">,</span> <span class="n">until</span> <span class="o">=</span> <span class="bp">cls</span><span class="o">.</span><span class="n">eat_subfilter</span><span class="p">(</span><span class="n">sub_params</span><span class="p">,</span> <span class="n">filter_idx</span><span class="p">)</span>
+        <span class="k">return</span> <span class="bp">cls</span><span class="p">(</span><span class="n">ct_gms</span><span class="p">,</span> <span class="nb">filter</span><span class="p">),</span> <span class="n">until</span>
+
+    <span class="k">def</span> <span class="nf">_excrete_from_movie</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">movie</span><span class="p">:</span> <span class="n">Movie</span><span class="p">,</span> <span class="n">mlf_movie</span><span class="p">:</span> <span class="n">_mlf</span><span class="o">.</span><span class="n">MLFMovie</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">bool</span><span class="p">:</span>
+        <span class="k">for</span> <span class="n">ct_gm</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">_ct_gms</span><span class="p">:</span>
+            <span class="k">for</span> <span class="n">role</span> <span class="ow">in</span> <span class="n">movie</span><span class="o">.</span><span class="n">associated_roles</span><span class="p">(</span><span class="o">*</span><span class="n">ct_gm</span><span class="p">):</span>
+                <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">_filter</span><span class="o">.</span><span class="n">excrete</span><span class="p">(</span><span class="n">role</span><span class="p">):</span>
+                    <span class="k">return</span> <span class="kc">True</span>
+
+        <span class="k">return</span> <span class="kc">False</span>
+
+    <span class="k">def</span> <span class="nf">regurgitate</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">typing</span><span class="o">.</span><span class="n">Iterable</span><span class="p">[</span><span class="nb">str</span><span class="p">]:</span>
+        <span class="c1"># Use `min` because LPAREN, RPAREN are sets of accepted strings and we want to pick one.</span>
+        <span class="k">yield from</span> <span class="nb">super</span><span class="p">()</span><span class="o">.</span><span class="n">regurgitate</span><span class="p">()</span>
+        <span class="k">yield</span> <span class="nb">min</span><span class="p">(</span><span class="n">Pipeline</span><span class="o">.</span><span class="n">LPAREN</span><span class="p">)</span>
+        <span class="k">yield from</span> <span class="p">(</span><span class="n">ct_gm_to_str</span><span class="p">(</span><span class="o">*</span><span class="n">ct_gm</span><span class="p">)</span> <span class="k">for</span> <span class="n">ct_gm</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">_ct_gms</span><span class="p">)</span>
+        <span class="k">yield</span> <span class="nb">min</span><span class="p">(</span><span class="n">Pipeline</span><span class="o">.</span><span class="n">RPAREN</span><span class="p">)</span>
+        <span class="k">yield from</span> <span class="bp">self</span><span class="o">.</span><span class="n">_filter</span><span class="o">.</span><span class="n">regurgitate</span><span class="p">()</span>
+
+    <span class="k">def</span> <span class="nf">colonoscopy</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">typing</span><span class="o">.</span><span class="n">Iterable</span><span class="p">[</span><span class="n">FilterMember</span><span class="p">]:</span>
+        <span class="k">yield</span> <span class="bp">self</span>
+        <span class="k">yield from</span> <span class="bp">self</span><span class="o">.</span><span class="n">_filter</span><span class="o">.</span><span class="n">colonoscopy</span><span class="p">()</span>
+</pre></div>
+</div>
+</section>
+<section id="implementing-a-custom-fetcher">
+<h2>Implementing a custom fetcher<a class="headerlink" href="#implementing-a-custom-fetcher" title="Link to this heading"></a></h2>
+<p>Fetchers are implemented by inheriting from <a class="reference internal" href="api/flam.html#flam._fetch.Fetcher" title="flam._fetch.Fetcher"><code class="xref py py-class docutils literal notranslate"><span class="pre">Fetcher</span></code></a>. You’ll need to:</p>
+<ul class="simple">
+<li><p>Fill in some parameters like the fetcher’s name in the <a class="reference internal" href="api/flam.html#flam._fetch.Fetcher.__init_subclass__" title="flam._fetch.Fetcher.__init_subclass__"><code class="xref py py-meth docutils literal notranslate"><span class="pre">class</span> <span class="pre">declaration</span></code></a></p></li>
+<li><p>Implement <a class="reference internal" href="api/flam.html#flam._fetch.Fetcher._fetch_into_file" title="flam._fetch.Fetcher._fetch_into_file"><code class="xref py py-meth docutils literal notranslate"><span class="pre">_fetch_into_file()</span></code></a></p></li>
+</ul>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="nd">@register</span>
+<span class="k">class</span> <span class="nc">MyCustomFetcher</span><span class="p">(</span><span class="n">Fetcher</span><span class="p">,</span> <span class="n">list_type</span><span class="o">=</span><span class="s1">&#39;my-database-list&#39;</span><span class="p">):</span>
+    <span class="k">def</span> <span class="nf">fetch_into_file</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">movie_list_file</span><span class="p">:</span> <span class="n">MovieListFile</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+        <span class="c1"># ...</span>
+</pre></div>
+</div>
+<p>Fetchers require gentle care in their implementation:</p>
+<ul class="simple">
+<li><p>Familiarize yourself with the structure of <a class="reference internal" href="api/flam.html#flam._mlf.MovieListFile" title="flam._mlf.MovieListFile"><code class="xref py py-class docutils literal notranslate"><span class="pre">MovieListFile</span></code></a></p></li>
+<li><p>Remember to delete movies in the file that were removed from the list, and to avoid re-fetching movies already in the file</p></li>
+<li><p>When deleting a movie, you don’t need to delete its people. That’s handled automatically</p></li>
+<li><p>Don’t add movies to the file until you’ve acquired all of their data, so that if fetch is interrupted at any point, the file will be in a good, saveable state</p></li>
+<li><p>If your fetcher is slow, call <a class="reference internal" href="api/flam.html#flam._fetch.Fetcher._checkpoint" title="flam._fetch.Fetcher._checkpoint"><code class="xref py py-meth docutils literal notranslate"><span class="pre">_checkpoint()</span></code></a> from time to time so that a crash won’t cause the data to be lost</p></li>
+<li><p>Be sure to handle server errors from the API you’re fetching from, and raise <a class="reference internal" href="api/flam.html#flam._exc.FetchInterrupt" title="flam._exc.FetchInterrupt"><code class="xref py py-exc docutils literal notranslate"><span class="pre">FetchInterrupt</span></code></a> as needed</p></li>
+<li><p>It’s also nice to handle <code class="docutils literal notranslate"><span class="pre">KeyboardInterrupt</span></code> by raising <a class="reference internal" href="api/flam.html#flam._exc.FetchInterrupt" title="flam._exc.FetchInterrupt"><code class="xref py py-exc docutils literal notranslate"><span class="pre">FetchInterrupt</span></code></a></p></li>
+</ul>
+<p>See it all in action:</p>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="c1"># This fetcher takes a size of a list to &quot;fetch&quot; and literally makes up a list with phony data.</span>
+<span class="nd">@register</span>
+<span class="k">class</span> <span class="nc">RandomDataFetcher</span><span class="p">(</span><span class="n">Fetcher</span><span class="p">,</span> <span class="n">list_type</span><span class="o">=</span><span class="s1">&#39;random-size&#39;</span><span class="p">):</span>
+    <span class="k">def</span> <span class="nf">_fetch_into_file</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">movie_list_file</span><span class="p">:</span> <span class="n">MovieListFile</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+        <span class="c1"># Takes the address to mean the number of movies the random list should have.</span>
+        <span class="n">num_movies</span> <span class="o">=</span> <span class="nb">int</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">concrete_listdef</span><span class="o">.</span><span class="n">address</span><span class="p">)</span>
+
+        <span class="c1"># We must assign a UID for each movie. Usually this would be, like, the IMDb ID of that movie.</span>
+        <span class="c1"># For this example we&#39;ll just use the index as the uid.</span>
+        <span class="n">movie_uids_in_list</span> <span class="o">=</span> <span class="p">[</span><span class="nb">str</span><span class="p">(</span><span class="n">movie_idx</span><span class="p">)</span> <span class="k">for</span> <span class="n">movie_idx</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="n">num_movies</span><span class="p">)]</span>
+
+        <span class="c1"># Remove all movies that were previously fetched but are no longer part of the list.</span>
+        <span class="n">movie_list_file</span><span class="o">.</span><span class="n">movies_by_uid</span> <span class="o">=</span> <span class="p">{</span><span class="n">uid</span><span class="p">:</span> <span class="n">m</span> <span class="k">for</span> <span class="n">uid</span><span class="p">,</span> <span class="n">m</span> <span class="ow">in</span> <span class="n">movie_list_file</span><span class="o">.</span><span class="n">movies_by_uid</span><span class="o">.</span><span class="n">items</span><span class="p">()</span> <span class="k">if</span> <span class="n">uid</span> <span class="ow">in</span> <span class="n">movie_uids_in_list</span><span class="p">}</span>
+
+        <span class="c1"># Now add all the movies that aren&#39;t already in the list from a previous fetch.</span>
+        <span class="c1"># Use this progressbar utility to print our progress to stdout as we go.</span>
+        <span class="k">with</span> <span class="n">utils</span><span class="o">.</span><span class="n">ProgressBar</span><span class="p">([</span><span class="n">uid</span> <span class="k">for</span> <span class="n">uid</span> <span class="ow">in</span> <span class="n">movie_uids_in_list</span> <span class="k">if</span> <span class="n">uid</span> <span class="ow">not</span> <span class="ow">in</span> <span class="n">movie_list_file</span><span class="o">.</span><span class="n">movies_by_uid</span><span class="p">],</span>
+                <span class="n">desc</span><span class="o">=</span><span class="s1">&#39;Downloading&#39;</span><span class="p">,</span>
+                <span class="n">keyfunc</span><span class="o">=</span><span class="k">lambda</span> <span class="n">uid</span><span class="p">:</span> <span class="n">uid</span><span class="p">)</span> <span class="k">as</span> <span class="n">bar</span><span class="p">:</span>
+            <span class="k">for</span> <span class="n">uid</span> <span class="ow">in</span> <span class="n">bar</span><span class="p">:</span>
+                <span class="k">try</span><span class="p">:</span>
+                    <span class="bp">self</span><span class="o">.</span><span class="n">fetch_movie</span><span class="p">(</span><span class="n">movie_list_file</span><span class="p">,</span> <span class="n">uid</span><span class="p">)</span>
+                <span class="k">except</span> <span class="ne">KeyboardInterrupt</span> <span class="k">as</span> <span class="n">e</span><span class="p">:</span>
+                    <span class="k">raise</span> <span class="n">FetchInterrupt</span><span class="p">(</span><span class="s2">&quot;User interrupted fetch in the middle.&quot;</span><span class="p">)</span> <span class="kn">from</span> <span class="nn">e</span>
+
+                <span class="c1"># Save what we&#39;ve fetched so far, so that if we experience a crash, data won&#39;t have to be re-fetched.</span>
+                <span class="bp">self</span><span class="o">.</span><span class="n">_checkpoint</span><span class="p">(</span><span class="n">movie_list_file</span><span class="p">)</span>
+
+    <span class="k">def</span> <span class="nf">fetch_movie</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">movie_list_file</span><span class="p">:</span> <span class="n">MovieListFile</span><span class="p">,</span> <span class="n">uid</span><span class="p">:</span> <span class="nb">str</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+        <span class="n">TITLES_POOL</span> <span class="o">=</span> <span class="p">[</span><span class="s1">&#39;Star Wars&#39;</span><span class="p">,</span> <span class="s1">&#39;Inside Llewyn Davis&#39;</span><span class="p">,</span> <span class="s1">&#39;Lord of the Rings&#39;</span><span class="p">,</span> <span class="s1">&#39;Interstellar&#39;</span><span class="p">]</span>
+        <span class="n">CHARACTERS_POOL</span> <span class="o">=</span> <span class="p">[</span><span class="s1">&#39;Darth Vader&#39;</span><span class="p">,</span> <span class="s1">&#39;Llewyn Davis&#39;</span><span class="p">,</span> <span class="s1">&#39;Galadriel&#39;</span><span class="p">,</span> <span class="s1">&#39;Murph&#39;</span><span class="p">]</span>
+
+        <span class="c1"># We&#39;ll seed the movie&#39;s RNG using its uid.</span>
+        <span class="n">rng</span> <span class="o">=</span> <span class="n">random</span><span class="o">.</span><span class="n">Random</span><span class="p">(</span><span class="n">uid</span><span class="p">)</span>
+
+        <span class="c1"># It&#39;s important to acquire all the movie&#39;s data and populate the file with the people from the movie before we add the movie itself.</span>
+        <span class="c1"># So we&#39;ll start by building the movie&#39;s crews.</span>
+        <span class="n">crew</span> <span class="o">=</span> <span class="p">{}</span>
+
+        <span class="k">for</span> <span class="n">crew_type</span> <span class="ow">in</span> <span class="n">CrewType</span><span class="o">.</span><span class="n">iterate_except_any</span><span class="p">():</span>
+            <span class="c1"># Randomly decide how many people are in this movie in this crew type.</span>
+            <span class="c1"># For their uid, we&#39;ll add some random base so that you don&#39;t get the same people everywhere.</span>
+            <span class="n">num_crewmembers</span> <span class="o">=</span> <span class="n">rng</span><span class="o">.</span><span class="n">randint</span><span class="p">(</span><span class="mi">0</span><span class="p">,</span> <span class="mi">10</span><span class="p">)</span>
+            <span class="n">base_uid</span> <span class="o">=</span> <span class="n">rng</span><span class="o">.</span><span class="n">randint</span><span class="p">(</span><span class="mi">0</span><span class="p">,</span> <span class="mi">1000</span><span class="p">)</span>
+
+            <span class="n">crew</span><span class="p">[</span><span class="n">crew_type</span><span class="p">]</span> <span class="o">=</span> <span class="n">MLFCrew</span><span class="p">(</span>
+                <span class="n">crew_type</span> <span class="o">=</span> <span class="n">crew_type</span><span class="p">,</span>
+                <span class="n">roles_by_uid</span> <span class="o">=</span> <span class="p">{},</span>
+            <span class="p">)</span>
+
+            <span class="k">for</span> <span class="n">person_idx</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="n">num_crewmembers</span><span class="p">):</span>
+                <span class="c1"># Make up some uid for this fake person.</span>
+                <span class="n">person_uid</span> <span class="o">=</span> <span class="nb">str</span><span class="p">(</span><span class="n">base_uid</span> <span class="o">+</span> <span class="n">person_idx</span><span class="p">)</span>
+
+                <span class="c1"># For actors, we&#39;ll make up a bit of data about which character they played.</span>
+                <span class="c1"># We can always fill in None, or leave lists empty if we&#39;re missing that data.</span>
+                <span class="n">crew</span><span class="p">[</span><span class="n">crew_type</span><span class="p">]</span><span class="o">.</span><span class="n">roles_by_uid</span><span class="p">[</span><span class="n">person_uid</span><span class="p">]</span> <span class="o">=</span> <span class="n">MLFRole</span><span class="p">(</span>
+                    <span class="n">person_uid</span>          <span class="o">=</span> <span class="n">person_uid</span><span class="p">,</span>
+                    <span class="n">is_star</span>             <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+                    <span class="n">episodes_num</span>        <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+                    <span class="n">oscar_noms</span>          <span class="o">=</span> <span class="p">[],</span>
+                    <span class="n">oscar_wins</span>          <span class="o">=</span> <span class="p">[],</span>
+                    <span class="n">characters</span>          <span class="o">=</span> <span class="p">[</span><span class="n">rng</span><span class="o">.</span><span class="n">choice</span><span class="p">(</span><span class="n">CHARACTERS_POOL</span><span class="p">)]</span> <span class="k">if</span> <span class="n">crew_type</span> <span class="o">==</span> <span class="n">CrewType</span><span class="o">.</span><span class="n">CAST</span> <span class="k">else</span> <span class="p">[],</span>
+                    <span class="n">jobs</span>                <span class="o">=</span> <span class="p">[],</span>
+                <span class="p">)</span>
+
+                <span class="c1"># This person may have already been fetched because of their presence in another movie or another crew type in this movie.</span>
+                <span class="k">if</span> <span class="n">person_uid</span> <span class="ow">not</span> <span class="ow">in</span> <span class="n">movie_list_file</span><span class="o">.</span><span class="n">people_by_uid</span><span class="p">:</span>
+                    <span class="bp">self</span><span class="o">.</span><span class="n">fetch_person</span><span class="p">(</span><span class="n">movie_list_file</span><span class="p">,</span> <span class="n">person_uid</span><span class="p">)</span>
+
+        <span class="c1"># We support some data about movies which is actually specifically about that movie&#39;s presence in this list.</span>
+        <span class="c1"># For example, the date it was added to this list.</span>
+        <span class="n">per_src_data</span> <span class="o">=</span> <span class="n">MLFMoviePerSourceData</span><span class="p">(</span>
+            <span class="n">canon_listdef</span>       <span class="o">=</span> <span class="n">movie_list_file</span><span class="o">.</span><span class="n">abstract_listdef</span><span class="p">,</span>
+            <span class="n">list_index</span>          <span class="o">=</span> <span class="nb">int</span><span class="p">(</span><span class="n">uid</span><span class="p">),</span>
+            <span class="n">list_note</span>           <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+            <span class="n">listing_date</span>        <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+        <span class="p">)</span>
+
+        <span class="n">mlf_movie</span> <span class="o">=</span> <span class="n">MLFMovie</span><span class="p">(</span>
+            <span class="n">uid</span>                 <span class="o">=</span> <span class="n">uid</span><span class="p">,</span>
+            <span class="n">per_src_data</span>        <span class="o">=</span> <span class="p">[</span><span class="n">per_src_data</span><span class="p">],</span>
+            <span class="n">media_type</span>          <span class="o">=</span> <span class="s1">&#39;movie&#39;</span><span class="p">,</span>
+            <span class="n">title</span>               <span class="o">=</span> <span class="n">rng</span><span class="o">.</span><span class="n">choice</span><span class="p">(</span><span class="n">TITLES_POOL</span><span class="p">),</span>
+            <span class="n">original_title</span>      <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+            <span class="n">tagline</span>             <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+            <span class="n">synopsis</span>            <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+            <span class="n">url</span>                 <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+            <span class="n">runtime_minutes</span>     <span class="o">=</span> <span class="mi">145</span><span class="p">,</span>
+            <span class="n">metascore_votes</span>     <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+            <span class="n">metascore</span>           <span class="o">=</span> <span class="mi">82</span><span class="p">,</span>
+            <span class="n">votes</span>               <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+            <span class="n">rating</span>              <span class="o">=</span> <span class="mf">8.5</span><span class="p">,</span>
+            <span class="n">my_rating</span>           <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+            <span class="n">likes</span>               <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+            <span class="n">is_liked</span>            <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+            <span class="n">budget_usd</span>          <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+            <span class="n">revenue_usd</span>         <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+            <span class="n">content_rating</span>      <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+            <span class="n">release_date</span>        <span class="o">=</span> <span class="n">datetime</span><span class="o">.</span><span class="n">date</span><span class="p">(</span><span class="mi">1969</span><span class="p">,</span> <span class="mi">7</span><span class="p">,</span> <span class="mi">4</span><span class="p">),</span>
+            <span class="n">watch_dates</span>         <span class="o">=</span> <span class="p">[],</span>
+            <span class="n">my_notes</span>            <span class="o">=</span> <span class="p">[],</span>
+            <span class="n">episodes_num</span>        <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+            <span class="n">seasons_num</span>         <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+            <span class="n">end_date</span>            <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+            <span class="n">genres</span>              <span class="o">=</span> <span class="p">[</span><span class="s1">&#39;Drama&#39;</span><span class="p">,</span> <span class="s1">&#39;Western&#39;</span><span class="p">],</span>
+            <span class="n">studios</span>             <span class="o">=</span> <span class="p">[</span><span class="s1">&#39;Paramount Pictures&#39;</span><span class="p">,</span> <span class="s1">&#39;Rafran Cinematografica&#39;</span><span class="p">,</span> <span class="s1">&#39;San Marco&#39;</span><span class="p">],</span>
+            <span class="n">languages</span>           <span class="o">=</span> <span class="p">[</span><span class="s1">&#39;English&#39;</span><span class="p">,</span> <span class="s1">&#39;Italian&#39;</span><span class="p">,</span> <span class="s1">&#39;Spanish&#39;</span><span class="p">],</span>
+            <span class="n">countries</span>           <span class="o">=</span> <span class="p">[</span><span class="s1">&#39;Italy&#39;</span><span class="p">,</span> <span class="s1">&#39;United States&#39;</span><span class="p">],</span>
+            <span class="n">crew</span>                <span class="o">=</span> <span class="n">crew</span><span class="p">,</span>
+        <span class="p">)</span>
+
+        <span class="c1"># Add the movie to the file only at the end, after all its data is acquired, and all the people from the movie are already added!</span>
+        <span class="n">movie_list_file</span><span class="o">.</span><span class="n">movies_by_uid</span><span class="p">[</span><span class="n">mlf_movie</span><span class="o">.</span><span class="n">uid</span><span class="p">]</span> <span class="o">=</span> <span class="n">mlf_movie</span>
+
+    <span class="k">def</span> <span class="nf">fetch_person</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">movie_list_file</span><span class="p">:</span> <span class="n">MovieListFile</span><span class="p">,</span> <span class="n">uid</span><span class="p">:</span> <span class="nb">str</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+        <span class="n">NAMES_POOL</span> <span class="o">=</span> <span class="p">[</span><span class="s1">&#39;James&#39;</span><span class="p">,</span> <span class="s1">&#39;Spencer&#39;</span><span class="p">,</span> <span class="s1">&#39;Hayden&#39;</span><span class="p">,</span> <span class="s1">&#39;David&#39;</span><span class="p">,</span> <span class="s1">&#39;Oscar&#39;</span><span class="p">,</span> <span class="s1">&#39;Cate&#39;</span><span class="p">,</span> <span class="s1">&#39;Jessica&#39;</span><span class="p">,</span> <span class="s1">&#39;Ellen&#39;</span><span class="p">]</span>
+        <span class="n">GENDERS_POOL</span> <span class="o">=</span> <span class="p">[</span><span class="s1">&#39;male&#39;</span><span class="p">,</span> <span class="s1">&#39;female&#39;</span><span class="p">,</span> <span class="s1">&#39;nonbinary&#39;</span><span class="p">]</span>
+
+        <span class="c1"># We&#39;ll seed the person&#39;s RNG using its uid.</span>
+        <span class="n">rng</span> <span class="o">=</span> <span class="n">random</span><span class="o">.</span><span class="n">Random</span><span class="p">(</span><span class="n">uid</span><span class="p">)</span>
+
+        <span class="n">movie_list_file</span><span class="o">.</span><span class="n">people_by_uid</span><span class="p">[</span><span class="n">uid</span><span class="p">]</span> <span class="o">=</span> <span class="n">MLFPerson</span><span class="p">(</span>
+            <span class="n">uid</span>                 <span class="o">=</span> <span class="n">uid</span><span class="p">,</span>
+            <span class="n">name</span>                <span class="o">=</span> <span class="n">rng</span><span class="o">.</span><span class="n">choice</span><span class="p">(</span><span class="n">NAMES_POOL</span><span class="p">),</span>
+            <span class="n">gender</span>              <span class="o">=</span> <span class="n">rng</span><span class="o">.</span><span class="n">choice</span><span class="p">(</span><span class="n">GENDERS_POOL</span><span class="p">),</span>
+            <span class="n">birthday</span>            <span class="o">=</span> <span class="n">datetime</span><span class="o">.</span><span class="n">date</span><span class="p">(</span><span class="mi">1989</span><span class="p">,</span> <span class="mi">2</span><span class="p">,</span> <span class="mi">24</span><span class="p">),</span>
+            <span class="n">deathday</span>            <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+            <span class="n">death_reason</span>        <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+            <span class="n">height_cm</span>           <span class="o">=</span> <span class="mf">174.0</span><span class="p">,</span>
+            <span class="n">countries</span>           <span class="o">=</span> <span class="p">[</span><span class="s1">&#39;England&#39;</span><span class="p">],</span>
+        <span class="p">)</span>
+</pre></div>
+</div>
+</section>
 </section>
 
 

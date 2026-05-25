@@ -1,0 +1,229 @@
+
+
+<!DOCTYPE html>
+<html class="writer-html5" lang="en" data-content_root="./">
+<head>
+  <meta charset="utf-8" /><meta name="viewport" content="width=device-width, initial-scale=1" />
+
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Introduction &mdash; FilmFlam 2026.5.25.dev1779735591 documentation</title>
+      <link rel="stylesheet" type="text/css" href="_static/pygments.css?v=80d5e7a1" />
+      <link rel="stylesheet" type="text/css" href="_static/css/theme.css?v=9edc463e" />
+
+  
+      <script src="_static/jquery.js?v=5d32c60e"></script>
+      <script src="_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
+      <script src="_static/documentation_options.js?v=9950e6dc"></script>
+      <script src="_static/doctools.js?v=fd6eb6e6"></script>
+      <script src="_static/sphinx_highlight.js?v=6ffebe34"></script>
+    <script src="_static/js/theme.js"></script>
+    <link rel="index" title="Index" href="genindex.html" />
+    <link rel="search" title="Search" href="search.html" />
+    <link rel="next" title="Findables" href="findables.html" />
+    <link rel="prev" title="FilmFlam 2026.5.25.dev1779735591 documentation" href="index.html" /> 
+</head>
+
+<body class="wy-body-for-nav"> 
+  <div class="wy-grid-for-nav">
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search" >
+
+          
+          
+          <a href="index.html" class="icon icon-home">
+            FilmFlam
+          </a>
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" aria-label="Search docs" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+        </div><div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
+              <p class="caption" role="heading"><span class="caption-text">Getting started</span></p>
+<ul class="current">
+<li class="toctree-l1 current"><a class="current reference internal" href="#">Introduction</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="#features">Features</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#installation">Installation</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#basic-usage">Basic usage</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#what-s-next">What’s next</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#supported-platforms">Supported platforms</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#getting-help">Getting help</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#disclaimer">Disclaimer</a></li>
+</ul>
+</li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">Basic concepts</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="findables.html">Findables</a></li>
+<li class="toctree-l1"><a class="reference internal" href="attributes.html">Attributes</a></li>
+<li class="toctree-l1"><a class="reference internal" href="filters.html">Filters</a></li>
+<li class="toctree-l1"><a class="reference internal" href="predicates.html">Predicates</a></li>
+<li class="toctree-l1"><a class="reference internal" href="lists.html">Lists</a></li>
+<li class="toctree-l1"><a class="reference internal" href="fetchers.html">Fetchers</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">Advanced</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="cli/cli.html">Commandline</a></li>
+<li class="toctree-l1"><a class="reference internal" href="api/api.html">API</a></li>
+<li class="toctree-l1"><a class="reference internal" href="extending.html">Extending Flam</a></li>
+</ul>
+
+        </div>
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap"><nav class="wy-nav-top" aria-label="Mobile navigation menu" >
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="index.html">FilmFlam</a>
+      </nav>
+
+      <div class="wy-nav-content">
+        <div class="rst-content">
+          <div role="navigation" aria-label="Page navigation">
+  <ul class="wy-breadcrumbs">
+      <li><a href="index.html" class="icon icon-home" aria-label="Home"></a></li>
+      <li class="breadcrumb-item active">Introduction</li>
+      <li class="wy-breadcrumbs-aside">
+            <a href="_sources/introduction.rst.txt" rel="nofollow"> View page source</a>
+      </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+             
+  <section id="introduction">
+<h1>Introduction<a class="headerlink" href="#introduction" title="Link to this heading"></a></h1>
+<p>FilmFlam (or just “flam”) is a commandline tool and API for extracting insights from your movie lists.</p>
+<p>From the commandline, flam enables you to quickly answer questions like “where have I seen this actor?”, or “which director have I seen the most movies from?”, and so much more.</p>
+<p>For more powerful uses, you can <code class="docutils literal notranslate"><span class="pre">import</span> <span class="pre">flam</span></code> and use the underlying API to access all the data about the movies and people in your movie lists.</p>
+<img alt="_images/find_movies.gif" src="_images/find_movies.gif" />
+<img alt="_images/find_tarantino.gif" src="_images/find_tarantino.gif" />
+<section id="features">
+<h2>Features<a class="headerlink" href="#features" title="Link to this heading"></a></h2>
+<ul class="simple">
+<li><p>Get <strong>information</strong> about all the movies in your movie list, or about the people in those movies</p></li>
+<li><p><strong>Filter</strong> those movies or people to find something specific</p></li>
+<li><p><strong>Sort</strong> everything and everyone and discover standouts</p></li>
+<li><p><strong>Extend</strong> flam to support custom movie databases, custom filters, and custom attributes</p></li>
+<li><p>All in a short and quick commandline</p></li>
+<li><p>All in a python API for using from a script</p></li>
+</ul>
+</section>
+<section id="installation">
+<h2>Installation<a class="headerlink" href="#installation" title="Link to this heading"></a></h2>
+<p>Simply:</p>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>pip<span class="w"> </span>install<span class="w"> </span>film-flam
+</pre></div>
+</div>
+<p>And you should be good to go!</p>
+</section>
+<section id="basic-usage">
+<h2>Basic usage<a class="headerlink" href="#basic-usage" title="Link to this heading"></a></h2>
+<div class="admonition warning">
+<p class="admonition-title">Warning</p>
+<p>This tutorial assumes your list is on <strong>IMDb</strong> and is <strong>public</strong>.
+If that is not the case, read the <a class="reference internal" href="fetchers.html#list-of-builtin-fetchers"><span class="std std-ref">full list of supported fetchers</span></a> and pick the one that’s right for you.</p>
+</div>
+<p>The first thing you need to do is <strong>let flam know which movie list you want to use</strong>. For IMDb lists, it’s easy to find the list ID from the URL on the list page:</p>
+<img alt="_images/imdb_url.PNG" src="_images/imdb_url.PNG" />
+<p>So in this case the list ID is 083886771. Let’s configure it:</p>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>flam<span class="w"> </span>config<span class="w"> </span>list<span class="w"> </span>watched<span class="w"> </span>imdb-listid<span class="o">=</span><span class="m">083886771</span>
+</pre></div>
+</div>
+<p>Now flam will know this list by the name “watched”, and it knows that this list can be downloaded using the “fetcher” imdb-listid.</p>
+<div class="admonition tip">
+<p class="admonition-title">Tip</p>
+<p><a class="reference internal" href="fetchers.html#fetchers"><span class="std std-ref">Fetchers</span></a> tell flam how to download a list - different fetchers may download from different sites (IMDb, Letterboxd, etc.),
+or in different ways (the official IMDb API, or some unofficial one, etc.).</p>
+</div>
+<p>Next, assuming your list is configured, we can <strong>fetch all its data</strong>. Run:</p>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>flam<span class="w"> </span>fetch<span class="w"> </span>watched
+</pre></div>
+</div>
+<p>This will automatically open your browser and click some buttons to export the IMDb list to CSV, so don’t be alarmed by that.
+Fetching can be quick or it may take several hours, depending on the size of your list. It’s safe to interrupt this in the middle. Once it’s done, you’re ready to <strong>start using flam!</strong></p>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span><span class="c1"># Browse all movies in the list.</span>
+flam<span class="w"> </span>find<span class="w"> </span>movies<span class="w"> </span>watched
+
+<span class="c1"># Find directors named &quot;tarantino&quot; including all their movies from the list.</span>
+flam<span class="w"> </span>find<span class="w"> </span>director<span class="w"> </span>watched<span class="w"> </span>-name<span class="w"> </span>tarantino
+
+<span class="c1"># Find people from any movie in the list whose average rating across those movies is at least 8.</span>
+flam<span class="w"> </span>find<span class="w"> </span>people<span class="w"> </span>watched<span class="w"> </span>-avg-rating<span class="w"> </span>+8
+
+<span class="c1"># Find the tallest actors in the list.</span>
+flam<span class="w"> </span>find<span class="w"> </span>--sort<span class="w"> </span>height<span class="w"> </span>cast-people<span class="w"> </span>watched
+
+<span class="c1"># Find movies both written and directed by women.</span>
+flam<span class="w"> </span>find<span class="w"> </span>movies<span class="w"> </span>watched<span class="w"> </span>-every-role<span class="w"> </span><span class="o">[</span><span class="w"> </span>writer<span class="w"> </span>director<span class="w"> </span><span class="o">]</span><span class="w"> </span>-gender<span class="w"> </span>female
+
+<span class="c1"># Find people who share your birthday :)</span>
+flam<span class="w"> </span>find<span class="w"> </span>people<span class="w"> </span>watched<span class="w"> </span>-birth-month-day<span class="w"> </span><span class="m">07</span>-25
+</pre></div>
+</div>
+</section>
+<section id="what-s-next">
+<h2>What’s next<a class="headerlink" href="#what-s-next" title="Link to this heading"></a></h2>
+<ul class="simple">
+<li><p>Configure your lists with <code class="docutils literal notranslate"><span class="pre">--default-fetch=yes</span></code>, <code class="docutils literal notranslate"><span class="pre">--default-find=yes</span></code> so you don’t need to type their name every time</p></li>
+<li><p>Re-run <code class="docutils literal notranslate"><span class="pre">flam</span> <span class="pre">fetch</span></code> whenever you want to refresh the database after adding movies to your list</p></li>
+<li><p>Flam supports finding <strong>movies</strong>, <strong>people</strong>, or <strong>roles</strong>. Read all about <a class="reference internal" href="findables.html#findables"><span class="std std-ref">what they mean</span></a></p></li>
+<li><p>Read about <a class="reference internal" href="filters.html#filters"><span class="std std-ref">filters</span></a> for composing more complex queries. Any random question you can think of, flam can answer!*</p></li>
+<li><p>Read more about <a class="reference internal" href="lists.html#lists"><span class="std std-ref">how to configure lists</span></a> and configure flam with all your movie lists!</p></li>
+<li><p>Read the <a class="reference internal" href="api/api.html#api"><span class="std std-ref">API docs</span></a> if you’re interested in using flam from a python script</p></li>
+</ul>
+<p>* Probably :)</p>
+</section>
+<section id="supported-platforms">
+<h2>Supported platforms<a class="headerlink" href="#supported-platforms" title="Link to this heading"></a></h2>
+<p>Flam is cross-platform and should work on Windows, Linux, and macOS. However, it’s only well-tested on Windows, since that is what I am using. Please let me know if you encounter issues.</p>
+<p>Flam is better if you have <code class="docutils literal notranslate"><span class="pre">less</span></code> installed. If you’re on Windows, it’s recommended to install it. One easy way is to just install <a class="reference external" href="https://git-scm.com/">git</a>.</p>
+</section>
+<section id="getting-help">
+<h2>Getting help<a class="headerlink" href="#getting-help" title="Link to this heading"></a></h2>
+<p>If you encounter issues or have questions, you can <a class="reference external" href="https://github.com/Verpous/film-flam/issues">open a GitHub issue</a>, or email me at <a class="reference external" href="mailto:ederyaviv2&#37;&#52;&#48;gmail&#46;com">ederyaviv2<span>&#64;</span>gmail<span>&#46;</span>com</a>.</p>
+</section>
+<section id="disclaimer">
+<h2>Disclaimer<a class="headerlink" href="#disclaimer" title="Link to this heading"></a></h2>
+<p>This program uses TMDB and the TMDB APIs but is not endorsed, certified, or otherwise approved by TMDB.</p>
+<p>Likewise for IMDb, Letterboxd, or what-have-you.</p>
+<img alt="_images/tmdb.svg" src="_images/tmdb.svg" />
+</section>
+</section>
+
+
+           </div>
+          </div>
+          <footer><div class="rst-footer-buttons" role="navigation" aria-label="Footer">
+        <a href="index.html" class="btn btn-neutral float-left" title="FilmFlam 2026.5.25.dev1779735591 documentation" accesskey="p" rel="prev"><span class="fa fa-arrow-circle-left" aria-hidden="true"></span> Previous</a>
+        <a href="findables.html" class="btn btn-neutral float-right" title="Findables" accesskey="n" rel="next">Next <span class="fa fa-arrow-circle-right" aria-hidden="true"></span></a>
+    </div>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>&#169; Copyright 2026, Aviv Edery.</p>
+  </div>
+
+  Built with <a href="https://www.sphinx-doc.org/">Sphinx</a> using a
+    <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a>
+    provided by <a href="https://readthedocs.org">Read the Docs</a>.
+   
+
+</footer>
+        </div>
+      </div>
+    </section>
+  </div>
+  <script>
+      jQuery(function () {
+          SphinxRtdTheme.Navigation.enable(true);
+      });
+  </script> 
+
+</body>
+</html>

@@ -6,14 +6,14 @@
   <meta charset="utf-8" /><meta name="viewport" content="width=device-width, initial-scale=1" />
 
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>flam &mdash; FilmFlam 2026.4.28.dev1777409694 documentation</title>
+  <title>flam &mdash; FilmFlam 2026.5.25.dev1779735591 documentation</title>
       <link rel="stylesheet" type="text/css" href="../_static/pygments.css?v=80d5e7a1" />
       <link rel="stylesheet" type="text/css" href="../_static/css/theme.css?v=9edc463e" />
 
   
       <script src="../_static/jquery.js?v=5d32c60e"></script>
       <script src="../_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
-      <script src="../_static/documentation_options.js?v=11d3572e"></script>
+      <script src="../_static/documentation_options.js?v=9950e6dc"></script>
       <script src="../_static/doctools.js?v=fd6eb6e6"></script>
       <script src="../_static/sphinx_highlight.js?v=6ffebe34"></script>
     <script src="../_static/js/theme.js"></script>
@@ -42,17 +42,22 @@
   </form>
 </div>
         </div><div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
-              <p class="caption" role="heading"><span class="caption-text">Contents:</span></p>
-<ul class="current">
-<li class="toctree-l1"><a class="reference internal" href="../install.html">Setup</a></li>
-<li class="toctree-l1"><a class="reference internal" href="../examples.html">Examples</a></li>
+              <p class="caption" role="heading"><span class="caption-text">Getting started</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../introduction.html">Introduction</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">Basic concepts</span></p>
+<ul>
 <li class="toctree-l1"><a class="reference internal" href="../findables.html">Findables</a></li>
-<li class="toctree-l1"><a class="reference internal" href="../listdefs.html">Listdefs</a></li>
-<li class="toctree-l1"><a class="reference internal" href="../filters.html">Filters</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../attributes.html">Attributes</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../filters.html">Filters</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../predicates.html">Predicates</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../lists.html">Lists</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../fetchers.html">Fetchers</a></li>
-<li class="toctree-l1"><a class="reference internal" href="../cli/cli.html">Commandline tool</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">Advanced</span></p>
+<ul class="current">
+<li class="toctree-l1"><a class="reference internal" href="../cli/cli.html">Commandline</a></li>
 <li class="toctree-l1 current"><a class="reference internal" href="api.html">API</a><ul class="current">
 <li class="toctree-l2 current"><a class="current reference internal" href="#">flam</a><ul>
 <li class="toctree-l3"><a class="reference internal" href="#flam._ctx.DEFAULT_FLAM_DIR"><code class="docutils literal notranslate"><span class="pre">DEFAULT_FLAM_DIR</span></code></a></li>
@@ -69,18 +74,23 @@
 <li class="toctree-l4"><a class="reference internal" href="#flam._ctx.FlamContext.fetchers"><code class="docutils literal notranslate"><span class="pre">FlamContext.fetchers</span></code></a></li>
 <li class="toctree-l4"><a class="reference internal" href="#flam._ctx.FlamContext.predicates"><code class="docutils literal notranslate"><span class="pre">FlamContext.predicates</span></code></a></li>
 <li class="toctree-l4"><a class="reference internal" href="#flam._ctx.FlamContext.attributes"><code class="docutils literal notranslate"><span class="pre">FlamContext.attributes</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="#flam._ctx.FlamContext.parse_listdef"><code class="docutils literal notranslate"><span class="pre">FlamContext.parse_listdef()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="#flam._ctx.FlamContext.register"><code class="docutils literal notranslate"><span class="pre">FlamContext.register()</span></code></a></li>
 <li class="toctree-l4"><a class="reference internal" href="#flam._ctx.FlamContext.get_movie_list"><code class="docutils literal notranslate"><span class="pre">FlamContext.get_movie_list()</span></code></a></li>
 <li class="toctree-l4"><a class="reference internal" href="#flam._ctx.FlamContext.configure"><code class="docutils literal notranslate"><span class="pre">FlamContext.configure()</span></code></a></li>
 <li class="toctree-l4"><a class="reference internal" href="#flam._ctx.FlamContext.fetch"><code class="docutils literal notranslate"><span class="pre">FlamContext.fetch()</span></code></a></li>
 <li class="toctree-l4"><a class="reference internal" href="#flam._ctx.FlamContext.precache"><code class="docutils literal notranslate"><span class="pre">FlamContext.precache()</span></code></a></li>
 <li class="toctree-l4"><a class="reference internal" href="#flam._ctx.FlamContext.compile_filter"><code class="docutils literal notranslate"><span class="pre">FlamContext.compile_filter()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="#flam._ctx.FlamContext.compile_movies_filter"><code class="docutils literal notranslate"><span class="pre">FlamContext.compile_movies_filter()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="#flam._ctx.FlamContext.compile_people_filter"><code class="docutils literal notranslate"><span class="pre">FlamContext.compile_people_filter()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="#flam._ctx.FlamContext.compile_roles_filter"><code class="docutils literal notranslate"><span class="pre">FlamContext.compile_roles_filter()</span></code></a></li>
 </ul>
 </li>
 <li class="toctree-l3"><a class="reference internal" href="#flam._ctx.RegistriesOf"><code class="docutils literal notranslate"><span class="pre">RegistriesOf</span></code></a><ul>
 <li class="toctree-l4"><a class="reference internal" href="#flam._ctx.RegistriesOf.__getitem__"><code class="docutils literal notranslate"><span class="pre">RegistriesOf.__getitem__()</span></code></a></li>
 <li class="toctree-l4"><a class="reference internal" href="#flam._ctx.RegistriesOf.__contains__"><code class="docutils literal notranslate"><span class="pre">RegistriesOf.__contains__()</span></code></a></li>
 <li class="toctree-l4"><a class="reference internal" href="#flam._ctx.RegistriesOf.__iter__"><code class="docutils literal notranslate"><span class="pre">RegistriesOf.__iter__()</span></code></a></li>
-<li class="toctree-l4"><a class="reference internal" href="#flam._ctx.RegistriesOf.register"><code class="docutils literal notranslate"><span class="pre">RegistriesOf.register()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="#flam._ctx.RegistriesOf.raw_iterate"><code class="docutils literal notranslate"><span class="pre">RegistriesOf.raw_iterate()</span></code></a></li>
 <li class="toctree-l4"><a class="reference internal" href="#flam._ctx.RegistriesOf.get"><code class="docutils literal notranslate"><span class="pre">RegistriesOf.get()</span></code></a></li>
 </ul>
 </li>
@@ -92,14 +102,20 @@
 </ul>
 </li>
 <li class="toctree-l3"><a class="reference internal" href="#flam._ml.CrewType"><code class="docutils literal notranslate"><span class="pre">CrewType</span></code></a><ul>
-<li class="toctree-l4"><a class="reference internal" href="#flam._ml.CrewType.CAST"><code class="docutils literal notranslate"><span class="pre">CrewType.CAST</span></code></a></li>
-<li class="toctree-l4"><a class="reference internal" href="#flam._ml.CrewType.STUNTCAST"><code class="docutils literal notranslate"><span class="pre">CrewType.STUNTCAST</span></code></a></li>
 <li class="toctree-l4"><a class="reference internal" href="#flam._ml.CrewType.DIRECTOR"><code class="docutils literal notranslate"><span class="pre">CrewType.DIRECTOR</span></code></a></li>
-<li class="toctree-l4"><a class="reference internal" href="#flam._ml.CrewType.WRITER"><code class="docutils literal notranslate"><span class="pre">CrewType.WRITER</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="#flam._ml.CrewType.ASSISTANT_DIRECTOR"><code class="docutils literal notranslate"><span class="pre">CrewType.ASSISTANT_DIRECTOR</span></code></a></li>
 <li class="toctree-l4"><a class="reference internal" href="#flam._ml.CrewType.PRODUCER"><code class="docutils literal notranslate"><span class="pre">CrewType.PRODUCER</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="#flam._ml.CrewType.EXECUTIVE_PRODUCER"><code class="docutils literal notranslate"><span class="pre">CrewType.EXECUTIVE_PRODUCER</span></code></a></li>
 <li class="toctree-l4"><a class="reference internal" href="#flam._ml.CrewType.COMPOSER"><code class="docutils literal notranslate"><span class="pre">CrewType.COMPOSER</span></code></a></li>
 <li class="toctree-l4"><a class="reference internal" href="#flam._ml.CrewType.CINEMATOGRAPHER"><code class="docutils literal notranslate"><span class="pre">CrewType.CINEMATOGRAPHER</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="#flam._ml.CrewType.CHOREOGRAPHER"><code class="docutils literal notranslate"><span class="pre">CrewType.CHOREOGRAPHER</span></code></a></li>
 <li class="toctree-l4"><a class="reference internal" href="#flam._ml.CrewType.EDITOR"><code class="docutils literal notranslate"><span class="pre">CrewType.EDITOR</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="#flam._ml.CrewType.WRITER"><code class="docutils literal notranslate"><span class="pre">CrewType.WRITER</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="#flam._ml.CrewType.CAST"><code class="docutils literal notranslate"><span class="pre">CrewType.CAST</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="#flam._ml.CrewType.STUNTCAST"><code class="docutils literal notranslate"><span class="pre">CrewType.STUNTCAST</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="#flam._ml.CrewType.CASTING_DIRECTOR"><code class="docutils literal notranslate"><span class="pre">CrewType.CASTING_DIRECTOR</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="#flam._ml.CrewType.ART_DIRECTOR"><code class="docutils literal notranslate"><span class="pre">CrewType.ART_DIRECTOR</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="#flam._ml.CrewType.ADDITIONAL"><code class="docutils literal notranslate"><span class="pre">CrewType.ADDITIONAL</span></code></a></li>
 <li class="toctree-l4"><a class="reference internal" href="#flam._ml.CrewType.ANY"><code class="docutils literal notranslate"><span class="pre">CrewType.ANY</span></code></a></li>
 <li class="toctree-l4"><a class="reference internal" href="#flam._ml.CrewType.default_group_mode"><code class="docutils literal notranslate"><span class="pre">CrewType.default_group_mode</span></code></a></li>
 <li class="toctree-l4"><a class="reference internal" href="#flam._ml.CrewType.iterate_except_any"><code class="docutils literal notranslate"><span class="pre">CrewType.iterate_except_any()</span></code></a></li>
@@ -221,7 +237,6 @@
 <li class="toctree-l3"><a class="reference internal" href="#flam._ldef.CanonListdef"><code class="docutils literal notranslate"><span class="pre">CanonListdef</span></code></a><ul>
 <li class="toctree-l4"><a class="reference internal" href="#flam._ldef.CanonListdef.list_type"><code class="docutils literal notranslate"><span class="pre">CanonListdef.list_type</span></code></a></li>
 <li class="toctree-l4"><a class="reference internal" href="#flam._ldef.CanonListdef.address"><code class="docutils literal notranslate"><span class="pre">CanonListdef.address</span></code></a></li>
-<li class="toctree-l4"><a class="reference internal" href="#flam._ldef.CanonListdef.parse"><code class="docutils literal notranslate"><span class="pre">CanonListdef.parse()</span></code></a></li>
 <li class="toctree-l4"><a class="reference internal" href="#flam._ldef.CanonListdef.is_special"><code class="docutils literal notranslate"><span class="pre">CanonListdef.is_special</span></code></a></li>
 <li class="toctree-l4"><a class="reference internal" href="#flam._ldef.CanonListdef.is_abstract"><code class="docutils literal notranslate"><span class="pre">CanonListdef.is_abstract</span></code></a></li>
 <li class="toctree-l4"><a class="reference internal" href="#flam._ldef.CanonListdef.is_concrete"><code class="docutils literal notranslate"><span class="pre">CanonListdef.is_concrete</span></code></a></li>
@@ -239,16 +254,18 @@
 <li class="toctree-l3"><a class="reference internal" href="#flam._reg.register"><code class="docutils literal notranslate"><span class="pre">register()</span></code></a></li>
 <li class="toctree-l3"><a class="reference internal" href="#flam._reg.compose_qualified_attr_or_pred_name"><code class="docutils literal notranslate"><span class="pre">compose_qualified_attr_or_pred_name()</span></code></a></li>
 <li class="toctree-l3"><a class="reference internal" href="#flam._reg.decompose_qualified_attr_or_pred_name"><code class="docutils literal notranslate"><span class="pre">decompose_qualified_attr_or_pred_name()</span></code></a></li>
-<li class="toctree-l3"><a class="reference internal" href="#flam._fetch.ListFetcher"><code class="docutils literal notranslate"><span class="pre">ListFetcher</span></code></a><ul>
-<li class="toctree-l4"><a class="reference internal" href="#flam._fetch.ListFetcher.qualified_name"><code class="docutils literal notranslate"><span class="pre">ListFetcher.qualified_name</span></code></a></li>
-<li class="toctree-l4"><a class="reference internal" href="#flam._fetch.ListFetcher.qualified_aliases"><code class="docutils literal notranslate"><span class="pre">ListFetcher.qualified_aliases</span></code></a></li>
-<li class="toctree-l4"><a class="reference internal" href="#flam._fetch.ListFetcher.uid_family"><code class="docutils literal notranslate"><span class="pre">ListFetcher.uid_family</span></code></a></li>
-<li class="toctree-l4"><a class="reference internal" href="#flam._fetch.ListFetcher.__init_subclass__"><code class="docutils literal notranslate"><span class="pre">ListFetcher.__init_subclass__()</span></code></a></li>
-<li class="toctree-l4"><a class="reference internal" href="#flam._fetch.ListFetcher.__init__"><code class="docutils literal notranslate"><span class="pre">ListFetcher.__init__()</span></code></a></li>
-<li class="toctree-l4"><a class="reference internal" href="#flam._fetch.ListFetcher.concrete_listdef"><code class="docutils literal notranslate"><span class="pre">ListFetcher.concrete_listdef</span></code></a></li>
-<li class="toctree-l4"><a class="reference internal" href="#flam._fetch.ListFetcher.abstract_listdef"><code class="docutils literal notranslate"><span class="pre">ListFetcher.abstract_listdef</span></code></a></li>
-<li class="toctree-l4"><a class="reference internal" href="#flam._fetch.ListFetcher._fetch_into_file"><code class="docutils literal notranslate"><span class="pre">ListFetcher._fetch_into_file()</span></code></a></li>
-<li class="toctree-l4"><a class="reference internal" href="#flam._fetch.ListFetcher._checkpoint"><code class="docutils literal notranslate"><span class="pre">ListFetcher._checkpoint()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="#flam._fetch.Fetcher"><code class="docutils literal notranslate"><span class="pre">Fetcher</span></code></a><ul>
+<li class="toctree-l4"><a class="reference internal" href="#flam._fetch.Fetcher.qualified_name"><code class="docutils literal notranslate"><span class="pre">Fetcher.qualified_name</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="#flam._fetch.Fetcher.qualified_aliases"><code class="docutils literal notranslate"><span class="pre">Fetcher.qualified_aliases</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="#flam._fetch.Fetcher.uid_family"><code class="docutils literal notranslate"><span class="pre">Fetcher.uid_family</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="#flam._fetch.Fetcher.__init_subclass__"><code class="docutils literal notranslate"><span class="pre">Fetcher.__init_subclass__()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="#flam._fetch.Fetcher.__init__"><code class="docutils literal notranslate"><span class="pre">Fetcher.__init__()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="#flam._fetch.Fetcher.concrete_listdef"><code class="docutils literal notranslate"><span class="pre">Fetcher.concrete_listdef</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="#flam._fetch.Fetcher.abstract_listdef"><code class="docutils literal notranslate"><span class="pre">Fetcher.abstract_listdef</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="#flam._fetch.Fetcher.get_param"><code class="docutils literal notranslate"><span class="pre">Fetcher.get_param()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="#flam._fetch.Fetcher.has_param"><code class="docutils literal notranslate"><span class="pre">Fetcher.has_param()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="#flam._fetch.Fetcher._fetch_into_file"><code class="docutils literal notranslate"><span class="pre">Fetcher._fetch_into_file()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="#flam._fetch.Fetcher._checkpoint"><code class="docutils literal notranslate"><span class="pre">Fetcher._checkpoint()</span></code></a></li>
 </ul>
 </li>
 <li class="toctree-l3"><a class="reference internal" href="#flam._filter.EatParams"><code class="docutils literal notranslate"><span class="pre">EatParams</span></code></a><ul>
@@ -270,7 +287,7 @@
 <li class="toctree-l4"><a class="reference internal" href="#flam._filter.FilterMember.eat_type"><code class="docutils literal notranslate"><span class="pre">FilterMember.eat_type()</span></code></a></li>
 <li class="toctree-l4"><a class="reference internal" href="#flam._filter.FilterMember.eat_movie_list"><code class="docutils literal notranslate"><span class="pre">FilterMember.eat_movie_list()</span></code></a></li>
 <li class="toctree-l4"><a class="reference internal" href="#flam._filter.FilterMember.eat_ct_gm"><code class="docutils literal notranslate"><span class="pre">FilterMember.eat_ct_gm()</span></code></a></li>
-<li class="toctree-l4"><a class="reference internal" href="#flam._filter.FilterMember.eat_single"><code class="docutils literal notranslate"><span class="pre">FilterMember.eat_single()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="#flam._filter.FilterMember.eat_subfilter"><code class="docutils literal notranslate"><span class="pre">FilterMember.eat_subfilter()</span></code></a></li>
 </ul>
 </li>
 <li class="toctree-l3"><a class="reference internal" href="#flam._filter.Filter"><code class="docutils literal notranslate"><span class="pre">Filter</span></code></a><ul>
@@ -328,6 +345,7 @@
 <li class="toctree-l4"><a class="reference internal" href="#flam._cfg.SimpleList.concrete_listdef"><code class="docutils literal notranslate"><span class="pre">SimpleList.concrete_listdef</span></code></a></li>
 <li class="toctree-l4"><a class="reference internal" href="#flam._cfg.SimpleList.is_default_fetch"><code class="docutils literal notranslate"><span class="pre">SimpleList.is_default_fetch</span></code></a></li>
 <li class="toctree-l4"><a class="reference internal" href="#flam._cfg.SimpleList.is_default_find"><code class="docutils literal notranslate"><span class="pre">SimpleList.is_default_find</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="#flam._cfg.SimpleList.fetch_params"><code class="docutils literal notranslate"><span class="pre">SimpleList.fetch_params</span></code></a></li>
 <li class="toctree-l4"><a class="reference internal" href="#flam._cfg.SimpleList.abstract_listdef"><code class="docutils literal notranslate"><span class="pre">SimpleList.abstract_listdef</span></code></a></li>
 </ul>
 </li>
@@ -361,8 +379,12 @@
 </li>
 <li class="toctree-l3"><a class="reference internal" href="#flam._mlf.MLFRole"><code class="docutils literal notranslate"><span class="pre">MLFRole</span></code></a><ul>
 <li class="toctree-l4"><a class="reference internal" href="#flam._mlf.MLFRole.person_uid"><code class="docutils literal notranslate"><span class="pre">MLFRole.person_uid</span></code></a></li>
-<li class="toctree-l4"><a class="reference internal" href="#flam._mlf.MLFRole.characters"><code class="docutils literal notranslate"><span class="pre">MLFRole.characters</span></code></a></li>
 <li class="toctree-l4"><a class="reference internal" href="#flam._mlf.MLFRole.is_star"><code class="docutils literal notranslate"><span class="pre">MLFRole.is_star</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="#flam._mlf.MLFRole.episodes_num"><code class="docutils literal notranslate"><span class="pre">MLFRole.episodes_num</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="#flam._mlf.MLFRole.oscar_noms"><code class="docutils literal notranslate"><span class="pre">MLFRole.oscar_noms</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="#flam._mlf.MLFRole.oscar_wins"><code class="docutils literal notranslate"><span class="pre">MLFRole.oscar_wins</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="#flam._mlf.MLFRole.characters"><code class="docutils literal notranslate"><span class="pre">MLFRole.characters</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="#flam._mlf.MLFRole.jobs"><code class="docutils literal notranslate"><span class="pre">MLFRole.jobs</span></code></a></li>
 </ul>
 </li>
 <li class="toctree-l3"><a class="reference internal" href="#flam._mlf.MLFCrew"><code class="docutils literal notranslate"><span class="pre">MLFCrew</span></code></a><ul>
@@ -376,30 +398,46 @@
 <li class="toctree-l4"><a class="reference internal" href="#flam._mlf.MLFPerson.gender"><code class="docutils literal notranslate"><span class="pre">MLFPerson.gender</span></code></a></li>
 <li class="toctree-l4"><a class="reference internal" href="#flam._mlf.MLFPerson.height_cm"><code class="docutils literal notranslate"><span class="pre">MLFPerson.height_cm</span></code></a></li>
 <li class="toctree-l4"><a class="reference internal" href="#flam._mlf.MLFPerson.birthday"><code class="docutils literal notranslate"><span class="pre">MLFPerson.birthday</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="#flam._mlf.MLFPerson.deathday"><code class="docutils literal notranslate"><span class="pre">MLFPerson.deathday</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="#flam._mlf.MLFPerson.death_reason"><code class="docutils literal notranslate"><span class="pre">MLFPerson.death_reason</span></code></a></li>
 <li class="toctree-l4"><a class="reference internal" href="#flam._mlf.MLFPerson.countries"><code class="docutils literal notranslate"><span class="pre">MLFPerson.countries</span></code></a></li>
 </ul>
 </li>
 <li class="toctree-l3"><a class="reference internal" href="#flam._mlf.MLFMoviePerSourceData"><code class="docutils literal notranslate"><span class="pre">MLFMoviePerSourceData</span></code></a><ul>
 <li class="toctree-l4"><a class="reference internal" href="#flam._mlf.MLFMoviePerSourceData.canon_listdef"><code class="docutils literal notranslate"><span class="pre">MLFMoviePerSourceData.canon_listdef</span></code></a></li>
 <li class="toctree-l4"><a class="reference internal" href="#flam._mlf.MLFMoviePerSourceData.list_index"><code class="docutils literal notranslate"><span class="pre">MLFMoviePerSourceData.list_index</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="#flam._mlf.MLFMoviePerSourceData.list_note"><code class="docutils literal notranslate"><span class="pre">MLFMoviePerSourceData.list_note</span></code></a></li>
 <li class="toctree-l4"><a class="reference internal" href="#flam._mlf.MLFMoviePerSourceData.listing_date"><code class="docutils literal notranslate"><span class="pre">MLFMoviePerSourceData.listing_date</span></code></a></li>
-<li class="toctree-l4"><a class="reference internal" href="#flam._mlf.MLFMoviePerSourceData.note"><code class="docutils literal notranslate"><span class="pre">MLFMoviePerSourceData.note</span></code></a></li>
 </ul>
 </li>
 <li class="toctree-l3"><a class="reference internal" href="#flam._mlf.MLFMovie"><code class="docutils literal notranslate"><span class="pre">MLFMovie</span></code></a><ul>
 <li class="toctree-l4"><a class="reference internal" href="#flam._mlf.MLFMovie.uid"><code class="docutils literal notranslate"><span class="pre">MLFMovie.uid</span></code></a></li>
 <li class="toctree-l4"><a class="reference internal" href="#flam._mlf.MLFMovie.per_src_data"><code class="docutils literal notranslate"><span class="pre">MLFMovie.per_src_data</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="#flam._mlf.MLFMovie.media_type"><code class="docutils literal notranslate"><span class="pre">MLFMovie.media_type</span></code></a></li>
 <li class="toctree-l4"><a class="reference internal" href="#flam._mlf.MLFMovie.title"><code class="docutils literal notranslate"><span class="pre">MLFMovie.title</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="#flam._mlf.MLFMovie.original_title"><code class="docutils literal notranslate"><span class="pre">MLFMovie.original_title</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="#flam._mlf.MLFMovie.tagline"><code class="docutils literal notranslate"><span class="pre">MLFMovie.tagline</span></code></a></li>
 <li class="toctree-l4"><a class="reference internal" href="#flam._mlf.MLFMovie.synopsis"><code class="docutils literal notranslate"><span class="pre">MLFMovie.synopsis</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="#flam._mlf.MLFMovie.url"><code class="docutils literal notranslate"><span class="pre">MLFMovie.url</span></code></a></li>
 <li class="toctree-l4"><a class="reference internal" href="#flam._mlf.MLFMovie.runtime_minutes"><code class="docutils literal notranslate"><span class="pre">MLFMovie.runtime_minutes</span></code></a></li>
 <li class="toctree-l4"><a class="reference internal" href="#flam._mlf.MLFMovie.metascore_votes"><code class="docutils literal notranslate"><span class="pre">MLFMovie.metascore_votes</span></code></a></li>
 <li class="toctree-l4"><a class="reference internal" href="#flam._mlf.MLFMovie.metascore"><code class="docutils literal notranslate"><span class="pre">MLFMovie.metascore</span></code></a></li>
 <li class="toctree-l4"><a class="reference internal" href="#flam._mlf.MLFMovie.votes"><code class="docutils literal notranslate"><span class="pre">MLFMovie.votes</span></code></a></li>
 <li class="toctree-l4"><a class="reference internal" href="#flam._mlf.MLFMovie.rating"><code class="docutils literal notranslate"><span class="pre">MLFMovie.rating</span></code></a></li>
 <li class="toctree-l4"><a class="reference internal" href="#flam._mlf.MLFMovie.my_rating"><code class="docutils literal notranslate"><span class="pre">MLFMovie.my_rating</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="#flam._mlf.MLFMovie.likes"><code class="docutils literal notranslate"><span class="pre">MLFMovie.likes</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="#flam._mlf.MLFMovie.is_liked"><code class="docutils literal notranslate"><span class="pre">MLFMovie.is_liked</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="#flam._mlf.MLFMovie.budget_usd"><code class="docutils literal notranslate"><span class="pre">MLFMovie.budget_usd</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="#flam._mlf.MLFMovie.revenue_usd"><code class="docutils literal notranslate"><span class="pre">MLFMovie.revenue_usd</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="#flam._mlf.MLFMovie.content_rating"><code class="docutils literal notranslate"><span class="pre">MLFMovie.content_rating</span></code></a></li>
 <li class="toctree-l4"><a class="reference internal" href="#flam._mlf.MLFMovie.release_date"><code class="docutils literal notranslate"><span class="pre">MLFMovie.release_date</span></code></a></li>
 <li class="toctree-l4"><a class="reference internal" href="#flam._mlf.MLFMovie.watch_dates"><code class="docutils literal notranslate"><span class="pre">MLFMovie.watch_dates</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="#flam._mlf.MLFMovie.my_notes"><code class="docutils literal notranslate"><span class="pre">MLFMovie.my_notes</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="#flam._mlf.MLFMovie.episodes_num"><code class="docutils literal notranslate"><span class="pre">MLFMovie.episodes_num</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="#flam._mlf.MLFMovie.seasons_num"><code class="docutils literal notranslate"><span class="pre">MLFMovie.seasons_num</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="#flam._mlf.MLFMovie.end_date"><code class="docutils literal notranslate"><span class="pre">MLFMovie.end_date</span></code></a></li>
 <li class="toctree-l4"><a class="reference internal" href="#flam._mlf.MLFMovie.genres"><code class="docutils literal notranslate"><span class="pre">MLFMovie.genres</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="#flam._mlf.MLFMovie.studios"><code class="docutils literal notranslate"><span class="pre">MLFMovie.studios</span></code></a></li>
 <li class="toctree-l4"><a class="reference internal" href="#flam._mlf.MLFMovie.languages"><code class="docutils literal notranslate"><span class="pre">MLFMovie.languages</span></code></a></li>
 <li class="toctree-l4"><a class="reference internal" href="#flam._mlf.MLFMovie.countries"><code class="docutils literal notranslate"><span class="pre">MLFMovie.countries</span></code></a></li>
 <li class="toctree-l4"><a class="reference internal" href="#flam._mlf.MLFMovie.crew"><code class="docutils literal notranslate"><span class="pre">MLFMovie.crew</span></code></a></li>
@@ -410,17 +448,19 @@
 <li class="toctree-l4"><a class="reference internal" href="#flam._mlf.MovieListFile.abstract_listdef"><code class="docutils literal notranslate"><span class="pre">MovieListFile.abstract_listdef</span></code></a></li>
 <li class="toctree-l4"><a class="reference internal" href="#flam._mlf.MovieListFile.uid_family"><code class="docutils literal notranslate"><span class="pre">MovieListFile.uid_family</span></code></a></li>
 <li class="toctree-l4"><a class="reference internal" href="#flam._mlf.MovieListFile.movies_by_uid"><code class="docutils literal notranslate"><span class="pre">MovieListFile.movies_by_uid</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="#flam._mlf.MovieListFile.expiration_date"><code class="docutils literal notranslate"><span class="pre">MovieListFile.expiration_date</span></code></a></li>
 <li class="toctree-l4"><a class="reference internal" href="#flam._mlf.MovieListFile.people_by_uid"><code class="docutils literal notranslate"><span class="pre">MovieListFile.people_by_uid</span></code></a></li>
 </ul>
 </li>
 <li class="toctree-l3"><a class="reference internal" href="#flam._dbg.FlamEnv"><code class="docutils literal notranslate"><span class="pre">FlamEnv</span></code></a><ul>
 <li class="toctree-l4"><a class="reference internal" href="#flam._dbg.FlamEnv.DEBUG"><code class="docutils literal notranslate"><span class="pre">FlamEnv.DEBUG</span></code></a></li>
 <li class="toctree-l4"><a class="reference internal" href="#flam._dbg.FlamEnv.LOG2CONSOLE"><code class="docutils literal notranslate"><span class="pre">FlamEnv.LOG2CONSOLE</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="#flam._dbg.FlamEnv.LOGLEVEL"><code class="docutils literal notranslate"><span class="pre">FlamEnv.LOGLEVEL</span></code></a></li>
 <li class="toctree-l4"><a class="reference internal" href="#flam._dbg.FlamEnv.CTX_DIR"><code class="docutils literal notranslate"><span class="pre">FlamEnv.CTX_DIR</span></code></a></li>
 <li class="toctree-l4"><a class="reference internal" href="#flam._dbg.FlamEnv.DOWNLOADS_DIR"><code class="docutils literal notranslate"><span class="pre">FlamEnv.DOWNLOADS_DIR</span></code></a></li>
 <li class="toctree-l4"><a class="reference internal" href="#flam._dbg.FlamEnv.BROWSER"><code class="docutils literal notranslate"><span class="pre">FlamEnv.BROWSER</span></code></a></li>
 <li class="toctree-l4"><a class="reference internal" href="#flam._dbg.FlamEnv.BROWSER_PROFILE"><code class="docutils literal notranslate"><span class="pre">FlamEnv.BROWSER_PROFILE</span></code></a></li>
-<li class="toctree-l4"><a class="reference internal" href="#flam._dbg.FlamEnv.LOGLEVEL"><code class="docutils literal notranslate"><span class="pre">FlamEnv.LOGLEVEL</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="#flam._dbg.FlamEnv.TMDB_API_TOKEN"><code class="docutils literal notranslate"><span class="pre">FlamEnv.TMDB_API_TOKEN</span></code></a></li>
 <li class="toctree-l4"><a class="reference internal" href="#flam._dbg.FlamEnv.is_defined"><code class="docutils literal notranslate"><span class="pre">FlamEnv.is_defined</span></code></a></li>
 <li class="toctree-l4"><a class="reference internal" href="#flam._dbg.FlamEnv.is_truthy"><code class="docutils literal notranslate"><span class="pre">FlamEnv.is_truthy</span></code></a></li>
 <li class="toctree-l4"><a class="reference internal" href="#flam._dbg.FlamEnv.get_or_default"><code class="docutils literal notranslate"><span class="pre">FlamEnv.get_or_default()</span></code></a></li>
@@ -479,7 +519,7 @@
 <dl class="py data" id="module-flam._ctx">
 <dt class="sig sig-object py" id="flam._ctx.DEFAULT_FLAM_DIR">
 <span class="sig-name descname"><span class="pre">DEFAULT_FLAM_DIR</span></span><a class="headerlink" href="#flam._ctx.DEFAULT_FLAM_DIR" title="Link to this definition"></a></dt>
-<dd><p>The default path where flam stores all your movie lists and configuration. Equal to the environment variable FLAM_DIR, or ~/.film_flam if it’s not defined.</p>
+<dd><p>The default path where flam stores all your movie lists and configuration. Equal to the environment variable <strong>FLAM_DIR</strong>, or ~/.film_flam if it’s not defined.</p>
 <dl class="field-list simple">
 </dl>
 </dd></dl>
@@ -519,8 +559,15 @@
 <dd><dl class="field-list simple">
 <dt class="field-odd">Parameters<span class="colon">:</span></dt>
 <dd class="field-odd"><ul class="simple">
-<li><p><strong>flam_dir</strong> (<em>None</em><em> | </em><em>str</em>) – the directory where all movie lists and configuration should be stored. If this is None, flam will work in “volatile mode” - everything you fetch or configure will be lost when the context dies.</p></li>
-<li><p><strong>import_extensions</strong> (<em>bool</em>) – import all configured extensions, and subscribe to globally registered extensions. Only enable this if you trust the extensions in the configuration.</p></li>
+<li><p><strong>flam_dir</strong> (<em>None</em><em> | </em><em>str</em>) – <p>the directory where all movie lists and configuration should be stored.</p>
+<p>If this is <code class="docutils literal notranslate"><span class="pre">None</span></code>, flam will work in “volatile mode” - everything you fetch or configure will be lost when the context dies.</p>
+</p></li>
+<li><p><strong>import_extensions</strong> (<em>bool</em>) – <p>import all configured extensions, and subscribe to globally registered extensions.</p>
+<div class="admonition warning">
+<p class="admonition-title">Warning</p>
+<p>Only enable this if you trust the extensions in the configuration.</p>
+</div>
+</p></li>
 </ul>
 </dd>
 <dt class="field-even">Return type<span class="colon">:</span></dt>
@@ -538,12 +585,12 @@
 <dl class="py property">
 <dt class="sig sig-object py" id="flam._ctx.FlamContext.cfg_readonly">
 <span class="property"><span class="k"><span class="pre">property</span></span><span class="w"> </span></span><span class="sig-name descname"><span class="pre">cfg_readonly</span></span><span class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><a class="reference internal" href="#flam._cfg.Configuration" title="flam._cfg.Configuration"><span class="pre">Configuration</span></a></span><a class="headerlink" href="#flam._ctx.FlamContext.cfg_readonly" title="Link to this definition"></a></dt>
-<dd><p>All configuration settings. This object can technically be modified to but that would lead to disaster. If you want to modify the configuration, use <a class="reference internal" href="#flam._ctx.FlamContext.configure" title="flam._ctx.FlamContext.configure"><code class="xref py py-meth docutils literal notranslate"><span class="pre">configure()</span></code></a>.</p>
+<dd><p>All configuration settings. This object can technically be modified, but that would lead to disaster. If you want to modify the configuration, use <a class="reference internal" href="#flam._ctx.FlamContext.configure" title="flam._ctx.FlamContext.configure"><code class="xref py py-meth docutils literal notranslate"><span class="pre">configure()</span></code></a>.</p>
 </dd></dl>
 
 <dl class="py property">
 <dt class="sig sig-object py" id="flam._ctx.FlamContext.fetchers">
-<span class="property"><span class="k"><span class="pre">property</span></span><span class="w"> </span></span><span class="sig-name descname"><span class="pre">fetchers</span></span><span class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><a class="reference internal" href="#flam._ctx.RegistriesOf" title="flam._ctx.RegistriesOf"><span class="pre">RegistriesOf</span></a><span class="p"><span class="pre">[</span></span><span class="pre">type</span><span class="p"><span class="pre">[</span></span><a class="reference internal" href="#flam._fetch.ListFetcher" title="flam._fetch.ListFetcher"><span class="pre">ListFetcher</span></a><span class="p"><span class="pre">]</span></span><span class="p"><span class="pre">]</span></span></span><a class="headerlink" href="#flam._ctx.FlamContext.fetchers" title="Link to this definition"></a></dt>
+<span class="property"><span class="k"><span class="pre">property</span></span><span class="w"> </span></span><span class="sig-name descname"><span class="pre">fetchers</span></span><span class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><a class="reference internal" href="#flam._ctx.RegistriesOf" title="flam._ctx.RegistriesOf"><span class="pre">RegistriesOf</span></a><span class="p"><span class="pre">[</span></span><span class="pre">type</span><span class="p"><span class="pre">[</span></span><a class="reference internal" href="#flam._fetch.Fetcher" title="flam._fetch.Fetcher"><span class="pre">Fetcher</span></a><span class="p"><span class="pre">]</span></span><span class="p"><span class="pre">]</span></span></span><a class="headerlink" href="#flam._ctx.FlamContext.fetchers" title="Link to this definition"></a></dt>
 <dd><p>A registry object with all registered fetchers.</p>
 </dd></dl>
 
@@ -557,6 +604,42 @@
 <dt class="sig sig-object py" id="flam._ctx.FlamContext.attributes">
 <span class="property"><span class="k"><span class="pre">property</span></span><span class="w"> </span></span><span class="sig-name descname"><span class="pre">attributes</span></span><span class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><a class="reference internal" href="#flam._ctx.RegistriesOf" title="flam._ctx.RegistriesOf"><span class="pre">RegistriesOf</span></a><span class="p"><span class="pre">[</span></span><a class="reference internal" href="#flam._attr.Attribute" title="flam._attr.Attribute"><span class="pre">Attribute</span></a><span class="p"><span class="pre">]</span></span></span><a class="headerlink" href="#flam._ctx.FlamContext.attributes" title="Link to this definition"></a></dt>
 <dd><p>A registry object with all registered attributes.</p>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="flam._ctx.FlamContext.parse_listdef">
+<span class="sig-name descname"><span class="pre">parse_listdef</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">listdef</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">str</span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><a class="reference internal" href="#flam._ldef.CanonListdef" title="flam._ldef.CanonListdef"><span class="pre">CanonListdef</span></a></span></span><a class="headerlink" href="#flam._ctx.FlamContext.parse_listdef" title="Link to this definition"></a></dt>
+<dd><p>Parse a string representation of a <a class="reference internal" href="../lists.html#listdefs"><span class="std std-ref">listdef</span></a> and canonicalize it.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><p><strong>listdef</strong> (<em>str</em>) – <p>the listdef as a string. It can have a few forms:</p>
+<ul class="simple">
+<li><p><a class="reference internal" href="#flam._ldef.SpecialListType.ALL" title="flam._ldef.SpecialListType.ALL"><code class="xref py py-attr docutils literal notranslate"><span class="pre">ALL</span></code></a></p></li>
+<li><p><a class="reference internal" href="#flam._ldef.SpecialListType.DEFAULTS" title="flam._ldef.SpecialListType.DEFAULTS"><code class="xref py py-attr docutils literal notranslate"><span class="pre">DEFAULTS</span></code></a></p></li>
+<li><p>’&lt;name&gt;’ - where &lt;name&gt; is the name of a simple or composite list</p></li>
+<li><p>’&lt;list_type&gt;=&lt;address&gt;’ - where &lt;list_type&gt; is <a class="reference internal" href="#flam._ldef.SpecialListType.SIMPLE" title="flam._ldef.SpecialListType.SIMPLE"><code class="xref py py-attr docutils literal notranslate"><span class="pre">SIMPLE</span></code></a>, <a class="reference internal" href="#flam._ldef.SpecialListType.COMPOSITE" title="flam._ldef.SpecialListType.COMPOSITE"><code class="xref py py-attr docutils literal notranslate"><span class="pre">COMPOSITE</span></code></a>, or the name of a fetcher.</p></li>
+</ul>
+</p>
+</dd>
+<dt class="field-even">Return type<span class="colon">:</span></dt>
+<dd class="field-even"><p><a class="reference internal" href="#flam._ldef.CanonListdef" title="flam._ldef.CanonListdef"><em>CanonListdef</em></a></p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="flam._ctx.FlamContext.register">
+<span class="sig-name descname"><span class="pre">register</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">item</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">T</span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">T</span></span></span><a class="headerlink" href="#flam._ctx.FlamContext.register" title="Link to this definition"></a></dt>
+<dd><p>Register a context-level extension. Context extensions are only available from the specific context to which they were registered.</p>
+<p>You may register an item with the same name as that of a global extension or a builtin, and it will shadow them.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><p><strong>item</strong> (<em>T</em>) – the item to register.</p>
+</dd>
+<dt class="field-even">Return type<span class="colon">:</span></dt>
+<dd class="field-even"><p>T</p>
+</dd>
+</dl>
 </dd></dl>
 
 <dl class="py method">
@@ -580,7 +663,6 @@
 <dt class="sig sig-object py" id="flam._ctx.FlamContext.configure">
 <span class="sig-name descname"><span class="pre">configure</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">Iterator</span><span class="p"><span class="pre">[</span></span><a class="reference internal" href="#flam._cfg.Configuration" title="flam._cfg.Configuration"><span class="pre">Configuration</span></a><span class="p"><span class="pre">]</span></span></span></span><a class="headerlink" href="#flam._ctx.FlamContext.configure" title="Link to this definition"></a></dt>
 <dd><p>Returns the configuration settings inside a context where they may be modified. When the context exits, all changes are saved.</p>
-<p>Example:</p>
 <div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="k">with</span> <span class="n">ctx</span><span class="o">.</span><span class="n">configure</span><span class="p">()</span> <span class="k">as</span> <span class="n">cfg</span><span class="p">:</span>
     <span class="n">cfg</span><span class="o">.</span><span class="n">extensions</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="s1">&#39;my_extension.py&#39;</span><span class="p">)</span>
 </pre></div>
@@ -594,8 +676,9 @@
 
 <dl class="py method">
 <dt class="sig sig-object py" id="flam._ctx.FlamContext.fetch">
-<span class="sig-name descname"><span class="pre">fetch</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">listdefs</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">Iterable</span><span class="p"><span class="pre">[</span></span><span class="pre">str</span><span class="p"><span class="pre">]</span></span></span></em>, <em class="sig-param"><span class="n"><span class="pre">refetch_pattern</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">None</span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><span class="pre">str</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">quiet</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">bool</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">True</span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">None</span></span></span><a class="headerlink" href="#flam._ctx.FlamContext.fetch" title="Link to this definition"></a></dt>
-<dd><p>Fetch movie lists, i.e. download all their data from some external source and store it locally. Depending on the fetcher and the size of the list, this may run for a long time - even hours.</p>
+<span class="sig-name descname"><span class="pre">fetch</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">listdefs</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">Iterable</span><span class="p"><span class="pre">[</span></span><span class="pre">str</span><span class="p"><span class="pre">]</span></span></span></em>, <em class="sig-param"><span class="n"><span class="pre">refetch_pattern</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">None</span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><span class="pre">str</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">quiet</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">bool</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">True</span></span></em>, <em class="sig-param"><span class="o"><span class="pre">**</span></span><span class="n"><span class="pre">fetch_params</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">str</span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">None</span></span></span><a class="headerlink" href="#flam._ctx.FlamContext.fetch" title="Link to this definition"></a></dt>
+<dd><p>Fetch movie lists, i.e. download all their data from some external source and store it locally.
+Depending on the fetcher and the size of the list, this may run for a long time - even hours.</p>
 <dl class="field-list simple">
 <dt class="field-odd">Parameters<span class="colon">:</span></dt>
 <dd class="field-odd"><ul class="simple">
@@ -605,8 +688,10 @@
 <li><p>Supports <code class="docutils literal notranslate"><span class="pre">'*'</span></code> to fetch all configured lists</p></li>
 </ul>
 </p></li>
-<li><p><strong>refetch_pattern</strong> (<em>None</em><em> | </em><em>str</em>) – forces titles that match this regular expression (case-insensitive) to be refetched even if they are already locally stored. The expression only needs to match any part of the title, not the whole title. This feature is intended for redownloading shows after a new season has come out.</p></li>
+<li><p><strong>refetch_pattern</strong> (<em>None</em><em> | </em><em>str</em>) – forces titles that match this regular expression (case-insensitive) to be refetched even if they are already locally stored.
+The expression only needs to match any part of the title, not the whole title. Intended for redownloading shows after a new season has come out.</p></li>
 <li><p><strong>quiet</strong> (<em>bool</em>) – indicates if progress should be printed to stdout.</p></li>
+<li><p><strong>fetch_params</strong> (<em>str</em>)</p></li>
 </ul>
 </dd>
 <dt class="field-even">Return type<span class="colon">:</span></dt>
@@ -657,13 +742,55 @@
 </dl>
 </dd></dl>
 
+<dl class="py method">
+<dt class="sig sig-object py" id="flam._ctx.FlamContext.compile_movies_filter">
+<span class="sig-name descname"><span class="pre">compile_movies_filter</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">tokens</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">list</span><span class="p"><span class="pre">[</span></span><span class="pre">str</span><span class="p"><span class="pre">]</span></span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><a class="reference internal" href="#flam._filter.Filter" title="flam._filter.Filter"><span class="pre">Filter</span></a></span></span><a class="headerlink" href="#flam._ctx.FlamContext.compile_movies_filter" title="Link to this definition"></a></dt>
+<dd><p>Wrapper for <a class="reference internal" href="#flam._ctx.FlamContext.compile_filter" title="flam._ctx.FlamContext.compile_filter"><code class="xref py py-meth docutils literal notranslate"><span class="pre">compile_filter()</span></code></a> when the filter is for <a class="reference internal" href="#flam._ml.FindableType.MOVIES" title="flam._ml.FindableType.MOVIES"><code class="xref py py-attr docutils literal notranslate"><span class="pre">MOVIES</span></code></a>.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><p><strong>tokens</strong> (<em>list</em><em>[</em><em>str</em><em>]</em>)</p>
+</dd>
+<dt class="field-even">Return type<span class="colon">:</span></dt>
+<dd class="field-even"><p><a class="reference internal" href="#flam._filter.Filter" title="flam._filter.Filter"><em>Filter</em></a></p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="flam._ctx.FlamContext.compile_people_filter">
+<span class="sig-name descname"><span class="pre">compile_people_filter</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">tokens</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">list</span><span class="p"><span class="pre">[</span></span><span class="pre">str</span><span class="p"><span class="pre">]</span></span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><a class="reference internal" href="#flam._filter.Filter" title="flam._filter.Filter"><span class="pre">Filter</span></a></span></span><a class="headerlink" href="#flam._ctx.FlamContext.compile_people_filter" title="Link to this definition"></a></dt>
+<dd><p>Wrapper for <a class="reference internal" href="#flam._ctx.FlamContext.compile_filter" title="flam._ctx.FlamContext.compile_filter"><code class="xref py py-meth docutils literal notranslate"><span class="pre">compile_filter()</span></code></a> when the filter is for <a class="reference internal" href="#flam._ml.FindableType.PEOPLE" title="flam._ml.FindableType.PEOPLE"><code class="xref py py-attr docutils literal notranslate"><span class="pre">PEOPLE</span></code></a>.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><p><strong>tokens</strong> (<em>list</em><em>[</em><em>str</em><em>]</em>)</p>
+</dd>
+<dt class="field-even">Return type<span class="colon">:</span></dt>
+<dd class="field-even"><p><a class="reference internal" href="#flam._filter.Filter" title="flam._filter.Filter"><em>Filter</em></a></p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="flam._ctx.FlamContext.compile_roles_filter">
+<span class="sig-name descname"><span class="pre">compile_roles_filter</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">tokens</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">list</span><span class="p"><span class="pre">[</span></span><span class="pre">str</span><span class="p"><span class="pre">]</span></span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><a class="reference internal" href="#flam._filter.Filter" title="flam._filter.Filter"><span class="pre">Filter</span></a></span></span><a class="headerlink" href="#flam._ctx.FlamContext.compile_roles_filter" title="Link to this definition"></a></dt>
+<dd><p>Wrapper for <a class="reference internal" href="#flam._ctx.FlamContext.compile_filter" title="flam._ctx.FlamContext.compile_filter"><code class="xref py py-meth docutils literal notranslate"><span class="pre">compile_filter()</span></code></a> when the filter is for <a class="reference internal" href="#flam._ml.FindableType.ROLES" title="flam._ml.FindableType.ROLES"><code class="xref py py-attr docutils literal notranslate"><span class="pre">ROLES</span></code></a>.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><p><strong>tokens</strong> (<em>list</em><em>[</em><em>str</em><em>]</em>)</p>
+</dd>
+<dt class="field-even">Return type<span class="colon">:</span></dt>
+<dd class="field-even"><p><a class="reference internal" href="#flam._filter.Filter" title="flam._filter.Filter"><em>Filter</em></a></p>
+</dd>
+</dl>
+</dd></dl>
+
 </dd></dl>
 
 <dl class="py class">
 <dt class="sig sig-object py" id="flam._ctx.RegistriesOf">
 <span class="property"><span class="k"><span class="pre">class</span></span><span class="w"> </span></span><span class="sig-name descname"><span class="pre">RegistriesOf</span></span><a class="headerlink" href="#flam._ctx.RegistriesOf" title="Link to this definition"></a></dt>
 <dd><p>Object representing everything that is registered in a <a class="reference internal" href="#flam._ctx.FlamContext" title="flam._ctx.FlamContext"><code class="xref py py-class docutils literal notranslate"><span class="pre">FlamContext</span></code></a> of type <code class="docutils literal notranslate"><span class="pre">T</span></code>.
-<code class="docutils literal notranslate"><span class="pre">T</span></code> may be either <a class="reference internal" href="#flam._attr.Attribute" title="flam._attr.Attribute"><code class="xref py py-class docutils literal notranslate"><span class="pre">Attribute</span></code></a>, <a class="reference internal" href="#flam._filter.Predicate" title="flam._filter.Predicate"><code class="xref py py-class docutils literal notranslate"><span class="pre">type[Predicate]</span></code></a>, or <a class="reference internal" href="#flam._fetch.ListFetcher" title="flam._fetch.ListFetcher"><code class="xref py py-class docutils literal notranslate"><span class="pre">type[ListFetcher]</span></code></a>.</p>
+<code class="docutils literal notranslate"><span class="pre">T</span></code> may be either <a class="reference internal" href="#flam._attr.Attribute" title="flam._attr.Attribute"><code class="xref py py-class docutils literal notranslate"><span class="pre">Attribute</span></code></a>, <a class="reference internal" href="#flam._filter.Predicate" title="flam._filter.Predicate"><code class="xref py py-class docutils literal notranslate"><span class="pre">type[Predicate]</span></code></a>, or <a class="reference internal" href="#flam._fetch.Fetcher" title="flam._fetch.Fetcher"><code class="xref py py-class docutils literal notranslate"><span class="pre">type[Fetcher]</span></code></a>.</p>
 <dl class="py method">
 <dt class="sig sig-object py" id="flam._ctx.RegistriesOf.__getitem__">
 <span class="sig-name descname"><span class="pre">__getitem__</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">qualified_name</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">str</span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">T</span></span></span><a class="headerlink" href="#flam._ctx.RegistriesOf.__getitem__" title="Link to this definition"></a></dt>
@@ -694,44 +821,30 @@
 
 <dl class="py method">
 <dt class="sig sig-object py" id="flam._ctx.RegistriesOf.__iter__">
-<span class="sig-name descname"><span class="pre">__iter__</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">Iterator</span><span class="p"><span class="pre">[</span></span><span class="pre">str</span><span class="p"><span class="pre">]</span></span></span></span><a class="headerlink" href="#flam._ctx.RegistriesOf.__iter__" title="Link to this definition"></a></dt>
-<dd><p>Iterate over the names of all items in the registry. Some things to be careful of:</p>
-<blockquote>
-<div><ul>
-<li><p>Extensions may be registered with the same name as a builtin and shadow them. This will cause the same name to be returned multiple times.</p></li>
-<li><p>Because items can have aliases, this may return multiple names for the same item. If you want to iterate over every item exactly once, here is how to skip aliases:</p>
-<blockquote>
-<div><div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="k">for</span> <span class="n">attr_name</span> <span class="ow">in</span> <span class="n">ctx</span><span class="o">.</span><span class="n">attributes</span><span class="p">:</span>
-    <span class="n">attr</span> <span class="o">=</span> <span class="n">ctx</span><span class="o">.</span><span class="n">attributes</span><span class="p">[</span><span class="n">attr_name</span><span class="p">]</span>
-
-    <span class="c1"># Skip because it&#39;s an alias.</span>
-    <span class="k">if</span> <span class="n">attr_name</span> <span class="o">!=</span> <span class="n">attr</span><span class="o">.</span><span class="n">qualified_name</span><span class="p">:</span>
-        <span class="k">continue</span>
-
-    <span class="n">do_something</span><span class="p">(</span><span class="n">attr</span><span class="p">)</span>
-</pre></div>
-</div>
-</div></blockquote>
-</li>
-</ul>
-</div></blockquote>
+<span class="sig-name descname"><span class="pre">__iter__</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">Iterator</span><span class="p"><span class="pre">[</span></span><span class="pre">T</span><span class="p"><span class="pre">]</span></span></span></span><a class="headerlink" href="#flam._ctx.RegistriesOf.__iter__" title="Link to this definition"></a></dt>
+<dd><p>Iterate over all unique items in the registry.</p>
+<p>To iterate over the raw registry, see <a class="reference internal" href="#flam._ctx.RegistriesOf.raw_iterate" title="flam._ctx.RegistriesOf.raw_iterate"><code class="xref py py-meth docutils literal notranslate"><span class="pre">raw_iterate()</span></code></a>.</p>
 <dl class="field-list simple">
 <dt class="field-odd">Return type<span class="colon">:</span></dt>
-<dd class="field-odd"><p><em>Iterator</em>[str]</p>
+<dd class="field-odd"><p><em>Iterator</em>[T]</p>
 </dd>
 </dl>
 </dd></dl>
 
 <dl class="py method">
-<dt class="sig sig-object py" id="flam._ctx.RegistriesOf.register">
-<span class="sig-name descname"><span class="pre">register</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">item</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">T</span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">None</span></span></span><a class="headerlink" href="#flam._ctx.RegistriesOf.register" title="Link to this definition"></a></dt>
-<dd><p>Register a context-level extension. Context extensions are only available from the specific context to which they were registered.</p>
+<dt class="sig sig-object py" id="flam._ctx.RegistriesOf.raw_iterate">
+<span class="sig-name descname"><span class="pre">raw_iterate</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">Iterable</span><span class="p"><span class="pre">[</span></span><span class="pre">str</span><span class="p"><span class="pre">]</span></span></span></span><a class="headerlink" href="#flam._ctx.RegistriesOf.raw_iterate" title="Link to this definition"></a></dt>
+<dd><p>Iterate over the names of all items in the registry. Beware:</p>
+<blockquote>
+<div><ul class="simple">
+<li><p>Items support aliases so the same item may be returned multiple times, once for each name it is known by</p></li>
+<li><p>Items may be shadowed if a different item with the same name is registered in a higher-level registry, so this may return the same name twice</p></li>
+</ul>
+</div></blockquote>
+<p>To iterate over items without worrying about the above, use <a class="reference internal" href="#flam._ctx.RegistriesOf.__iter__" title="flam._ctx.RegistriesOf.__iter__"><code class="xref py py-meth docutils literal notranslate"><span class="pre">__iter__()</span></code></a>.</p>
 <dl class="field-list simple">
-<dt class="field-odd">Parameters<span class="colon">:</span></dt>
-<dd class="field-odd"><p><strong>item</strong> (<em>T</em>) – the item to register.</p>
-</dd>
-<dt class="field-even">Return type<span class="colon">:</span></dt>
-<dd class="field-even"><p>None</p>
+<dt class="field-odd">Return type<span class="colon">:</span></dt>
+<dd class="field-odd"><p><em>Iterable</em>[str]</p>
 </dd>
 </dl>
 </dd></dl>
@@ -739,13 +852,17 @@
 <dl class="py method">
 <dt class="sig sig-object py" id="flam._ctx.RegistriesOf.get">
 <span class="sig-name descname"><span class="pre">get</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">name</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">str</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">type_hint</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">None</span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><a class="reference internal" href="#flam._ml.FindableType" title="flam._ml.FindableType"><span class="pre">_ml.FindableType</span></a></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">None</span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">T</span></span></span><a class="headerlink" href="#flam._ctx.RegistriesOf.get" title="Link to this definition"></a></dt>
-<dd><p>Get a registered item, with support for non-qualified names.</p>
+<dd><p>Get a registered item, with optional support for non-qualified names.</p>
 <dl class="field-list simple">
 <dt class="field-odd">Parameters<span class="colon">:</span></dt>
 <dd class="field-odd"><ul class="simple">
-<li><p><strong>name</strong> (<em>str</em>) – the name of the item. If the name is not a qualified name, the type will be inferred.</p></li>
-<li><p><strong>type_hint</strong> (<em>None</em><em> | </em><a class="reference internal" href="#flam._ml.FindableType" title="flam._ml.FindableType"><em>_ml.FindableType</em></a>) – <p>a hint about which type to search the item in. Multiple items can have the same name but with a different type, so this helps resolve that ambiguity.</p>
-<p>Note that this does NOT guarantee that the returned item will have the same type! It only guarantees to prefer that type if it exists.</p>
+<li><p><strong>name</strong> (<em>str</em>) – the name of the item. It must be fully qualified unless <code class="docutils literal notranslate"><span class="pre">type_hint</span></code> is given.</p></li>
+<li><p><strong>type_hint</strong> (<em>None</em><em> | </em><a class="reference internal" href="#flam._ml.FindableType" title="flam._ml.FindableType"><em>_ml.FindableType</em></a>) – <p>attempt to infer the type from a non-qualified name, with a preference for this hinted type.
+Multiple items can have the same name but with a different type, so this helps resolve that ambiguity.</p>
+<div class="admonition warning">
+<p class="admonition-title">Warning</p>
+<p>This does NOT guarantee that the returned item will have the same type! It only guarantees to prefer that type if there’s ambiguity.</p>
+</div>
 </p></li>
 </ul>
 </dd>
@@ -798,28 +915,23 @@ For example, if grouping is enabled then the Coen brothers will be presented as 
 <span class="property"><span class="k"><span class="pre">class</span></span><span class="w"> </span></span><span class="sig-name descname"><span class="pre">CrewType</span></span><a class="headerlink" href="#flam._ml.CrewType" title="Link to this definition"></a></dt>
 <dd><p>A job on a movie set.</p>
 <dl class="py attribute">
-<dt class="sig sig-object py" id="flam._ml.CrewType.CAST">
-<span class="sig-name descname"><span class="pre">CAST</span></span><span class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">'cast'</span></span><a class="headerlink" href="#flam._ml.CrewType.CAST" title="Link to this definition"></a></dt>
-<dd></dd></dl>
-
-<dl class="py attribute">
-<dt class="sig sig-object py" id="flam._ml.CrewType.STUNTCAST">
-<span class="sig-name descname"><span class="pre">STUNTCAST</span></span><span class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">'stuntcast'</span></span><a class="headerlink" href="#flam._ml.CrewType.STUNTCAST" title="Link to this definition"></a></dt>
-<dd></dd></dl>
-
-<dl class="py attribute">
 <dt class="sig sig-object py" id="flam._ml.CrewType.DIRECTOR">
 <span class="sig-name descname"><span class="pre">DIRECTOR</span></span><span class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">'director'</span></span><a class="headerlink" href="#flam._ml.CrewType.DIRECTOR" title="Link to this definition"></a></dt>
 <dd></dd></dl>
 
 <dl class="py attribute">
-<dt class="sig sig-object py" id="flam._ml.CrewType.WRITER">
-<span class="sig-name descname"><span class="pre">WRITER</span></span><span class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">'writer'</span></span><a class="headerlink" href="#flam._ml.CrewType.WRITER" title="Link to this definition"></a></dt>
+<dt class="sig sig-object py" id="flam._ml.CrewType.ASSISTANT_DIRECTOR">
+<span class="sig-name descname"><span class="pre">ASSISTANT_DIRECTOR</span></span><span class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">'assistant-director'</span></span><a class="headerlink" href="#flam._ml.CrewType.ASSISTANT_DIRECTOR" title="Link to this definition"></a></dt>
 <dd></dd></dl>
 
 <dl class="py attribute">
 <dt class="sig sig-object py" id="flam._ml.CrewType.PRODUCER">
 <span class="sig-name descname"><span class="pre">PRODUCER</span></span><span class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">'producer'</span></span><a class="headerlink" href="#flam._ml.CrewType.PRODUCER" title="Link to this definition"></a></dt>
+<dd></dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="flam._ml.CrewType.EXECUTIVE_PRODUCER">
+<span class="sig-name descname"><span class="pre">EXECUTIVE_PRODUCER</span></span><span class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">'executive-producer'</span></span><a class="headerlink" href="#flam._ml.CrewType.EXECUTIVE_PRODUCER" title="Link to this definition"></a></dt>
 <dd></dd></dl>
 
 <dl class="py attribute">
@@ -833,9 +945,45 @@ For example, if grouping is enabled then the Coen brothers will be presented as 
 <dd></dd></dl>
 
 <dl class="py attribute">
+<dt class="sig sig-object py" id="flam._ml.CrewType.CHOREOGRAPHER">
+<span class="sig-name descname"><span class="pre">CHOREOGRAPHER</span></span><span class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">'choreographer'</span></span><a class="headerlink" href="#flam._ml.CrewType.CHOREOGRAPHER" title="Link to this definition"></a></dt>
+<dd></dd></dl>
+
+<dl class="py attribute">
 <dt class="sig sig-object py" id="flam._ml.CrewType.EDITOR">
 <span class="sig-name descname"><span class="pre">EDITOR</span></span><span class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">'editor'</span></span><a class="headerlink" href="#flam._ml.CrewType.EDITOR" title="Link to this definition"></a></dt>
 <dd></dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="flam._ml.CrewType.WRITER">
+<span class="sig-name descname"><span class="pre">WRITER</span></span><span class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">'writer'</span></span><a class="headerlink" href="#flam._ml.CrewType.WRITER" title="Link to this definition"></a></dt>
+<dd></dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="flam._ml.CrewType.CAST">
+<span class="sig-name descname"><span class="pre">CAST</span></span><span class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">'cast'</span></span><a class="headerlink" href="#flam._ml.CrewType.CAST" title="Link to this definition"></a></dt>
+<dd></dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="flam._ml.CrewType.STUNTCAST">
+<span class="sig-name descname"><span class="pre">STUNTCAST</span></span><span class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">'stuntcast'</span></span><a class="headerlink" href="#flam._ml.CrewType.STUNTCAST" title="Link to this definition"></a></dt>
+<dd></dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="flam._ml.CrewType.CASTING_DIRECTOR">
+<span class="sig-name descname"><span class="pre">CASTING_DIRECTOR</span></span><span class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">'casting-director'</span></span><a class="headerlink" href="#flam._ml.CrewType.CASTING_DIRECTOR" title="Link to this definition"></a></dt>
+<dd></dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="flam._ml.CrewType.ART_DIRECTOR">
+<span class="sig-name descname"><span class="pre">ART_DIRECTOR</span></span><span class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">'art-director'</span></span><a class="headerlink" href="#flam._ml.CrewType.ART_DIRECTOR" title="Link to this definition"></a></dt>
+<dd></dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="flam._ml.CrewType.ADDITIONAL">
+<span class="sig-name descname"><span class="pre">ADDITIONAL</span></span><span class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">'additional'</span></span><a class="headerlink" href="#flam._ml.CrewType.ADDITIONAL" title="Link to this definition"></a></dt>
+<dd><p>Catch-all category for crew types not listed above.</p>
+</dd></dl>
 
 <dl class="py attribute">
 <dt class="sig sig-object py" id="flam._ml.CrewType.ANY">
@@ -915,7 +1063,7 @@ For example, if grouping is enabled then the Coen brothers will be presented as 
 <span class="sig-name descname"><span class="pre">ROLES</span></span><span class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">'roles'</span></span><a class="headerlink" href="#flam._ml.FindableType.ROLES" title="Link to this definition"></a></dt>
 <dd><p>Each object represents an appearance of a person (or several grouped people) in a specific film in some specific capacity.
 Think “Cristoph Waltz as a castmember in Inglorious Basterds”.</p>
-<p>So when searching for roles, you will see an entry per person per movie.</p>
+<p>So when searching for roles, you will see an entry per people per movie.</p>
 </dd></dl>
 
 <dl class="py method">
@@ -1009,8 +1157,11 @@ Think “Cristoph Waltz as a castmember in Inglorious Basterds”.</p>
 <dt class="sig sig-object py" id="flam._ml.Movie.underlying_file_movie_readonly">
 <span class="property"><span class="k"><span class="pre">property</span></span><span class="w"> </span></span><span class="sig-name descname"><span class="pre">underlying_file_movie_readonly</span></span><span class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><a class="reference internal" href="#flam._mlf.MLFMovie" title="flam._mlf.MLFMovie"><span class="pre">MLFMovie</span></a></span><a class="headerlink" href="#flam._ml.Movie.underlying_file_movie_readonly" title="Link to this definition"></a></dt>
 <dd><p>Serializable object we use to store all the movie’s data to disk. It can technically be modified, but you shouldn’t do that.</p>
-<p>NOTE: this is mostly an internal API; you might need it when implementing a custom extension.
-For typical use cases, you should use attributes to read the movie’s data instead.</p>
+<div class="admonition note">
+<p class="admonition-title">Note</p>
+<p>This is mostly an internal API; you might need it when <a class="reference internal" href="../extending.html#extending-flam"><span class="std std-ref">implementing a custom extension</span></a>.</p>
+<p>For typical use cases, you should use attributes to read the movie’s data instead.</p>
+</div>
 </dd></dl>
 
 <dl class="py method">
@@ -1102,15 +1253,18 @@ For typical use cases, you should use attributes to read the movie’s data inst
 <dt class="sig sig-object py" id="flam._ml.People.underlying_file_people_readonly">
 <span class="property"><span class="k"><span class="pre">property</span></span><span class="w"> </span></span><span class="sig-name descname"><span class="pre">underlying_file_people_readonly</span></span><span class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="pre">list</span><span class="p"><span class="pre">[</span></span><a class="reference internal" href="#flam._mlf.MLFPerson" title="flam._mlf.MLFPerson"><span class="pre">MLFPerson</span></a><span class="p"><span class="pre">]</span></span></span><a class="headerlink" href="#flam._ml.People.underlying_file_people_readonly" title="Link to this definition"></a></dt>
 <dd><p>List of serializable objects we use to store each person’s data to disk, sorted in a consistent order. It can technically be modified, but you shouldn’t do that.</p>
-<p>NOTE: this is mostly an internal API; you might need it when implementing a custom extension.
-For typical use cases, you should use attributes to read the people’s data instead.</p>
+<div class="admonition note">
+<p class="admonition-title">Note</p>
+<p>This is mostly an internal API; you might need it when <a class="reference internal" href="../extending.html#extending-flam"><span class="std std-ref">implementing a custom extension</span></a>.</p>
+<p>For typical use cases, you should use attributes to read the people’s data instead.</p>
+</div>
 </dd></dl>
 
 <dl class="py method">
 <dt class="sig sig-object py" id="flam._ml.People.associated_movies">
 <span class="sig-name descname"><span class="pre">associated_movies</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">Iterable</span><span class="p"><span class="pre">[</span></span><a class="reference internal" href="#flam._ml.Movie" title="flam._ml.Movie"><span class="pre">Movie</span></a><span class="p"><span class="pre">]</span></span></span></span><a class="headerlink" href="#flam._ml.People.associated_movies" title="Link to this definition"></a></dt>
 <dd><p>Iterate over movies these people were in as this crew type. The order of iteration is guaranteed to be consistent.</p>
-<p>Note that in the case of several grouped people, only movies that they <strong>were all in together</strong> will be returned.</p>
+<p>In the case of several grouped people, only movies that they <strong>were all in together</strong> will be returned.</p>
 <dl class="field-list simple">
 <dt class="field-odd">Return type<span class="colon">:</span></dt>
 <dd class="field-odd"><p><em>Iterable</em>[<a class="reference internal" href="#flam._ml.Movie" title="flam._ml.Movie"><em>Movie</em></a>]</p>
@@ -1163,7 +1317,7 @@ For typical use cases, you should use attributes to read the people’s data ins
 <dl class="py method">
 <dt class="sig sig-object py" id="flam._ml.People.are_in_movie">
 <span class="sig-name descname"><span class="pre">are_in_movie</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">movie</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference internal" href="#flam._ml.Movie" title="flam._ml.Movie"><span class="pre">Movie</span></a></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">bool</span></span></span><a class="headerlink" href="#flam._ml.People.are_in_movie" title="Link to this definition"></a></dt>
-<dd><p>Check if these people were in a movie as their crew type.</p>
+<dd><p>Check if these people were in this movie. This takes the crew type into consideration.</p>
 <dl class="field-list simple">
 <dt class="field-odd">Parameters<span class="colon">:</span></dt>
 <dd class="field-odd"><p><strong>movie</strong> (<a class="reference internal" href="#flam._ml.Movie" title="flam._ml.Movie"><em>Movie</em></a>) – the movie to check.</p>
@@ -1227,7 +1381,15 @@ For typical use cases, you should use attributes to read the people’s data ins
 <dl class="py type">
 <dt class="sig sig-object py" id="flam._ml.MLFRolesDict">
 <span class="property"><span class="k"><span class="pre">type</span></span><span class="w"> </span></span><span class="sig-name descname"><span class="pre">MLFRolesDict</span></span><span class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">dict</span><span class="p"><span class="pre">[</span></span><span class="pre">str</span><span class="p"><span class="pre">,</span></span><span class="w"> </span><span class="pre">dict</span><span class="p"><span class="pre">[</span></span><a class="reference internal" href="#flam._ml.CrewType" title="flam._ml.CrewType"><span class="pre">CrewType</span></a><span class="p"><span class="pre">,</span></span><span class="w"> </span><a class="reference internal" href="#flam._mlf.MLFRole" title="flam._mlf.MLFRole"><span class="pre">MLFRole</span></a><span class="p"><span class="pre">]</span></span><span class="p"><span class="pre">]</span></span></span><a class="headerlink" href="#flam._ml.MLFRolesDict" title="Link to this definition"></a></dt>
-<dd><p>Return type of <a class="reference internal" href="#flam._ml.Role.underlying_file_roles_readonly" title="flam._ml.Role.underlying_file_roles_readonly"><code class="xref py py-meth docutils literal notranslate"><span class="pre">Role.underlying_file_roles_readonly()</span></code></a>.</p>
+<dd><p>Data structure with all the raw fetch information about a role.
+It maps the “MLF” UID of people in the group (i.e., the UID of a person in the fetch source) and the crew type to the object with the role data.</p>
+<p>If the <a class="reference internal" href="#flam._ml.Role" title="flam._ml.Role"><code class="xref py py-class docutils literal notranslate"><span class="pre">Role</span></code></a>'s crew type isn’t <a class="reference internal" href="#flam._ml.CrewType.ANY" title="flam._ml.CrewType.ANY"><code class="xref py py-attr docutils literal notranslate"><span class="pre">CrewType.ANY</span></code></a>, then that’ll be the only crew type in the dictionary.
+Otherwise, the dictionary will have every crew type the person occupied.</p>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="c1"># mlf_person is a person&#39;s underlying file object, and crew_type is the crew type he was in in this role.</span>
+<span class="n">mlf_role</span> <span class="o">=</span> <span class="n">roles_dict</span><span class="p">[</span><span class="n">mlf_person</span><span class="o">.</span><span class="n">uid</span><span class="p">][</span><span class="n">crew_type</span><span class="p">]</span>
+<span class="nb">print</span><span class="p">(</span><span class="n">mlf_role</span><span class="o">.</span><span class="n">characters</span><span class="p">)</span>
+</pre></div>
+</div>
 </dd></dl>
 
 <dl class="py class">
@@ -1274,15 +1436,11 @@ For typical use cases, you should use attributes to read the people’s data ins
 <dt class="sig sig-object py" id="flam._ml.Role.underlying_file_roles_readonly">
 <span class="property"><span class="k"><span class="pre">property</span></span><span class="w"> </span></span><span class="sig-name descname"><span class="pre">underlying_file_roles_readonly</span></span><span class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><a class="reference internal" href="#flam._ml.MLFRolesDict" title="flam._ml.MLFRolesDict"><span class="pre">MLFRolesDict</span></a></span><a class="headerlink" href="#flam._ml.Role.underlying_file_roles_readonly" title="Link to this definition"></a></dt>
 <dd><p>Dictionary of serializable objects we use to store each role’s data to disk. It can technically be modified, but you shouldn’t do that.</p>
-<p>The data structure maps the “MLF” UID of people in the group (i.e., the UID of a person in the fetch source) and the crew type to the object with the role data.</p>
-<p>If <a class="reference internal" href="#flam._ml.Role.crew_type" title="flam._ml.Role.crew_type"><code class="xref py py-attr docutils literal notranslate"><span class="pre">crew_type</span></code></a> isn’t <a class="reference internal" href="#flam._ml.CrewType.ANY" title="flam._ml.CrewType.ANY"><code class="xref py py-attr docutils literal notranslate"><span class="pre">CrewType.ANY</span></code></a>, then that’ll be the only crew type in the dictionary.
-Otherwise, the dictionary will have every crew type the person occupied.</p>
-<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="c1"># mlf_person is a person&#39;s underlying file object, and crew_type is the crew type he was in in this role.</span>
-<span class="n">mlf_role</span> <span class="o">=</span> <span class="n">roles_dict</span><span class="p">[</span><span class="n">mlf_person</span><span class="o">.</span><span class="n">uid</span><span class="p">][</span><span class="n">crew_type</span><span class="p">]</span>
-<span class="nb">print</span><span class="p">(</span><span class="n">mlf_role</span><span class="o">.</span><span class="n">characters</span><span class="p">)</span>
-</pre></div>
+<div class="admonition note">
+<p class="admonition-title">Note</p>
+<p>This is mostly an internal API; you might need it when <a class="reference internal" href="../extending.html#extending-flam"><span class="std std-ref">implementing a custom extension</span></a>.</p>
+<p>For typical use cases, you should use attributes to read the role’s data instead.</p>
 </div>
-<p>NOTE: this is mostly an internal API; you might need it when implementing a custom extension. For typical use cases, you should use attributes to read the role’s data instead.</p>
 </dd></dl>
 
 <dl class="py method">
@@ -1326,8 +1484,11 @@ Otherwise, the dictionary will have every crew type the person occupied.</p>
 <dt class="sig sig-object py" id="flam._ml.MovieList.underlying_file_readonly">
 <span class="property"><span class="k"><span class="pre">property</span></span><span class="w"> </span></span><span class="sig-name descname"><span class="pre">underlying_file_readonly</span></span><span class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><a class="reference internal" href="#flam._mlf.MovieListFile" title="flam._mlf.MovieListFile"><span class="pre">MovieListFile</span></a></span><a class="headerlink" href="#flam._ml.MovieList.underlying_file_readonly" title="Link to this definition"></a></dt>
 <dd><p>Serializable object we use to store all the list’s data to disk. It can technically be modified, but you shouldn’t do that.</p>
-<p>NOTE: this is mostly an internal API; you might need it when implementing a custom extension.
-For typical use cases, you should use <a class="reference internal" href="#flam._ml.MovieList.find" title="flam._ml.MovieList.find"><code class="xref py py-meth docutils literal notranslate"><span class="pre">find()</span></code></a> to read the list’s data instead.</p>
+<div class="admonition note">
+<p class="admonition-title">Note</p>
+<p>This is mostly an internal API; you might need it when <a class="reference internal" href="../extending.html#extending-flam"><span class="std std-ref">implementing a custom extension</span></a>.</p>
+<p>For typical use cases, you should use <a class="reference internal" href="#flam._ml.MovieList.find" title="flam._ml.MovieList.find"><code class="xref py py-meth docutils literal notranslate"><span class="pre">find()</span></code></a> to read the list’s data instead.</p>
+</div>
 </dd></dl>
 
 <dl class="py property">
@@ -1567,7 +1728,7 @@ I.e., if you have multiple ways to fetch data from IMDb, they would all have the
 <dl class="py class">
 <dt class="sig sig-object py" id="flam._attr.CmpTo">
 <span class="property"><span class="k"><span class="pre">class</span></span><span class="w"> </span></span><span class="sig-name descname"><span class="pre">CmpTo</span></span><a class="headerlink" href="#flam._attr.CmpTo" title="Link to this definition"></a></dt>
-<dd><p>Represents comparison of some attribute’s values to some constant value C, using a specific comparison operator.</p>
+<dd><p>Represents comparison of some attribute’s values to some constant primitive value, using a specific comparison operator.</p>
 <p>In a filter, these would be represented as a string like so: ‘&lt;op&gt;&lt;value&gt;’, where &lt;op&gt; is the sign of a <a class="reference internal" href="#flam._attr.ComparisonOp" title="flam._attr.ComparisonOp"><code class="xref py py-class docutils literal notranslate"><span class="pre">ComparisonOp</span></code></a>, and &lt;value&gt; is a possible value of an attribute.
 The &lt;op&gt; part is optional as all attributes define a default operator. To illustrate:</p>
 <div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="c1"># As a string: &#39;+90&#39;. Checks if metascores are greater or equal to 90.</span>
@@ -1618,7 +1779,7 @@ The &lt;op&gt; part is optional as all attributes define a default operator. To 
 <dd><p>Base class for all attributes that a findable object may have. This is a key element in interfacing with flam -
 any data you may be interested in obtaining about a movie, people, or role is obtained via attributes.</p>
 <p>Attributes provide facilities for using them generically.
-You can extend flam by inheriting from this class and registering your own custom attributes (read more about that in the docs).</p>
+You can extend flam by inheriting from this class and registering <a class="reference internal" href="../extending.html#implementing-a-custom-attribute"><span class="std std-ref">your own custom attributes</span></a>.</p>
 <dl class="py attribute">
 <dt class="sig sig-object py" id="flam._attr.Attribute.NONE_STR">
 <span class="sig-name descname"><span class="pre">NONE_STR</span></span><span class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">'-'</span></span><a class="headerlink" href="#flam._attr.Attribute.NONE_STR" title="Link to this definition"></a></dt>
@@ -1685,7 +1846,11 @@ You can extend flam by inheriting from this class and registering your own custo
 <dl class="py method">
 <dt class="sig sig-object py" id="flam._attr.Attribute._parse_primitive_not_none">
 <span class="property"><span class="k"><span class="pre">abstractmethod</span></span><span class="w"> </span></span><span class="sig-name descname"><span class="pre">_parse_primitive_not_none</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">primitive_str</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">str</span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><a class="reference internal" href="#flam._attr.AttributePrimitive" title="flam._attr.AttributePrimitive"><span class="pre">AttributePrimitive</span></a></span></span><a class="headerlink" href="#flam._attr.Attribute._parse_primitive_not_none" title="Link to this definition"></a></dt>
-<dd><p>NOTE: this is an internal method of attributes. Outside users shouldn’t use it, but you need to implement it as part of implementing a custom attribute.</p>
+<dd><div class="admonition note">
+<p class="admonition-title">Note</p>
+<p>This is an internal method of attributes. Outside users shouldn’t call it,
+but you need to implement it as part of <a class="reference internal" href="../extending.html#implementing-a-custom-attribute"><span class="std std-ref">implementing a custom attribute</span></a>.</p>
+</div>
 <p>Parse a string representing a single primitive into the value of this attribute. You do not need to handle <code class="docutils literal notranslate"><span class="pre">None</span></code> or lists in this function.</p>
 <dl class="field-list simple">
 <dt class="field-odd">Parameters<span class="colon">:</span></dt>
@@ -1700,7 +1865,11 @@ You can extend flam by inheriting from this class and registering your own custo
 <dl class="py method">
 <dt class="sig sig-object py" id="flam._attr.Attribute._str_of_primitive_not_none">
 <span class="property"><span class="k"><span class="pre">abstractmethod</span></span><span class="w"> </span></span><span class="sig-name descname"><span class="pre">_str_of_primitive_not_none</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">primitive</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference internal" href="#flam._attr.AttributePrimitive" title="flam._attr.AttributePrimitive"><span class="pre">AttributePrimitive</span></a></span></em>, <em class="sig-param"><span class="n"><span class="pre">abbreviate</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">bool</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">extras</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">dict</span><span class="p"><span class="pre">[</span></span><span class="pre">str</span><span class="p"><span class="pre">,</span></span><span class="w"> </span><span class="pre">Any</span><span class="p"><span class="pre">]</span></span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">str</span></span></span><a class="headerlink" href="#flam._attr.Attribute._str_of_primitive_not_none" title="Link to this definition"></a></dt>
-<dd><p>NOTE: this is an internal method of attributes. Outside users shouldn’t use it, but you need to implement it as part of implementing a custom attribute.</p>
+<dd><div class="admonition note">
+<p class="admonition-title">Note</p>
+<p>This is an internal method of attributes. Outside users shouldn’t call it,
+but you need to implement it as part of <a class="reference internal" href="../extending.html#implementing-a-custom-attribute"><span class="std std-ref">implementing a custom attribute</span></a>.</p>
+</div>
 <p>Return a string representation of a single primitive value of this attribute. You do not need to handle <code class="docutils literal notranslate"><span class="pre">None</span></code> or lists in this function.</p>
 <p>If <code class="docutils literal notranslate"><span class="pre">abbreviate</span></code> is false, then this method must be the inverse of <a class="reference internal" href="#flam._attr.Attribute._parse_primitive_not_none" title="flam._attr.Attribute._parse_primitive_not_none"><code class="xref py py-meth docutils literal notranslate"><span class="pre">_parse_primitive_not_none()</span></code></a>.</p>
 <dl class="field-list simple">
@@ -1786,7 +1955,7 @@ and internally we “canonicalize” them into this object. This process involve
 </ul>
 <p>Concrete and abstract canon listdefs:</p>
 <ul class="simple">
-<li><p>Canon listdefs are “concrete” when they describe the raw address from which the data was fetched. E.g., “imdb-browser-apidev-listid=083886771”</p></li>
+<li><p>Canon listdefs are “concrete” when they describe the raw address from which the data was fetched. E.g., “imdb-listid=083886771”</p></li>
 <li><p>Canon listdefs are “abstract” when they describe a configured list. E.g., “list=watched”</p></li>
 </ul>
 <dl class="py attribute">
@@ -1799,30 +1968,6 @@ and internally we “canonicalize” them into this object. This process involve
 <dt class="sig sig-object py" id="flam._ldef.CanonListdef.address">
 <span class="sig-name descname"><span class="pre">address</span></span><span class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="pre">str</span></span><a class="headerlink" href="#flam._ldef.CanonListdef.address" title="Link to this definition"></a></dt>
 <dd><p>An address pointing to an exact list. This could be different based on the list type - it could be a path, a URL, a name, or anything else.</p>
-</dd></dl>
-
-<dl class="py method">
-<dt class="sig sig-object py" id="flam._ldef.CanonListdef.parse">
-<span class="property"><span class="k"><span class="pre">classmethod</span></span><span class="w"> </span></span><span class="sig-name descname"><span class="pre">parse</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">listdef</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">str</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">ctx</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference internal" href="#flam._ctx.FlamContext" title="flam._ctx.FlamContext"><span class="pre">FlamContext</span></a></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><a class="reference internal" href="#flam._ldef.CanonListdef" title="flam._ldef.CanonListdef"><span class="pre">CanonListdef</span></a></span></span><a class="headerlink" href="#flam._ldef.CanonListdef.parse" title="Link to this definition"></a></dt>
-<dd><p>Parse a string representation of a listdef and canonicalize it.</p>
-<dl class="field-list simple">
-<dt class="field-odd">Parameters<span class="colon">:</span></dt>
-<dd class="field-odd"><ul class="simple">
-<li><p><strong>listdef</strong> (<em>str</em>) – <p>the listdef as a string. It can have a few forms:</p>
-<ul>
-<li><p><a class="reference internal" href="#flam._ldef.SpecialListType.ALL" title="flam._ldef.SpecialListType.ALL"><code class="xref py py-attr docutils literal notranslate"><span class="pre">SpecialListType.ALL</span></code></a></p></li>
-<li><p><a class="reference internal" href="#flam._ldef.SpecialListType.DEFAULTS" title="flam._ldef.SpecialListType.DEFAULTS"><code class="xref py py-attr docutils literal notranslate"><span class="pre">SpecialListType.DEFAULTS</span></code></a></p></li>
-<li><p>’&lt;name&gt;’ - where &lt;name&gt; is the name of a simple or composite list</p></li>
-<li><p>’&lt;list_type&gt;=&lt;address&gt;’ - where &lt;list_type&gt; is <a class="reference internal" href="#flam._ldef.SpecialListType.SIMPLE" title="flam._ldef.SpecialListType.SIMPLE"><code class="xref py py-attr docutils literal notranslate"><span class="pre">SpecialListType.SIMPLE</span></code></a>, <a class="reference internal" href="#flam._ldef.SpecialListType.COMPOSITE" title="flam._ldef.SpecialListType.COMPOSITE"><code class="xref py py-attr docutils literal notranslate"><span class="pre">SpecialListType.COMPOSITE</span></code></a>, or the name of a fetcher.</p></li>
-</ul>
-</p></li>
-<li><p><strong>ctx</strong> (<a class="reference internal" href="#flam._ctx.FlamContext" title="flam._ctx.FlamContext"><em>FlamContext</em></a>) – the context containing list configurations we need to know.</p></li>
-</ul>
-</dd>
-<dt class="field-even">Return type<span class="colon">:</span></dt>
-<dd class="field-even"><p><a class="reference internal" href="#flam._ldef.CanonListdef" title="flam._ldef.CanonListdef"><em>CanonListdef</em></a></p>
-</dd>
-</dl>
 </dd></dl>
 
 <dl class="py property">
@@ -1840,7 +1985,7 @@ and internally we “canonicalize” them into this object. This process involve
 <dl class="py property">
 <dt class="sig sig-object py" id="flam._ldef.CanonListdef.is_concrete">
 <span class="property"><span class="k"><span class="pre">property</span></span><span class="w"> </span></span><span class="sig-name descname"><span class="pre">is_concrete</span></span><span class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="pre">bool</span></span><a class="headerlink" href="#flam._ldef.CanonListdef.is_concrete" title="Link to this definition"></a></dt>
-<dd><p>Whether this listdef is “concrete”, meaning it describes a raw address from which the data was fetched. E.g., “imdb-browser-apidev-listid=083886771”.</p>
+<dd><p>Whether this listdef is “concrete”, meaning it describes a raw address from which the data was fetched. E.g., “imdb-listid=083886771”.</p>
 </dd></dl>
 
 <dl class="py method">
@@ -1897,11 +2042,13 @@ and internally we “canonicalize” them into this object. This process involve
 
 <dl class="py function" id="module-flam._reg">
 <dt class="sig sig-object py" id="flam._reg.register">
-<span class="sig-name descname"><span class="pre">register</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">obj</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">T</span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">T</span></span></span><a class="headerlink" href="#flam._reg.register" title="Link to this definition"></a></dt>
+<span class="sig-name descname"><span class="pre">register</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">item</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">T</span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">T</span></span></span><a class="headerlink" href="#flam._reg.register" title="Link to this definition"></a></dt>
 <dd><p>Register an predicate, attribute, or fetcher as a global extension. Global extensions are available to use from any context with <code class="docutils literal notranslate"><span class="pre">import_extensions=True</span></code>.</p>
+<p>You may register an item with the same name as that of a builtin, and it will shadow it.</p>
+<p>This function is meant to be used as a decorator (i.e. with <code class="docutils literal notranslate"><span class="pre">&#64;register</span></code>).</p>
 <dl class="field-list simple">
 <dt class="field-odd">Parameters<span class="colon">:</span></dt>
-<dd class="field-odd"><p><strong>obj</strong> (<em>T</em>)</p>
+<dd class="field-odd"><p><strong>item</strong> (<em>T</em>) – the item to register.</p>
 </dd>
 <dt class="field-even">Return type<span class="colon">:</span></dt>
 <dd class="field-even"><p>T</p>
@@ -1913,7 +2060,7 @@ and internally we “canonicalize” them into this object. This process involve
 <dt class="sig sig-object py" id="flam._reg.compose_qualified_attr_or_pred_name">
 <span class="sig-name descname"><span class="pre">compose_qualified_attr_or_pred_name</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">findable_type</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference internal" href="#flam._ml.FindableType" title="flam._ml.FindableType"><span class="pre">FindableType</span></a></span></em>, <em class="sig-param"><span class="n"><span class="pre">name_without_type</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">str</span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">str</span></span></span><a class="headerlink" href="#flam._reg.compose_qualified_attr_or_pred_name" title="Link to this definition"></a></dt>
 <dd><p>Compose an attribute or predicate qualified name from its parts. For example:</p>
-<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="n">compose_qualified_attr_or_pred_name</span><span class="p">(</span><span class="n">FindableType</span><span class="o">.</span><span class="n">MOVIES</span><span class="p">,</span> <span class="s1">&#39;title&#39;</span><span class="p">)</span> <span class="c1"># Returns &#39;movies-title&#39;.</span>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="n">compose_qualified_attr_or_pred_name</span><span class="p">(</span><span class="n">FindableType</span><span class="o">.</span><span class="n">MOVIES</span><span class="p">,</span> <span class="s1">&#39;title&#39;</span><span class="p">)</span> <span class="c1"># Returns &#39;movies-title&#39;.</span>
 </pre></div>
 </div>
 <dl class="field-list simple">
@@ -1944,25 +2091,25 @@ and internally we “canonicalize” them into this object. This process involve
 </dd></dl>
 
 <dl class="py class" id="module-flam._fetch">
-<dt class="sig sig-object py" id="flam._fetch.ListFetcher">
-<span class="property"><span class="k"><span class="pre">class</span></span><span class="w"> </span></span><span class="sig-name descname"><span class="pre">ListFetcher</span></span><a class="headerlink" href="#flam._fetch.ListFetcher" title="Link to this definition"></a></dt>
+<dt class="sig sig-object py" id="flam._fetch.Fetcher">
+<span class="property"><span class="k"><span class="pre">class</span></span><span class="w"> </span></span><span class="sig-name descname"><span class="pre">Fetcher</span></span><a class="headerlink" href="#flam._fetch.Fetcher" title="Link to this definition"></a></dt>
 <dd><p>Base class for all fetchers. Fetchers are in charge of actually downloading data about movie lists from some source like IMDb, Letterboxd, etc.</p>
-<p>You can extend flam by inheriting from this class and registering your own custom fetchers (read more about that in the docs).</p>
+<p>You can extend flam by inheriting from this class and registering <a class="reference internal" href="../extending.html#implementing-a-custom-fetcher"><span class="std std-ref">your own custom fetchers</span></a>.</p>
 <dl class="py attribute">
-<dt class="sig sig-object py" id="flam._fetch.ListFetcher.qualified_name">
-<span class="sig-name descname"><span class="pre">qualified_name</span></span><span class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="pre">str</span></span><a class="headerlink" href="#flam._fetch.ListFetcher.qualified_name" title="Link to this definition"></a></dt>
+<dt class="sig sig-object py" id="flam._fetch.Fetcher.qualified_name">
+<span class="sig-name descname"><span class="pre">qualified_name</span></span><span class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="pre">str</span></span><a class="headerlink" href="#flam._fetch.Fetcher.qualified_name" title="Link to this definition"></a></dt>
 <dd><p>The fetcher’s name. This corresponds to a listdef’s <a class="reference internal" href="#flam._ldef.CanonListdef.list_type" title="flam._ldef.CanonListdef.list_type"><code class="xref py py-attr docutils literal notranslate"><span class="pre">list_type</span></code></a>.</p>
 </dd></dl>
 
 <dl class="py attribute">
-<dt class="sig sig-object py" id="flam._fetch.ListFetcher.qualified_aliases">
-<span class="sig-name descname"><span class="pre">qualified_aliases</span></span><span class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="pre">list</span><span class="p"><span class="pre">[</span></span><span class="pre">str</span><span class="p"><span class="pre">]</span></span></span><a class="headerlink" href="#flam._fetch.ListFetcher.qualified_aliases" title="Link to this definition"></a></dt>
+<dt class="sig sig-object py" id="flam._fetch.Fetcher.qualified_aliases">
+<span class="sig-name descname"><span class="pre">qualified_aliases</span></span><span class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="pre">list</span><span class="p"><span class="pre">[</span></span><span class="pre">str</span><span class="p"><span class="pre">]</span></span></span><a class="headerlink" href="#flam._fetch.Fetcher.qualified_aliases" title="Link to this definition"></a></dt>
 <dd><p>List of aliases for the fetcher.</p>
 </dd></dl>
 
 <dl class="py attribute">
-<dt class="sig sig-object py" id="flam._fetch.ListFetcher.uid_family">
-<span class="sig-name descname"><span class="pre">uid_family</span></span><span class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="pre">str</span></span><a class="headerlink" href="#flam._fetch.ListFetcher.uid_family" title="Link to this definition"></a></dt>
+<dt class="sig sig-object py" id="flam._fetch.Fetcher.uid_family">
+<span class="sig-name descname"><span class="pre">uid_family</span></span><span class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="pre">str</span></span><a class="headerlink" href="#flam._fetch.Fetcher.uid_family" title="Link to this definition"></a></dt>
 <dd><p>The UID family this fetcher uses. Composite lists can only be formed from lists with the same UID family.</p>
 <p>Fetchers need to assign some unique string to each movie and person they download, but what exactly they use can vary from fetcher to fetcher.
 Usually they’ll use the UIDs used by the source the data is fetched from.</p>
@@ -1972,10 +2119,10 @@ If you make all those fetchers use the same UID family, then they will all be co
 </dd></dl>
 
 <dl class="py method">
-<dt class="sig sig-object py" id="flam._fetch.ListFetcher.__init_subclass__">
-<span class="property"><span class="k"><span class="pre">classmethod</span></span><span class="w"> </span></span><span class="sig-name descname"><span class="pre">__init_subclass__</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">list_type</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">str</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">qualified_aliases</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">None</span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><span class="pre">list</span><span class="p"><span class="pre">[</span></span><span class="pre">str</span><span class="p"><span class="pre">]</span></span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">uid_family</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">None</span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><span class="pre">str</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="o"><span class="pre">**</span></span><span class="n"><span class="pre">kwargs</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">Any</span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">None</span></span></span><a class="headerlink" href="#flam._fetch.ListFetcher.__init_subclass__" title="Link to this definition"></a></dt>
+<dt class="sig sig-object py" id="flam._fetch.Fetcher.__init_subclass__">
+<span class="property"><span class="k"><span class="pre">classmethod</span></span><span class="w"> </span></span><span class="sig-name descname"><span class="pre">__init_subclass__</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">list_type</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">str</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">qualified_aliases</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">None</span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><span class="pre">list</span><span class="p"><span class="pre">[</span></span><span class="pre">str</span><span class="p"><span class="pre">]</span></span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">uid_family</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">None</span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><span class="pre">str</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="o"><span class="pre">**</span></span><span class="n"><span class="pre">kwargs</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">Any</span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">None</span></span></span><a class="headerlink" href="#flam._fetch.Fetcher.__init_subclass__" title="Link to this definition"></a></dt>
 <dd><p>Defines parameters that subclasses can (or must) pass in as part of subclassing. Ex:</p>
-<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="k">class</span> <span class="nc">MyCustomFetcher</span><span class="p">(</span><span class="n">ListFetcher</span><span class="p">,</span> <span class="n">list_type</span><span class="o">=</span><span class="s1">&#39;my-imdb-fetcher&#39;</span><span class="p">,</span> <span class="n">uid_family</span><span class="o">=</span><span class="s1">&#39;imdb&#39;</span><span class="p">):</span>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="k">class</span> <span class="nc">MyCustomFetcher</span><span class="p">(</span><span class="n">Fetcher</span><span class="p">,</span> <span class="n">list_type</span><span class="o">=</span><span class="s1">&#39;my-imdb-fetcher&#39;</span><span class="p">,</span> <span class="n">uid_family</span><span class="o">=</span><span class="s1">&#39;imdb&#39;</span><span class="p">):</span>
     <span class="c1"># ...</span>
 </pre></div>
 </div>
@@ -1983,8 +2130,8 @@ If you make all those fetchers use the same UID family, then they will all be co
 <dt class="field-odd">Parameters<span class="colon">:</span></dt>
 <dd class="field-odd"><ul class="simple">
 <li><p><strong>list_type</strong> (<em>str</em>) – the name of this fetcher.</p></li>
-<li><p><strong>qualified_aliases</strong> (<em>None</em><em> | </em><em>list</em><em>[</em><em>str</em><em>]</em>) – list of alises for this fetcher.</p></li>
-<li><p><strong>uid_family</strong> (<em>None</em><em> | </em><em>str</em>) – which UID family this fetcher uses.</p></li>
+<li><p><strong>qualified_aliases</strong> (<em>None</em><em> | </em><em>list</em><em>[</em><em>str</em><em>]</em>) – list of aliases for this fetcher.</p></li>
+<li><p><strong>uid_family</strong> (<em>None</em><em> | </em><em>str</em>) – which UID family this fetcher uses. Defaults to <code class="docutils literal notranslate"><span class="pre">list_type</span></code>, indicating this fetcher is only compatible with itself.</p></li>
 <li><p><strong>kwargs</strong> (<em>Any</em>)</p></li>
 </ul>
 </dd>
@@ -1995,13 +2142,14 @@ If you make all those fetchers use the same UID family, then they will all be co
 </dd></dl>
 
 <dl class="py method">
-<dt class="sig sig-object py" id="flam._fetch.ListFetcher.__init__">
-<span class="sig-name descname"><span class="pre">__init__</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">concrete_listdef</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference internal" href="#flam._ldef.CanonListdef" title="flam._ldef.CanonListdef"><span class="pre">CanonListdef</span></a></span></em>, <em class="sig-param"><span class="n"><span class="pre">abstract_listdef</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference internal" href="#flam._ldef.CanonListdef" title="flam._ldef.CanonListdef"><span class="pre">CanonListdef</span></a></span></em>, <em class="sig-param"><span class="n"><span class="pre">ctx</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference internal" href="#flam._ctx.FlamContext" title="flam._ctx.FlamContext"><span class="pre">FlamContext</span></a></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">None</span></span></span><a class="headerlink" href="#flam._fetch.ListFetcher.__init__" title="Link to this definition"></a></dt>
+<dt class="sig sig-object py" id="flam._fetch.Fetcher.__init__">
+<span class="sig-name descname"><span class="pre">__init__</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">concrete_listdef</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference internal" href="#flam._ldef.CanonListdef" title="flam._ldef.CanonListdef"><span class="pre">CanonListdef</span></a></span></em>, <em class="sig-param"><span class="n"><span class="pre">abstract_listdef</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference internal" href="#flam._ldef.CanonListdef" title="flam._ldef.CanonListdef"><span class="pre">CanonListdef</span></a></span></em>, <em class="sig-param"><span class="n"><span class="pre">fetch_params</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">dict</span><span class="p"><span class="pre">[</span></span><span class="pre">str</span><span class="p"><span class="pre">,</span></span><span class="w"> </span><span class="pre">str</span><span class="p"><span class="pre">]</span></span></span></em>, <em class="sig-param"><span class="n"><span class="pre">ctx</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference internal" href="#flam._ctx.FlamContext" title="flam._ctx.FlamContext"><span class="pre">FlamContext</span></a></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">None</span></span></span><a class="headerlink" href="#flam._fetch.Fetcher.__init__" title="Link to this definition"></a></dt>
 <dd><dl class="field-list simple">
 <dt class="field-odd">Parameters<span class="colon">:</span></dt>
 <dd class="field-odd"><ul class="simple">
 <li><p><strong>concrete_listdef</strong> (<a class="reference internal" href="#flam._ldef.CanonListdef" title="flam._ldef.CanonListdef"><em>CanonListdef</em></a>)</p></li>
 <li><p><strong>abstract_listdef</strong> (<a class="reference internal" href="#flam._ldef.CanonListdef" title="flam._ldef.CanonListdef"><em>CanonListdef</em></a>)</p></li>
+<li><p><strong>fetch_params</strong> (<em>dict</em><em>[</em><em>str</em><em>, </em><em>str</em><em>]</em>)</p></li>
 <li><p><strong>ctx</strong> (<a class="reference internal" href="#flam._ctx.FlamContext" title="flam._ctx.FlamContext"><em>FlamContext</em></a>)</p></li>
 </ul>
 </dd>
@@ -2012,29 +2160,61 @@ If you make all those fetchers use the same UID family, then they will all be co
 </dd></dl>
 
 <dl class="py property">
-<dt class="sig sig-object py" id="flam._fetch.ListFetcher.concrete_listdef">
-<span class="property"><span class="k"><span class="pre">property</span></span><span class="w"> </span></span><span class="sig-name descname"><span class="pre">concrete_listdef</span></span><span class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><a class="reference internal" href="#flam._ldef.CanonListdef" title="flam._ldef.CanonListdef"><span class="pre">CanonListdef</span></a></span><a class="headerlink" href="#flam._fetch.ListFetcher.concrete_listdef" title="Link to this definition"></a></dt>
+<dt class="sig sig-object py" id="flam._fetch.Fetcher.concrete_listdef">
+<span class="property"><span class="k"><span class="pre">property</span></span><span class="w"> </span></span><span class="sig-name descname"><span class="pre">concrete_listdef</span></span><span class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><a class="reference internal" href="#flam._ldef.CanonListdef" title="flam._ldef.CanonListdef"><span class="pre">CanonListdef</span></a></span><a class="headerlink" href="#flam._fetch.Fetcher.concrete_listdef" title="Link to this definition"></a></dt>
 <dd><p>The raw fetcher name and address to fetch from.</p>
 </dd></dl>
 
 <dl class="py property">
-<dt class="sig sig-object py" id="flam._fetch.ListFetcher.abstract_listdef">
-<span class="property"><span class="k"><span class="pre">property</span></span><span class="w"> </span></span><span class="sig-name descname"><span class="pre">abstract_listdef</span></span><span class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><a class="reference internal" href="#flam._ldef.CanonListdef" title="flam._ldef.CanonListdef"><span class="pre">CanonListdef</span></a></span><a class="headerlink" href="#flam._fetch.ListFetcher.abstract_listdef" title="Link to this definition"></a></dt>
-<dd><p>The simple list being fetched, if it is a simple list. Otherwise same as <a class="reference internal" href="#flam._fetch.ListFetcher.concrete_listdef" title="flam._fetch.ListFetcher.concrete_listdef"><code class="xref py py-attr docutils literal notranslate"><span class="pre">concrete_listdef</span></code></a>.</p>
+<dt class="sig sig-object py" id="flam._fetch.Fetcher.abstract_listdef">
+<span class="property"><span class="k"><span class="pre">property</span></span><span class="w"> </span></span><span class="sig-name descname"><span class="pre">abstract_listdef</span></span><span class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><a class="reference internal" href="#flam._ldef.CanonListdef" title="flam._ldef.CanonListdef"><span class="pre">CanonListdef</span></a></span><a class="headerlink" href="#flam._fetch.Fetcher.abstract_listdef" title="Link to this definition"></a></dt>
+<dd><p>The simple list being fetched, if it is a simple list. Otherwise same as <a class="reference internal" href="#flam._fetch.Fetcher.concrete_listdef" title="flam._fetch.Fetcher.concrete_listdef"><code class="xref py py-attr docutils literal notranslate"><span class="pre">concrete_listdef</span></code></a>.</p>
 </dd></dl>
 
 <dl class="py method">
-<dt class="sig sig-object py" id="flam._fetch.ListFetcher._fetch_into_file">
-<span class="property"><span class="k"><span class="pre">abstractmethod</span></span><span class="w"> </span></span><span class="sig-name descname"><span class="pre">_fetch_into_file</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">movie_list_file</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference internal" href="#flam._mlf.MovieListFile" title="flam._mlf.MovieListFile"><span class="pre">MovieListFile</span></a></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">None</span></span></span><a class="headerlink" href="#flam._fetch.ListFetcher._fetch_into_file" title="Link to this definition"></a></dt>
-<dd><p>NOTE: this is an internal method of fetchers. Outside users shouldn’t use it, but you need to implement it as part of implementing a custom fetcher.</p>
-<p>Obtain data about the list identified by <a class="reference internal" href="#flam._fetch.ListFetcher.concrete_listdef" title="flam._fetch.ListFetcher.concrete_listdef"><code class="xref py py-attr docutils literal notranslate"><span class="pre">concrete_listdef</span></code></a>, and populate <code class="docutils literal notranslate"><span class="pre">movie_list_file</span></code> with all the data fetched about movies in the list and the people in them.</p>
+<dt class="sig sig-object py" id="flam._fetch.Fetcher.get_param">
+<span class="sig-name descname"><span class="pre">get_param</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">param_name</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">str</span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">str</span></span></span><a class="headerlink" href="#flam._fetch.Fetcher.get_param" title="Link to this definition"></a></dt>
+<dd><p>Get the value of a fetch parameter.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><p><strong>param_name</strong> (<em>str</em>)</p>
+</dd>
+<dt class="field-even">Return type<span class="colon">:</span></dt>
+<dd class="field-even"><p>str</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="flam._fetch.Fetcher.has_param">
+<span class="sig-name descname"><span class="pre">has_param</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">param_name</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">str</span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">bool</span></span></span><a class="headerlink" href="#flam._fetch.Fetcher.has_param" title="Link to this definition"></a></dt>
+<dd><p>Check if fetcher has been passed this parameter.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><p><strong>param_name</strong> (<em>str</em>)</p>
+</dd>
+<dt class="field-even">Return type<span class="colon">:</span></dt>
+<dd class="field-even"><p>bool</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="flam._fetch.Fetcher._fetch_into_file">
+<span class="property"><span class="k"><span class="pre">abstractmethod</span></span><span class="w"> </span></span><span class="sig-name descname"><span class="pre">_fetch_into_file</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">movie_list_file</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference internal" href="#flam._mlf.MovieListFile" title="flam._mlf.MovieListFile"><span class="pre">MovieListFile</span></a></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">None</span></span></span><a class="headerlink" href="#flam._fetch.Fetcher._fetch_into_file" title="Link to this definition"></a></dt>
+<dd><div class="admonition note">
+<p class="admonition-title">Note</p>
+<p>This is an internal method of fetchers. Outside users shouldn’t call it,
+but you need to implement it as part of <a class="reference internal" href="../extending.html#implementing-a-custom-fetcher"><span class="std std-ref">implementing a custom fetcher</span></a>.</p>
+</div>
+<p>Obtain data about the list identified by <a class="reference internal" href="#flam._fetch.Fetcher.concrete_listdef" title="flam._fetch.Fetcher.concrete_listdef"><code class="xref py py-attr docutils literal notranslate"><span class="pre">concrete_listdef</span></code></a>, and populate <code class="docutils literal notranslate"><span class="pre">movie_list_file</span></code> with all the data fetched about movies in the list and the people in them.</p>
 <p>If this function raises <a class="reference internal" href="#flam._exc.FetchInterrupt" title="flam._exc.FetchInterrupt"><code class="xref py py-exc docutils literal notranslate"><span class="pre">FetchInterrupt</span></code></a>, everything written to the file so far will be saved to disk.</p>
 <p>There are a few sensitive points about the exact order that you populate this object with data:</p>
 <ul class="simple">
 <li><p>Always add the people in a movie before you add the movie itself</p></li>
 <li><p>Only add a movie object after it’s fully populated with its data</p></li>
 </ul>
-<p>The above points ensure that the file is always in a good, save-able state. So if fetching gets interrupted or <a class="reference internal" href="#flam._fetch.ListFetcher._checkpoint" title="flam._fetch.ListFetcher._checkpoint"><code class="xref py py-meth docutils literal notranslate"><span class="pre">_checkpoint()</span></code></a> is called and the file is saved,
+<p>The above points ensure that the file is always in a good, saveable state. So if fetching gets interrupted or <a class="reference internal" href="#flam._fetch.Fetcher._checkpoint" title="flam._fetch.Fetcher._checkpoint"><code class="xref py py-meth docutils literal notranslate"><span class="pre">_checkpoint()</span></code></a> is called and the file is saved,
 it won’t cause partially fetched movies to be in the file, which on the next fetch you won’t know you have to re-fetch.</p>
 <dl class="field-list simple">
 <dt class="field-odd">Parameters<span class="colon">:</span></dt>
@@ -2054,14 +2234,14 @@ That happens automatically before the file is saved.</p>
 </dd></dl>
 
 <dl class="py method">
-<dt class="sig sig-object py" id="flam._fetch.ListFetcher._checkpoint">
-<span class="sig-name descname"><span class="pre">_checkpoint</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">movie_list_file</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference internal" href="#flam._mlf.MovieListFile" title="flam._mlf.MovieListFile"><span class="pre">MovieListFile</span></a></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">None</span></span></span><a class="headerlink" href="#flam._fetch.ListFetcher._checkpoint" title="Link to this definition"></a></dt>
+<dt class="sig sig-object py" id="flam._fetch.Fetcher._checkpoint">
+<span class="sig-name descname"><span class="pre">_checkpoint</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">movie_list_file</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference internal" href="#flam._mlf.MovieListFile" title="flam._mlf.MovieListFile"><span class="pre">MovieListFile</span></a></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">None</span></span></span><a class="headerlink" href="#flam._fetch.Fetcher._checkpoint" title="Link to this definition"></a></dt>
 <dd><p>Store the work-in-progress on this file to disk, so that if a crash happens the data fetched so far won’t be lost.
-This method is meant to only be called internally from inside <a class="reference internal" href="#flam._fetch.ListFetcher._fetch_into_file" title="flam._fetch.ListFetcher._fetch_into_file"><code class="xref py py-meth docutils literal notranslate"><span class="pre">_fetch_into_file()</span></code></a>.</p>
+This method is meant to only be called internally from inside <a class="reference internal" href="#flam._fetch.Fetcher._fetch_into_file" title="flam._fetch.Fetcher._fetch_into_file"><code class="xref py py-meth docutils literal notranslate"><span class="pre">_fetch_into_file()</span></code></a>.</p>
 <p>You should only call this function during good save points. I.e., moments when the file doesn’t contain any partially fetched movies.</p>
 <dl class="field-list simple">
 <dt class="field-odd">Parameters<span class="colon">:</span></dt>
-<dd class="field-odd"><p><strong>movie_list_file</strong> (<a class="reference internal" href="#flam._mlf.MovieListFile" title="flam._mlf.MovieListFile"><em>MovieListFile</em></a>) – the same object that was passed to <a class="reference internal" href="#flam._fetch.ListFetcher._fetch_into_file" title="flam._fetch.ListFetcher._fetch_into_file"><code class="xref py py-meth docutils literal notranslate"><span class="pre">_fetch_into_file()</span></code></a>.</p>
+<dd class="field-odd"><p><strong>movie_list_file</strong> (<a class="reference internal" href="#flam._mlf.MovieListFile" title="flam._mlf.MovieListFile"><em>MovieListFile</em></a>) – the same object that was passed to <a class="reference internal" href="#flam._fetch.Fetcher._fetch_into_file" title="flam._fetch.Fetcher._fetch_into_file"><code class="xref py py-meth docutils literal notranslate"><span class="pre">_fetch_into_file()</span></code></a>.</p>
 </dd>
 <dt class="field-even">Return type<span class="colon">:</span></dt>
 <dd class="field-even"><p>None</p>
@@ -2195,7 +2375,7 @@ This method is meant to only be called internally from inside <a class="referenc
 </li>
 </ul>
 </div></blockquote>
-<p>Eaxmple of eating a list of CTGMs:</p>
+<p>Example of eating a list of CTGMs:</p>
 <blockquote>
 <div><div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="n">ct_gms</span><span class="p">,</span> <span class="n">until</span> <span class="o">=</span> <span class="n">FilterMember</span><span class="o">.</span><span class="n">eat_listof</span><span class="p">(</span><span class="n">FilterMember</span><span class="o">.</span><span class="n">eat_ct_gm</span><span class="p">,</span> <span class="n">params</span><span class="p">,</span> <span class="n">at</span><span class="p">,</span> <span class="n">at_least_one</span><span class="o">=</span><span class="kc">False</span><span class="p">)</span>
 </pre></div>
@@ -2326,8 +2506,8 @@ Returns a tuple of the movie list and the index of the first token after the lis
 </dd></dl>
 
 <dl class="py method">
-<dt class="sig sig-object py" id="flam._filter.FilterMember.eat_single">
-<span class="property"><span class="k"><span class="pre">classmethod</span></span><span class="w"> </span></span><span class="sig-name descname"><span class="pre">eat_single</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">params</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference internal" href="#flam._filter.EatParams" title="flam._filter.EatParams"><span class="pre">EatParams</span></a></span></em>, <em class="sig-param"><span class="n"><span class="pre">at</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">int</span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">tuple</span><span class="p"><span class="pre">[</span></span><a class="reference internal" href="#flam._filter.Filter" title="flam._filter.Filter"><span class="pre">Filter</span></a><span class="p"><span class="pre">,</span></span><span class="w"> </span><span class="pre">int</span><span class="p"><span class="pre">]</span></span></span></span><a class="headerlink" href="#flam._filter.FilterMember.eat_single" title="Link to this definition"></a></dt>
+<dt class="sig sig-object py" id="flam._filter.FilterMember.eat_subfilter">
+<span class="property"><span class="k"><span class="pre">classmethod</span></span><span class="w"> </span></span><span class="sig-name descname"><span class="pre">eat_subfilter</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">params</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference internal" href="#flam._filter.EatParams" title="flam._filter.EatParams"><span class="pre">EatParams</span></a></span></em>, <em class="sig-param"><span class="n"><span class="pre">at</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">int</span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">tuple</span><span class="p"><span class="pre">[</span></span><a class="reference internal" href="#flam._filter.Filter" title="flam._filter.Filter"><span class="pre">Filter</span></a><span class="p"><span class="pre">,</span></span><span class="w"> </span><span class="pre">int</span><span class="p"><span class="pre">]</span></span></span></span><a class="headerlink" href="#flam._filter.FilterMember.eat_subfilter" title="Link to this definition"></a></dt>
 <dd><p>Helper method to eat a list of tokens representing a subfilter that is either made up of a single member or enclosed in parentheses.
 Returns a tuple of the subfilter and the index of the first token after the filter.</p>
 <dl class="field-list simple">
@@ -2335,7 +2515,7 @@ Returns a tuple of the subfilter and the index of the first token after the filt
 <dd class="field-odd"><ul class="simple">
 <li><p><strong>params</strong> (<a class="reference internal" href="#flam._filter.EatParams" title="flam._filter.EatParams"><em>EatParams</em></a>) – <p>general parameters of this compilation. Sometimes subfilters may have a different <a class="reference internal" href="#flam._filter.EatParams.find" title="flam._filter.EatParams.find"><code class="xref py py-attr docutils literal notranslate"><span class="pre">EatParams.find</span></code></a> than the parent filter. For example:</p>
 <div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="n">sub_params</span> <span class="o">=</span> <span class="n">dataclasses</span><span class="o">.</span><span class="n">replace</span><span class="p">(</span><span class="n">params</span><span class="p">,</span> <span class="n">find</span><span class="o">=</span><span class="n">FindableType</span><span class="o">.</span><span class="n">ROLES</span><span class="p">)</span>
-<span class="n">sub_filter</span><span class="p">,</span> <span class="n">until</span> <span class="o">=</span> <span class="n">FilterMember</span><span class="o">.</span><span class="n">eat_single</span><span class="p">(</span><span class="n">sub_params</span><span class="p">,</span> <span class="n">at</span><span class="p">)</span>
+<span class="n">sub_filter</span><span class="p">,</span> <span class="n">until</span> <span class="o">=</span> <span class="n">FilterMember</span><span class="o">.</span><span class="n">eat_subfilter</span><span class="p">(</span><span class="n">sub_params</span><span class="p">,</span> <span class="n">at</span><span class="p">)</span>
 </pre></div>
 </div>
 </p></li>
@@ -2582,7 +2762,7 @@ Returns a tuple of the subfilter and the index of the first token after the filt
 <dt class="sig sig-object py" id="flam._filter.Predicate">
 <span class="property"><span class="k"><span class="pre">class</span></span><span class="w"> </span></span><span class="sig-name descname"><span class="pre">Predicate</span></span><a class="headerlink" href="#flam._filter.Predicate" title="Link to this definition"></a></dt>
 <dd><p>Base class for all predicates - filter members which check something about a findable object.</p>
-<p>You can extend flam by inheriting from this class and registering your own custom predicates (read more about that in the docs).</p>
+<p>You can extend flam by inheriting from this class and registering <a class="reference internal" href="../extending.html#implementing-a-custom-predicate"><span class="std std-ref">your own custom predicates</span></a>.</p>
 <dl class="py attribute">
 <dt class="sig sig-object py" id="flam._filter.Predicate.PREFIX">
 <span class="sig-name descname"><span class="pre">PREFIX</span></span><span class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">'-'</span></span><a class="headerlink" href="#flam._filter.Predicate.PREFIX" title="Link to this definition"></a></dt>
@@ -2611,7 +2791,7 @@ Returns a tuple of the subfilter and the index of the first token after the filt
 <dt class="sig sig-object py" id="flam._filter.Predicate.__init_subclass__">
 <span class="property"><span class="k"><span class="pre">classmethod</span></span><span class="w"> </span></span><span class="sig-name descname"><span class="pre">__init_subclass__</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">name_without_type</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">str</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">aliases_without_type</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">None</span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><span class="pre">list</span><span class="p"><span class="pre">[</span></span><span class="pre">str</span><span class="p"><span class="pre">]</span></span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">findable_type</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">None</span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><a class="reference internal" href="#flam._ml.FindableType" title="flam._ml.FindableType"><span class="pre">FindableType</span></a></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="o"><span class="pre">**</span></span><span class="n"><span class="pre">kwargs</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">Any</span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">None</span></span></span><a class="headerlink" href="#flam._filter.Predicate.__init_subclass__" title="Link to this definition"></a></dt>
 <dd><p>Defines parameters that subclasses can (or must) pass in as part of subclassing. Ex:</p>
-<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="k">class</span> <span class="nc">MyCustomPredicate</span><span class="p">(</span><span class="n">Predicate</span><span class="p">,</span> <span class="n">name_without_type</span><span class="o">=</span><span class="s1">&#39;my-predicate&#39;</span><span class="p">,</span> <span class="n">findable_type</span><span class="o">=</span><span class="n">FindableType</span><span class="o">.</span><span class="n">MOVIES</span><span class="p">):</span>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="k">class</span> <span class="nc">MyCustomPredicate</span><span class="p">(</span><span class="n">Predicate</span><span class="p">,</span> <span class="n">name_without_type</span><span class="o">=</span><span class="s1">&#39;my-predicate&#39;</span><span class="p">,</span> <span class="n">findable_type</span><span class="o">=</span><span class="n">FindableType</span><span class="o">.</span><span class="n">MOVIES</span><span class="p">):</span>
     <span class="c1"># ...</span>
 </pre></div>
 </div>
@@ -2736,6 +2916,11 @@ Returns a tuple of the subfilter and the index of the first token after the filt
 <dl class="py attribute">
 <dt class="sig sig-object py" id="flam._cfg.SimpleList.is_default_find">
 <span class="sig-name descname"><span class="pre">is_default_find</span></span><span class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="pre">bool</span></span><a class="headerlink" href="#flam._cfg.SimpleList.is_default_find" title="Link to this definition"></a></dt>
+<dd></dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="flam._cfg.SimpleList.fetch_params">
+<span class="sig-name descname"><span class="pre">fetch_params</span></span><span class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="pre">dict</span><span class="p"><span class="pre">[</span></span><span class="pre">str</span><span class="p"><span class="pre">,</span></span><span class="w"> </span><span class="pre">str</span><span class="p"><span class="pre">]</span></span></span><a class="headerlink" href="#flam._cfg.SimpleList.fetch_params" title="Link to this definition"></a></dt>
 <dd></dd></dl>
 
 <dl class="py property">
@@ -2930,14 +3115,35 @@ Returns a tuple of the subfilter and the index of the first token after the filt
 <dd></dd></dl>
 
 <dl class="py attribute">
+<dt class="sig sig-object py" id="flam._mlf.MLFRole.is_star">
+<span class="sig-name descname"><span class="pre">is_star</span></span><span class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="pre">None</span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><span class="pre">bool</span></span><a class="headerlink" href="#flam._mlf.MLFRole.is_star" title="Link to this definition"></a></dt>
+<dd></dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="flam._mlf.MLFRole.episodes_num">
+<span class="sig-name descname"><span class="pre">episodes_num</span></span><span class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="pre">None</span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><span class="pre">int</span></span><a class="headerlink" href="#flam._mlf.MLFRole.episodes_num" title="Link to this definition"></a></dt>
+<dd></dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="flam._mlf.MLFRole.oscar_noms">
+<span class="sig-name descname"><span class="pre">oscar_noms</span></span><span class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="pre">list</span><span class="p"><span class="pre">[</span></span><span class="pre">str</span><span class="p"><span class="pre">]</span></span></span><a class="headerlink" href="#flam._mlf.MLFRole.oscar_noms" title="Link to this definition"></a></dt>
+<dd></dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="flam._mlf.MLFRole.oscar_wins">
+<span class="sig-name descname"><span class="pre">oscar_wins</span></span><span class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="pre">list</span><span class="p"><span class="pre">[</span></span><span class="pre">str</span><span class="p"><span class="pre">]</span></span></span><a class="headerlink" href="#flam._mlf.MLFRole.oscar_wins" title="Link to this definition"></a></dt>
+<dd></dd></dl>
+
+<dl class="py attribute">
 <dt class="sig sig-object py" id="flam._mlf.MLFRole.characters">
 <span class="sig-name descname"><span class="pre">characters</span></span><span class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="pre">list</span><span class="p"><span class="pre">[</span></span><span class="pre">str</span><span class="p"><span class="pre">]</span></span></span><a class="headerlink" href="#flam._mlf.MLFRole.characters" title="Link to this definition"></a></dt>
 <dd></dd></dl>
 
 <dl class="py attribute">
-<dt class="sig sig-object py" id="flam._mlf.MLFRole.is_star">
-<span class="sig-name descname"><span class="pre">is_star</span></span><span class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="pre">None</span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><span class="pre">bool</span></span><a class="headerlink" href="#flam._mlf.MLFRole.is_star" title="Link to this definition"></a></dt>
-<dd></dd></dl>
+<dt class="sig sig-object py" id="flam._mlf.MLFRole.jobs">
+<span class="sig-name descname"><span class="pre">jobs</span></span><span class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="pre">list</span><span class="p"><span class="pre">[</span></span><span class="pre">str</span><span class="p"><span class="pre">]</span></span></span><a class="headerlink" href="#flam._mlf.MLFRole.jobs" title="Link to this definition"></a></dt>
+<dd><p>For crew type <a class="reference internal" href="#flam._ml.CrewType.ADDITIONAL" title="flam._ml.CrewType.ADDITIONAL"><code class="xref py py-attr docutils literal notranslate"><span class="pre">ADDITIONAL</span></code></a>, this describes what the roles were.</p>
+</dd></dl>
 
 </dd></dl>
 
@@ -2974,7 +3180,8 @@ Returns a tuple of the subfilter and the index of the first token after the filt
 <dl class="py attribute">
 <dt class="sig sig-object py" id="flam._mlf.MLFPerson.gender">
 <span class="sig-name descname"><span class="pre">gender</span></span><span class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="pre">None</span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><span class="pre">str</span></span><a class="headerlink" href="#flam._mlf.MLFPerson.gender" title="Link to this definition"></a></dt>
-<dd></dd></dl>
+<dd><p>The exact strings representing each gender may vary based on where the data was fetched from.</p>
+</dd></dl>
 
 <dl class="py attribute">
 <dt class="sig sig-object py" id="flam._mlf.MLFPerson.height_cm">
@@ -2984,6 +3191,16 @@ Returns a tuple of the subfilter and the index of the first token after the filt
 <dl class="py attribute">
 <dt class="sig sig-object py" id="flam._mlf.MLFPerson.birthday">
 <span class="sig-name descname"><span class="pre">birthday</span></span><span class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="pre">None</span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><span class="pre">date</span></span><a class="headerlink" href="#flam._mlf.MLFPerson.birthday" title="Link to this definition"></a></dt>
+<dd></dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="flam._mlf.MLFPerson.deathday">
+<span class="sig-name descname"><span class="pre">deathday</span></span><span class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="pre">None</span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><span class="pre">date</span></span><a class="headerlink" href="#flam._mlf.MLFPerson.deathday" title="Link to this definition"></a></dt>
+<dd></dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="flam._mlf.MLFPerson.death_reason">
+<span class="sig-name descname"><span class="pre">death_reason</span></span><span class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="pre">None</span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><span class="pre">str</span></span><a class="headerlink" href="#flam._mlf.MLFPerson.death_reason" title="Link to this definition"></a></dt>
 <dd></dd></dl>
 
 <dl class="py attribute">
@@ -3000,7 +3217,7 @@ Returns a tuple of the subfilter and the index of the first token after the filt
 <dl class="py attribute">
 <dt class="sig sig-object py" id="flam._mlf.MLFMoviePerSourceData.canon_listdef">
 <span class="sig-name descname"><span class="pre">canon_listdef</span></span><span class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><a class="reference internal" href="#flam._ldef.CanonListdef" title="flam._ldef.CanonListdef"><span class="pre">CanonListdef</span></a></span><a class="headerlink" href="#flam._mlf.MLFMoviePerSourceData.canon_listdef" title="Link to this definition"></a></dt>
-<dd><p>The list this data belongs to.</p>
+<dd><p>The list this data belongs to. Fetchers should make this equal to the <a class="reference internal" href="#flam._mlf.MovieListFile.abstract_listdef" title="flam._mlf.MovieListFile.abstract_listdef"><code class="xref py py-attr docutils literal notranslate"><span class="pre">MovieListFile.abstract_listdef</span></code></a>.</p>
 </dd></dl>
 
 <dl class="py attribute">
@@ -3009,14 +3226,17 @@ Returns a tuple of the subfilter and the index of the first token after the filt
 <dd></dd></dl>
 
 <dl class="py attribute">
-<dt class="sig sig-object py" id="flam._mlf.MLFMoviePerSourceData.listing_date">
-<span class="sig-name descname"><span class="pre">listing_date</span></span><span class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="pre">None</span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><span class="pre">date</span></span><a class="headerlink" href="#flam._mlf.MLFMoviePerSourceData.listing_date" title="Link to this definition"></a></dt>
-<dd></dd></dl>
+<dt class="sig sig-object py" id="flam._mlf.MLFMoviePerSourceData.list_note">
+<span class="sig-name descname"><span class="pre">list_note</span></span><span class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="pre">None</span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><span class="pre">str</span></span><a class="headerlink" href="#flam._mlf.MLFMoviePerSourceData.list_note" title="Link to this definition"></a></dt>
+<dd><p>This field is for notes specifically attached to the occurrence of the film in this list.</p>
+<p>For the user’s notes about the film in general, use <a class="reference internal" href="#flam._mlf.MLFMovie.my_notes" title="flam._mlf.MLFMovie.my_notes"><code class="xref py py-attr docutils literal notranslate"><span class="pre">MLFMovie.my_notes</span></code></a>.</p>
+</dd></dl>
 
 <dl class="py attribute">
-<dt class="sig sig-object py" id="flam._mlf.MLFMoviePerSourceData.note">
-<span class="sig-name descname"><span class="pre">note</span></span><span class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="pre">None</span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><span class="pre">str</span></span><a class="headerlink" href="#flam._mlf.MLFMoviePerSourceData.note" title="Link to this definition"></a></dt>
-<dd></dd></dl>
+<dt class="sig sig-object py" id="flam._mlf.MLFMoviePerSourceData.listing_date">
+<span class="sig-name descname"><span class="pre">listing_date</span></span><span class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="pre">None</span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><span class="pre">date</span></span><a class="headerlink" href="#flam._mlf.MLFMoviePerSourceData.listing_date" title="Link to this definition"></a></dt>
+<dd><p>The date this movie was added to this list.</p>
+</dd></dl>
 
 </dd></dl>
 
@@ -3032,6 +3252,12 @@ Returns a tuple of the subfilter and the index of the first token after the filt
 <dl class="py attribute">
 <dt class="sig sig-object py" id="flam._mlf.MLFMovie.per_src_data">
 <span class="sig-name descname"><span class="pre">per_src_data</span></span><span class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="pre">list</span><span class="p"><span class="pre">[</span></span><a class="reference internal" href="#flam._mlf.MLFMoviePerSourceData" title="flam._mlf.MLFMoviePerSourceData"><span class="pre">MLFMoviePerSourceData</span></a><span class="p"><span class="pre">]</span></span></span><a class="headerlink" href="#flam._mlf.MLFMovie.per_src_data" title="Link to this definition"></a></dt>
+<dd><p>Data about a movie which is specific to the list from which it came. Fetchers should build this list with only one element.</p>
+</dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="flam._mlf.MLFMovie.media_type">
+<span class="sig-name descname"><span class="pre">media_type</span></span><span class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="pre">None</span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><span class="pre">str</span></span><a class="headerlink" href="#flam._mlf.MLFMovie.media_type" title="Link to this definition"></a></dt>
 <dd></dd></dl>
 
 <dl class="py attribute">
@@ -3040,8 +3266,23 @@ Returns a tuple of the subfilter and the index of the first token after the filt
 <dd></dd></dl>
 
 <dl class="py attribute">
+<dt class="sig sig-object py" id="flam._mlf.MLFMovie.original_title">
+<span class="sig-name descname"><span class="pre">original_title</span></span><span class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="pre">None</span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><span class="pre">str</span></span><a class="headerlink" href="#flam._mlf.MLFMovie.original_title" title="Link to this definition"></a></dt>
+<dd></dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="flam._mlf.MLFMovie.tagline">
+<span class="sig-name descname"><span class="pre">tagline</span></span><span class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="pre">None</span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><span class="pre">str</span></span><a class="headerlink" href="#flam._mlf.MLFMovie.tagline" title="Link to this definition"></a></dt>
+<dd></dd></dl>
+
+<dl class="py attribute">
 <dt class="sig sig-object py" id="flam._mlf.MLFMovie.synopsis">
 <span class="sig-name descname"><span class="pre">synopsis</span></span><span class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="pre">None</span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><span class="pre">str</span></span><a class="headerlink" href="#flam._mlf.MLFMovie.synopsis" title="Link to this definition"></a></dt>
+<dd></dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="flam._mlf.MLFMovie.url">
+<span class="sig-name descname"><span class="pre">url</span></span><span class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="pre">None</span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><span class="pre">str</span></span><a class="headerlink" href="#flam._mlf.MLFMovie.url" title="Link to this definition"></a></dt>
 <dd></dd></dl>
 
 <dl class="py attribute">
@@ -3075,6 +3316,31 @@ Returns a tuple of the subfilter and the index of the first token after the filt
 <dd></dd></dl>
 
 <dl class="py attribute">
+<dt class="sig sig-object py" id="flam._mlf.MLFMovie.likes">
+<span class="sig-name descname"><span class="pre">likes</span></span><span class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="pre">None</span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><span class="pre">int</span></span><a class="headerlink" href="#flam._mlf.MLFMovie.likes" title="Link to this definition"></a></dt>
+<dd></dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="flam._mlf.MLFMovie.is_liked">
+<span class="sig-name descname"><span class="pre">is_liked</span></span><span class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="pre">None</span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><span class="pre">bool</span></span><a class="headerlink" href="#flam._mlf.MLFMovie.is_liked" title="Link to this definition"></a></dt>
+<dd></dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="flam._mlf.MLFMovie.budget_usd">
+<span class="sig-name descname"><span class="pre">budget_usd</span></span><span class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="pre">None</span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><span class="pre">int</span></span><a class="headerlink" href="#flam._mlf.MLFMovie.budget_usd" title="Link to this definition"></a></dt>
+<dd></dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="flam._mlf.MLFMovie.revenue_usd">
+<span class="sig-name descname"><span class="pre">revenue_usd</span></span><span class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="pre">None</span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><span class="pre">int</span></span><a class="headerlink" href="#flam._mlf.MLFMovie.revenue_usd" title="Link to this definition"></a></dt>
+<dd></dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="flam._mlf.MLFMovie.content_rating">
+<span class="sig-name descname"><span class="pre">content_rating</span></span><span class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="pre">None</span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><span class="pre">str</span></span><a class="headerlink" href="#flam._mlf.MLFMovie.content_rating" title="Link to this definition"></a></dt>
+<dd></dd></dl>
+
+<dl class="py attribute">
 <dt class="sig sig-object py" id="flam._mlf.MLFMovie.release_date">
 <span class="sig-name descname"><span class="pre">release_date</span></span><span class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="pre">None</span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><span class="pre">date</span></span><a class="headerlink" href="#flam._mlf.MLFMovie.release_date" title="Link to this definition"></a></dt>
 <dd></dd></dl>
@@ -3082,11 +3348,38 @@ Returns a tuple of the subfilter and the index of the first token after the filt
 <dl class="py attribute">
 <dt class="sig sig-object py" id="flam._mlf.MLFMovie.watch_dates">
 <span class="sig-name descname"><span class="pre">watch_dates</span></span><span class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="pre">list</span><span class="p"><span class="pre">[</span></span><span class="pre">date</span><span class="p"><span class="pre">]</span></span></span><a class="headerlink" href="#flam._mlf.MLFMovie.watch_dates" title="Link to this definition"></a></dt>
+<dd><p>The date(s) you watched this movie. It’s a list in case you’ve seen it more than once and have that data.</p>
+</dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="flam._mlf.MLFMovie.my_notes">
+<span class="sig-name descname"><span class="pre">my_notes</span></span><span class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="pre">list</span><span class="p"><span class="pre">[</span></span><span class="pre">str</span><span class="p"><span class="pre">]</span></span></span><a class="headerlink" href="#flam._mlf.MLFMovie.my_notes" title="Link to this definition"></a></dt>
+<dd><p>What constitutes a “note” is up to the fetcher. For instance, in Letterboxd fetcher it’s the user’s reviews of the film.</p>
+</dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="flam._mlf.MLFMovie.episodes_num">
+<span class="sig-name descname"><span class="pre">episodes_num</span></span><span class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="pre">None</span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><span class="pre">int</span></span><a class="headerlink" href="#flam._mlf.MLFMovie.episodes_num" title="Link to this definition"></a></dt>
+<dd></dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="flam._mlf.MLFMovie.seasons_num">
+<span class="sig-name descname"><span class="pre">seasons_num</span></span><span class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="pre">None</span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><span class="pre">int</span></span><a class="headerlink" href="#flam._mlf.MLFMovie.seasons_num" title="Link to this definition"></a></dt>
+<dd></dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="flam._mlf.MLFMovie.end_date">
+<span class="sig-name descname"><span class="pre">end_date</span></span><span class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="pre">None</span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><span class="pre">date</span></span><a class="headerlink" href="#flam._mlf.MLFMovie.end_date" title="Link to this definition"></a></dt>
 <dd></dd></dl>
 
 <dl class="py attribute">
 <dt class="sig sig-object py" id="flam._mlf.MLFMovie.genres">
 <span class="sig-name descname"><span class="pre">genres</span></span><span class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="pre">list</span><span class="p"><span class="pre">[</span></span><span class="pre">str</span><span class="p"><span class="pre">]</span></span></span><a class="headerlink" href="#flam._mlf.MLFMovie.genres" title="Link to this definition"></a></dt>
+<dd></dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="flam._mlf.MLFMovie.studios">
+<span class="sig-name descname"><span class="pre">studios</span></span><span class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="pre">list</span><span class="p"><span class="pre">[</span></span><span class="pre">str</span><span class="p"><span class="pre">]</span></span></span><a class="headerlink" href="#flam._mlf.MLFMovie.studios" title="Link to this definition"></a></dt>
 <dd></dd></dl>
 
 <dl class="py attribute">
@@ -3123,12 +3416,21 @@ Returns a tuple of the subfilter and the index of the first token after the filt
 <dl class="py attribute">
 <dt class="sig sig-object py" id="flam._mlf.MovieListFile.uid_family">
 <span class="sig-name descname"><span class="pre">uid_family</span></span><span class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="pre">str</span></span><a class="headerlink" href="#flam._mlf.MovieListFile.uid_family" title="Link to this definition"></a></dt>
-<dd></dd></dl>
+<dd><p>Files are “compatible” if they have a matching family. For instance, different IMDb fetchers might all rely on IMDb IDs, so they can all have the same family.</p>
+</dd></dl>
 
 <dl class="py attribute">
 <dt class="sig sig-object py" id="flam._mlf.MovieListFile.movies_by_uid">
 <span class="sig-name descname"><span class="pre">movies_by_uid</span></span><span class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="pre">dict</span><span class="p"><span class="pre">[</span></span><span class="pre">str</span><span class="p"><span class="pre">,</span></span><span class="w"> </span><a class="reference internal" href="#flam._mlf.MLFMovie" title="flam._mlf.MLFMovie"><span class="pre">MLFMovie</span></a><span class="p"><span class="pre">]</span></span></span><a class="headerlink" href="#flam._mlf.MovieListFile.movies_by_uid" title="Link to this definition"></a></dt>
-<dd></dd></dl>
+<dd><p>All the movies in the list. Note that we don’t support multiple occurrences of the same movie.
+Fetchers are free to choose one occurrence to keep at random.</p>
+</dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="flam._mlf.MovieListFile.expiration_date">
+<span class="sig-name descname"><span class="pre">expiration_date</span></span><span class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="pre">None</span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><span class="pre">date</span></span><a class="headerlink" href="#flam._mlf.MovieListFile.expiration_date" title="Link to this definition"></a></dt>
+<dd><p>Some APIs legally require us to not cache data forever. When this date hits, the file will be deleted and everything will have to be re-fetched.</p>
+</dd></dl>
 
 <dl class="py attribute">
 <dt class="sig sig-object py" id="flam._mlf.MovieListFile.people_by_uid">
@@ -3151,6 +3453,12 @@ Returns a tuple of the subfilter and the index of the first token after the filt
 <dt class="sig sig-object py" id="flam._dbg.FlamEnv.LOG2CONSOLE">
 <span class="sig-name descname"><span class="pre">LOG2CONSOLE</span></span><span class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">'FLAM_LOG2CONSOLE'</span></span><a class="headerlink" href="#flam._dbg.FlamEnv.LOG2CONSOLE" title="Link to this definition"></a></dt>
 <dd><p>If <a class="reference internal" href="#flam._dbg.FlamEnv.is_truthy" title="flam._dbg.FlamEnv.is_truthy"><code class="xref py py-attr docutils literal notranslate"><span class="pre">is_truthy</span></code></a>, logs will be printed not just to their log file but also to the console.</p>
+</dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="flam._dbg.FlamEnv.LOGLEVEL">
+<span class="sig-name descname"><span class="pre">LOGLEVEL</span></span><span class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">'FLAM_LOGLEVEL'</span></span><a class="headerlink" href="#flam._dbg.FlamEnv.LOGLEVEL" title="Link to this definition"></a></dt>
+<dd><p>Suppresses logs below this level. See the <a class="reference external" href="https://docs.python.org/3/library/logging.html#levels">python docs on logging levels</a>.</p>
 </dd></dl>
 
 <dl class="py attribute">
@@ -3179,9 +3487,9 @@ Returns a tuple of the subfilter and the index of the first token after the filt
 </dd></dl>
 
 <dl class="py attribute">
-<dt class="sig sig-object py" id="flam._dbg.FlamEnv.LOGLEVEL">
-<span class="sig-name descname"><span class="pre">LOGLEVEL</span></span><span class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">'FLAM_LOGLEVEL'</span></span><a class="headerlink" href="#flam._dbg.FlamEnv.LOGLEVEL" title="Link to this definition"></a></dt>
-<dd><p>Suppresses logs below this level.</p>
+<dt class="sig sig-object py" id="flam._dbg.FlamEnv.TMDB_API_TOKEN">
+<span class="sig-name descname"><span class="pre">TMDB_API_TOKEN</span></span><span class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">'FLAM_TMDB_API_TOKEN'</span></span><a class="headerlink" href="#flam._dbg.FlamEnv.TMDB_API_TOKEN" title="Link to this definition"></a></dt>
+<dd><p>The API read access token granted to you by TMDB for using their API.</p>
 </dd></dl>
 
 <dl class="py property">
@@ -3231,7 +3539,7 @@ Returns a tuple of the subfilter and the index of the first token after the filt
 <li><p>Windows: %LOCALAPPDATA%/film_flam/output.log</p></li>
 <li><p>Linux: ~/.local/state/film_flam/output.log</p></li>
 <li><p>macOS: ~/Library/Logs/film_flam/output.log</p></li>
-<li><p>On other platforms, uses the current directory (./output.log)</p></li>
+<li><p>On unidentified platforms, uses the current directory (./output.log)</p></li>
 </ul>
 <dl class="field-list simple">
 <dt class="field-odd">Return type<span class="colon">:</span></dt>

@@ -6,14 +6,14 @@
   <meta charset="utf-8" /><meta name="viewport" content="width=device-width, initial-scale=1" />
 
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>flam find &mdash; FilmFlam 2026.4.28.dev1777409694 documentation</title>
+  <title>flam find &mdash; FilmFlam 2026.5.25.dev1779735591 documentation</title>
       <link rel="stylesheet" type="text/css" href="../_static/pygments.css?v=80d5e7a1" />
       <link rel="stylesheet" type="text/css" href="../_static/css/theme.css?v=9edc463e" />
 
   
       <script src="../_static/jquery.js?v=5d32c60e"></script>
       <script src="../_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
-      <script src="../_static/documentation_options.js?v=11d3572e"></script>
+      <script src="../_static/documentation_options.js?v=9950e6dc"></script>
       <script src="../_static/doctools.js?v=fd6eb6e6"></script>
       <script src="../_static/sphinx_highlight.js?v=6ffebe34"></script>
     <script src="../_static/js/theme.js"></script>
@@ -42,17 +42,22 @@
   </form>
 </div>
         </div><div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
-              <p class="caption" role="heading"><span class="caption-text">Contents:</span></p>
-<ul class="current">
-<li class="toctree-l1"><a class="reference internal" href="../install.html">Setup</a></li>
-<li class="toctree-l1"><a class="reference internal" href="../examples.html">Examples</a></li>
+              <p class="caption" role="heading"><span class="caption-text">Getting started</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../introduction.html">Introduction</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">Basic concepts</span></p>
+<ul>
 <li class="toctree-l1"><a class="reference internal" href="../findables.html">Findables</a></li>
-<li class="toctree-l1"><a class="reference internal" href="../listdefs.html">Listdefs</a></li>
-<li class="toctree-l1"><a class="reference internal" href="../filters.html">Filters</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../attributes.html">Attributes</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../filters.html">Filters</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../predicates.html">Predicates</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../lists.html">Lists</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../fetchers.html">Fetchers</a></li>
-<li class="toctree-l1 current"><a class="reference internal" href="cli.html">Commandline tool</a><ul class="current">
+</ul>
+<p class="caption" role="heading"><span class="caption-text">Advanced</span></p>
+<ul class="current">
+<li class="toctree-l1 current"><a class="reference internal" href="cli.html">Commandline</a><ul class="current">
 <li class="toctree-l2"><a class="reference internal" href="config.html">flam config</a></li>
 <li class="toctree-l2"><a class="reference internal" href="fetch.html">flam fetch</a></li>
 <li class="toctree-l2 current"><a class="current reference internal" href="#">flam find</a></li>
@@ -77,7 +82,7 @@
           <div role="navigation" aria-label="Page navigation">
   <ul class="wy-breadcrumbs">
       <li><a href="../index.html" class="icon icon-home" aria-label="Home"></a></li>
-          <li class="breadcrumb-item"><a href="cli.html">Commandline tool</a></li>
+          <li class="breadcrumb-item"><a href="cli.html">Commandline</a></li>
       <li class="breadcrumb-item active">flam find</li>
       <li class="wy-breadcrumbs-aside">
             <a href="../_sources/cli/find.rst.txt" rel="nofollow"> View page source</a>
@@ -90,8 +95,9 @@
              
   <section id="flam-find">
 <h1>flam find<a class="headerlink" href="#flam-find" title="Link to this heading"></a></h1>
-<div class="highlight-text notranslate"><div class="highlight"><pre><span></span>usage: flam find [-h] [-s ATTRIBUTES] [-c ATTRIBUTES] [-C {always,auto,never}]
-                 [-d DELIM] [-v] [-r] [-S] [-P {always,auto,never}] [-t]
+<div class="highlight-text notranslate"><div class="highlight"><pre><span></span>usage: flam find [-h] [-s ATTRIBUTES] [-c ATTRIBUTES] [-l ATTRIBUTES]
+                 [-C {always,auto,never}] [-d DELIM] [-v] [-r] [-S]
+                 [-P {always,auto,never}] [-t]
                  FINDABLE [LISTDEF ...] [FILTER ...]
 
 Explore &quot;findables&quot; (movies, people, or roles) in your movie lists, and query for specific ones which answer to some filter.
@@ -99,46 +105,37 @@ Found objects are printed in a nice table format, and you can customize what is 
 
 positional arguments:
   FINDABLE              Choose what to find: movies, people, or roles.
-                        Movies are simply the movies in the list.
                         
-                        People are the people were in the movies in the list. They can be searched per crew type (i.e. &#39;director&#39;, &#39;cast&#39;) or as &#39;any&#39; crew type.
-                        
-                        Roles are an appearance of a specific people in a specific film. Think &quot;Cristoph Waltz in Inglorious Basterds&quot;. They can also be searched per crew type.
-                        So when searching for roles, you will see an entry per person per movie.
-                        Since roles combine a people and a movie, they accept any movie attribute, people attribute, and also their own role attributes.
-                        
-                        Supported crew types: cast, stuntcast, director, writer, producer, composer, cinematographer, editor, any
-                        
-                        People and roles can be &quot;grouped&quot;. Grouping simply combines some people together if they are known collaborators.
-                        For example, if grouping is enabled then the Coen brothers will become a single &quot;people&quot; entry.
-                        Each crew type has its own default grouping mode according to what makes sense, but you can override it
-                        
-                        People and roles support limiting the search to a specific crew type and optionally also group mode, and support comma-delimited several types. Use &#39;crew&#39; to catenate all types.
+                        People and roles support limiting the search to a specific crew type with an optional group mode, or comma-delimited several types. Use &#39;crew&#39; to catenate all types.
                         For roles, it looks like: &#39;cast&#39;, &#39;director:group&#39;, &#39;composer:separate,stuntcast&#39;, &#39;crew&#39;, etc.
                         For people, it looks like &#39;cast-people&#39;, &#39;director-people:group&#39;, etc.
                         
-  LISTDEF               Which lists to search in. They must&#39;ve been previously fetched. See `flam fetch --help` for information about supported forms.
-                        By default searches in all lists configured with --default-find.
+                        Supported crew types: director, assistant-director, producer, executive-producer, composer, cinematographer, choreographer, editor, writer, cast, stuntcast, casting-director, art-director, additional, any
                         
-  FILTER                Search only for findables which pass None.
-                        Filters can check the values of attributes and more. They support standard constructs like &#39;-and&#39;, &#39;-or&#39;, &#39;-not&#39; operators and parenthesized expressions.
-                        See the full documentation for filter syntax.
+                        Read more about findables: https://verpous.github.io/film-flam/findables.html
+                        
+  LISTDEF               Which lists to search in. They must&#39;ve been previously fetched. By default searches in all lists configured with --default-find.
+                        Read more about supported LISTDEFs: https://verpous.github.io/film-flam/lists.html.
+                        
+  FILTER                Search only for findables which pass FILTER.
+                        Read more about filters: https://verpous.github.io/film-flam/filters.html.
 
 options:
   -h, --help            show this help message and exit
   -s ATTRIBUTES, --sort ATTRIBUTES
                         Sort FINDABLEs according to ATTRIBUTES, which is a comma-delimited list of attributes to sort by, in decreasing priority.
                         Each findable type has its own default:
-                            movies      release-year,title,runtime
+                        
+                            movies      release-year,title
                             people      crew-type,group-mode,num-movies,name
-                            roles       crew-type,group-mode,num-movies,name,release-year,title,runtime
-                        See the full documentation for a list of supported attributes.
+                            roles       crew-type,group-mode,num-movies,name,release-year,title
+                        
+                        For a full list of supported attributes: https://verpous.github.io/film-flam/attributes.html.
   -c ATTRIBUTES, --columns ATTRIBUTES
                         Comma-delimited list of attributes of FINDABLE to print.
-                        Each findable type has its own defaults. There are also &quot;smart&quot; defaults which are printed only if certain conditions are met.
                         If ATTRIBUTES starts with a &#39;+&#39; then they will be printed in addition to the defaults instead of instead.
-                        Supports globbing (e.g. &#39;*-date&#39; for all date attributes).
-                        See the full documentation for a list of supported attributes.
+  -l ATTRIBUTES, --split ATTRIBUTES
+                        Comma-delimited list of attributes. If their type is a list, each element will be split into a separate entry.
   -C {always,auto,never}, --color {always,auto,never}
                         Set whether columns should be colored. Defaults to auto.
   -d DELIM, --dsv DELIM

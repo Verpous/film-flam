@@ -6,14 +6,14 @@
   <meta charset="utf-8" /><meta name="viewport" content="width=device-width, initial-scale=1" />
 
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>flam config list &mdash; FilmFlam 2026.4.28.dev1777409694 documentation</title>
+  <title>flam config list &mdash; FilmFlam 2026.5.25.dev1779735591 documentation</title>
       <link rel="stylesheet" type="text/css" href="../_static/pygments.css?v=80d5e7a1" />
       <link rel="stylesheet" type="text/css" href="../_static/css/theme.css?v=9edc463e" />
 
   
       <script src="../_static/jquery.js?v=5d32c60e"></script>
       <script src="../_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
-      <script src="../_static/documentation_options.js?v=11d3572e"></script>
+      <script src="../_static/documentation_options.js?v=9950e6dc"></script>
       <script src="../_static/doctools.js?v=fd6eb6e6"></script>
       <script src="../_static/sphinx_highlight.js?v=6ffebe34"></script>
     <script src="../_static/js/theme.js"></script>
@@ -42,17 +42,22 @@
   </form>
 </div>
         </div><div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
-              <p class="caption" role="heading"><span class="caption-text">Contents:</span></p>
-<ul class="current">
-<li class="toctree-l1"><a class="reference internal" href="../install.html">Setup</a></li>
-<li class="toctree-l1"><a class="reference internal" href="../examples.html">Examples</a></li>
+              <p class="caption" role="heading"><span class="caption-text">Getting started</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../introduction.html">Introduction</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">Basic concepts</span></p>
+<ul>
 <li class="toctree-l1"><a class="reference internal" href="../findables.html">Findables</a></li>
-<li class="toctree-l1"><a class="reference internal" href="../listdefs.html">Listdefs</a></li>
-<li class="toctree-l1"><a class="reference internal" href="../filters.html">Filters</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../attributes.html">Attributes</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../filters.html">Filters</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../predicates.html">Predicates</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../lists.html">Lists</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../fetchers.html">Fetchers</a></li>
-<li class="toctree-l1 current"><a class="reference internal" href="cli.html">Commandline tool</a><ul class="current">
+</ul>
+<p class="caption" role="heading"><span class="caption-text">Advanced</span></p>
+<ul class="current">
+<li class="toctree-l1 current"><a class="reference internal" href="cli.html">Commandline</a><ul class="current">
 <li class="toctree-l2 current"><a class="reference internal" href="config.html">flam config</a><ul class="current">
 <li class="toctree-l3"><a class="reference internal" href="config.extension.html">flam config extension</a></li>
 <li class="toctree-l3 current"><a class="current reference internal" href="#">flam config list</a></li>
@@ -82,7 +87,7 @@
           <div role="navigation" aria-label="Page navigation">
   <ul class="wy-breadcrumbs">
       <li><a href="../index.html" class="icon icon-home" aria-label="Home"></a></li>
-          <li class="breadcrumb-item"><a href="cli.html">Commandline tool</a></li>
+          <li class="breadcrumb-item"><a href="cli.html">Commandline</a></li>
           <li class="breadcrumb-item"><a href="config.html">flam config</a></li>
       <li class="breadcrumb-item active">flam config list</li>
       <li class="wy-breadcrumbs-aside">
@@ -97,18 +102,17 @@
   <section id="flam-config-list">
 <h1>flam config list<a class="headerlink" href="#flam-config-list" title="Link to this heading"></a></h1>
 <div class="highlight-text notranslate"><div class="highlight"><pre><span></span>usage: flam config list [-h] [-E | -D | -P] [-n NEW_NAME] [-i {yes,no,auto}]
-                        [-e {yes,no,auto}]
+                        [-e {yes,no,auto}] [-p PARAM=VALUE] [-d PARAM]
                         [NAME] [LISTDEF]
 
-View, add, edit, or remove &quot;simple&quot; lists. These are lists which are directly copied from some external source like an IMDb list.
+View, add, edit, or remove lists.
 Once configured, lists can be easily used by their name in other commands like `flam fetch`, `flam find`.
+
+Read more about lists: https://verpous.github.io/film-flam/lists.html.
 
 positional arguments:
   NAME                  Operate on the list named NAME.
   LISTDEF               In --edit, set the list type and address to LISTDEF.
-                        LISTDEFs have the form &lt;list type&gt;=&lt;address&gt;, where the list type is some supported way of downloading list information, and the address indicates the exact list to download.
-                        See the full documentation for a list of supported list types. Below is one recommended example for IMDb lists:
-                            imdb-browser-apidev-listid      Takes an IMDb list ID and downloads it by opening the list in the browser and exporting to CSV, then filling in information with https://imdbapi.dev
 
 options:
   -h, --help            show this help message and exit
@@ -121,12 +125,16 @@ options:
                         In --edit, decide if the list should be default for `flam find`.
   -e {yes,no,auto}, --default-fetch {yes,no,auto}
                         In --edit, decide if the list should be default for `flam fetch`.
+  -p PARAM=VALUE, --fetch-param PARAM=VALUE
+                        In --edit, set a parameter for controlling how this list is fetched.
+  -d PARAM, --delete-param PARAM
+                        In --edit, delete a parameter configured with --fetch-param (&#39;*&#39; to delete all).
 
 Examples:
-    flam config list mylist imdb-browser-apidev-listid=083886771
-        (Create a list &#39;mylist&#39;. It&#39;s a local copy of the IMDb list &#39;083886771&#39; - https://www.imdb.com/list/ls083886771/. It&#39;s downloaded via the browser+imdbapi.dev)
+    flam config list mylist imdb-listid=083886771
+        (Create a list &#39;mylist&#39;. It&#39;s a local copy of the IMDb list &#39;083886771&#39; - https://www.imdb.com/list/ls083886771/)
     flam config list mylist --default-fetch=yes --default-find=yes
-        (Modify &#39;mylist&#39; to be default for fetch and find, so if you run `flam fetch` or `flam find` with no arguments they will use this list)
+        (Modify &#39;mylist&#39; to be default for fetch and find, so `flam fetch`, `flam find` with no arguments will use this list)
     flam config list
         (Print all lists)
     flam config list --rename ourlist mylist

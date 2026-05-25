@@ -6,21 +6,21 @@
   <meta charset="utf-8" /><meta name="viewport" content="width=device-width, initial-scale=1" />
 
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Filters &mdash; FilmFlam 2026.4.28.dev1777409694 documentation</title>
+  <title>Filters &mdash; FilmFlam 2026.5.25.dev1779735591 documentation</title>
       <link rel="stylesheet" type="text/css" href="_static/pygments.css?v=80d5e7a1" />
       <link rel="stylesheet" type="text/css" href="_static/css/theme.css?v=9edc463e" />
 
   
       <script src="_static/jquery.js?v=5d32c60e"></script>
       <script src="_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
-      <script src="_static/documentation_options.js?v=11d3572e"></script>
+      <script src="_static/documentation_options.js?v=9950e6dc"></script>
       <script src="_static/doctools.js?v=fd6eb6e6"></script>
       <script src="_static/sphinx_highlight.js?v=6ffebe34"></script>
     <script src="_static/js/theme.js"></script>
     <link rel="index" title="Index" href="genindex.html" />
     <link rel="search" title="Search" href="search.html" />
-    <link rel="next" title="Attributes" href="attributes.html" />
-    <link rel="prev" title="Listdefs" href="listdefs.html" /> 
+    <link rel="next" title="Predicates" href="predicates.html" />
+    <link rel="prev" title="Attributes" href="attributes.html" /> 
 </head>
 
 <body class="wy-body-for-nav"> 
@@ -42,17 +42,25 @@
   </form>
 </div>
         </div><div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
-              <p class="caption" role="heading"><span class="caption-text">Contents:</span></p>
+              <p class="caption" role="heading"><span class="caption-text">Getting started</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="introduction.html">Introduction</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">Basic concepts</span></p>
 <ul class="current">
-<li class="toctree-l1"><a class="reference internal" href="install.html">Setup</a></li>
-<li class="toctree-l1"><a class="reference internal" href="examples.html">Examples</a></li>
 <li class="toctree-l1"><a class="reference internal" href="findables.html">Findables</a></li>
-<li class="toctree-l1"><a class="reference internal" href="listdefs.html">Listdefs</a></li>
-<li class="toctree-l1 current"><a class="current reference internal" href="#">Filters</a></li>
 <li class="toctree-l1"><a class="reference internal" href="attributes.html">Attributes</a></li>
+<li class="toctree-l1 current"><a class="current reference internal" href="#">Filters</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="#formal-syntax">Formal syntax</a></li>
+</ul>
+</li>
 <li class="toctree-l1"><a class="reference internal" href="predicates.html">Predicates</a></li>
+<li class="toctree-l1"><a class="reference internal" href="lists.html">Lists</a></li>
 <li class="toctree-l1"><a class="reference internal" href="fetchers.html">Fetchers</a></li>
-<li class="toctree-l1"><a class="reference internal" href="cli/cli.html">Commandline tool</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">Advanced</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="cli/cli.html">Commandline</a></li>
 <li class="toctree-l1"><a class="reference internal" href="api/api.html">API</a></li>
 <li class="toctree-l1"><a class="reference internal" href="extending.html">Extending Flam</a></li>
 </ul>
@@ -83,15 +91,73 @@
              
   <section id="filters">
 <h1>Filters<a class="headerlink" href="#filters" title="Link to this heading"></a></h1>
-<p>TODO</p>
+<p>Flam lets you easily apply a filter when you search for <a class="reference internal" href="findables.html#findables"><span class="std std-ref">findables</span></a>. Filters can be very simple:</p>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span><span class="c1"># Filter directors to only ones named tarantino.</span>
+flam<span class="w"> </span>find<span class="w"> </span>director<span class="w"> </span>-name<span class="w"> </span>tarantino
+</pre></div>
+</div>
+<p>Or more complex:</p>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span><span class="c1"># Find only movies released since 1980 and which contain at least one actor who was in either Lord of the Rings or Star Wars.</span>
+flam<span class="w"> </span>find<span class="w"> </span>movies<span class="w"> </span>-release-year<span class="w"> </span>+1980<span class="w"> </span>-any-role<span class="w"> </span>cast<span class="w"> </span><span class="o">[</span><span class="w"> </span>-movies<span class="w"> </span>lord.of.the.rings<span class="w"> </span>-o<span class="w"> </span>-movies<span class="w"> </span>star.wars<span class="w"> </span><span class="o">]</span>
+</pre></div>
+</div>
+<p>Filters are essentially a combination of <strong>predicates</strong>. Each predicate checks one thing about the findable object.
+By default predicates are joined together using AND (i.e., <code class="docutils literal notranslate"><span class="pre">-pred1</span> <span class="pre">-pred2</span></code> means “pred1 AND pred2”), but filters support all the standard features you’d expect:</p>
+<ul>
+<li><p>AND: &amp;, -a, -and</p>
+<blockquote>
+<div><p>This is the default</p>
+</div></blockquote>
+</li>
+<li><p>OR: |, -o, -or</p>
+<blockquote>
+<div><p><code class="docutils literal notranslate"><span class="pre">-pred1</span> <span class="pre">-o</span> <span class="pre">-pred2</span></code></p>
+</div></blockquote>
+</li>
+<li><p>NOT: !, -n, -not</p>
+<blockquote>
+<div><p><code class="docutils literal notranslate"><span class="pre">-n</span> <span class="pre">-pred</span></code></p>
+</div></blockquote>
+</li>
+<li><p>Parentheses: [ ], ( ), -lparen -rparen</p>
+<blockquote>
+<div><p>Control the order of operations: <code class="docutils literal notranslate"><span class="pre">[</span> <span class="pre">-pred1</span> <span class="pre">-pred2</span> <span class="pre">]</span> <span class="pre">-o</span> <span class="pre">[</span> <span class="pre">-pred3</span> <span class="pre">-pred4</span> <span class="pre">]</span></code></p>
+</div></blockquote>
+</li>
+</ul>
+<div class="admonition tip">
+<p class="admonition-title">Tip</p>
+<p>Click <a class="reference internal" href="predicates.html#predicates"><span class="std std-ref">here</span></a> to read more about predicates and see a list of all builtin predicates.</p>
+</div>
+<section id="formal-syntax">
+<h2>Formal syntax<a class="headerlink" href="#formal-syntax" title="Link to this heading"></a></h2>
+<p>Below is the formal syntax for filters. Note that filters are case-sensitive!</p>
+<div class="highlight-text notranslate"><div class="highlight"><pre><span></span>FILTER    := PIPELINE | &lt;epsilon&gt;
+PIPELINE  := SINGLE JOINABLE*
+SINGLE    := NEGATIVE | POSITIVE
+POSITIVE  := PREDICATE | [ PIPELINE ]
+NEGATIVE  := NOT POSITIVE
+JOINABLE  := CONJOINED | DISJOINED | SINGLE
+CONJOINED := AND SINGLE
+DISJOINED := OR SINGLE
+PREDICATE := -&lt;name&gt; &lt;arg1&gt; &lt;arg2&gt;...
+
+OR        := -o | -or  | `|`
+AND       := -a | -and | &amp;
+NOT       := -n | -not | !
+[         := [  | (    | -lparen
+]         := ]  | )    | -rparen
+</pre></div>
+</div>
+</section>
 </section>
 
 
            </div>
           </div>
           <footer><div class="rst-footer-buttons" role="navigation" aria-label="Footer">
-        <a href="listdefs.html" class="btn btn-neutral float-left" title="Listdefs" accesskey="p" rel="prev"><span class="fa fa-arrow-circle-left" aria-hidden="true"></span> Previous</a>
-        <a href="attributes.html" class="btn btn-neutral float-right" title="Attributes" accesskey="n" rel="next">Next <span class="fa fa-arrow-circle-right" aria-hidden="true"></span></a>
+        <a href="attributes.html" class="btn btn-neutral float-left" title="Attributes" accesskey="p" rel="prev"><span class="fa fa-arrow-circle-left" aria-hidden="true"></span> Previous</a>
+        <a href="predicates.html" class="btn btn-neutral float-right" title="Predicates" accesskey="n" rel="next">Next <span class="fa fa-arrow-circle-right" aria-hidden="true"></span></a>
     </div>
 
   <hr/>

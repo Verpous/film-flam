@@ -1,12 +1,28 @@
 Attributes
 =======================
 
-TODO
+Attributes are all the information bits you can know about a :ref:`findable <Findables>` object.
+Things like the title of a film, its metascore, the name of a person, his height, etc. are all attributes.
+
+Attributes provide some facilities for using them generically without caring about the specific attribute:
+
+* They let you sort the attribute's values
+* They let you convert values to strings
+* They let you parse those strings back into values
+* Flam generically handles attributes which return lists
+* Flam generically handles attributes whose values are missing (i.e. not available in the fetch source)
+* There are a few more ways that attributes support generic handling
+
+Each attribute is specific to some findable type, but role attributes support any attribute of movies or people!
+
+.. tip::
+
+    Flam supports implementing :ref:`custom attributes <Implementing a custom attribute>`.
 
 List of builtin attributes
 ---------------------------
 
-Note that almost every attribute may return ``None`` if the data is not available.
+Note that almost every attribute may return ``None`` if the data is not available. As a string, it looks like ``'-'``.
 
 Many attributes below support variants. Here are the variants we support:
 
@@ -38,7 +54,7 @@ Ex: ``avg-height`` - the average height of everyone in the movie.
 avg-X-as-CT
 ~~~~~~~~~~~
 
-Any attribute which supports avg-X also supports "avg-X-as-CT", where CT is a crew type.
+Any attribute which supports :ref:`avg-X` also supports "avg-X-as-CT", where CT is a :ref:`crew type <Crew type>`.
 
 For some movie attribute X, "avg-X-as-CT" is a people attribute which returns the average of X across all movies those people were in as the crew type CT.
 
@@ -51,12 +67,12 @@ Ex: ``avg-height-as-cast`` - the average height of all actors in the movie.
 sum-X
 ~~~~~
 
-Same as avg-X, but with summation instead of averaging.
+Same as :ref:`avg-X`, but with summation instead of averaging.
 
 sum-X-as-CT
 ~~~~~~~~~~~
 
-Same as avg-X-as-CT, but with summation instead of averaging.
+Same as :ref:`avg-X-as-CT`, but with summation instead of averaging.
 
 Movie attributes
 ~~~~~~~~~~~~~~~~
@@ -71,9 +87,6 @@ People attributes
 Role attributes
 ~~~~~~~~~~~~~~~
 
-In addition to the below, all movie, people attributes are also valid role attributes.
+In addition to the below, **all movie and people attributes are also valid role attributes!**
 
 .. builtin-attributes:: roles
-
-Implementing a custom attribute
---------------------------------

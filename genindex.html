@@ -5,14 +5,14 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Index &mdash; FilmFlam 2026.4.28.dev1777409694 documentation</title>
+  <title>Index &mdash; FilmFlam 2026.5.25.dev1779735591 documentation</title>
       <link rel="stylesheet" type="text/css" href="_static/pygments.css?v=80d5e7a1" />
       <link rel="stylesheet" type="text/css" href="_static/css/theme.css?v=9edc463e" />
 
   
       <script src="_static/jquery.js?v=5d32c60e"></script>
       <script src="_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
-      <script src="_static/documentation_options.js?v=11d3572e"></script>
+      <script src="_static/documentation_options.js?v=9950e6dc"></script>
       <script src="_static/doctools.js?v=fd6eb6e6"></script>
       <script src="_static/sphinx_highlight.js?v=6ffebe34"></script>
     <script src="_static/js/theme.js"></script>
@@ -39,17 +39,22 @@
   </form>
 </div>
         </div><div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
-              <p class="caption" role="heading"><span class="caption-text">Contents:</span></p>
+              <p class="caption" role="heading"><span class="caption-text">Getting started</span></p>
 <ul>
-<li class="toctree-l1"><a class="reference internal" href="install.html">Setup</a></li>
-<li class="toctree-l1"><a class="reference internal" href="examples.html">Examples</a></li>
+<li class="toctree-l1"><a class="reference internal" href="introduction.html">Introduction</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">Basic concepts</span></p>
+<ul>
 <li class="toctree-l1"><a class="reference internal" href="findables.html">Findables</a></li>
-<li class="toctree-l1"><a class="reference internal" href="listdefs.html">Listdefs</a></li>
-<li class="toctree-l1"><a class="reference internal" href="filters.html">Filters</a></li>
 <li class="toctree-l1"><a class="reference internal" href="attributes.html">Attributes</a></li>
+<li class="toctree-l1"><a class="reference internal" href="filters.html">Filters</a></li>
 <li class="toctree-l1"><a class="reference internal" href="predicates.html">Predicates</a></li>
+<li class="toctree-l1"><a class="reference internal" href="lists.html">Lists</a></li>
 <li class="toctree-l1"><a class="reference internal" href="fetchers.html">Fetchers</a></li>
-<li class="toctree-l1"><a class="reference internal" href="cli/cli.html">Commandline tool</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">Advanced</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="cli/cli.html">Commandline</a></li>
 <li class="toctree-l1"><a class="reference internal" href="api/api.html">API</a></li>
 <li class="toctree-l1"><a class="reference internal" href="extending.html">Extending Flam</a></li>
 </ul>
@@ -95,6 +100,7 @@
  | <a href="#L"><strong>L</strong></a>
  | <a href="#M"><strong>M</strong></a>
  | <a href="#N"><strong>N</strong></a>
+ | <a href="#O"><strong>O</strong></a>
  | <a href="#P"><strong>P</strong></a>
  | <a href="#Q"><strong>Q</strong></a>
  | <a href="#R"><strong>R</strong></a>
@@ -149,9 +155,9 @@
 </li>
         <li><a href="api/flam.html#flam._filter.EatParams.__init__">(EatParams method)</a>
 </li>
-        <li><a href="api/flam.html#flam._ctx.FlamContext.__init__">(FlamContext method)</a>
+        <li><a href="api/flam.html#flam._fetch.Fetcher.__init__">(Fetcher method)</a>
 </li>
-        <li><a href="api/flam.html#flam._fetch.ListFetcher.__init__">(ListFetcher method)</a>
+        <li><a href="api/flam.html#flam._ctx.FlamContext.__init__">(FlamContext method)</a>
 </li>
         <li><a href="api/flam.utils.html#flam.utils.ProgressBar.__init__">(ProgressBar method)</a>
 </li>
@@ -164,7 +170,7 @@
       </ul></li>
   </ul></td>
   <td style="width: 33%; vertical-align: top;"><ul>
-      <li><a href="api/flam.html#flam._fetch.ListFetcher.__init_subclass__">__init_subclass__() (ListFetcher class method)</a>
+      <li><a href="api/flam.html#flam._fetch.Fetcher.__init_subclass__">__init_subclass__() (Fetcher class method)</a>
 
       <ul>
         <li><a href="api/flam.html#flam._filter.Predicate.__init_subclass__">(Predicate class method)</a>
@@ -178,9 +184,9 @@
         <li><a href="api/flam.html#flam._ctx.RegistriesOf.__iter__">(RegistriesOf method)</a>
 </li>
       </ul></li>
-      <li><a href="api/flam.html#flam._fetch.ListFetcher._checkpoint">_checkpoint() (ListFetcher method)</a>
+      <li><a href="api/flam.html#flam._fetch.Fetcher._checkpoint">_checkpoint() (Fetcher method)</a>
 </li>
-      <li><a href="api/flam.html#flam._fetch.ListFetcher._fetch_into_file">_fetch_into_file() (ListFetcher method)</a>
+      <li><a href="api/flam.html#flam._fetch.Fetcher._fetch_into_file">_fetch_into_file() (Fetcher method)</a>
 </li>
       <li><a href="api/flam.html#flam._attr.Attribute._parse_primitive_not_none">_parse_primitive_not_none() (Attribute method)</a>
 </li>
@@ -195,7 +201,7 @@
       <li><a href="api/flam.html#flam._cfg.CompositeList.abstract_listdef">abstract_listdef (CompositeList property)</a>
 
       <ul>
-        <li><a href="api/flam.html#flam._fetch.ListFetcher.abstract_listdef">(ListFetcher property)</a>
+        <li><a href="api/flam.html#flam._fetch.Fetcher.abstract_listdef">(Fetcher property)</a>
 </li>
         <li><a href="api/flam.html#flam._ml.MovieList.abstract_listdef">(MovieList property)</a>
 </li>
@@ -204,6 +210,8 @@
         <li><a href="api/flam.html#flam._cfg.SimpleList.abstract_listdef">(SimpleList property)</a>
 </li>
       </ul></li>
+      <li><a href="api/flam.html#flam._ml.CrewType.ADDITIONAL">ADDITIONAL (CrewType attribute)</a>
+</li>
       <li><a href="api/flam.html#flam._ldef.CanonListdef.address">address (CanonListdef attribute)</a>
 </li>
       <li><a href="api/flam.html#flam._attr.Attribute.aliases_without_type">aliases_without_type (Attribute property)</a>
@@ -223,6 +231,10 @@
       <li><a href="api/flam.html#flam._ml.People.are_in_movie">are_in_movie() (People method)</a>
 </li>
       <li><a href="api/flam.attrutils.html#flam.attrutils.ArrayLengthAttribute">ArrayLengthAttribute (class in flam.attrutils)</a>
+</li>
+      <li><a href="api/flam.html#flam._ml.CrewType.ART_DIRECTOR">ART_DIRECTOR (CrewType attribute)</a>
+</li>
+      <li><a href="api/flam.html#flam._ml.CrewType.ASSISTANT_DIRECTOR">ASSISTANT_DIRECTOR (CrewType attribute)</a>
 </li>
       <li><a href="api/flam.html#flam._ml.People.associated_movies">associated_movies() (People method)</a>
 </li>
@@ -256,15 +268,17 @@
 </li>
       <li><a href="api/flam.attrutils.html#flam.attrutils.BOOL_HANDLER">BOOL_HANDLER (in module flam.attrutils)</a>
 </li>
-  </ul></td>
-  <td style="width: 33%; vertical-align: top;"><ul>
       <li><a href="api/flam.attrutils.html#flam.attrutils.BoolHandler">BoolHandler (class in flam.attrutils)</a>
 </li>
+  </ul></td>
+  <td style="width: 33%; vertical-align: top;"><ul>
       <li><a href="api/flam.html#flam._filter.Pipeline.BOTHPAREN">BOTHPAREN (Pipeline attribute)</a>
 </li>
       <li><a href="api/flam.html#flam._dbg.FlamEnv.BROWSER">BROWSER (FlamEnv attribute)</a>
 </li>
       <li><a href="api/flam.html#flam._dbg.FlamEnv.BROWSER_PROFILE">BROWSER_PROFILE (FlamEnv attribute)</a>
+</li>
+      <li><a href="api/flam.html#flam._mlf.MLFMovie.budget_usd">budget_usd (MLFMovie attribute)</a>
 </li>
   </ul></td>
 </tr></table>
@@ -278,9 +292,13 @@
 </li>
       <li><a href="api/flam.html#flam._ml.CrewType.CAST">CAST (CrewType attribute)</a>
 </li>
+      <li><a href="api/flam.html#flam._ml.CrewType.CASTING_DIRECTOR">CASTING_DIRECTOR (CrewType attribute)</a>
+</li>
       <li><a href="api/flam.html#flam._ctx.FlamContext.cfg_readonly">cfg_readonly (FlamContext property)</a>
 </li>
       <li><a href="api/flam.html#flam._mlf.MLFRole.characters">characters (MLFRole attribute)</a>
+</li>
+      <li><a href="api/flam.html#flam._ml.CrewType.CHOREOGRAPHER">CHOREOGRAPHER (CrewType attribute)</a>
 </li>
       <li><a href="api/flam.html#flam._ml.CrewType.CINEMATOGRAPHER">CINEMATOGRAPHER (CrewType attribute)</a>
 </li>
@@ -306,6 +324,12 @@
 </li>
       <li><a href="api/flam.html#flam._ctx.FlamContext.compile_filter">compile_filter() (FlamContext method)</a>
 </li>
+      <li><a href="api/flam.html#flam._ctx.FlamContext.compile_movies_filter">compile_movies_filter() (FlamContext method)</a>
+</li>
+      <li><a href="api/flam.html#flam._ctx.FlamContext.compile_people_filter">compile_people_filter() (FlamContext method)</a>
+</li>
+      <li><a href="api/flam.html#flam._ctx.FlamContext.compile_roles_filter">compile_roles_filter() (FlamContext method)</a>
+</li>
       <li><a href="api/flam.html#flam._reg.compose_qualified_attr_or_pred_name">compose_qualified_attr_or_pred_name() (in module flam._reg)</a>
 </li>
       <li><a href="api/flam.html#flam._ml.People.compose_uid">compose_uid() (People class method)</a>
@@ -316,17 +340,17 @@
       </ul></li>
       <li><a href="api/flam.html#flam._ml.CrewType.COMPOSER">COMPOSER (CrewType attribute)</a>
 </li>
+  </ul></td>
+  <td style="width: 33%; vertical-align: top;"><ul>
       <li><a href="api/flam.html#flam._ldef.SpecialListType.COMPOSITE">COMPOSITE (SpecialListType attribute)</a>
 </li>
       <li><a href="api/flam.html#flam._cfg.Configuration.composite_lists">composite_lists (Configuration property)</a>
 </li>
-  </ul></td>
-  <td style="width: 33%; vertical-align: top;"><ul>
       <li><a href="api/flam.html#flam._cfg.Configuration.composite_lists_raw">composite_lists_raw (Configuration attribute)</a>
 </li>
       <li><a href="api/flam.html#flam._cfg.CompositeList">CompositeList (class in flam._cfg)</a>
 </li>
-      <li><a href="api/flam.html#flam._fetch.ListFetcher.concrete_listdef">concrete_listdef (ListFetcher property)</a>
+      <li><a href="api/flam.html#flam._fetch.Fetcher.concrete_listdef">concrete_listdef (Fetcher property)</a>
 
       <ul>
         <li><a href="api/flam.html#flam._cfg.SimpleList.concrete_listdef">(SimpleList attribute)</a>
@@ -341,6 +365,8 @@
       <li><a href="api/flam.html#flam._filter.Conjoined.CONJOIN">CONJOIN (Conjoined attribute)</a>
 </li>
       <li><a href="api/flam.html#flam._filter.Conjoined">Conjoined (class in flam._filter)</a>
+</li>
+      <li><a href="api/flam.html#flam._mlf.MLFMovie.content_rating">content_rating (MLFMovie attribute)</a>
 </li>
       <li><a href="api/flam.html#flam._mlf.MLFMovie.countries">countries (MLFMovie attribute)</a>
 
@@ -386,6 +412,10 @@
 </li>
       <li><a href="api/flam.attrutils.html#flam.attrutils.DateHandler">DateHandler (class in flam.attrutils)</a>
 </li>
+      <li><a href="api/flam.html#flam._mlf.MLFPerson.death_reason">death_reason (MLFPerson attribute)</a>
+</li>
+      <li><a href="api/flam.html#flam._mlf.MLFPerson.deathday">deathday (MLFPerson attribute)</a>
+</li>
       <li><a href="api/flam.html#flam._dbg.FlamEnv.DEBUG">DEBUG (FlamEnv attribute)</a>
 </li>
       <li><a href="api/flam.html#flam._reg.decompose_qualified_attr_or_pred_name">decompose_qualified_attr_or_pred_name() (in module flam._reg)</a>
@@ -400,10 +430,10 @@
 </li>
       <li><a href="api/flam.html#flam._ctx.DEFAULT_FLAM_DIR">DEFAULT_FLAM_DIR (in module flam._ctx)</a>
 </li>
-      <li><a href="api/flam.html#flam._ml.CrewType.default_group_mode">default_group_mode (CrewType property)</a>
-</li>
   </ul></td>
   <td style="width: 33%; vertical-align: top;"><ul>
+      <li><a href="api/flam.html#flam._ml.CrewType.default_group_mode">default_group_mode (CrewType property)</a>
+</li>
       <li><a href="api/flam.attrutils.html#flam.attrutils.EasyAttributeParams.default_max_len">default_max_len (EasyAttributeParams attribute)</a>
 </li>
       <li><a href="api/flam.html#flam._attr.Attribute.default_op">default_op (Attribute property)</a>
@@ -454,18 +484,26 @@
 </li>
       <li><a href="api/flam.html#flam._filter.FilterMember.eat_one_of">eat_one_of() (FilterMember class method)</a>
 </li>
-      <li><a href="api/flam.html#flam._filter.FilterMember.eat_single">eat_single() (FilterMember class method)</a>
-</li>
       <li><a href="api/flam.html#flam._filter.FilterMember.eat_str">eat_str() (FilterMember class method)</a>
+</li>
+      <li><a href="api/flam.html#flam._filter.FilterMember.eat_subfilter">eat_subfilter() (FilterMember class method)</a>
 </li>
       <li><a href="api/flam.html#flam._filter.FilterMember.eat_type">eat_type() (FilterMember class method)</a>
 </li>
-  </ul></td>
-  <td style="width: 33%; vertical-align: top;"><ul>
       <li><a href="api/flam.html#flam._filter.EatParams">EatParams (class in flam._filter)</a>
 </li>
       <li><a href="api/flam.html#flam._ml.CrewType.EDITOR">EDITOR (CrewType attribute)</a>
 </li>
+  </ul></td>
+  <td style="width: 33%; vertical-align: top;"><ul>
+      <li><a href="api/flam.html#flam._mlf.MLFMovie.end_date">end_date (MLFMovie attribute)</a>
+</li>
+      <li><a href="api/flam.html#flam._mlf.MLFMovie.episodes_num">episodes_num (MLFMovie attribute)</a>
+
+      <ul>
+        <li><a href="api/flam.html#flam._mlf.MLFRole.episodes_num">(MLFRole attribute)</a>
+</li>
+      </ul></li>
       <li><a href="api/flam.html#flam._attr.ComparisonOp.EQ">EQ (ComparisonOp attribute)</a>
 </li>
       <li><a href="api/flam.html#flam._ctx.PrecachePreference.EVERYTHING">EVERYTHING (PrecachePreference attribute)</a>
@@ -484,6 +522,10 @@
         <li><a href="api/flam.html#flam._filter.Predicate.excrete">(Predicate method)</a>
 </li>
       </ul></li>
+      <li><a href="api/flam.html#flam._ml.CrewType.EXECUTIVE_PRODUCER">EXECUTIVE_PRODUCER (CrewType attribute)</a>
+</li>
+      <li><a href="api/flam.html#flam._mlf.MovieListFile.expiration_date">expiration_date (MovieListFile attribute)</a>
+</li>
       <li><a href="api/flam.html#flam._cfg.Configuration.extensions">extensions (Configuration attribute)</a>
 </li>
       <li><a href="api/flam.html#flam._ml.Findable.extract">extract() (Findable method)</a>
@@ -497,6 +539,10 @@
 <table style="width: 100%" class="indextable genindextable"><tr>
   <td style="width: 33%; vertical-align: top;"><ul>
       <li><a href="api/flam.html#flam._ctx.FlamContext.fetch">fetch() (FlamContext method)</a>
+</li>
+      <li><a href="api/flam.html#flam._cfg.SimpleList.fetch_params">fetch_params (SimpleList attribute)</a>
+</li>
+      <li><a href="api/flam.html#flam._fetch.Fetcher">Fetcher (class in flam._fetch)</a>
 </li>
       <li><a href="api/flam.html#flam._ctx.FlamContext.fetchers">fetchers (FlamContext property)</a>
 </li>
@@ -702,6 +748,8 @@
 </li>
       <li><a href="api/flam.html#flam._dbg.FlamEnv.get_or_default">get_or_default() (FlamEnv method)</a>
 </li>
+      <li><a href="api/flam.html#flam._fetch.Fetcher.get_param">get_param() (Fetcher method)</a>
+</li>
       <li><a href="api/flam.html#flam._ml.MovieList.get_people_by_uid">get_people_by_uid() (MovieList method)</a>
 </li>
       <li><a href="api/flam.html#flam._ml.MovieList.get_role_by_uid">get_role_by_uid() (MovieList method)</a>
@@ -725,6 +773,10 @@
 
 <h2 id="H">H</h2>
 <table style="width: 100%" class="indextable genindextable"><tr>
+  <td style="width: 33%; vertical-align: top;"><ul>
+      <li><a href="api/flam.html#flam._fetch.Fetcher.has_param">has_param() (Fetcher method)</a>
+</li>
+  </ul></td>
   <td style="width: 33%; vertical-align: top;"><ul>
       <li><a href="api/flam.html#flam._mlf.MLFPerson.height_cm">height_cm (MLFPerson attribute)</a>
 </li>
@@ -770,6 +822,8 @@
 </li>
       <li><a href="api/flam.html#flam._filter.Filter.is_empty">is_empty (Filter property)</a>
 </li>
+      <li><a href="api/flam.html#flam._mlf.MLFMovie.is_liked">is_liked (MLFMovie attribute)</a>
+</li>
       <li><a href="api/flam.html#flam._ldef.CanonListdef.is_special">is_special (CanonListdef property)</a>
 </li>
       <li><a href="api/flam.html#flam._mlf.MLFRole.is_star">is_star (MLFRole attribute)</a>
@@ -786,6 +840,10 @@
 <h2 id="J">J</h2>
 <table style="width: 100%" class="indextable genindextable"><tr>
   <td style="width: 33%; vertical-align: top;"><ul>
+      <li><a href="api/flam.html#flam._mlf.MLFRole.jobs">jobs (MLFRole attribute)</a>
+</li>
+  </ul></td>
+  <td style="width: 33%; vertical-align: top;"><ul>
       <li><a href="api/flam.html#flam._exc.FilterSyntaxError.join_tokens">join_tokens() (FilterSyntaxError class method)</a>
 </li>
   </ul></td>
@@ -798,11 +856,13 @@
 </li>
       <li><a href="api/flam.html#flam._attr.ComparisonOp.LE">LE (ComparisonOp attribute)</a>
 </li>
+      <li><a href="api/flam.html#flam._mlf.MLFMovie.likes">likes (MLFMovie attribute)</a>
+</li>
       <li><a href="api/flam.html#flam._mlf.MLFMoviePerSourceData.list_index">list_index (MLFMoviePerSourceData attribute)</a>
 </li>
-      <li><a href="api/flam.html#flam._ldef.CanonListdef.list_type">list_type (CanonListdef attribute)</a>
+      <li><a href="api/flam.html#flam._mlf.MLFMoviePerSourceData.list_note">list_note (MLFMoviePerSourceData attribute)</a>
 </li>
-      <li><a href="api/flam.html#flam._fetch.ListFetcher">ListFetcher (class in flam._fetch)</a>
+      <li><a href="api/flam.html#flam._ldef.CanonListdef.list_type">list_type (CanonListdef attribute)</a>
 </li>
       <li><a href="api/flam.html#flam._mlf.MLFMoviePerSourceData.listing_date">listing_date (MLFMoviePerSourceData attribute)</a>
 </li>
@@ -828,6 +888,8 @@
 <h2 id="M">M</h2>
 <table style="width: 100%" class="indextable genindextable"><tr>
   <td style="width: 33%; vertical-align: top;"><ul>
+      <li><a href="api/flam.html#flam._mlf.MLFMovie.media_type">media_type (MLFMovie attribute)</a>
+</li>
       <li><a href="api/flam.html#flam._mlf.MLFMovie.metascore">metascore (MLFMovie attribute)</a>
 </li>
       <li><a href="api/flam.html#flam._mlf.MLFMovie.metascore_votes">metascore_votes (MLFMovie attribute)</a>
@@ -893,6 +955,8 @@
       </ul></li>
   </ul></td>
   <td style="width: 33%; vertical-align: top;"><ul>
+      <li><a href="api/flam.utils.html#flam.utils.move_clobber">move_clobber() (in module flam.utils)</a>
+</li>
       <li><a href="api/flam.html#flam._ml.Movie">Movie (class in flam._ml)</a>
 </li>
       <li><a href="api/flam.html#flam._ml.Role.movie">movie (Role property)</a>
@@ -910,6 +974,8 @@
       <li><a href="api/flam.html#flam._ml.FindableType.MOVIES">MOVIES (FindableType attribute)</a>
 </li>
       <li><a href="api/flam.html#flam._mlf.MovieListFile.movies_by_uid">movies_by_uid (MovieListFile attribute)</a>
+</li>
+      <li><a href="api/flam.html#flam._mlf.MLFMovie.my_notes">my_notes (MLFMovie attribute)</a>
 </li>
       <li><a href="api/flam.html#flam._mlf.MLFMovie.my_rating">my_rating (MLFMovie attribute)</a>
 </li>
@@ -945,9 +1011,21 @@
 </li>
       <li><a href="api/flam.html#flam._attr.Attribute.NONE_STR">NONE_STR (Attribute attribute)</a>
 </li>
-      <li><a href="api/flam.html#flam._mlf.MLFMoviePerSourceData.note">note (MLFMoviePerSourceData attribute)</a>
-</li>
       <li><a href="api/flam.utils.html#flam.utils.num_pretty">num_pretty() (in module flam.utils)</a>
+</li>
+  </ul></td>
+</tr></table>
+
+<h2 id="O">O</h2>
+<table style="width: 100%" class="indextable genindextable"><tr>
+  <td style="width: 33%; vertical-align: top;"><ul>
+      <li><a href="api/flam.html#flam._mlf.MLFMovie.original_title">original_title (MLFMovie attribute)</a>
+</li>
+  </ul></td>
+  <td style="width: 33%; vertical-align: top;"><ul>
+      <li><a href="api/flam.html#flam._mlf.MLFRole.oscar_noms">oscar_noms (MLFRole attribute)</a>
+</li>
+      <li><a href="api/flam.html#flam._mlf.MLFRole.oscar_wins">oscar_wins (MLFRole attribute)</a>
 </li>
   </ul></td>
 </tr></table>
@@ -955,13 +1033,11 @@
 <h2 id="P">P</h2>
 <table style="width: 100%" class="indextable genindextable"><tr>
   <td style="width: 33%; vertical-align: top;"><ul>
-      <li><a href="api/flam.html#flam._ldef.CanonListdef.parse">parse() (CanonListdef class method)</a>
-
-      <ul>
-        <li><a href="api/flam.attrutils.html#flam.attrutils.TypeHandler.parse">(TypeHandler method)</a>
+      <li><a href="api/flam.attrutils.html#flam.attrutils.TypeHandler.parse">parse() (TypeHandler method)</a>
 </li>
-      </ul></li>
       <li><a href="api/flam.html#flam._ml.parse_ct_gm">parse_ct_gm() (in module flam._ml)</a>
+</li>
+      <li><a href="api/flam.html#flam._ctx.FlamContext.parse_listdef">parse_listdef() (FlamContext method)</a>
 </li>
       <li><a href="api/flam.utils.html#flam.utils.parse_num_pretty">parse_num_pretty() (in module flam.utils)</a>
 </li>
@@ -1014,7 +1090,7 @@
       <li><a href="api/flam.html#flam._attr.Attribute.qualified_aliases">qualified_aliases (Attribute property)</a>
 
       <ul>
-        <li><a href="api/flam.html#flam._fetch.ListFetcher.qualified_aliases">(ListFetcher attribute)</a>
+        <li><a href="api/flam.html#flam._fetch.Fetcher.qualified_aliases">(Fetcher attribute)</a>
 </li>
         <li><a href="api/flam.html#flam._filter.Predicate.qualified_aliases">(Predicate attribute)</a>
 </li>
@@ -1024,7 +1100,7 @@
       <li><a href="api/flam.html#flam._attr.Attribute.qualified_name">qualified_name (Attribute property)</a>
 
       <ul>
-        <li><a href="api/flam.html#flam._fetch.ListFetcher.qualified_name">(ListFetcher attribute)</a>
+        <li><a href="api/flam.html#flam._fetch.Fetcher.qualified_name">(Fetcher attribute)</a>
 </li>
         <li><a href="api/flam.html#flam._filter.Predicate.qualified_name">(Predicate attribute)</a>
 </li>
@@ -1037,10 +1113,12 @@
   <td style="width: 33%; vertical-align: top;"><ul>
       <li><a href="api/flam.html#flam._mlf.MLFMovie.rating">rating (MLFMovie attribute)</a>
 </li>
-      <li><a href="api/flam.html#flam._reg.register">register() (in module flam._reg)</a>
+      <li><a href="api/flam.html#flam._ctx.RegistriesOf.raw_iterate">raw_iterate() (RegistriesOf method)</a>
+</li>
+      <li><a href="api/flam.html#flam._ctx.FlamContext.register">register() (FlamContext method)</a>
 
       <ul>
-        <li><a href="api/flam.html#flam._ctx.RegistriesOf.register">(RegistriesOf method)</a>
+        <li><a href="api/flam.html#flam._reg.register">(in module flam._reg)</a>
 </li>
       </ul></li>
       <li><a href="api/flam.html#flam._ctx.RegistriesOf">RegistriesOf (class in flam._ctx)</a>
@@ -1065,6 +1143,8 @@
 </li>
       <li><a href="api/flam.html#flam._ctx.PrecachePreference.RESET">RESET (PrecachePreference attribute)</a>
 </li>
+      <li><a href="api/flam.html#flam._mlf.MLFMovie.revenue_usd">revenue_usd (MLFMovie attribute)</a>
+</li>
       <li><a href="api/flam.html#flam._ml.Role">Role (class in flam._ml)</a>
 </li>
       <li><a href="api/flam.attrutils.html#flam.attrutils.RoleExtractor">RoleExtractor (in module flam.attrutils)</a>
@@ -1087,6 +1167,8 @@
 <h2 id="S">S</h2>
 <table style="width: 100%" class="indextable genindextable"><tr>
   <td style="width: 33%; vertical-align: top;"><ul>
+      <li><a href="api/flam.html#flam._mlf.MLFMovie.seasons_num">seasons_num (MLFMovie attribute)</a>
+</li>
       <li><a href="api/flam.html#flam._ml.GroupMode.SEPARATE">SEPARATE (GroupMode attribute)</a>
 </li>
       <li><a href="api/flam.html#flam._ldef.SpecialListType.SIMPLE">SIMPLE (SpecialListType attribute)</a>
@@ -1107,9 +1189,11 @@
 </li>
       <li><a href="api/flam.html#flam._ldef.SpecialListType">SpecialListType (class in flam._ldef)</a>
 </li>
+      <li><a href="api/flam.utils.html#flam.utils.stable_dedup">stable_dedup() (in module flam.utils)</a>
+</li>
   </ul></td>
   <td style="width: 33%; vertical-align: top;"><ul>
-      <li><a href="api/flam.utils.html#flam.utils.stable_dedup">stable_dedup() (in module flam.utils)</a>
+      <li><a href="api/flam.utils.html#flam.utils.str2bool">str2bool() (in module flam.utils)</a>
 </li>
       <li><a href="api/flam.attrutils.html#flam.attrutils.STR_HANDLER">STR_HANDLER (in module flam.attrutils)</a>
 </li>
@@ -1127,6 +1211,8 @@
 </li>
       <li><a href="api/flam.attrutils.html#flam.attrutils.DateHandler.strip">strip() (DateHandler method)</a>
 </li>
+      <li><a href="api/flam.html#flam._mlf.MLFMovie.studios">studios (MLFMovie attribute)</a>
+</li>
       <li><a href="api/flam.html#flam._ml.CrewType.STUNTCAST">STUNTCAST (CrewType attribute)</a>
 </li>
       <li><a href="api/flam.attrutils.html#flam.attrutils.SumAttribute">SumAttribute (class in flam.attrutils)</a>
@@ -1141,11 +1227,15 @@
   <td style="width: 33%; vertical-align: top;"><ul>
       <li><a href="api/flam.utils.html#flam.utils.tabulate">tabulate() (in module flam.utils)</a>
 </li>
+      <li><a href="api/flam.html#flam._mlf.MLFMovie.tagline">tagline (MLFMovie attribute)</a>
+</li>
       <li><a href="api/flam.utils.html#flam.utils.Timeout.tick">tick() (Timeout method)</a>
 </li>
       <li><a href="api/flam.utils.html#flam.utils.Timeout">Timeout (class in flam.utils)</a>
 </li>
       <li><a href="api/flam.html#flam._mlf.MLFMovie.title">title (MLFMovie attribute)</a>
+</li>
+      <li><a href="api/flam.html#flam._dbg.FlamEnv.TMDB_API_TOKEN">TMDB_API_TOKEN (FlamEnv attribute)</a>
 </li>
       <li><a href="api/flam.html#flam._filter.EatParams.tokens">tokens (EatParams attribute)</a>
 </li>
@@ -1155,10 +1245,10 @@
 </li>
       <li><a href="api/flam.utils.html#flam.utils.TruncationStyle.TRIM_MIDDLE">TRIM_MIDDLE (TruncationStyle attribute)</a>
 </li>
-      <li><a href="api/flam.utils.html#flam.utils.TruncationStyle.TRIM_START">TRIM_START (TruncationStyle attribute)</a>
-</li>
   </ul></td>
   <td style="width: 33%; vertical-align: top;"><ul>
+      <li><a href="api/flam.utils.html#flam.utils.TruncationStyle.TRIM_START">TRIM_START (TruncationStyle attribute)</a>
+</li>
       <li><a href="api/flam.utils.html#flam.utils.truncate">truncate() (in module flam.utils)</a>
 </li>
       <li><a href="api/flam.attrutils.html#flam.attrutils.EasyAttributeParams.truncation_style">truncation_style (EasyAttributeParams attribute)</a>
@@ -1205,7 +1295,7 @@
       </ul></li>
   </ul></td>
   <td style="width: 33%; vertical-align: top;"><ul>
-      <li><a href="api/flam.html#flam._fetch.ListFetcher.uid_family">uid_family (ListFetcher attribute)</a>
+      <li><a href="api/flam.html#flam._fetch.Fetcher.uid_family">uid_family (Fetcher attribute)</a>
 
       <ul>
         <li><a href="api/flam.html#flam._ml.MovieList.uid_family">(MovieList property)</a>
@@ -1220,6 +1310,8 @@
       <li><a href="api/flam.html#flam._ml.MovieList.underlying_file_readonly">underlying_file_readonly (MovieList property)</a>
 </li>
       <li><a href="api/flam.html#flam._ml.Role.underlying_file_roles_readonly">underlying_file_roles_readonly (Role property)</a>
+</li>
+      <li><a href="api/flam.html#flam._mlf.MLFMovie.url">url (MLFMovie attribute)</a>
 </li>
   </ul></td>
 </tr></table>

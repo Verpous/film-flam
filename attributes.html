@@ -6,21 +6,21 @@
   <meta charset="utf-8" /><meta name="viewport" content="width=device-width, initial-scale=1" />
 
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Attributes &mdash; FilmFlam 2026.4.28.dev1777409694 documentation</title>
+  <title>Attributes &mdash; FilmFlam 2026.5.25.dev1779735591 documentation</title>
       <link rel="stylesheet" type="text/css" href="_static/pygments.css?v=80d5e7a1" />
       <link rel="stylesheet" type="text/css" href="_static/css/theme.css?v=9edc463e" />
 
   
       <script src="_static/jquery.js?v=5d32c60e"></script>
       <script src="_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
-      <script src="_static/documentation_options.js?v=11d3572e"></script>
+      <script src="_static/documentation_options.js?v=9950e6dc"></script>
       <script src="_static/doctools.js?v=fd6eb6e6"></script>
       <script src="_static/sphinx_highlight.js?v=6ffebe34"></script>
     <script src="_static/js/theme.js"></script>
     <link rel="index" title="Index" href="genindex.html" />
     <link rel="search" title="Search" href="search.html" />
-    <link rel="next" title="Predicates" href="predicates.html" />
-    <link rel="prev" title="Filters" href="filters.html" /> 
+    <link rel="next" title="Filters" href="filters.html" />
+    <link rel="prev" title="Findables" href="findables.html" /> 
 </head>
 
 <body class="wy-body-for-nav"> 
@@ -42,13 +42,13 @@
   </form>
 </div>
         </div><div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
-              <p class="caption" role="heading"><span class="caption-text">Contents:</span></p>
+              <p class="caption" role="heading"><span class="caption-text">Getting started</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="introduction.html">Introduction</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">Basic concepts</span></p>
 <ul class="current">
-<li class="toctree-l1"><a class="reference internal" href="install.html">Setup</a></li>
-<li class="toctree-l1"><a class="reference internal" href="examples.html">Examples</a></li>
 <li class="toctree-l1"><a class="reference internal" href="findables.html">Findables</a></li>
-<li class="toctree-l1"><a class="reference internal" href="listdefs.html">Listdefs</a></li>
-<li class="toctree-l1"><a class="reference internal" href="filters.html">Filters</a></li>
 <li class="toctree-l1 current"><a class="current reference internal" href="#">Attributes</a><ul>
 <li class="toctree-l2"><a class="reference internal" href="#list-of-builtin-attributes">List of builtin attributes</a><ul>
 <li class="toctree-l3"><a class="reference internal" href="#len-x">len-X</a></li>
@@ -62,12 +62,16 @@
 <li class="toctree-l3"><a class="reference internal" href="#role-attributes">Role attributes</a></li>
 </ul>
 </li>
-<li class="toctree-l2"><a class="reference internal" href="#implementing-a-custom-attribute">Implementing a custom attribute</a></li>
 </ul>
 </li>
+<li class="toctree-l1"><a class="reference internal" href="filters.html">Filters</a></li>
 <li class="toctree-l1"><a class="reference internal" href="predicates.html">Predicates</a></li>
+<li class="toctree-l1"><a class="reference internal" href="lists.html">Lists</a></li>
 <li class="toctree-l1"><a class="reference internal" href="fetchers.html">Fetchers</a></li>
-<li class="toctree-l1"><a class="reference internal" href="cli/cli.html">Commandline tool</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">Advanced</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="cli/cli.html">Commandline</a></li>
 <li class="toctree-l1"><a class="reference internal" href="api/api.html">API</a></li>
 <li class="toctree-l1"><a class="reference internal" href="extending.html">Extending Flam</a></li>
 </ul>
@@ -98,10 +102,25 @@
              
   <section id="attributes">
 <h1>Attributes<a class="headerlink" href="#attributes" title="Link to this heading"></a></h1>
-<p>TODO</p>
+<p>Attributes are all the information bits you can know about a <a class="reference internal" href="findables.html#findables"><span class="std std-ref">findable</span></a> object.
+Things like the title of a film, its metascore, the name of a person, his height, etc. are all attributes.</p>
+<p>Attributes provide some facilities for using them generically without caring about the specific attribute:</p>
+<ul class="simple">
+<li><p>They let you sort the attribute’s values</p></li>
+<li><p>They let you convert values to strings</p></li>
+<li><p>They let you parse those strings back into values</p></li>
+<li><p>Flam generically handles attributes which return lists</p></li>
+<li><p>Flam generically handles attributes whose values are missing (i.e. not available in the fetch source)</p></li>
+<li><p>There are a few more ways that attributes support generic handling</p></li>
+</ul>
+<p>Each attribute is specific to some findable type, but role attributes support any attribute of movies or people!</p>
+<div class="admonition tip">
+<p class="admonition-title">Tip</p>
+<p>Flam supports implementing <a class="reference internal" href="extending.html#implementing-a-custom-attribute"><span class="std std-ref">custom attributes</span></a>.</p>
+</div>
 <section id="list-of-builtin-attributes">
 <h2>List of builtin attributes<a class="headerlink" href="#list-of-builtin-attributes" title="Link to this heading"></a></h2>
-<p>Note that almost every attribute may return <code class="docutils literal notranslate"><span class="pre">None</span></code> if the data is not available.</p>
+<p>Note that almost every attribute may return <code class="docutils literal notranslate"><span class="pre">None</span></code> if the data is not available. As a string, it looks like <code class="docutils literal notranslate"><span class="pre">'-'</span></code>.</p>
 <p>Many attributes below support variants. Here are the variants we support:</p>
 <section id="len-x">
 <h3>len-X<a class="headerlink" href="#len-x" title="Link to this heading"></a></h3>
@@ -122,7 +141,7 @@
 </section>
 <section id="avg-x-as-ct">
 <h3>avg-X-as-CT<a class="headerlink" href="#avg-x-as-ct" title="Link to this heading"></a></h3>
-<p>Any attribute which supports avg-X also supports “avg-X-as-CT”, where CT is a crew type.</p>
+<p>Any attribute which supports <a class="reference internal" href="#avg-x"><span class="std std-ref">avg-X</span></a> also supports “avg-X-as-CT”, where CT is a <a class="reference internal" href="findables.html#crew-type"><span class="std std-ref">crew type</span></a>.</p>
 <p>For some movie attribute X, “avg-X-as-CT” is a people attribute which returns the average of X across all movies those people were in as the crew type CT.</p>
 <p>Ex: <code class="docutils literal notranslate"><span class="pre">avg-rating-as-director</span></code> - the average rating across all movies the person directed.</p>
 <p>For a people attribute X, “avg-X-as-CT” is a movie attribute which returns the average of X for all the people in the movie as the crew type CT.</p>
@@ -130,23 +149,22 @@
 </section>
 <section id="sum-x">
 <h3>sum-X<a class="headerlink" href="#sum-x" title="Link to this heading"></a></h3>
-<p>Same as avg-X, but with summation instead of averaging.</p>
+<p>Same as <a class="reference internal" href="#avg-x"><span class="std std-ref">avg-X</span></a>, but with summation instead of averaging.</p>
 </section>
 <section id="sum-x-as-ct">
 <h3>sum-X-as-CT<a class="headerlink" href="#sum-x-as-ct" title="Link to this heading"></a></h3>
-<p>Same as avg-X-as-CT, but with summation instead of averaging.</p>
+<p>Same as <a class="reference internal" href="#avg-x-as-ct"><span class="std std-ref">avg-X-as-CT</span></a>, but with summation instead of averaging.</p>
 </section>
 <section id="movie-attributes">
 <h3>Movie attributes<a class="headerlink" href="#movie-attributes" title="Link to this heading"></a></h3>
-<p><strong>uid</strong> - the movie’s UID in flam.</p>
+<p><strong>additional</strong> - list of names of the movie’s crewmembers in this crew type.</p>
 <blockquote>
 <div><dl class="field-list simple">
 <dt class="field-odd">variants<span class="colon">:</span></dt>
 <dd class="field-odd"><p>len, num</p>
 </dd>
 <dt class="field-even">aliases<span class="colon">:</span></dt>
-<dd class="field-even"><p>id, guid, identifier</p>
-</dd>
+<dd class="field-even"><p></p></dd>
 <dt class="field-odd">ascending<span class="colon">:</span></dt>
 <dd class="field-odd"><p>True</p>
 </dd>
@@ -155,15 +173,14 @@
 </dd>
 </dl>
 </div></blockquote>
-<p><strong>origin-uid</strong> - the movie’s UID in the source from which the data is fetched.</p>
+<p><strong>art-director</strong> - list of names of the movie’s crewmembers in this crew type.</p>
 <blockquote>
 <div><dl class="field-list simple">
 <dt class="field-odd">variants<span class="colon">:</span></dt>
 <dd class="field-odd"><p>len, num</p>
 </dd>
 <dt class="field-even">aliases<span class="colon">:</span></dt>
-<dd class="field-even"><p>origin-id, origin-guid, origin-identifier</p>
-</dd>
+<dd class="field-even"><p></p></dd>
 <dt class="field-odd">ascending<span class="colon">:</span></dt>
 <dd class="field-odd"><p>True</p>
 </dd>
@@ -172,15 +189,14 @@
 </dd>
 </dl>
 </div></blockquote>
-<p><strong>title</strong> - the movie’s title.</p>
+<p><strong>assistant-director</strong> - list of names of the movie’s crewmembers in this crew type.</p>
 <blockquote>
 <div><dl class="field-list simple">
 <dt class="field-odd">variants<span class="colon">:</span></dt>
 <dd class="field-odd"><p>len, num</p>
 </dd>
 <dt class="field-even">aliases<span class="colon">:</span></dt>
-<dd class="field-even"><p>name, movie</p>
-</dd>
+<dd class="field-even"><p></p></dd>
 <dt class="field-odd">ascending<span class="colon">:</span></dt>
 <dd class="field-odd"><p>True</p>
 </dd>
@@ -189,48 +205,14 @@
 </dd>
 </dl>
 </div></blockquote>
-<p><strong>source</strong> - for composite lists - which lists this movie came from.</p>
+<p><strong>budget-usd</strong> - the movie’s budget in US dollars.</p>
 <blockquote>
 <div><dl class="field-list simple">
 <dt class="field-odd">variants<span class="colon">:</span></dt>
-<dd class="field-odd"><p>len, num</p>
+<dd class="field-odd"><p>len, num, avg, sum</p>
 </dd>
 <dt class="field-even">aliases<span class="colon">:</span></dt>
-<dd class="field-even"><p>sources, origin, origins, src, list, lists</p>
-</dd>
-<dt class="field-odd">ascending<span class="colon">:</span></dt>
-<dd class="field-odd"><p>True</p>
-</dd>
-<dt class="field-even">default op<span class="colon">:</span></dt>
-<dd class="field-even"><p>‘~’</p>
-</dd>
-</dl>
-</div></blockquote>
-<p><strong>synopsis</strong> - the movie’s synopsis.</p>
-<blockquote>
-<div><dl class="field-list simple">
-<dt class="field-odd">variants<span class="colon">:</span></dt>
-<dd class="field-odd"><p>len, num</p>
-</dd>
-<dt class="field-even">aliases<span class="colon">:</span></dt>
-<dd class="field-even"><p>plot, summary, description, desc</p>
-</dd>
-<dt class="field-odd">ascending<span class="colon">:</span></dt>
-<dd class="field-odd"><p>True</p>
-</dd>
-<dt class="field-even">default op<span class="colon">:</span></dt>
-<dd class="field-even"><p>‘~’</p>
-</dd>
-</dl>
-</div></blockquote>
-<p><strong>watch-date</strong> - list of dates that you watched the film in this date format.</p>
-<blockquote>
-<div><dl class="field-list simple">
-<dt class="field-odd">variants<span class="colon">:</span></dt>
-<dd class="field-odd"><p>len, num</p>
-</dd>
-<dt class="field-even">aliases<span class="colon">:</span></dt>
-<dd class="field-even"><p>w-d</p>
+<dd class="field-even"><p>budget</p>
 </dd>
 <dt class="field-odd">ascending<span class="colon">:</span></dt>
 <dd class="field-odd"><p>False</p>
@@ -240,20 +222,470 @@
 </dd>
 </dl>
 </div></blockquote>
-<p><strong>release-date</strong> - the movie’s release date in this date format.</p>
+<p><strong>cast</strong> - list of names of the movie’s crewmembers in this crew type.</p>
 <blockquote>
 <div><dl class="field-list simple">
 <dt class="field-odd">variants<span class="colon">:</span></dt>
 <dd class="field-odd"><p>len, num</p>
 </dd>
 <dt class="field-even">aliases<span class="colon">:</span></dt>
-<dd class="field-even"><p>r-d</p>
+<dd class="field-even"><p></p></dd>
+<dt class="field-odd">ascending<span class="colon">:</span></dt>
+<dd class="field-odd"><p>True</p>
+</dd>
+<dt class="field-even">default op<span class="colon">:</span></dt>
+<dd class="field-even"><p>‘~’</p>
+</dd>
+</dl>
+</div></blockquote>
+<p><strong>casting-director</strong> - list of names of the movie’s crewmembers in this crew type.</p>
+<blockquote>
+<div><dl class="field-list simple">
+<dt class="field-odd">variants<span class="colon">:</span></dt>
+<dd class="field-odd"><p>len, num</p>
+</dd>
+<dt class="field-even">aliases<span class="colon">:</span></dt>
+<dd class="field-even"><p></p></dd>
+<dt class="field-odd">ascending<span class="colon">:</span></dt>
+<dd class="field-odd"><p>True</p>
+</dd>
+<dt class="field-even">default op<span class="colon">:</span></dt>
+<dd class="field-even"><p>‘~’</p>
+</dd>
+</dl>
+</div></blockquote>
+<p><strong>choreographer</strong> - list of names of the movie’s crewmembers in this crew type.</p>
+<blockquote>
+<div><dl class="field-list simple">
+<dt class="field-odd">variants<span class="colon">:</span></dt>
+<dd class="field-odd"><p>len, num</p>
+</dd>
+<dt class="field-even">aliases<span class="colon">:</span></dt>
+<dd class="field-even"><p></p></dd>
+<dt class="field-odd">ascending<span class="colon">:</span></dt>
+<dd class="field-odd"><p>True</p>
+</dd>
+<dt class="field-even">default op<span class="colon">:</span></dt>
+<dd class="field-even"><p>‘~’</p>
+</dd>
+</dl>
+</div></blockquote>
+<p><strong>cinematographer</strong> - list of names of the movie’s crewmembers in this crew type.</p>
+<blockquote>
+<div><dl class="field-list simple">
+<dt class="field-odd">variants<span class="colon">:</span></dt>
+<dd class="field-odd"><p>len, num</p>
+</dd>
+<dt class="field-even">aliases<span class="colon">:</span></dt>
+<dd class="field-even"><p></p></dd>
+<dt class="field-odd">ascending<span class="colon">:</span></dt>
+<dd class="field-odd"><p>True</p>
+</dd>
+<dt class="field-even">default op<span class="colon">:</span></dt>
+<dd class="field-even"><p>‘~’</p>
+</dd>
+</dl>
+</div></blockquote>
+<p><strong>composer</strong> - list of names of the movie’s crewmembers in this crew type.</p>
+<blockquote>
+<div><dl class="field-list simple">
+<dt class="field-odd">variants<span class="colon">:</span></dt>
+<dd class="field-odd"><p>len, num</p>
+</dd>
+<dt class="field-even">aliases<span class="colon">:</span></dt>
+<dd class="field-even"><p></p></dd>
+<dt class="field-odd">ascending<span class="colon">:</span></dt>
+<dd class="field-odd"><p>True</p>
+</dd>
+<dt class="field-even">default op<span class="colon">:</span></dt>
+<dd class="field-even"><p>‘~’</p>
+</dd>
+</dl>
+</div></blockquote>
+<p><strong>content-rating</strong> - the movie’s content rating.</p>
+<blockquote>
+<div><dl class="field-list simple">
+<dt class="field-odd">variants<span class="colon">:</span></dt>
+<dd class="field-odd"><p>len, num</p>
+</dd>
+<dt class="field-even">aliases<span class="colon">:</span></dt>
+<dd class="field-even"><p></p></dd>
+<dt class="field-odd">ascending<span class="colon">:</span></dt>
+<dd class="field-odd"><p>True</p>
+</dd>
+<dt class="field-even">default op<span class="colon">:</span></dt>
+<dd class="field-even"><p>‘~’</p>
+</dd>
+</dl>
+</div></blockquote>
+<p><strong>countries</strong> - list of the movie’s producing countries.</p>
+<blockquote>
+<div><dl class="field-list simple">
+<dt class="field-odd">variants<span class="colon">:</span></dt>
+<dd class="field-odd"><p>len, num</p>
+</dd>
+<dt class="field-even">aliases<span class="colon">:</span></dt>
+<dd class="field-even"><p>country, nation, nations, nationality, nationalities</p>
+</dd>
+<dt class="field-odd">ascending<span class="colon">:</span></dt>
+<dd class="field-odd"><p>True</p>
+</dd>
+<dt class="field-even">default op<span class="colon">:</span></dt>
+<dd class="field-even"><p>‘~’</p>
+</dd>
+</dl>
+</div></blockquote>
+<p><strong>director</strong> - list of names of the movie’s crewmembers in this crew type.</p>
+<blockquote>
+<div><dl class="field-list simple">
+<dt class="field-odd">variants<span class="colon">:</span></dt>
+<dd class="field-odd"><p>len, num</p>
+</dd>
+<dt class="field-even">aliases<span class="colon">:</span></dt>
+<dd class="field-even"><p></p></dd>
+<dt class="field-odd">ascending<span class="colon">:</span></dt>
+<dd class="field-odd"><p>True</p>
+</dd>
+<dt class="field-even">default op<span class="colon">:</span></dt>
+<dd class="field-even"><p>‘~’</p>
+</dd>
+</dl>
+</div></blockquote>
+<p><strong>editor</strong> - list of names of the movie’s crewmembers in this crew type.</p>
+<blockquote>
+<div><dl class="field-list simple">
+<dt class="field-odd">variants<span class="colon">:</span></dt>
+<dd class="field-odd"><p>len, num</p>
+</dd>
+<dt class="field-even">aliases<span class="colon">:</span></dt>
+<dd class="field-even"><p></p></dd>
+<dt class="field-odd">ascending<span class="colon">:</span></dt>
+<dd class="field-odd"><p>True</p>
+</dd>
+<dt class="field-even">default op<span class="colon">:</span></dt>
+<dd class="field-even"><p>‘~’</p>
+</dd>
+</dl>
+</div></blockquote>
+<p><strong>end-date</strong> - the TV show’s final air date in this date format.</p>
+<blockquote>
+<div><dl class="field-list simple">
+<dt class="field-odd">variants<span class="colon">:</span></dt>
+<dd class="field-odd"><p>len, num</p>
+</dd>
+<dt class="field-even">aliases<span class="colon">:</span></dt>
+<dd class="field-even"><p>e-d</p>
 </dd>
 <dt class="field-odd">ascending<span class="colon">:</span></dt>
 <dd class="field-odd"><p>False</p>
 </dd>
 <dt class="field-even">default op<span class="colon">:</span></dt>
 <dd class="field-even"><p>‘=’</p>
+</dd>
+</dl>
+</div></blockquote>
+<p><strong>end-day-of-month</strong> - the TV show’s final air date in this date format.</p>
+<blockquote>
+<div><dl class="field-list simple">
+<dt class="field-odd">variants<span class="colon">:</span></dt>
+<dd class="field-odd"><p>len, num</p>
+</dd>
+<dt class="field-even">aliases<span class="colon">:</span></dt>
+<dd class="field-even"><p>e-d-o-m</p>
+</dd>
+<dt class="field-odd">ascending<span class="colon">:</span></dt>
+<dd class="field-odd"><p>True</p>
+</dd>
+<dt class="field-even">default op<span class="colon">:</span></dt>
+<dd class="field-even"><p>‘=’</p>
+</dd>
+</dl>
+</div></blockquote>
+<p><strong>end-day-of-week</strong> - the TV show’s final air date in this date format.</p>
+<blockquote>
+<div><dl class="field-list simple">
+<dt class="field-odd">variants<span class="colon">:</span></dt>
+<dd class="field-odd"><p>len, num</p>
+</dd>
+<dt class="field-even">aliases<span class="colon">:</span></dt>
+<dd class="field-even"><p>e-d-o-w</p>
+</dd>
+<dt class="field-odd">ascending<span class="colon">:</span></dt>
+<dd class="field-odd"><p>True</p>
+</dd>
+<dt class="field-even">default op<span class="colon">:</span></dt>
+<dd class="field-even"><p>‘=’</p>
+</dd>
+</dl>
+</div></blockquote>
+<p><strong>end-day-of-week-monday</strong> - the TV show’s final air date in this date format.</p>
+<blockquote>
+<div><dl class="field-list simple">
+<dt class="field-odd">variants<span class="colon">:</span></dt>
+<dd class="field-odd"><p>len, num</p>
+</dd>
+<dt class="field-even">aliases<span class="colon">:</span></dt>
+<dd class="field-even"><p>e-d-o-w-m</p>
+</dd>
+<dt class="field-odd">ascending<span class="colon">:</span></dt>
+<dd class="field-odd"><p>True</p>
+</dd>
+<dt class="field-even">default op<span class="colon">:</span></dt>
+<dd class="field-even"><p>‘=’</p>
+</dd>
+</dl>
+</div></blockquote>
+<p><strong>end-day-of-year</strong> - the TV show’s final air date in this date format.</p>
+<blockquote>
+<div><dl class="field-list simple">
+<dt class="field-odd">variants<span class="colon">:</span></dt>
+<dd class="field-odd"><p>len, num</p>
+</dd>
+<dt class="field-even">aliases<span class="colon">:</span></dt>
+<dd class="field-even"><p>e-d-o-y</p>
+</dd>
+<dt class="field-odd">ascending<span class="colon">:</span></dt>
+<dd class="field-odd"><p>True</p>
+</dd>
+<dt class="field-even">default op<span class="colon">:</span></dt>
+<dd class="field-even"><p>‘=’</p>
+</dd>
+</dl>
+</div></blockquote>
+<p><strong>end-month</strong> - the TV show’s final air date in this date format.</p>
+<blockquote>
+<div><dl class="field-list simple">
+<dt class="field-odd">variants<span class="colon">:</span></dt>
+<dd class="field-odd"><p>len, num</p>
+</dd>
+<dt class="field-even">aliases<span class="colon">:</span></dt>
+<dd class="field-even"><p>e-m</p>
+</dd>
+<dt class="field-odd">ascending<span class="colon">:</span></dt>
+<dd class="field-odd"><p>True</p>
+</dd>
+<dt class="field-even">default op<span class="colon">:</span></dt>
+<dd class="field-even"><p>‘=’</p>
+</dd>
+</dl>
+</div></blockquote>
+<p><strong>end-month-day</strong> - the TV show’s final air date in this date format.</p>
+<blockquote>
+<div><dl class="field-list simple">
+<dt class="field-odd">variants<span class="colon">:</span></dt>
+<dd class="field-odd"><p>len, num</p>
+</dd>
+<dt class="field-even">aliases<span class="colon">:</span></dt>
+<dd class="field-even"><p>e-m-d</p>
+</dd>
+<dt class="field-odd">ascending<span class="colon">:</span></dt>
+<dd class="field-odd"><p>True</p>
+</dd>
+<dt class="field-even">default op<span class="colon">:</span></dt>
+<dd class="field-even"><p>‘=’</p>
+</dd>
+</dl>
+</div></blockquote>
+<p><strong>end-week-of-year</strong> - the TV show’s final air date in this date format.</p>
+<blockquote>
+<div><dl class="field-list simple">
+<dt class="field-odd">variants<span class="colon">:</span></dt>
+<dd class="field-odd"><p>len, num</p>
+</dd>
+<dt class="field-even">aliases<span class="colon">:</span></dt>
+<dd class="field-even"><p>e-w-o-y</p>
+</dd>
+<dt class="field-odd">ascending<span class="colon">:</span></dt>
+<dd class="field-odd"><p>True</p>
+</dd>
+<dt class="field-even">default op<span class="colon">:</span></dt>
+<dd class="field-even"><p>‘=’</p>
+</dd>
+</dl>
+</div></blockquote>
+<p><strong>end-week-of-year-monday</strong> - the TV show’s final air date in this date format.</p>
+<blockquote>
+<div><dl class="field-list simple">
+<dt class="field-odd">variants<span class="colon">:</span></dt>
+<dd class="field-odd"><p>len, num</p>
+</dd>
+<dt class="field-even">aliases<span class="colon">:</span></dt>
+<dd class="field-even"><p>e-w-o-y-m</p>
+</dd>
+<dt class="field-odd">ascending<span class="colon">:</span></dt>
+<dd class="field-odd"><p>True</p>
+</dd>
+<dt class="field-even">default op<span class="colon">:</span></dt>
+<dd class="field-even"><p>‘=’</p>
+</dd>
+</dl>
+</div></blockquote>
+<p><strong>end-year</strong> - the TV show’s final air date in this date format.</p>
+<blockquote>
+<div><dl class="field-list simple">
+<dt class="field-odd">variants<span class="colon">:</span></dt>
+<dd class="field-odd"><p>len, num</p>
+</dd>
+<dt class="field-even">aliases<span class="colon">:</span></dt>
+<dd class="field-even"><p>e-y</p>
+</dd>
+<dt class="field-odd">ascending<span class="colon">:</span></dt>
+<dd class="field-odd"><p>False</p>
+</dd>
+<dt class="field-even">default op<span class="colon">:</span></dt>
+<dd class="field-even"><p>‘=’</p>
+</dd>
+</dl>
+</div></blockquote>
+<p><strong>end-year-month</strong> - the TV show’s final air date in this date format.</p>
+<blockquote>
+<div><dl class="field-list simple">
+<dt class="field-odd">variants<span class="colon">:</span></dt>
+<dd class="field-odd"><p>len, num</p>
+</dd>
+<dt class="field-even">aliases<span class="colon">:</span></dt>
+<dd class="field-even"><p>e-y-m</p>
+</dd>
+<dt class="field-odd">ascending<span class="colon">:</span></dt>
+<dd class="field-odd"><p>False</p>
+</dd>
+<dt class="field-even">default op<span class="colon">:</span></dt>
+<dd class="field-even"><p>‘=’</p>
+</dd>
+</dl>
+</div></blockquote>
+<p><strong>episodes-num</strong> - the number of episodes in this TV show.</p>
+<blockquote>
+<div><dl class="field-list simple">
+<dt class="field-odd">variants<span class="colon">:</span></dt>
+<dd class="field-odd"><p>len, num, avg, sum</p>
+</dd>
+<dt class="field-even">aliases<span class="colon">:</span></dt>
+<dd class="field-even"><p>episodes</p>
+</dd>
+<dt class="field-odd">ascending<span class="colon">:</span></dt>
+<dd class="field-odd"><p>False</p>
+</dd>
+<dt class="field-even">default op<span class="colon">:</span></dt>
+<dd class="field-even"><p>‘=’</p>
+</dd>
+</dl>
+</div></blockquote>
+<p><strong>executive-producer</strong> - list of names of the movie’s crewmembers in this crew type.</p>
+<blockquote>
+<div><dl class="field-list simple">
+<dt class="field-odd">variants<span class="colon">:</span></dt>
+<dd class="field-odd"><p>len, num</p>
+</dd>
+<dt class="field-even">aliases<span class="colon">:</span></dt>
+<dd class="field-even"><p></p></dd>
+<dt class="field-odd">ascending<span class="colon">:</span></dt>
+<dd class="field-odd"><p>True</p>
+</dd>
+<dt class="field-even">default op<span class="colon">:</span></dt>
+<dd class="field-even"><p>‘~’</p>
+</dd>
+</dl>
+</div></blockquote>
+<p><strong>genres</strong> - list of the movie’s genres.</p>
+<blockquote>
+<div><dl class="field-list simple">
+<dt class="field-odd">variants<span class="colon">:</span></dt>
+<dd class="field-odd"><p>len, num</p>
+</dd>
+<dt class="field-even">aliases<span class="colon">:</span></dt>
+<dd class="field-even"><p>genre, category, categories</p>
+</dd>
+<dt class="field-odd">ascending<span class="colon">:</span></dt>
+<dd class="field-odd"><p>True</p>
+</dd>
+<dt class="field-even">default op<span class="colon">:</span></dt>
+<dd class="field-even"><p>‘~’</p>
+</dd>
+</dl>
+</div></blockquote>
+<p><strong>is-liked</strong> - whether you gave the film a like.</p>
+<blockquote>
+<div><dl class="field-list simple">
+<dt class="field-odd">variants<span class="colon">:</span></dt>
+<dd class="field-odd"><p>len, num</p>
+</dd>
+<dt class="field-even">aliases<span class="colon">:</span></dt>
+<dd class="field-even"><p>liked, my-like</p>
+</dd>
+<dt class="field-odd">ascending<span class="colon">:</span></dt>
+<dd class="field-odd"><p>False</p>
+</dd>
+<dt class="field-even">default op<span class="colon">:</span></dt>
+<dd class="field-even"><p>‘=’</p>
+</dd>
+</dl>
+</div></blockquote>
+<p><strong>languages</strong> - list of the movie’s languages.</p>
+<blockquote>
+<div><dl class="field-list simple">
+<dt class="field-odd">variants<span class="colon">:</span></dt>
+<dd class="field-odd"><p>len, num</p>
+</dd>
+<dt class="field-even">aliases<span class="colon">:</span></dt>
+<dd class="field-even"><p>language</p>
+</dd>
+<dt class="field-odd">ascending<span class="colon">:</span></dt>
+<dd class="field-odd"><p>True</p>
+</dd>
+<dt class="field-even">default op<span class="colon">:</span></dt>
+<dd class="field-even"><p>‘~’</p>
+</dd>
+</dl>
+</div></blockquote>
+<p><strong>likes</strong> - how many people liked the film.</p>
+<blockquote>
+<div><dl class="field-list simple">
+<dt class="field-odd">variants<span class="colon">:</span></dt>
+<dd class="field-odd"><p>len, num, avg, sum</p>
+</dd>
+<dt class="field-even">aliases<span class="colon">:</span></dt>
+<dd class="field-even"><p>like-count</p>
+</dd>
+<dt class="field-odd">ascending<span class="colon">:</span></dt>
+<dd class="field-odd"><p>False</p>
+</dd>
+<dt class="field-even">default op<span class="colon">:</span></dt>
+<dd class="field-even"><p>‘=’</p>
+</dd>
+</dl>
+</div></blockquote>
+<p><strong>list-index</strong> - list of the movie’s indexes in the lists it came from.</p>
+<blockquote>
+<div><dl class="field-list simple">
+<dt class="field-odd">variants<span class="colon">:</span></dt>
+<dd class="field-odd"><p>len, num</p>
+</dd>
+<dt class="field-even">aliases<span class="colon">:</span></dt>
+<dd class="field-even"><p>index, list-indices, indices, list-indexes, indexes</p>
+</dd>
+<dt class="field-odd">ascending<span class="colon">:</span></dt>
+<dd class="field-odd"><p>True</p>
+</dd>
+<dt class="field-even">default op<span class="colon">:</span></dt>
+<dd class="field-even"><p>‘=’</p>
+</dd>
+</dl>
+</div></blockquote>
+<p><strong>list-note</strong> - list of notes left on this movie in this list.</p>
+<blockquote>
+<div><dl class="field-list simple">
+<dt class="field-odd">variants<span class="colon">:</span></dt>
+<dd class="field-odd"><p>len, num</p>
+</dd>
+<dt class="field-even">aliases<span class="colon">:</span></dt>
+<dd class="field-even"><p>list-comment, list-notes, list-comments</p>
+</dd>
+<dt class="field-odd">ascending<span class="colon">:</span></dt>
+<dd class="field-odd"><p>True</p>
+</dd>
+<dt class="field-even">default op<span class="colon">:</span></dt>
+<dd class="field-even"><p>‘~’</p>
 </dd>
 </dl>
 </div></blockquote>
@@ -274,295 +706,6 @@
 </dd>
 </dl>
 </div></blockquote>
-<p><strong>watch-year</strong> - list of dates that you watched the film in this date format.</p>
-<blockquote>
-<div><dl class="field-list simple">
-<dt class="field-odd">variants<span class="colon">:</span></dt>
-<dd class="field-odd"><p>len, num</p>
-</dd>
-<dt class="field-even">aliases<span class="colon">:</span></dt>
-<dd class="field-even"><p>w-y</p>
-</dd>
-<dt class="field-odd">ascending<span class="colon">:</span></dt>
-<dd class="field-odd"><p>False</p>
-</dd>
-<dt class="field-even">default op<span class="colon">:</span></dt>
-<dd class="field-even"><p>‘=’</p>
-</dd>
-</dl>
-</div></blockquote>
-<p><strong>release-year</strong> - the movie’s release date in this date format.</p>
-<blockquote>
-<div><dl class="field-list simple">
-<dt class="field-odd">variants<span class="colon">:</span></dt>
-<dd class="field-odd"><p>len, num</p>
-</dd>
-<dt class="field-even">aliases<span class="colon">:</span></dt>
-<dd class="field-even"><p>r-y</p>
-</dd>
-<dt class="field-odd">ascending<span class="colon">:</span></dt>
-<dd class="field-odd"><p>False</p>
-</dd>
-<dt class="field-even">default op<span class="colon">:</span></dt>
-<dd class="field-even"><p>‘=’</p>
-</dd>
-</dl>
-</div></blockquote>
-<p><strong>listing-year</strong> - list of when you added this movie to this list or all lists compositing this list, in this date format.</p>
-<blockquote>
-<div><dl class="field-list simple">
-<dt class="field-odd">variants<span class="colon">:</span></dt>
-<dd class="field-odd"><p>len, num</p>
-</dd>
-<dt class="field-even">aliases<span class="colon">:</span></dt>
-<dd class="field-even"><p>l-y</p>
-</dd>
-<dt class="field-odd">ascending<span class="colon">:</span></dt>
-<dd class="field-odd"><p>False</p>
-</dd>
-<dt class="field-even">default op<span class="colon">:</span></dt>
-<dd class="field-even"><p>‘=’</p>
-</dd>
-</dl>
-</div></blockquote>
-<p><strong>watch-month</strong> - list of dates that you watched the film in this date format.</p>
-<blockquote>
-<div><dl class="field-list simple">
-<dt class="field-odd">variants<span class="colon">:</span></dt>
-<dd class="field-odd"><p>len, num</p>
-</dd>
-<dt class="field-even">aliases<span class="colon">:</span></dt>
-<dd class="field-even"><p>w-m</p>
-</dd>
-<dt class="field-odd">ascending<span class="colon">:</span></dt>
-<dd class="field-odd"><p>False</p>
-</dd>
-<dt class="field-even">default op<span class="colon">:</span></dt>
-<dd class="field-even"><p>‘=’</p>
-</dd>
-</dl>
-</div></blockquote>
-<p><strong>release-month</strong> - the movie’s release date in this date format.</p>
-<blockquote>
-<div><dl class="field-list simple">
-<dt class="field-odd">variants<span class="colon">:</span></dt>
-<dd class="field-odd"><p>len, num</p>
-</dd>
-<dt class="field-even">aliases<span class="colon">:</span></dt>
-<dd class="field-even"><p>r-m</p>
-</dd>
-<dt class="field-odd">ascending<span class="colon">:</span></dt>
-<dd class="field-odd"><p>False</p>
-</dd>
-<dt class="field-even">default op<span class="colon">:</span></dt>
-<dd class="field-even"><p>‘=’</p>
-</dd>
-</dl>
-</div></blockquote>
-<p><strong>listing-month</strong> - list of when you added this movie to this list or all lists compositing this list, in this date format.</p>
-<blockquote>
-<div><dl class="field-list simple">
-<dt class="field-odd">variants<span class="colon">:</span></dt>
-<dd class="field-odd"><p>len, num</p>
-</dd>
-<dt class="field-even">aliases<span class="colon">:</span></dt>
-<dd class="field-even"><p>l-m</p>
-</dd>
-<dt class="field-odd">ascending<span class="colon">:</span></dt>
-<dd class="field-odd"><p>False</p>
-</dd>
-<dt class="field-even">default op<span class="colon">:</span></dt>
-<dd class="field-even"><p>‘=’</p>
-</dd>
-</dl>
-</div></blockquote>
-<p><strong>watch-week-of-year</strong> - list of dates that you watched the film in this date format.</p>
-<blockquote>
-<div><dl class="field-list simple">
-<dt class="field-odd">variants<span class="colon">:</span></dt>
-<dd class="field-odd"><p>len, num</p>
-</dd>
-<dt class="field-even">aliases<span class="colon">:</span></dt>
-<dd class="field-even"><p>w-w-o-y</p>
-</dd>
-<dt class="field-odd">ascending<span class="colon">:</span></dt>
-<dd class="field-odd"><p>True</p>
-</dd>
-<dt class="field-even">default op<span class="colon">:</span></dt>
-<dd class="field-even"><p>‘=’</p>
-</dd>
-</dl>
-</div></blockquote>
-<p><strong>release-week-of-year</strong> - the movie’s release date in this date format.</p>
-<blockquote>
-<div><dl class="field-list simple">
-<dt class="field-odd">variants<span class="colon">:</span></dt>
-<dd class="field-odd"><p>len, num</p>
-</dd>
-<dt class="field-even">aliases<span class="colon">:</span></dt>
-<dd class="field-even"><p>r-w-o-y</p>
-</dd>
-<dt class="field-odd">ascending<span class="colon">:</span></dt>
-<dd class="field-odd"><p>True</p>
-</dd>
-<dt class="field-even">default op<span class="colon">:</span></dt>
-<dd class="field-even"><p>‘=’</p>
-</dd>
-</dl>
-</div></blockquote>
-<p><strong>listing-week-of-year</strong> - list of when you added this movie to this list or all lists compositing this list, in this date format.</p>
-<blockquote>
-<div><dl class="field-list simple">
-<dt class="field-odd">variants<span class="colon">:</span></dt>
-<dd class="field-odd"><p>len, num</p>
-</dd>
-<dt class="field-even">aliases<span class="colon">:</span></dt>
-<dd class="field-even"><p>l-w-o-y</p>
-</dd>
-<dt class="field-odd">ascending<span class="colon">:</span></dt>
-<dd class="field-odd"><p>True</p>
-</dd>
-<dt class="field-even">default op<span class="colon">:</span></dt>
-<dd class="field-even"><p>‘=’</p>
-</dd>
-</dl>
-</div></blockquote>
-<p><strong>watch-week-of-year-monday</strong> - list of dates that you watched the film in this date format.</p>
-<blockquote>
-<div><dl class="field-list simple">
-<dt class="field-odd">variants<span class="colon">:</span></dt>
-<dd class="field-odd"><p>len, num</p>
-</dd>
-<dt class="field-even">aliases<span class="colon">:</span></dt>
-<dd class="field-even"><p>w-w-o-y-m</p>
-</dd>
-<dt class="field-odd">ascending<span class="colon">:</span></dt>
-<dd class="field-odd"><p>True</p>
-</dd>
-<dt class="field-even">default op<span class="colon">:</span></dt>
-<dd class="field-even"><p>‘=’</p>
-</dd>
-</dl>
-</div></blockquote>
-<p><strong>release-week-of-year-monday</strong> - the movie’s release date in this date format.</p>
-<blockquote>
-<div><dl class="field-list simple">
-<dt class="field-odd">variants<span class="colon">:</span></dt>
-<dd class="field-odd"><p>len, num</p>
-</dd>
-<dt class="field-even">aliases<span class="colon">:</span></dt>
-<dd class="field-even"><p>r-w-o-y-m</p>
-</dd>
-<dt class="field-odd">ascending<span class="colon">:</span></dt>
-<dd class="field-odd"><p>True</p>
-</dd>
-<dt class="field-even">default op<span class="colon">:</span></dt>
-<dd class="field-even"><p>‘=’</p>
-</dd>
-</dl>
-</div></blockquote>
-<p><strong>listing-week-of-year-monday</strong> - list of when you added this movie to this list or all lists compositing this list, in this date format.</p>
-<blockquote>
-<div><dl class="field-list simple">
-<dt class="field-odd">variants<span class="colon">:</span></dt>
-<dd class="field-odd"><p>len, num</p>
-</dd>
-<dt class="field-even">aliases<span class="colon">:</span></dt>
-<dd class="field-even"><p>l-w-o-y-m</p>
-</dd>
-<dt class="field-odd">ascending<span class="colon">:</span></dt>
-<dd class="field-odd"><p>True</p>
-</dd>
-<dt class="field-even">default op<span class="colon">:</span></dt>
-<dd class="field-even"><p>‘=’</p>
-</dd>
-</dl>
-</div></blockquote>
-<p><strong>watch-day-of-year</strong> - list of dates that you watched the film in this date format.</p>
-<blockquote>
-<div><dl class="field-list simple">
-<dt class="field-odd">variants<span class="colon">:</span></dt>
-<dd class="field-odd"><p>len, num</p>
-</dd>
-<dt class="field-even">aliases<span class="colon">:</span></dt>
-<dd class="field-even"><p>w-d-o-y</p>
-</dd>
-<dt class="field-odd">ascending<span class="colon">:</span></dt>
-<dd class="field-odd"><p>True</p>
-</dd>
-<dt class="field-even">default op<span class="colon">:</span></dt>
-<dd class="field-even"><p>‘=’</p>
-</dd>
-</dl>
-</div></blockquote>
-<p><strong>release-day-of-year</strong> - the movie’s release date in this date format.</p>
-<blockquote>
-<div><dl class="field-list simple">
-<dt class="field-odd">variants<span class="colon">:</span></dt>
-<dd class="field-odd"><p>len, num</p>
-</dd>
-<dt class="field-even">aliases<span class="colon">:</span></dt>
-<dd class="field-even"><p>r-d-o-y</p>
-</dd>
-<dt class="field-odd">ascending<span class="colon">:</span></dt>
-<dd class="field-odd"><p>True</p>
-</dd>
-<dt class="field-even">default op<span class="colon">:</span></dt>
-<dd class="field-even"><p>‘=’</p>
-</dd>
-</dl>
-</div></blockquote>
-<p><strong>listing-day-of-year</strong> - list of when you added this movie to this list or all lists compositing this list, in this date format.</p>
-<blockquote>
-<div><dl class="field-list simple">
-<dt class="field-odd">variants<span class="colon">:</span></dt>
-<dd class="field-odd"><p>len, num</p>
-</dd>
-<dt class="field-even">aliases<span class="colon">:</span></dt>
-<dd class="field-even"><p>l-d-o-y</p>
-</dd>
-<dt class="field-odd">ascending<span class="colon">:</span></dt>
-<dd class="field-odd"><p>True</p>
-</dd>
-<dt class="field-even">default op<span class="colon">:</span></dt>
-<dd class="field-even"><p>‘=’</p>
-</dd>
-</dl>
-</div></blockquote>
-<p><strong>watch-day-of-month</strong> - list of dates that you watched the film in this date format.</p>
-<blockquote>
-<div><dl class="field-list simple">
-<dt class="field-odd">variants<span class="colon">:</span></dt>
-<dd class="field-odd"><p>len, num</p>
-</dd>
-<dt class="field-even">aliases<span class="colon">:</span></dt>
-<dd class="field-even"><p>w-d-o-m</p>
-</dd>
-<dt class="field-odd">ascending<span class="colon">:</span></dt>
-<dd class="field-odd"><p>True</p>
-</dd>
-<dt class="field-even">default op<span class="colon">:</span></dt>
-<dd class="field-even"><p>‘=’</p>
-</dd>
-</dl>
-</div></blockquote>
-<p><strong>release-day-of-month</strong> - the movie’s release date in this date format.</p>
-<blockquote>
-<div><dl class="field-list simple">
-<dt class="field-odd">variants<span class="colon">:</span></dt>
-<dd class="field-odd"><p>len, num</p>
-</dd>
-<dt class="field-even">aliases<span class="colon">:</span></dt>
-<dd class="field-even"><p>r-d-o-m</p>
-</dd>
-<dt class="field-odd">ascending<span class="colon">:</span></dt>
-<dd class="field-odd"><p>True</p>
-</dd>
-<dt class="field-even">default op<span class="colon">:</span></dt>
-<dd class="field-even"><p>‘=’</p>
-</dd>
-</dl>
-</div></blockquote>
 <p><strong>listing-day-of-month</strong> - list of when you added this movie to this list or all lists compositing this list, in this date format.</p>
 <blockquote>
 <div><dl class="field-list simple">
@@ -571,91 +714,6 @@
 </dd>
 <dt class="field-even">aliases<span class="colon">:</span></dt>
 <dd class="field-even"><p>l-d-o-m</p>
-</dd>
-<dt class="field-odd">ascending<span class="colon">:</span></dt>
-<dd class="field-odd"><p>True</p>
-</dd>
-<dt class="field-even">default op<span class="colon">:</span></dt>
-<dd class="field-even"><p>‘=’</p>
-</dd>
-</dl>
-</div></blockquote>
-<p><strong>watch-month-of-year</strong> - list of dates that you watched the film in this date format.</p>
-<blockquote>
-<div><dl class="field-list simple">
-<dt class="field-odd">variants<span class="colon">:</span></dt>
-<dd class="field-odd"><p>len, num</p>
-</dd>
-<dt class="field-even">aliases<span class="colon">:</span></dt>
-<dd class="field-even"><p>w-m-o-y</p>
-</dd>
-<dt class="field-odd">ascending<span class="colon">:</span></dt>
-<dd class="field-odd"><p>True</p>
-</dd>
-<dt class="field-even">default op<span class="colon">:</span></dt>
-<dd class="field-even"><p>‘=’</p>
-</dd>
-</dl>
-</div></blockquote>
-<p><strong>release-month-of-year</strong> - the movie’s release date in this date format.</p>
-<blockquote>
-<div><dl class="field-list simple">
-<dt class="field-odd">variants<span class="colon">:</span></dt>
-<dd class="field-odd"><p>len, num</p>
-</dd>
-<dt class="field-even">aliases<span class="colon">:</span></dt>
-<dd class="field-even"><p>r-m-o-y</p>
-</dd>
-<dt class="field-odd">ascending<span class="colon">:</span></dt>
-<dd class="field-odd"><p>True</p>
-</dd>
-<dt class="field-even">default op<span class="colon">:</span></dt>
-<dd class="field-even"><p>‘=’</p>
-</dd>
-</dl>
-</div></blockquote>
-<p><strong>listing-month-of-year</strong> - list of when you added this movie to this list or all lists compositing this list, in this date format.</p>
-<blockquote>
-<div><dl class="field-list simple">
-<dt class="field-odd">variants<span class="colon">:</span></dt>
-<dd class="field-odd"><p>len, num</p>
-</dd>
-<dt class="field-even">aliases<span class="colon">:</span></dt>
-<dd class="field-even"><p>l-m-o-y</p>
-</dd>
-<dt class="field-odd">ascending<span class="colon">:</span></dt>
-<dd class="field-odd"><p>True</p>
-</dd>
-<dt class="field-even">default op<span class="colon">:</span></dt>
-<dd class="field-even"><p>‘=’</p>
-</dd>
-</dl>
-</div></blockquote>
-<p><strong>watch-day-of-week</strong> - list of dates that you watched the film in this date format.</p>
-<blockquote>
-<div><dl class="field-list simple">
-<dt class="field-odd">variants<span class="colon">:</span></dt>
-<dd class="field-odd"><p>len, num</p>
-</dd>
-<dt class="field-even">aliases<span class="colon">:</span></dt>
-<dd class="field-even"><p>w-d-o-w</p>
-</dd>
-<dt class="field-odd">ascending<span class="colon">:</span></dt>
-<dd class="field-odd"><p>True</p>
-</dd>
-<dt class="field-even">default op<span class="colon">:</span></dt>
-<dd class="field-even"><p>‘=’</p>
-</dd>
-</dl>
-</div></blockquote>
-<p><strong>release-day-of-week</strong> - the movie’s release date in this date format.</p>
-<blockquote>
-<div><dl class="field-list simple">
-<dt class="field-odd">variants<span class="colon">:</span></dt>
-<dd class="field-odd"><p>len, num</p>
-</dd>
-<dt class="field-even">aliases<span class="colon">:</span></dt>
-<dd class="field-even"><p>r-d-o-w</p>
 </dd>
 <dt class="field-odd">ascending<span class="colon">:</span></dt>
 <dd class="field-odd"><p>True</p>
@@ -682,40 +740,6 @@
 </dd>
 </dl>
 </div></blockquote>
-<p><strong>watch-day-of-week-monday</strong> - list of dates that you watched the film in this date format.</p>
-<blockquote>
-<div><dl class="field-list simple">
-<dt class="field-odd">variants<span class="colon">:</span></dt>
-<dd class="field-odd"><p>len, num</p>
-</dd>
-<dt class="field-even">aliases<span class="colon">:</span></dt>
-<dd class="field-even"><p>w-d-o-w-m</p>
-</dd>
-<dt class="field-odd">ascending<span class="colon">:</span></dt>
-<dd class="field-odd"><p>True</p>
-</dd>
-<dt class="field-even">default op<span class="colon">:</span></dt>
-<dd class="field-even"><p>‘=’</p>
-</dd>
-</dl>
-</div></blockquote>
-<p><strong>release-day-of-week-monday</strong> - the movie’s release date in this date format.</p>
-<blockquote>
-<div><dl class="field-list simple">
-<dt class="field-odd">variants<span class="colon">:</span></dt>
-<dd class="field-odd"><p>len, num</p>
-</dd>
-<dt class="field-even">aliases<span class="colon">:</span></dt>
-<dd class="field-even"><p>r-d-o-w-m</p>
-</dd>
-<dt class="field-odd">ascending<span class="colon">:</span></dt>
-<dd class="field-odd"><p>True</p>
-</dd>
-<dt class="field-even">default op<span class="colon">:</span></dt>
-<dd class="field-even"><p>‘=’</p>
-</dd>
-</dl>
-</div></blockquote>
 <p><strong>listing-day-of-week-monday</strong> - list of when you added this movie to this list or all lists compositing this list, in this date format.</p>
 <blockquote>
 <div><dl class="field-list simple">
@@ -733,54 +757,139 @@
 </dd>
 </dl>
 </div></blockquote>
-<p><strong>note</strong> - a personal note you left on this movie.</p>
+<p><strong>listing-day-of-year</strong> - list of when you added this movie to this list or all lists compositing this list, in this date format.</p>
 <blockquote>
 <div><dl class="field-list simple">
 <dt class="field-odd">variants<span class="colon">:</span></dt>
 <dd class="field-odd"><p>len, num</p>
 </dd>
 <dt class="field-even">aliases<span class="colon">:</span></dt>
-<dd class="field-even"><p>comment, notes, comments</p>
+<dd class="field-even"><p>l-d-o-y</p>
+</dd>
+<dt class="field-odd">ascending<span class="colon">:</span></dt>
+<dd class="field-odd"><p>True</p>
+</dd>
+<dt class="field-even">default op<span class="colon">:</span></dt>
+<dd class="field-even"><p>‘=’</p>
+</dd>
+</dl>
+</div></blockquote>
+<p><strong>listing-month</strong> - list of when you added this movie to this list or all lists compositing this list, in this date format.</p>
+<blockquote>
+<div><dl class="field-list simple">
+<dt class="field-odd">variants<span class="colon">:</span></dt>
+<dd class="field-odd"><p>len, num</p>
+</dd>
+<dt class="field-even">aliases<span class="colon">:</span></dt>
+<dd class="field-even"><p>l-m</p>
+</dd>
+<dt class="field-odd">ascending<span class="colon">:</span></dt>
+<dd class="field-odd"><p>True</p>
+</dd>
+<dt class="field-even">default op<span class="colon">:</span></dt>
+<dd class="field-even"><p>‘=’</p>
+</dd>
+</dl>
+</div></blockquote>
+<p><strong>listing-month-day</strong> - list of when you added this movie to this list or all lists compositing this list, in this date format.</p>
+<blockquote>
+<div><dl class="field-list simple">
+<dt class="field-odd">variants<span class="colon">:</span></dt>
+<dd class="field-odd"><p>len, num</p>
+</dd>
+<dt class="field-even">aliases<span class="colon">:</span></dt>
+<dd class="field-even"><p>l-m-d</p>
+</dd>
+<dt class="field-odd">ascending<span class="colon">:</span></dt>
+<dd class="field-odd"><p>True</p>
+</dd>
+<dt class="field-even">default op<span class="colon">:</span></dt>
+<dd class="field-even"><p>‘=’</p>
+</dd>
+</dl>
+</div></blockquote>
+<p><strong>listing-week-of-year</strong> - list of when you added this movie to this list or all lists compositing this list, in this date format.</p>
+<blockquote>
+<div><dl class="field-list simple">
+<dt class="field-odd">variants<span class="colon">:</span></dt>
+<dd class="field-odd"><p>len, num</p>
+</dd>
+<dt class="field-even">aliases<span class="colon">:</span></dt>
+<dd class="field-even"><p>l-w-o-y</p>
+</dd>
+<dt class="field-odd">ascending<span class="colon">:</span></dt>
+<dd class="field-odd"><p>True</p>
+</dd>
+<dt class="field-even">default op<span class="colon">:</span></dt>
+<dd class="field-even"><p>‘=’</p>
+</dd>
+</dl>
+</div></blockquote>
+<p><strong>listing-week-of-year-monday</strong> - list of when you added this movie to this list or all lists compositing this list, in this date format.</p>
+<blockquote>
+<div><dl class="field-list simple">
+<dt class="field-odd">variants<span class="colon">:</span></dt>
+<dd class="field-odd"><p>len, num</p>
+</dd>
+<dt class="field-even">aliases<span class="colon">:</span></dt>
+<dd class="field-even"><p>l-w-o-y-m</p>
+</dd>
+<dt class="field-odd">ascending<span class="colon">:</span></dt>
+<dd class="field-odd"><p>True</p>
+</dd>
+<dt class="field-even">default op<span class="colon">:</span></dt>
+<dd class="field-even"><p>‘=’</p>
+</dd>
+</dl>
+</div></blockquote>
+<p><strong>listing-year</strong> - list of when you added this movie to this list or all lists compositing this list, in this date format.</p>
+<blockquote>
+<div><dl class="field-list simple">
+<dt class="field-odd">variants<span class="colon">:</span></dt>
+<dd class="field-odd"><p>len, num</p>
+</dd>
+<dt class="field-even">aliases<span class="colon">:</span></dt>
+<dd class="field-even"><p>l-y</p>
+</dd>
+<dt class="field-odd">ascending<span class="colon">:</span></dt>
+<dd class="field-odd"><p>False</p>
+</dd>
+<dt class="field-even">default op<span class="colon">:</span></dt>
+<dd class="field-even"><p>‘=’</p>
+</dd>
+</dl>
+</div></blockquote>
+<p><strong>listing-year-month</strong> - list of when you added this movie to this list or all lists compositing this list, in this date format.</p>
+<blockquote>
+<div><dl class="field-list simple">
+<dt class="field-odd">variants<span class="colon">:</span></dt>
+<dd class="field-odd"><p>len, num</p>
+</dd>
+<dt class="field-even">aliases<span class="colon">:</span></dt>
+<dd class="field-even"><p>l-y-m</p>
+</dd>
+<dt class="field-odd">ascending<span class="colon">:</span></dt>
+<dd class="field-odd"><p>False</p>
+</dd>
+<dt class="field-even">default op<span class="colon">:</span></dt>
+<dd class="field-even"><p>‘=’</p>
+</dd>
+</dl>
+</div></blockquote>
+<p><strong>media-type</strong> - whether this “movie” is actually a movie, or a TV series, etc.</p>
+<blockquote>
+<div><dl class="field-list simple">
+<dt class="field-odd">variants<span class="colon">:</span></dt>
+<dd class="field-odd"><p>len, num</p>
+</dd>
+<dt class="field-even">aliases<span class="colon">:</span></dt>
+<dd class="field-even"><p>type, title-type</p>
 </dd>
 <dt class="field-odd">ascending<span class="colon">:</span></dt>
 <dd class="field-odd"><p>True</p>
 </dd>
 <dt class="field-even">default op<span class="colon">:</span></dt>
 <dd class="field-even"><p>‘~’</p>
-</dd>
-</dl>
-</div></blockquote>
-<p><strong>list-index</strong> - list of the movie’s indexes in the lists it came from.</p>
-<blockquote>
-<div><dl class="field-list simple">
-<dt class="field-odd">variants<span class="colon">:</span></dt>
-<dd class="field-odd"><p>len, num</p>
-</dd>
-<dt class="field-even">aliases<span class="colon">:</span></dt>
-<dd class="field-even"><p>index, list-indices, indices, list-indexes, indexes</p>
-</dd>
-<dt class="field-odd">ascending<span class="colon">:</span></dt>
-<dd class="field-odd"><p>True</p>
-</dd>
-<dt class="field-even">default op<span class="colon">:</span></dt>
-<dd class="field-even"><p>‘=’</p>
-</dd>
-</dl>
-</div></blockquote>
-<p><strong>runtime</strong> - the movie’s runtime in minutes.</p>
-<blockquote>
-<div><dl class="field-list simple">
-<dt class="field-odd">variants<span class="colon">:</span></dt>
-<dd class="field-odd"><p>len, num, avg, sum</p>
-</dd>
-<dt class="field-even">aliases<span class="colon">:</span></dt>
-<dd class="field-even"><p>runtime-minutes, length, minutes, run-length, run-time</p>
-</dd>
-<dt class="field-odd">ascending<span class="colon">:</span></dt>
-<dd class="field-odd"><p>True</p>
-</dd>
-<dt class="field-even">default op<span class="colon">:</span></dt>
-<dd class="field-even"><p>‘=’</p>
 </dd>
 </dl>
 </div></blockquote>
@@ -818,37 +927,20 @@
 </dd>
 </dl>
 </div></blockquote>
-<p><strong>rating</strong> - the movie’s rating.</p>
+<p><strong>my-notes</strong> - list of notes left on this movie by you in general.</p>
 <blockquote>
 <div><dl class="field-list simple">
 <dt class="field-odd">variants<span class="colon">:</span></dt>
-<dd class="field-odd"><p>len, num, avg, sum</p>
+<dd class="field-odd"><p>len, num</p>
 </dd>
 <dt class="field-even">aliases<span class="colon">:</span></dt>
-<dd class="field-even"><p>user-rating, user-score, ratings</p>
+<dd class="field-even"><p>my-note, my-comment, my-comments</p>
 </dd>
 <dt class="field-odd">ascending<span class="colon">:</span></dt>
-<dd class="field-odd"><p>False</p>
+<dd class="field-odd"><p>True</p>
 </dd>
 <dt class="field-even">default op<span class="colon">:</span></dt>
-<dd class="field-even"><p>‘=’</p>
-</dd>
-</dl>
-</div></blockquote>
-<p><strong>votes</strong> - how many people voted on this movie’s rating.</p>
-<blockquote>
-<div><dl class="field-list simple">
-<dt class="field-odd">variants<span class="colon">:</span></dt>
-<dd class="field-odd"><p>len, num, avg, sum</p>
-</dd>
-<dt class="field-even">aliases<span class="colon">:</span></dt>
-<dd class="field-even"><p>vote-count</p>
-</dd>
-<dt class="field-odd">ascending<span class="colon">:</span></dt>
-<dd class="field-odd"><p>False</p>
-</dd>
-<dt class="field-even">default op<span class="colon">:</span></dt>
-<dd class="field-even"><p>‘=’</p>
+<dd class="field-even"><p>‘~’</p>
 </dd>
 </dl>
 </div></blockquote>
@@ -869,14 +961,14 @@
 </dd>
 </dl>
 </div></blockquote>
-<p><strong>genres</strong> - list of the movie’s genres.</p>
+<p><strong>origin-uid</strong> - the movie’s UID in the source from which the data is fetched.</p>
 <blockquote>
 <div><dl class="field-list simple">
 <dt class="field-odd">variants<span class="colon">:</span></dt>
 <dd class="field-odd"><p>len, num</p>
 </dd>
 <dt class="field-even">aliases<span class="colon">:</span></dt>
-<dd class="field-even"><p>genre, category, categories</p>
+<dd class="field-even"><p>origin-id, origin-guid, origin-identifier</p>
 </dd>
 <dt class="field-odd">ascending<span class="colon">:</span></dt>
 <dd class="field-odd"><p>True</p>
@@ -886,14 +978,14 @@
 </dd>
 </dl>
 </div></blockquote>
-<p><strong>languages</strong> - list of the movie’s languages.</p>
+<p><strong>original-title</strong> - the movie’s original title in its native language.</p>
 <blockquote>
 <div><dl class="field-list simple">
 <dt class="field-odd">variants<span class="colon">:</span></dt>
 <dd class="field-odd"><p>len, num</p>
 </dd>
 <dt class="field-even">aliases<span class="colon">:</span></dt>
-<dd class="field-even"><p>language</p>
+<dd class="field-even"><p>original-name, native-title, native-name</p>
 </dd>
 <dt class="field-odd">ascending<span class="colon">:</span></dt>
 <dd class="field-odd"><p>True</p>
@@ -903,14 +995,14 @@
 </dd>
 </dl>
 </div></blockquote>
-<p><strong>countries</strong> - list of the movie’s producing countries.</p>
+<p><strong>oscar-noms</strong> - list of Oscar nominations received by this movie.</p>
 <blockquote>
 <div><dl class="field-list simple">
 <dt class="field-odd">variants<span class="colon">:</span></dt>
 <dd class="field-odd"><p>len, num</p>
 </dd>
 <dt class="field-even">aliases<span class="colon">:</span></dt>
-<dd class="field-even"><p>country, nation, nations, nationality, nationalities</p>
+<dd class="field-even"><p>oscar-nominations, noms, nominations</p>
 </dd>
 <dt class="field-odd">ascending<span class="colon">:</span></dt>
 <dd class="field-odd"><p>True</p>
@@ -920,14 +1012,15 @@
 </dd>
 </dl>
 </div></blockquote>
-<p><strong>cast</strong> - list of names of the movie’s crewmembers in this crew type.</p>
+<p><strong>oscar-wins</strong> - list of Oscars won by this movie.</p>
 <blockquote>
 <div><dl class="field-list simple">
 <dt class="field-odd">variants<span class="colon">:</span></dt>
 <dd class="field-odd"><p>len, num</p>
 </dd>
 <dt class="field-even">aliases<span class="colon">:</span></dt>
-<dd class="field-even"><p></p></dd>
+<dd class="field-even"><p>oscars, awards</p>
+</dd>
 <dt class="field-odd">ascending<span class="colon">:</span></dt>
 <dd class="field-odd"><p>True</p>
 </dd>
@@ -936,39 +1029,7 @@
 </dd>
 </dl>
 </div></blockquote>
-<p><strong>stuntcast</strong> - list of names of the movie’s crewmembers in this crew type.</p>
-<blockquote>
-<div><dl class="field-list simple">
-<dt class="field-odd">variants<span class="colon">:</span></dt>
-<dd class="field-odd"><p>len, num</p>
-</dd>
-<dt class="field-even">aliases<span class="colon">:</span></dt>
-<dd class="field-even"><p></p></dd>
-<dt class="field-odd">ascending<span class="colon">:</span></dt>
-<dd class="field-odd"><p>True</p>
-</dd>
-<dt class="field-even">default op<span class="colon">:</span></dt>
-<dd class="field-even"><p>‘~’</p>
-</dd>
-</dl>
-</div></blockquote>
-<p><strong>director</strong> - list of names of the movie’s crewmembers in this crew type.</p>
-<blockquote>
-<div><dl class="field-list simple">
-<dt class="field-odd">variants<span class="colon">:</span></dt>
-<dd class="field-odd"><p>len, num</p>
-</dd>
-<dt class="field-even">aliases<span class="colon">:</span></dt>
-<dd class="field-even"><p></p></dd>
-<dt class="field-odd">ascending<span class="colon">:</span></dt>
-<dd class="field-odd"><p>True</p>
-</dd>
-<dt class="field-even">default op<span class="colon">:</span></dt>
-<dd class="field-even"><p>‘~’</p>
-</dd>
-</dl>
-</div></blockquote>
-<p><strong>writer</strong> - list of names of the movie’s crewmembers in this crew type.</p>
+<p><strong>people</strong> - list of names of the movie’s crewmembers in this crew type.</p>
 <blockquote>
 <div><dl class="field-list simple">
 <dt class="field-odd">variants<span class="colon">:</span></dt>
@@ -1000,62 +1061,287 @@
 </dd>
 </dl>
 </div></blockquote>
-<p><strong>composer</strong> - list of names of the movie’s crewmembers in this crew type.</p>
+<p><strong>profit-usd</strong> - the movie’s profit in US dollars.</p>
+<blockquote>
+<div><dl class="field-list simple">
+<dt class="field-odd">variants<span class="colon">:</span></dt>
+<dd class="field-odd"><p>len, num, avg, sum</p>
+</dd>
+<dt class="field-even">aliases<span class="colon">:</span></dt>
+<dd class="field-even"><p>profit</p>
+</dd>
+<dt class="field-odd">ascending<span class="colon">:</span></dt>
+<dd class="field-odd"><p>False</p>
+</dd>
+<dt class="field-even">default op<span class="colon">:</span></dt>
+<dd class="field-even"><p>‘=’</p>
+</dd>
+</dl>
+</div></blockquote>
+<p><strong>rating</strong> - the movie’s rating.</p>
+<blockquote>
+<div><dl class="field-list simple">
+<dt class="field-odd">variants<span class="colon">:</span></dt>
+<dd class="field-odd"><p>len, num, avg, sum</p>
+</dd>
+<dt class="field-even">aliases<span class="colon">:</span></dt>
+<dd class="field-even"><p>user-rating, user-score, ratings</p>
+</dd>
+<dt class="field-odd">ascending<span class="colon">:</span></dt>
+<dd class="field-odd"><p>False</p>
+</dd>
+<dt class="field-even">default op<span class="colon">:</span></dt>
+<dd class="field-even"><p>‘=’</p>
+</dd>
+</dl>
+</div></blockquote>
+<p><strong>release-date</strong> - the movie’s release date in this date format.</p>
 <blockquote>
 <div><dl class="field-list simple">
 <dt class="field-odd">variants<span class="colon">:</span></dt>
 <dd class="field-odd"><p>len, num</p>
 </dd>
 <dt class="field-even">aliases<span class="colon">:</span></dt>
-<dd class="field-even"><p></p></dd>
+<dd class="field-even"><p>r-d</p>
+</dd>
+<dt class="field-odd">ascending<span class="colon">:</span></dt>
+<dd class="field-odd"><p>False</p>
+</dd>
+<dt class="field-even">default op<span class="colon">:</span></dt>
+<dd class="field-even"><p>‘=’</p>
+</dd>
+</dl>
+</div></blockquote>
+<p><strong>release-day-of-month</strong> - the movie’s release date in this date format.</p>
+<blockquote>
+<div><dl class="field-list simple">
+<dt class="field-odd">variants<span class="colon">:</span></dt>
+<dd class="field-odd"><p>len, num</p>
+</dd>
+<dt class="field-even">aliases<span class="colon">:</span></dt>
+<dd class="field-even"><p>r-d-o-m</p>
+</dd>
 <dt class="field-odd">ascending<span class="colon">:</span></dt>
 <dd class="field-odd"><p>True</p>
 </dd>
 <dt class="field-even">default op<span class="colon">:</span></dt>
-<dd class="field-even"><p>‘~’</p>
+<dd class="field-even"><p>‘=’</p>
 </dd>
 </dl>
 </div></blockquote>
-<p><strong>cinematographer</strong> - list of names of the movie’s crewmembers in this crew type.</p>
+<p><strong>release-day-of-week</strong> - the movie’s release date in this date format.</p>
 <blockquote>
 <div><dl class="field-list simple">
 <dt class="field-odd">variants<span class="colon">:</span></dt>
 <dd class="field-odd"><p>len, num</p>
 </dd>
 <dt class="field-even">aliases<span class="colon">:</span></dt>
-<dd class="field-even"><p></p></dd>
+<dd class="field-even"><p>r-d-o-w</p>
+</dd>
 <dt class="field-odd">ascending<span class="colon">:</span></dt>
 <dd class="field-odd"><p>True</p>
 </dd>
 <dt class="field-even">default op<span class="colon">:</span></dt>
-<dd class="field-even"><p>‘~’</p>
+<dd class="field-even"><p>‘=’</p>
 </dd>
 </dl>
 </div></blockquote>
-<p><strong>editor</strong> - list of names of the movie’s crewmembers in this crew type.</p>
+<p><strong>release-day-of-week-monday</strong> - the movie’s release date in this date format.</p>
 <blockquote>
 <div><dl class="field-list simple">
 <dt class="field-odd">variants<span class="colon">:</span></dt>
 <dd class="field-odd"><p>len, num</p>
 </dd>
 <dt class="field-even">aliases<span class="colon">:</span></dt>
-<dd class="field-even"><p></p></dd>
+<dd class="field-even"><p>r-d-o-w-m</p>
+</dd>
 <dt class="field-odd">ascending<span class="colon">:</span></dt>
 <dd class="field-odd"><p>True</p>
 </dd>
 <dt class="field-even">default op<span class="colon">:</span></dt>
-<dd class="field-even"><p>‘~’</p>
+<dd class="field-even"><p>‘=’</p>
 </dd>
 </dl>
 </div></blockquote>
-<p><strong>people</strong> - list of names of the movie’s crewmembers in this crew type.</p>
+<p><strong>release-day-of-year</strong> - the movie’s release date in this date format.</p>
 <blockquote>
 <div><dl class="field-list simple">
 <dt class="field-odd">variants<span class="colon">:</span></dt>
 <dd class="field-odd"><p>len, num</p>
 </dd>
 <dt class="field-even">aliases<span class="colon">:</span></dt>
-<dd class="field-even"><p></p></dd>
+<dd class="field-even"><p>r-d-o-y</p>
+</dd>
+<dt class="field-odd">ascending<span class="colon">:</span></dt>
+<dd class="field-odd"><p>True</p>
+</dd>
+<dt class="field-even">default op<span class="colon">:</span></dt>
+<dd class="field-even"><p>‘=’</p>
+</dd>
+</dl>
+</div></blockquote>
+<p><strong>release-month</strong> - the movie’s release date in this date format.</p>
+<blockquote>
+<div><dl class="field-list simple">
+<dt class="field-odd">variants<span class="colon">:</span></dt>
+<dd class="field-odd"><p>len, num</p>
+</dd>
+<dt class="field-even">aliases<span class="colon">:</span></dt>
+<dd class="field-even"><p>r-m</p>
+</dd>
+<dt class="field-odd">ascending<span class="colon">:</span></dt>
+<dd class="field-odd"><p>True</p>
+</dd>
+<dt class="field-even">default op<span class="colon">:</span></dt>
+<dd class="field-even"><p>‘=’</p>
+</dd>
+</dl>
+</div></blockquote>
+<p><strong>release-month-day</strong> - the movie’s release date in this date format.</p>
+<blockquote>
+<div><dl class="field-list simple">
+<dt class="field-odd">variants<span class="colon">:</span></dt>
+<dd class="field-odd"><p>len, num</p>
+</dd>
+<dt class="field-even">aliases<span class="colon">:</span></dt>
+<dd class="field-even"><p>r-m-d</p>
+</dd>
+<dt class="field-odd">ascending<span class="colon">:</span></dt>
+<dd class="field-odd"><p>True</p>
+</dd>
+<dt class="field-even">default op<span class="colon">:</span></dt>
+<dd class="field-even"><p>‘=’</p>
+</dd>
+</dl>
+</div></blockquote>
+<p><strong>release-week-of-year</strong> - the movie’s release date in this date format.</p>
+<blockquote>
+<div><dl class="field-list simple">
+<dt class="field-odd">variants<span class="colon">:</span></dt>
+<dd class="field-odd"><p>len, num</p>
+</dd>
+<dt class="field-even">aliases<span class="colon">:</span></dt>
+<dd class="field-even"><p>r-w-o-y</p>
+</dd>
+<dt class="field-odd">ascending<span class="colon">:</span></dt>
+<dd class="field-odd"><p>True</p>
+</dd>
+<dt class="field-even">default op<span class="colon">:</span></dt>
+<dd class="field-even"><p>‘=’</p>
+</dd>
+</dl>
+</div></blockquote>
+<p><strong>release-week-of-year-monday</strong> - the movie’s release date in this date format.</p>
+<blockquote>
+<div><dl class="field-list simple">
+<dt class="field-odd">variants<span class="colon">:</span></dt>
+<dd class="field-odd"><p>len, num</p>
+</dd>
+<dt class="field-even">aliases<span class="colon">:</span></dt>
+<dd class="field-even"><p>r-w-o-y-m</p>
+</dd>
+<dt class="field-odd">ascending<span class="colon">:</span></dt>
+<dd class="field-odd"><p>True</p>
+</dd>
+<dt class="field-even">default op<span class="colon">:</span></dt>
+<dd class="field-even"><p>‘=’</p>
+</dd>
+</dl>
+</div></blockquote>
+<p><strong>release-year</strong> - the movie’s release date in this date format.</p>
+<blockquote>
+<div><dl class="field-list simple">
+<dt class="field-odd">variants<span class="colon">:</span></dt>
+<dd class="field-odd"><p>len, num</p>
+</dd>
+<dt class="field-even">aliases<span class="colon">:</span></dt>
+<dd class="field-even"><p>r-y</p>
+</dd>
+<dt class="field-odd">ascending<span class="colon">:</span></dt>
+<dd class="field-odd"><p>False</p>
+</dd>
+<dt class="field-even">default op<span class="colon">:</span></dt>
+<dd class="field-even"><p>‘=’</p>
+</dd>
+</dl>
+</div></blockquote>
+<p><strong>release-year-month</strong> - the movie’s release date in this date format.</p>
+<blockquote>
+<div><dl class="field-list simple">
+<dt class="field-odd">variants<span class="colon">:</span></dt>
+<dd class="field-odd"><p>len, num</p>
+</dd>
+<dt class="field-even">aliases<span class="colon">:</span></dt>
+<dd class="field-even"><p>r-y-m</p>
+</dd>
+<dt class="field-odd">ascending<span class="colon">:</span></dt>
+<dd class="field-odd"><p>False</p>
+</dd>
+<dt class="field-even">default op<span class="colon">:</span></dt>
+<dd class="field-even"><p>‘=’</p>
+</dd>
+</dl>
+</div></blockquote>
+<p><strong>revenue-usd</strong> - the movie’s revenue in US dollars.</p>
+<blockquote>
+<div><dl class="field-list simple">
+<dt class="field-odd">variants<span class="colon">:</span></dt>
+<dd class="field-odd"><p>len, num, avg, sum</p>
+</dd>
+<dt class="field-even">aliases<span class="colon">:</span></dt>
+<dd class="field-even"><p>revenue</p>
+</dd>
+<dt class="field-odd">ascending<span class="colon">:</span></dt>
+<dd class="field-odd"><p>False</p>
+</dd>
+<dt class="field-even">default op<span class="colon">:</span></dt>
+<dd class="field-even"><p>‘=’</p>
+</dd>
+</dl>
+</div></blockquote>
+<p><strong>runtime</strong> - the movie’s runtime in minutes.</p>
+<blockquote>
+<div><dl class="field-list simple">
+<dt class="field-odd">variants<span class="colon">:</span></dt>
+<dd class="field-odd"><p>len, num, avg, sum</p>
+</dd>
+<dt class="field-even">aliases<span class="colon">:</span></dt>
+<dd class="field-even"><p>runtime-minutes, length, minutes, run-length, run-time</p>
+</dd>
+<dt class="field-odd">ascending<span class="colon">:</span></dt>
+<dd class="field-odd"><p>True</p>
+</dd>
+<dt class="field-even">default op<span class="colon">:</span></dt>
+<dd class="field-even"><p>‘=’</p>
+</dd>
+</dl>
+</div></blockquote>
+<p><strong>seasons-num</strong> - the number of seasons in this TV show.</p>
+<blockquote>
+<div><dl class="field-list simple">
+<dt class="field-odd">variants<span class="colon">:</span></dt>
+<dd class="field-odd"><p>len, num, avg, sum</p>
+</dd>
+<dt class="field-even">aliases<span class="colon">:</span></dt>
+<dd class="field-even"><p>seasons</p>
+</dd>
+<dt class="field-odd">ascending<span class="colon">:</span></dt>
+<dd class="field-odd"><p>False</p>
+</dd>
+<dt class="field-even">default op<span class="colon">:</span></dt>
+<dd class="field-even"><p>‘=’</p>
+</dd>
+</dl>
+</div></blockquote>
+<p><strong>source</strong> - for composite lists - which lists this movie came from.</p>
+<blockquote>
+<div><dl class="field-list simple">
+<dt class="field-odd">variants<span class="colon">:</span></dt>
+<dd class="field-odd"><p>len, num</p>
+</dd>
+<dt class="field-even">aliases<span class="colon">:</span></dt>
+<dd class="field-even"><p>sources, origin, origins, src, list, lists</p>
+</dd>
 <dt class="field-odd">ascending<span class="colon">:</span></dt>
 <dd class="field-odd"><p>True</p>
 </dd>
@@ -1081,10 +1367,91 @@
 </dd>
 </dl>
 </div></blockquote>
-</section>
-<section id="people-attributes">
-<h3>People attributes<a class="headerlink" href="#people-attributes" title="Link to this heading"></a></h3>
-<p><strong>uid</strong> - the people’s UID in flam.</p>
+<p><strong>studios</strong> - list of the movie’s producing studios.</p>
+<blockquote>
+<div><dl class="field-list simple">
+<dt class="field-odd">variants<span class="colon">:</span></dt>
+<dd class="field-odd"><p>len, num</p>
+</dd>
+<dt class="field-even">aliases<span class="colon">:</span></dt>
+<dd class="field-even"><p>studio</p>
+</dd>
+<dt class="field-odd">ascending<span class="colon">:</span></dt>
+<dd class="field-odd"><p>True</p>
+</dd>
+<dt class="field-even">default op<span class="colon">:</span></dt>
+<dd class="field-even"><p>‘~’</p>
+</dd>
+</dl>
+</div></blockquote>
+<p><strong>stuntcast</strong> - list of names of the movie’s crewmembers in this crew type.</p>
+<blockquote>
+<div><dl class="field-list simple">
+<dt class="field-odd">variants<span class="colon">:</span></dt>
+<dd class="field-odd"><p>len, num</p>
+</dd>
+<dt class="field-even">aliases<span class="colon">:</span></dt>
+<dd class="field-even"><p></p></dd>
+<dt class="field-odd">ascending<span class="colon">:</span></dt>
+<dd class="field-odd"><p>True</p>
+</dd>
+<dt class="field-even">default op<span class="colon">:</span></dt>
+<dd class="field-even"><p>‘~’</p>
+</dd>
+</dl>
+</div></blockquote>
+<p><strong>synopsis</strong> - the movie’s synopsis.</p>
+<blockquote>
+<div><dl class="field-list simple">
+<dt class="field-odd">variants<span class="colon">:</span></dt>
+<dd class="field-odd"><p>len, num</p>
+</dd>
+<dt class="field-even">aliases<span class="colon">:</span></dt>
+<dd class="field-even"><p>plot, summary, description, desc, overview</p>
+</dd>
+<dt class="field-odd">ascending<span class="colon">:</span></dt>
+<dd class="field-odd"><p>True</p>
+</dd>
+<dt class="field-even">default op<span class="colon">:</span></dt>
+<dd class="field-even"><p>‘~’</p>
+</dd>
+</dl>
+</div></blockquote>
+<p><strong>tagline</strong> - the movie’s tagline.</p>
+<blockquote>
+<div><dl class="field-list simple">
+<dt class="field-odd">variants<span class="colon">:</span></dt>
+<dd class="field-odd"><p>len, num</p>
+</dd>
+<dt class="field-even">aliases<span class="colon">:</span></dt>
+<dd class="field-even"><p>slogan</p>
+</dd>
+<dt class="field-odd">ascending<span class="colon">:</span></dt>
+<dd class="field-odd"><p>True</p>
+</dd>
+<dt class="field-even">default op<span class="colon">:</span></dt>
+<dd class="field-even"><p>‘~’</p>
+</dd>
+</dl>
+</div></blockquote>
+<p><strong>title</strong> - the movie’s title.</p>
+<blockquote>
+<div><dl class="field-list simple">
+<dt class="field-odd">variants<span class="colon">:</span></dt>
+<dd class="field-odd"><p>len, num</p>
+</dd>
+<dt class="field-even">aliases<span class="colon">:</span></dt>
+<dd class="field-even"><p>name, movie</p>
+</dd>
+<dt class="field-odd">ascending<span class="colon">:</span></dt>
+<dd class="field-odd"><p>True</p>
+</dd>
+<dt class="field-even">default op<span class="colon">:</span></dt>
+<dd class="field-even"><p>‘~’</p>
+</dd>
+</dl>
+</div></blockquote>
+<p><strong>uid</strong> - the movie’s UID in flam.</p>
 <blockquote>
 <div><dl class="field-list simple">
 <dt class="field-odd">variants<span class="colon">:</span></dt>
@@ -1101,14 +1468,14 @@
 </dd>
 </dl>
 </div></blockquote>
-<p><strong>origin-uid</strong> - list of every person’s UID in the source from which the data is fetched.</p>
+<p><strong>url</strong> - link to the movie’s page on the website it was fetched from.</p>
 <blockquote>
 <div><dl class="field-list simple">
 <dt class="field-odd">variants<span class="colon">:</span></dt>
 <dd class="field-odd"><p>len, num</p>
 </dd>
 <dt class="field-even">aliases<span class="colon">:</span></dt>
-<dd class="field-even"><p>origin-id, origin-guid, origin-identifier</p>
+<dd class="field-even"><p>link, page</p>
 </dd>
 <dt class="field-odd">ascending<span class="colon">:</span></dt>
 <dd class="field-odd"><p>True</p>
@@ -1118,80 +1485,14 @@
 </dd>
 </dl>
 </div></blockquote>
-<p><strong>crew-type</strong> - the people’s crew type.</p>
-<blockquote>
-<div><dl class="field-list simple">
-<dt class="field-odd">variants<span class="colon">:</span></dt>
-<dd class="field-odd"><p>len, num</p>
-</dd>
-<dt class="field-even">aliases<span class="colon">:</span></dt>
-<dd class="field-even"><p></p></dd>
-<dt class="field-odd">ascending<span class="colon">:</span></dt>
-<dd class="field-odd"><p>True</p>
-</dd>
-<dt class="field-even">default op<span class="colon">:</span></dt>
-<dd class="field-even"><p>‘~’</p>
-</dd>
-</dl>
-</div></blockquote>
-<p><strong>group-mode</strong> - the people’s group mode.</p>
-<blockquote>
-<div><dl class="field-list simple">
-<dt class="field-odd">variants<span class="colon">:</span></dt>
-<dd class="field-odd"><p>len, num</p>
-</dd>
-<dt class="field-even">aliases<span class="colon">:</span></dt>
-<dd class="field-even"><p></p></dd>
-<dt class="field-odd">ascending<span class="colon">:</span></dt>
-<dd class="field-odd"><p>True</p>
-</dd>
-<dt class="field-even">default op<span class="colon">:</span></dt>
-<dd class="field-even"><p>‘~’</p>
-</dd>
-</dl>
-</div></blockquote>
-<p><strong>name</strong> - list of every person’s name.</p>
-<blockquote>
-<div><dl class="field-list simple">
-<dt class="field-odd">variants<span class="colon">:</span></dt>
-<dd class="field-odd"><p>len, num</p>
-</dd>
-<dt class="field-even">aliases<span class="colon">:</span></dt>
-<dd class="field-even"><p>names, person, people</p>
-</dd>
-<dt class="field-odd">ascending<span class="colon">:</span></dt>
-<dd class="field-odd"><p>True</p>
-</dd>
-<dt class="field-even">default op<span class="colon">:</span></dt>
-<dd class="field-even"><p>‘~’</p>
-</dd>
-</dl>
-</div></blockquote>
-<p><strong>gender</strong> - list of every person’s gender (the exact strings representing each gender may vary based on where the data was fetched from).</p>
-<blockquote>
-<div><dl class="field-list simple">
-<dt class="field-odd">variants<span class="colon">:</span></dt>
-<dd class="field-odd"><p>len, num</p>
-</dd>
-<dt class="field-even">aliases<span class="colon">:</span></dt>
-<dd class="field-even"><p>sex</p>
-</dd>
-<dt class="field-odd">ascending<span class="colon">:</span></dt>
-<dd class="field-odd"><p>True</p>
-</dd>
-<dt class="field-even">default op<span class="colon">:</span></dt>
-<dd class="field-even"><p>‘~’</p>
-</dd>
-</dl>
-</div></blockquote>
-<p><strong>height-cm</strong> - list of every person’s height in centimeters.</p>
+<p><strong>votes</strong> - how many people voted on this movie’s rating.</p>
 <blockquote>
 <div><dl class="field-list simple">
 <dt class="field-odd">variants<span class="colon">:</span></dt>
 <dd class="field-odd"><p>len, num, avg, sum</p>
 </dd>
 <dt class="field-even">aliases<span class="colon">:</span></dt>
-<dd class="field-even"><p>height</p>
+<dd class="field-even"><p>vote-count</p>
 </dd>
 <dt class="field-odd">ascending<span class="colon">:</span></dt>
 <dd class="field-odd"><p>False</p>
@@ -1201,15 +1502,201 @@
 </dd>
 </dl>
 </div></blockquote>
-<p><strong>countries</strong> - list of every person’s countries.</p>
+<p><strong>watch-date</strong> - list of dates that you watched the film in this date format.</p>
 <blockquote>
 <div><dl class="field-list simple">
 <dt class="field-odd">variants<span class="colon">:</span></dt>
 <dd class="field-odd"><p>len, num</p>
 </dd>
 <dt class="field-even">aliases<span class="colon">:</span></dt>
-<dd class="field-even"><p>country, nation, nations, nationality, nationalities</p>
+<dd class="field-even"><p>w-d</p>
 </dd>
+<dt class="field-odd">ascending<span class="colon">:</span></dt>
+<dd class="field-odd"><p>False</p>
+</dd>
+<dt class="field-even">default op<span class="colon">:</span></dt>
+<dd class="field-even"><p>‘=’</p>
+</dd>
+</dl>
+</div></blockquote>
+<p><strong>watch-day-of-month</strong> - list of dates that you watched the film in this date format.</p>
+<blockquote>
+<div><dl class="field-list simple">
+<dt class="field-odd">variants<span class="colon">:</span></dt>
+<dd class="field-odd"><p>len, num</p>
+</dd>
+<dt class="field-even">aliases<span class="colon">:</span></dt>
+<dd class="field-even"><p>w-d-o-m</p>
+</dd>
+<dt class="field-odd">ascending<span class="colon">:</span></dt>
+<dd class="field-odd"><p>True</p>
+</dd>
+<dt class="field-even">default op<span class="colon">:</span></dt>
+<dd class="field-even"><p>‘=’</p>
+</dd>
+</dl>
+</div></blockquote>
+<p><strong>watch-day-of-week</strong> - list of dates that you watched the film in this date format.</p>
+<blockquote>
+<div><dl class="field-list simple">
+<dt class="field-odd">variants<span class="colon">:</span></dt>
+<dd class="field-odd"><p>len, num</p>
+</dd>
+<dt class="field-even">aliases<span class="colon">:</span></dt>
+<dd class="field-even"><p>w-d-o-w</p>
+</dd>
+<dt class="field-odd">ascending<span class="colon">:</span></dt>
+<dd class="field-odd"><p>True</p>
+</dd>
+<dt class="field-even">default op<span class="colon">:</span></dt>
+<dd class="field-even"><p>‘=’</p>
+</dd>
+</dl>
+</div></blockquote>
+<p><strong>watch-day-of-week-monday</strong> - list of dates that you watched the film in this date format.</p>
+<blockquote>
+<div><dl class="field-list simple">
+<dt class="field-odd">variants<span class="colon">:</span></dt>
+<dd class="field-odd"><p>len, num</p>
+</dd>
+<dt class="field-even">aliases<span class="colon">:</span></dt>
+<dd class="field-even"><p>w-d-o-w-m</p>
+</dd>
+<dt class="field-odd">ascending<span class="colon">:</span></dt>
+<dd class="field-odd"><p>True</p>
+</dd>
+<dt class="field-even">default op<span class="colon">:</span></dt>
+<dd class="field-even"><p>‘=’</p>
+</dd>
+</dl>
+</div></blockquote>
+<p><strong>watch-day-of-year</strong> - list of dates that you watched the film in this date format.</p>
+<blockquote>
+<div><dl class="field-list simple">
+<dt class="field-odd">variants<span class="colon">:</span></dt>
+<dd class="field-odd"><p>len, num</p>
+</dd>
+<dt class="field-even">aliases<span class="colon">:</span></dt>
+<dd class="field-even"><p>w-d-o-y</p>
+</dd>
+<dt class="field-odd">ascending<span class="colon">:</span></dt>
+<dd class="field-odd"><p>True</p>
+</dd>
+<dt class="field-even">default op<span class="colon">:</span></dt>
+<dd class="field-even"><p>‘=’</p>
+</dd>
+</dl>
+</div></blockquote>
+<p><strong>watch-month</strong> - list of dates that you watched the film in this date format.</p>
+<blockquote>
+<div><dl class="field-list simple">
+<dt class="field-odd">variants<span class="colon">:</span></dt>
+<dd class="field-odd"><p>len, num</p>
+</dd>
+<dt class="field-even">aliases<span class="colon">:</span></dt>
+<dd class="field-even"><p>w-m</p>
+</dd>
+<dt class="field-odd">ascending<span class="colon">:</span></dt>
+<dd class="field-odd"><p>True</p>
+</dd>
+<dt class="field-even">default op<span class="colon">:</span></dt>
+<dd class="field-even"><p>‘=’</p>
+</dd>
+</dl>
+</div></blockquote>
+<p><strong>watch-month-day</strong> - list of dates that you watched the film in this date format.</p>
+<blockquote>
+<div><dl class="field-list simple">
+<dt class="field-odd">variants<span class="colon">:</span></dt>
+<dd class="field-odd"><p>len, num</p>
+</dd>
+<dt class="field-even">aliases<span class="colon">:</span></dt>
+<dd class="field-even"><p>w-m-d</p>
+</dd>
+<dt class="field-odd">ascending<span class="colon">:</span></dt>
+<dd class="field-odd"><p>True</p>
+</dd>
+<dt class="field-even">default op<span class="colon">:</span></dt>
+<dd class="field-even"><p>‘=’</p>
+</dd>
+</dl>
+</div></blockquote>
+<p><strong>watch-week-of-year</strong> - list of dates that you watched the film in this date format.</p>
+<blockquote>
+<div><dl class="field-list simple">
+<dt class="field-odd">variants<span class="colon">:</span></dt>
+<dd class="field-odd"><p>len, num</p>
+</dd>
+<dt class="field-even">aliases<span class="colon">:</span></dt>
+<dd class="field-even"><p>w-w-o-y</p>
+</dd>
+<dt class="field-odd">ascending<span class="colon">:</span></dt>
+<dd class="field-odd"><p>True</p>
+</dd>
+<dt class="field-even">default op<span class="colon">:</span></dt>
+<dd class="field-even"><p>‘=’</p>
+</dd>
+</dl>
+</div></blockquote>
+<p><strong>watch-week-of-year-monday</strong> - list of dates that you watched the film in this date format.</p>
+<blockquote>
+<div><dl class="field-list simple">
+<dt class="field-odd">variants<span class="colon">:</span></dt>
+<dd class="field-odd"><p>len, num</p>
+</dd>
+<dt class="field-even">aliases<span class="colon">:</span></dt>
+<dd class="field-even"><p>w-w-o-y-m</p>
+</dd>
+<dt class="field-odd">ascending<span class="colon">:</span></dt>
+<dd class="field-odd"><p>True</p>
+</dd>
+<dt class="field-even">default op<span class="colon">:</span></dt>
+<dd class="field-even"><p>‘=’</p>
+</dd>
+</dl>
+</div></blockquote>
+<p><strong>watch-year</strong> - list of dates that you watched the film in this date format.</p>
+<blockquote>
+<div><dl class="field-list simple">
+<dt class="field-odd">variants<span class="colon">:</span></dt>
+<dd class="field-odd"><p>len, num</p>
+</dd>
+<dt class="field-even">aliases<span class="colon">:</span></dt>
+<dd class="field-even"><p>w-y</p>
+</dd>
+<dt class="field-odd">ascending<span class="colon">:</span></dt>
+<dd class="field-odd"><p>False</p>
+</dd>
+<dt class="field-even">default op<span class="colon">:</span></dt>
+<dd class="field-even"><p>‘=’</p>
+</dd>
+</dl>
+</div></blockquote>
+<p><strong>watch-year-month</strong> - list of dates that you watched the film in this date format.</p>
+<blockquote>
+<div><dl class="field-list simple">
+<dt class="field-odd">variants<span class="colon">:</span></dt>
+<dd class="field-odd"><p>len, num</p>
+</dd>
+<dt class="field-even">aliases<span class="colon">:</span></dt>
+<dd class="field-even"><p>w-y-m</p>
+</dd>
+<dt class="field-odd">ascending<span class="colon">:</span></dt>
+<dd class="field-odd"><p>False</p>
+</dd>
+<dt class="field-even">default op<span class="colon">:</span></dt>
+<dd class="field-even"><p>‘=’</p>
+</dd>
+</dl>
+</div></blockquote>
+<p><strong>writer</strong> - list of names of the movie’s crewmembers in this crew type.</p>
+<blockquote>
+<div><dl class="field-list simple">
+<dt class="field-odd">variants<span class="colon">:</span></dt>
+<dd class="field-odd"><p>len, num</p>
+</dd>
+<dt class="field-even">aliases<span class="colon">:</span></dt>
+<dd class="field-even"><p></p></dd>
 <dt class="field-odd">ascending<span class="colon">:</span></dt>
 <dd class="field-odd"><p>True</p>
 </dd>
@@ -1218,210 +1705,9 @@
 </dd>
 </dl>
 </div></blockquote>
-<p><strong>movies</strong> - list of movie titles these people were in.</p>
-<blockquote>
-<div><dl class="field-list simple">
-<dt class="field-odd">variants<span class="colon">:</span></dt>
-<dd class="field-odd"><p>len, num</p>
-</dd>
-<dt class="field-even">aliases<span class="colon">:</span></dt>
-<dd class="field-even"><p>titles, credits</p>
-</dd>
-<dt class="field-odd">ascending<span class="colon">:</span></dt>
-<dd class="field-odd"><p>True</p>
-</dd>
-<dt class="field-even">default op<span class="colon">:</span></dt>
-<dd class="field-even"><p>‘~’</p>
-</dd>
-</dl>
-</div></blockquote>
-<p><strong>movies-as-cast</strong> - list of movie titles these people were in as this crew type.</p>
-<blockquote>
-<div><dl class="field-list simple">
-<dt class="field-odd">variants<span class="colon">:</span></dt>
-<dd class="field-odd"><p>len, num</p>
-</dd>
-<dt class="field-even">aliases<span class="colon">:</span></dt>
-<dd class="field-even"><p>titles-as-cast, credits-as-cast</p>
-</dd>
-<dt class="field-odd">ascending<span class="colon">:</span></dt>
-<dd class="field-odd"><p>True</p>
-</dd>
-<dt class="field-even">default op<span class="colon">:</span></dt>
-<dd class="field-even"><p>‘~’</p>
-</dd>
-</dl>
-</div></blockquote>
-<p><strong>movies-as-stuntcast</strong> - list of movie titles these people were in as this crew type.</p>
-<blockquote>
-<div><dl class="field-list simple">
-<dt class="field-odd">variants<span class="colon">:</span></dt>
-<dd class="field-odd"><p>len, num</p>
-</dd>
-<dt class="field-even">aliases<span class="colon">:</span></dt>
-<dd class="field-even"><p>titles-as-stuntcast, credits-as-stuntcast</p>
-</dd>
-<dt class="field-odd">ascending<span class="colon">:</span></dt>
-<dd class="field-odd"><p>True</p>
-</dd>
-<dt class="field-even">default op<span class="colon">:</span></dt>
-<dd class="field-even"><p>‘~’</p>
-</dd>
-</dl>
-</div></blockquote>
-<p><strong>movies-as-director</strong> - list of movie titles these people were in as this crew type.</p>
-<blockquote>
-<div><dl class="field-list simple">
-<dt class="field-odd">variants<span class="colon">:</span></dt>
-<dd class="field-odd"><p>len, num</p>
-</dd>
-<dt class="field-even">aliases<span class="colon">:</span></dt>
-<dd class="field-even"><p>titles-as-director, credits-as-director</p>
-</dd>
-<dt class="field-odd">ascending<span class="colon">:</span></dt>
-<dd class="field-odd"><p>True</p>
-</dd>
-<dt class="field-even">default op<span class="colon">:</span></dt>
-<dd class="field-even"><p>‘~’</p>
-</dd>
-</dl>
-</div></blockquote>
-<p><strong>movies-as-writer</strong> - list of movie titles these people were in as this crew type.</p>
-<blockquote>
-<div><dl class="field-list simple">
-<dt class="field-odd">variants<span class="colon">:</span></dt>
-<dd class="field-odd"><p>len, num</p>
-</dd>
-<dt class="field-even">aliases<span class="colon">:</span></dt>
-<dd class="field-even"><p>titles-as-writer, credits-as-writer</p>
-</dd>
-<dt class="field-odd">ascending<span class="colon">:</span></dt>
-<dd class="field-odd"><p>True</p>
-</dd>
-<dt class="field-even">default op<span class="colon">:</span></dt>
-<dd class="field-even"><p>‘~’</p>
-</dd>
-</dl>
-</div></blockquote>
-<p><strong>movies-as-producer</strong> - list of movie titles these people were in as this crew type.</p>
-<blockquote>
-<div><dl class="field-list simple">
-<dt class="field-odd">variants<span class="colon">:</span></dt>
-<dd class="field-odd"><p>len, num</p>
-</dd>
-<dt class="field-even">aliases<span class="colon">:</span></dt>
-<dd class="field-even"><p>titles-as-producer, credits-as-producer</p>
-</dd>
-<dt class="field-odd">ascending<span class="colon">:</span></dt>
-<dd class="field-odd"><p>True</p>
-</dd>
-<dt class="field-even">default op<span class="colon">:</span></dt>
-<dd class="field-even"><p>‘~’</p>
-</dd>
-</dl>
-</div></blockquote>
-<p><strong>movies-as-composer</strong> - list of movie titles these people were in as this crew type.</p>
-<blockquote>
-<div><dl class="field-list simple">
-<dt class="field-odd">variants<span class="colon">:</span></dt>
-<dd class="field-odd"><p>len, num</p>
-</dd>
-<dt class="field-even">aliases<span class="colon">:</span></dt>
-<dd class="field-even"><p>titles-as-composer, credits-as-composer</p>
-</dd>
-<dt class="field-odd">ascending<span class="colon">:</span></dt>
-<dd class="field-odd"><p>True</p>
-</dd>
-<dt class="field-even">default op<span class="colon">:</span></dt>
-<dd class="field-even"><p>‘~’</p>
-</dd>
-</dl>
-</div></blockquote>
-<p><strong>movies-as-cinematographer</strong> - list of movie titles these people were in as this crew type.</p>
-<blockquote>
-<div><dl class="field-list simple">
-<dt class="field-odd">variants<span class="colon">:</span></dt>
-<dd class="field-odd"><p>len, num</p>
-</dd>
-<dt class="field-even">aliases<span class="colon">:</span></dt>
-<dd class="field-even"><p>titles-as-cinematographer, credits-as-cinematographer</p>
-</dd>
-<dt class="field-odd">ascending<span class="colon">:</span></dt>
-<dd class="field-odd"><p>True</p>
-</dd>
-<dt class="field-even">default op<span class="colon">:</span></dt>
-<dd class="field-even"><p>‘~’</p>
-</dd>
-</dl>
-</div></blockquote>
-<p><strong>movies-as-editor</strong> - list of movie titles these people were in as this crew type.</p>
-<blockquote>
-<div><dl class="field-list simple">
-<dt class="field-odd">variants<span class="colon">:</span></dt>
-<dd class="field-odd"><p>len, num</p>
-</dd>
-<dt class="field-even">aliases<span class="colon">:</span></dt>
-<dd class="field-even"><p>titles-as-editor, credits-as-editor</p>
-</dd>
-<dt class="field-odd">ascending<span class="colon">:</span></dt>
-<dd class="field-odd"><p>True</p>
-</dd>
-<dt class="field-even">default op<span class="colon">:</span></dt>
-<dd class="field-even"><p>‘~’</p>
-</dd>
-</dl>
-</div></blockquote>
-<p><strong>movies-as-any</strong> - list of movie titles these people were in as this crew type.</p>
-<blockquote>
-<div><dl class="field-list simple">
-<dt class="field-odd">variants<span class="colon">:</span></dt>
-<dd class="field-odd"><p>len, num</p>
-</dd>
-<dt class="field-even">aliases<span class="colon">:</span></dt>
-<dd class="field-even"><p>titles-as-any, credits-as-any</p>
-</dd>
-<dt class="field-odd">ascending<span class="colon">:</span></dt>
-<dd class="field-odd"><p>True</p>
-</dd>
-<dt class="field-even">default op<span class="colon">:</span></dt>
-<dd class="field-even"><p>‘~’</p>
-</dd>
-</dl>
-</div></blockquote>
-<p><strong>professions</strong> - list of crew types occupied by these people.</p>
-<blockquote>
-<div><dl class="field-list simple">
-<dt class="field-odd">variants<span class="colon">:</span></dt>
-<dd class="field-odd"><p>len, num</p>
-</dd>
-<dt class="field-even">aliases<span class="colon">:</span></dt>
-<dd class="field-even"><p>jobs, expertise</p>
-</dd>
-<dt class="field-odd">ascending<span class="colon">:</span></dt>
-<dd class="field-odd"><p>True</p>
-</dd>
-<dt class="field-even">default op<span class="colon">:</span></dt>
-<dd class="field-even"><p>‘~’</p>
-</dd>
-</dl>
-</div></blockquote>
-<p><strong>top-genres</strong> - list of up to 3 genres these people appear in the most.</p>
-<blockquote>
-<div><dl class="field-list simple">
-<dt class="field-odd">variants<span class="colon">:</span></dt>
-<dd class="field-odd"><p>len, num</p>
-</dd>
-<dt class="field-even">aliases<span class="colon">:</span></dt>
-<dd class="field-even"><p>top-genre</p>
-</dd>
-<dt class="field-odd">ascending<span class="colon">:</span></dt>
-<dd class="field-odd"><p>True</p>
-</dd>
-<dt class="field-even">default op<span class="colon">:</span></dt>
-<dd class="field-even"><p>‘~’</p>
-</dd>
-</dl>
-</div></blockquote>
+</section>
+<section id="people-attributes">
+<h3>People attributes<a class="headerlink" href="#people-attributes" title="Link to this heading"></a></h3>
 <p><strong>birth-date</strong> - list of every person’s birthday in this date format.</p>
 <blockquote>
 <div><dl class="field-list simple">
@@ -1439,91 +1725,6 @@
 </dd>
 </dl>
 </div></blockquote>
-<p><strong>birth-year</strong> - list of every person’s birthday in this date format.</p>
-<blockquote>
-<div><dl class="field-list simple">
-<dt class="field-odd">variants<span class="colon">:</span></dt>
-<dd class="field-odd"><p>len, num</p>
-</dd>
-<dt class="field-even">aliases<span class="colon">:</span></dt>
-<dd class="field-even"><p>b-y</p>
-</dd>
-<dt class="field-odd">ascending<span class="colon">:</span></dt>
-<dd class="field-odd"><p>False</p>
-</dd>
-<dt class="field-even">default op<span class="colon">:</span></dt>
-<dd class="field-even"><p>‘=’</p>
-</dd>
-</dl>
-</div></blockquote>
-<p><strong>birth-month</strong> - list of every person’s birthday in this date format.</p>
-<blockquote>
-<div><dl class="field-list simple">
-<dt class="field-odd">variants<span class="colon">:</span></dt>
-<dd class="field-odd"><p>len, num</p>
-</dd>
-<dt class="field-even">aliases<span class="colon">:</span></dt>
-<dd class="field-even"><p>b-m</p>
-</dd>
-<dt class="field-odd">ascending<span class="colon">:</span></dt>
-<dd class="field-odd"><p>False</p>
-</dd>
-<dt class="field-even">default op<span class="colon">:</span></dt>
-<dd class="field-even"><p>‘=’</p>
-</dd>
-</dl>
-</div></blockquote>
-<p><strong>birth-week-of-year</strong> - list of every person’s birthday in this date format.</p>
-<blockquote>
-<div><dl class="field-list simple">
-<dt class="field-odd">variants<span class="colon">:</span></dt>
-<dd class="field-odd"><p>len, num</p>
-</dd>
-<dt class="field-even">aliases<span class="colon">:</span></dt>
-<dd class="field-even"><p>b-w-o-y</p>
-</dd>
-<dt class="field-odd">ascending<span class="colon">:</span></dt>
-<dd class="field-odd"><p>True</p>
-</dd>
-<dt class="field-even">default op<span class="colon">:</span></dt>
-<dd class="field-even"><p>‘=’</p>
-</dd>
-</dl>
-</div></blockquote>
-<p><strong>birth-week-of-year-monday</strong> - list of every person’s birthday in this date format.</p>
-<blockquote>
-<div><dl class="field-list simple">
-<dt class="field-odd">variants<span class="colon">:</span></dt>
-<dd class="field-odd"><p>len, num</p>
-</dd>
-<dt class="field-even">aliases<span class="colon">:</span></dt>
-<dd class="field-even"><p>b-w-o-y-m</p>
-</dd>
-<dt class="field-odd">ascending<span class="colon">:</span></dt>
-<dd class="field-odd"><p>True</p>
-</dd>
-<dt class="field-even">default op<span class="colon">:</span></dt>
-<dd class="field-even"><p>‘=’</p>
-</dd>
-</dl>
-</div></blockquote>
-<p><strong>birth-day-of-year</strong> - list of every person’s birthday in this date format.</p>
-<blockquote>
-<div><dl class="field-list simple">
-<dt class="field-odd">variants<span class="colon">:</span></dt>
-<dd class="field-odd"><p>len, num</p>
-</dd>
-<dt class="field-even">aliases<span class="colon">:</span></dt>
-<dd class="field-even"><p>b-d-o-y</p>
-</dd>
-<dt class="field-odd">ascending<span class="colon">:</span></dt>
-<dd class="field-odd"><p>True</p>
-</dd>
-<dt class="field-even">default op<span class="colon">:</span></dt>
-<dd class="field-even"><p>‘=’</p>
-</dd>
-</dl>
-</div></blockquote>
 <p><strong>birth-day-of-month</strong> - list of every person’s birthday in this date format.</p>
 <blockquote>
 <div><dl class="field-list simple">
@@ -1532,23 +1733,6 @@
 </dd>
 <dt class="field-even">aliases<span class="colon">:</span></dt>
 <dd class="field-even"><p>b-d-o-m</p>
-</dd>
-<dt class="field-odd">ascending<span class="colon">:</span></dt>
-<dd class="field-odd"><p>True</p>
-</dd>
-<dt class="field-even">default op<span class="colon">:</span></dt>
-<dd class="field-even"><p>‘=’</p>
-</dd>
-</dl>
-</div></blockquote>
-<p><strong>birth-month-of-year</strong> - list of every person’s birthday in this date format.</p>
-<blockquote>
-<div><dl class="field-list simple">
-<dt class="field-odd">variants<span class="colon">:</span></dt>
-<dd class="field-odd"><p>len, num</p>
-</dd>
-<dt class="field-even">aliases<span class="colon">:</span></dt>
-<dd class="field-even"><p>b-m-o-y</p>
 </dd>
 <dt class="field-odd">ascending<span class="colon">:</span></dt>
 <dd class="field-odd"><p>True</p>
@@ -1592,11 +1776,786 @@
 </dd>
 </dl>
 </div></blockquote>
-</section>
-<section id="role-attributes">
-<h3>Role attributes<a class="headerlink" href="#role-attributes" title="Link to this heading"></a></h3>
-<p>In addition to the below, all movie, people attributes are also valid role attributes.</p>
-<p><strong>uid</strong> - the role’s UID in flam.</p>
+<p><strong>birth-day-of-year</strong> - list of every person’s birthday in this date format.</p>
+<blockquote>
+<div><dl class="field-list simple">
+<dt class="field-odd">variants<span class="colon">:</span></dt>
+<dd class="field-odd"><p>len, num</p>
+</dd>
+<dt class="field-even">aliases<span class="colon">:</span></dt>
+<dd class="field-even"><p>b-d-o-y</p>
+</dd>
+<dt class="field-odd">ascending<span class="colon">:</span></dt>
+<dd class="field-odd"><p>True</p>
+</dd>
+<dt class="field-even">default op<span class="colon">:</span></dt>
+<dd class="field-even"><p>‘=’</p>
+</dd>
+</dl>
+</div></blockquote>
+<p><strong>birth-month</strong> - list of every person’s birthday in this date format.</p>
+<blockquote>
+<div><dl class="field-list simple">
+<dt class="field-odd">variants<span class="colon">:</span></dt>
+<dd class="field-odd"><p>len, num</p>
+</dd>
+<dt class="field-even">aliases<span class="colon">:</span></dt>
+<dd class="field-even"><p>b-m</p>
+</dd>
+<dt class="field-odd">ascending<span class="colon">:</span></dt>
+<dd class="field-odd"><p>True</p>
+</dd>
+<dt class="field-even">default op<span class="colon">:</span></dt>
+<dd class="field-even"><p>‘=’</p>
+</dd>
+</dl>
+</div></blockquote>
+<p><strong>birth-month-day</strong> - list of every person’s birthday in this date format.</p>
+<blockquote>
+<div><dl class="field-list simple">
+<dt class="field-odd">variants<span class="colon">:</span></dt>
+<dd class="field-odd"><p>len, num</p>
+</dd>
+<dt class="field-even">aliases<span class="colon">:</span></dt>
+<dd class="field-even"><p>b-m-d</p>
+</dd>
+<dt class="field-odd">ascending<span class="colon">:</span></dt>
+<dd class="field-odd"><p>True</p>
+</dd>
+<dt class="field-even">default op<span class="colon">:</span></dt>
+<dd class="field-even"><p>‘=’</p>
+</dd>
+</dl>
+</div></blockquote>
+<p><strong>birth-week-of-year</strong> - list of every person’s birthday in this date format.</p>
+<blockquote>
+<div><dl class="field-list simple">
+<dt class="field-odd">variants<span class="colon">:</span></dt>
+<dd class="field-odd"><p>len, num</p>
+</dd>
+<dt class="field-even">aliases<span class="colon">:</span></dt>
+<dd class="field-even"><p>b-w-o-y</p>
+</dd>
+<dt class="field-odd">ascending<span class="colon">:</span></dt>
+<dd class="field-odd"><p>True</p>
+</dd>
+<dt class="field-even">default op<span class="colon">:</span></dt>
+<dd class="field-even"><p>‘=’</p>
+</dd>
+</dl>
+</div></blockquote>
+<p><strong>birth-week-of-year-monday</strong> - list of every person’s birthday in this date format.</p>
+<blockquote>
+<div><dl class="field-list simple">
+<dt class="field-odd">variants<span class="colon">:</span></dt>
+<dd class="field-odd"><p>len, num</p>
+</dd>
+<dt class="field-even">aliases<span class="colon">:</span></dt>
+<dd class="field-even"><p>b-w-o-y-m</p>
+</dd>
+<dt class="field-odd">ascending<span class="colon">:</span></dt>
+<dd class="field-odd"><p>True</p>
+</dd>
+<dt class="field-even">default op<span class="colon">:</span></dt>
+<dd class="field-even"><p>‘=’</p>
+</dd>
+</dl>
+</div></blockquote>
+<p><strong>birth-year</strong> - list of every person’s birthday in this date format.</p>
+<blockquote>
+<div><dl class="field-list simple">
+<dt class="field-odd">variants<span class="colon">:</span></dt>
+<dd class="field-odd"><p>len, num</p>
+</dd>
+<dt class="field-even">aliases<span class="colon">:</span></dt>
+<dd class="field-even"><p>b-y</p>
+</dd>
+<dt class="field-odd">ascending<span class="colon">:</span></dt>
+<dd class="field-odd"><p>False</p>
+</dd>
+<dt class="field-even">default op<span class="colon">:</span></dt>
+<dd class="field-even"><p>‘=’</p>
+</dd>
+</dl>
+</div></blockquote>
+<p><strong>birth-year-month</strong> - list of every person’s birthday in this date format.</p>
+<blockquote>
+<div><dl class="field-list simple">
+<dt class="field-odd">variants<span class="colon">:</span></dt>
+<dd class="field-odd"><p>len, num</p>
+</dd>
+<dt class="field-even">aliases<span class="colon">:</span></dt>
+<dd class="field-even"><p>b-y-m</p>
+</dd>
+<dt class="field-odd">ascending<span class="colon">:</span></dt>
+<dd class="field-odd"><p>False</p>
+</dd>
+<dt class="field-even">default op<span class="colon">:</span></dt>
+<dd class="field-even"><p>‘=’</p>
+</dd>
+</dl>
+</div></blockquote>
+<p><strong>countries</strong> - list of every person’s countries.</p>
+<blockquote>
+<div><dl class="field-list simple">
+<dt class="field-odd">variants<span class="colon">:</span></dt>
+<dd class="field-odd"><p>len, num</p>
+</dd>
+<dt class="field-even">aliases<span class="colon">:</span></dt>
+<dd class="field-even"><p>country, nation, nations, nationality, nationalities</p>
+</dd>
+<dt class="field-odd">ascending<span class="colon">:</span></dt>
+<dd class="field-odd"><p>True</p>
+</dd>
+<dt class="field-even">default op<span class="colon">:</span></dt>
+<dd class="field-even"><p>‘~’</p>
+</dd>
+</dl>
+</div></blockquote>
+<p><strong>crew-type</strong> - the people’s crew type.</p>
+<blockquote>
+<div><dl class="field-list simple">
+<dt class="field-odd">variants<span class="colon">:</span></dt>
+<dd class="field-odd"><p>len, num</p>
+</dd>
+<dt class="field-even">aliases<span class="colon">:</span></dt>
+<dd class="field-even"><p></p></dd>
+<dt class="field-odd">ascending<span class="colon">:</span></dt>
+<dd class="field-odd"><p>True</p>
+</dd>
+<dt class="field-even">default op<span class="colon">:</span></dt>
+<dd class="field-even"><p>‘~’</p>
+</dd>
+</dl>
+</div></blockquote>
+<p><strong>death-date</strong> - list of every person’s death date in this date format.</p>
+<blockquote>
+<div><dl class="field-list simple">
+<dt class="field-odd">variants<span class="colon">:</span></dt>
+<dd class="field-odd"><p>len, num</p>
+</dd>
+<dt class="field-even">aliases<span class="colon">:</span></dt>
+<dd class="field-even"><p>d-d</p>
+</dd>
+<dt class="field-odd">ascending<span class="colon">:</span></dt>
+<dd class="field-odd"><p>False</p>
+</dd>
+<dt class="field-even">default op<span class="colon">:</span></dt>
+<dd class="field-even"><p>‘=’</p>
+</dd>
+</dl>
+</div></blockquote>
+<p><strong>death-day-of-month</strong> - list of every person’s death date in this date format.</p>
+<blockquote>
+<div><dl class="field-list simple">
+<dt class="field-odd">variants<span class="colon">:</span></dt>
+<dd class="field-odd"><p>len, num</p>
+</dd>
+<dt class="field-even">aliases<span class="colon">:</span></dt>
+<dd class="field-even"><p>d-d-o-m</p>
+</dd>
+<dt class="field-odd">ascending<span class="colon">:</span></dt>
+<dd class="field-odd"><p>True</p>
+</dd>
+<dt class="field-even">default op<span class="colon">:</span></dt>
+<dd class="field-even"><p>‘=’</p>
+</dd>
+</dl>
+</div></blockquote>
+<p><strong>death-day-of-week</strong> - list of every person’s death date in this date format.</p>
+<blockquote>
+<div><dl class="field-list simple">
+<dt class="field-odd">variants<span class="colon">:</span></dt>
+<dd class="field-odd"><p>len, num</p>
+</dd>
+<dt class="field-even">aliases<span class="colon">:</span></dt>
+<dd class="field-even"><p>d-d-o-w</p>
+</dd>
+<dt class="field-odd">ascending<span class="colon">:</span></dt>
+<dd class="field-odd"><p>True</p>
+</dd>
+<dt class="field-even">default op<span class="colon">:</span></dt>
+<dd class="field-even"><p>‘=’</p>
+</dd>
+</dl>
+</div></blockquote>
+<p><strong>death-day-of-week-monday</strong> - list of every person’s death date in this date format.</p>
+<blockquote>
+<div><dl class="field-list simple">
+<dt class="field-odd">variants<span class="colon">:</span></dt>
+<dd class="field-odd"><p>len, num</p>
+</dd>
+<dt class="field-even">aliases<span class="colon">:</span></dt>
+<dd class="field-even"><p>d-d-o-w-m</p>
+</dd>
+<dt class="field-odd">ascending<span class="colon">:</span></dt>
+<dd class="field-odd"><p>True</p>
+</dd>
+<dt class="field-even">default op<span class="colon">:</span></dt>
+<dd class="field-even"><p>‘=’</p>
+</dd>
+</dl>
+</div></blockquote>
+<p><strong>death-day-of-year</strong> - list of every person’s death date in this date format.</p>
+<blockquote>
+<div><dl class="field-list simple">
+<dt class="field-odd">variants<span class="colon">:</span></dt>
+<dd class="field-odd"><p>len, num</p>
+</dd>
+<dt class="field-even">aliases<span class="colon">:</span></dt>
+<dd class="field-even"><p>d-d-o-y</p>
+</dd>
+<dt class="field-odd">ascending<span class="colon">:</span></dt>
+<dd class="field-odd"><p>True</p>
+</dd>
+<dt class="field-even">default op<span class="colon">:</span></dt>
+<dd class="field-even"><p>‘=’</p>
+</dd>
+</dl>
+</div></blockquote>
+<p><strong>death-month</strong> - list of every person’s death date in this date format.</p>
+<blockquote>
+<div><dl class="field-list simple">
+<dt class="field-odd">variants<span class="colon">:</span></dt>
+<dd class="field-odd"><p>len, num</p>
+</dd>
+<dt class="field-even">aliases<span class="colon">:</span></dt>
+<dd class="field-even"><p>d-m</p>
+</dd>
+<dt class="field-odd">ascending<span class="colon">:</span></dt>
+<dd class="field-odd"><p>True</p>
+</dd>
+<dt class="field-even">default op<span class="colon">:</span></dt>
+<dd class="field-even"><p>‘=’</p>
+</dd>
+</dl>
+</div></blockquote>
+<p><strong>death-month-day</strong> - list of every person’s death date in this date format.</p>
+<blockquote>
+<div><dl class="field-list simple">
+<dt class="field-odd">variants<span class="colon">:</span></dt>
+<dd class="field-odd"><p>len, num</p>
+</dd>
+<dt class="field-even">aliases<span class="colon">:</span></dt>
+<dd class="field-even"><p>d-m-d</p>
+</dd>
+<dt class="field-odd">ascending<span class="colon">:</span></dt>
+<dd class="field-odd"><p>True</p>
+</dd>
+<dt class="field-even">default op<span class="colon">:</span></dt>
+<dd class="field-even"><p>‘=’</p>
+</dd>
+</dl>
+</div></blockquote>
+<p><strong>death-reason</strong> - list of every person’s death reason.</p>
+<blockquote>
+<div><dl class="field-list simple">
+<dt class="field-odd">variants<span class="colon">:</span></dt>
+<dd class="field-odd"><p>len, num</p>
+</dd>
+<dt class="field-even">aliases<span class="colon">:</span></dt>
+<dd class="field-even"><p></p></dd>
+<dt class="field-odd">ascending<span class="colon">:</span></dt>
+<dd class="field-odd"><p>True</p>
+</dd>
+<dt class="field-even">default op<span class="colon">:</span></dt>
+<dd class="field-even"><p>‘~’</p>
+</dd>
+</dl>
+</div></blockquote>
+<p><strong>death-week-of-year</strong> - list of every person’s death date in this date format.</p>
+<blockquote>
+<div><dl class="field-list simple">
+<dt class="field-odd">variants<span class="colon">:</span></dt>
+<dd class="field-odd"><p>len, num</p>
+</dd>
+<dt class="field-even">aliases<span class="colon">:</span></dt>
+<dd class="field-even"><p>d-w-o-y</p>
+</dd>
+<dt class="field-odd">ascending<span class="colon">:</span></dt>
+<dd class="field-odd"><p>True</p>
+</dd>
+<dt class="field-even">default op<span class="colon">:</span></dt>
+<dd class="field-even"><p>‘=’</p>
+</dd>
+</dl>
+</div></blockquote>
+<p><strong>death-week-of-year-monday</strong> - list of every person’s death date in this date format.</p>
+<blockquote>
+<div><dl class="field-list simple">
+<dt class="field-odd">variants<span class="colon">:</span></dt>
+<dd class="field-odd"><p>len, num</p>
+</dd>
+<dt class="field-even">aliases<span class="colon">:</span></dt>
+<dd class="field-even"><p>d-w-o-y-m</p>
+</dd>
+<dt class="field-odd">ascending<span class="colon">:</span></dt>
+<dd class="field-odd"><p>True</p>
+</dd>
+<dt class="field-even">default op<span class="colon">:</span></dt>
+<dd class="field-even"><p>‘=’</p>
+</dd>
+</dl>
+</div></blockquote>
+<p><strong>death-year</strong> - list of every person’s death date in this date format.</p>
+<blockquote>
+<div><dl class="field-list simple">
+<dt class="field-odd">variants<span class="colon">:</span></dt>
+<dd class="field-odd"><p>len, num</p>
+</dd>
+<dt class="field-even">aliases<span class="colon">:</span></dt>
+<dd class="field-even"><p>d-y</p>
+</dd>
+<dt class="field-odd">ascending<span class="colon">:</span></dt>
+<dd class="field-odd"><p>False</p>
+</dd>
+<dt class="field-even">default op<span class="colon">:</span></dt>
+<dd class="field-even"><p>‘=’</p>
+</dd>
+</dl>
+</div></blockquote>
+<p><strong>death-year-month</strong> - list of every person’s death date in this date format.</p>
+<blockquote>
+<div><dl class="field-list simple">
+<dt class="field-odd">variants<span class="colon">:</span></dt>
+<dd class="field-odd"><p>len, num</p>
+</dd>
+<dt class="field-even">aliases<span class="colon">:</span></dt>
+<dd class="field-even"><p>d-y-m</p>
+</dd>
+<dt class="field-odd">ascending<span class="colon">:</span></dt>
+<dd class="field-odd"><p>False</p>
+</dd>
+<dt class="field-even">default op<span class="colon">:</span></dt>
+<dd class="field-even"><p>‘=’</p>
+</dd>
+</dl>
+</div></blockquote>
+<p><strong>gender</strong> - list of every person’s gender (the exact strings representing each gender may vary based on where the data was fetched from).</p>
+<blockquote>
+<div><dl class="field-list simple">
+<dt class="field-odd">variants<span class="colon">:</span></dt>
+<dd class="field-odd"><p>len, num</p>
+</dd>
+<dt class="field-even">aliases<span class="colon">:</span></dt>
+<dd class="field-even"><p>sex</p>
+</dd>
+<dt class="field-odd">ascending<span class="colon">:</span></dt>
+<dd class="field-odd"><p>True</p>
+</dd>
+<dt class="field-even">default op<span class="colon">:</span></dt>
+<dd class="field-even"><p>‘~’</p>
+</dd>
+</dl>
+</div></blockquote>
+<p><strong>group-mode</strong> - the people’s group mode.</p>
+<blockquote>
+<div><dl class="field-list simple">
+<dt class="field-odd">variants<span class="colon">:</span></dt>
+<dd class="field-odd"><p>len, num</p>
+</dd>
+<dt class="field-even">aliases<span class="colon">:</span></dt>
+<dd class="field-even"><p></p></dd>
+<dt class="field-odd">ascending<span class="colon">:</span></dt>
+<dd class="field-odd"><p>True</p>
+</dd>
+<dt class="field-even">default op<span class="colon">:</span></dt>
+<dd class="field-even"><p>‘~’</p>
+</dd>
+</dl>
+</div></blockquote>
+<p><strong>height-cm</strong> - list of every person’s height in centimeters.</p>
+<blockquote>
+<div><dl class="field-list simple">
+<dt class="field-odd">variants<span class="colon">:</span></dt>
+<dd class="field-odd"><p>len, num, avg, sum</p>
+</dd>
+<dt class="field-even">aliases<span class="colon">:</span></dt>
+<dd class="field-even"><p>height</p>
+</dd>
+<dt class="field-odd">ascending<span class="colon">:</span></dt>
+<dd class="field-odd"><p>False</p>
+</dd>
+<dt class="field-even">default op<span class="colon">:</span></dt>
+<dd class="field-even"><p>‘=’</p>
+</dd>
+</dl>
+</div></blockquote>
+<p><strong>movies</strong> - list of movie titles these people were in.</p>
+<blockquote>
+<div><dl class="field-list simple">
+<dt class="field-odd">variants<span class="colon">:</span></dt>
+<dd class="field-odd"><p>len, num</p>
+</dd>
+<dt class="field-even">aliases<span class="colon">:</span></dt>
+<dd class="field-even"><p>titles, credits</p>
+</dd>
+<dt class="field-odd">ascending<span class="colon">:</span></dt>
+<dd class="field-odd"><p>True</p>
+</dd>
+<dt class="field-even">default op<span class="colon">:</span></dt>
+<dd class="field-even"><p>‘~’</p>
+</dd>
+</dl>
+</div></blockquote>
+<p><strong>movies-as-additional</strong> - list of movie titles these people were in as this crew type.</p>
+<blockquote>
+<div><dl class="field-list simple">
+<dt class="field-odd">variants<span class="colon">:</span></dt>
+<dd class="field-odd"><p>len, num</p>
+</dd>
+<dt class="field-even">aliases<span class="colon">:</span></dt>
+<dd class="field-even"><p>titles-as-additional, credits-as-additional</p>
+</dd>
+<dt class="field-odd">ascending<span class="colon">:</span></dt>
+<dd class="field-odd"><p>True</p>
+</dd>
+<dt class="field-even">default op<span class="colon">:</span></dt>
+<dd class="field-even"><p>‘~’</p>
+</dd>
+</dl>
+</div></blockquote>
+<p><strong>movies-as-any</strong> - list of movie titles these people were in as this crew type.</p>
+<blockquote>
+<div><dl class="field-list simple">
+<dt class="field-odd">variants<span class="colon">:</span></dt>
+<dd class="field-odd"><p>len, num</p>
+</dd>
+<dt class="field-even">aliases<span class="colon">:</span></dt>
+<dd class="field-even"><p>titles-as-any, credits-as-any</p>
+</dd>
+<dt class="field-odd">ascending<span class="colon">:</span></dt>
+<dd class="field-odd"><p>True</p>
+</dd>
+<dt class="field-even">default op<span class="colon">:</span></dt>
+<dd class="field-even"><p>‘~’</p>
+</dd>
+</dl>
+</div></blockquote>
+<p><strong>movies-as-art-director</strong> - list of movie titles these people were in as this crew type.</p>
+<blockquote>
+<div><dl class="field-list simple">
+<dt class="field-odd">variants<span class="colon">:</span></dt>
+<dd class="field-odd"><p>len, num</p>
+</dd>
+<dt class="field-even">aliases<span class="colon">:</span></dt>
+<dd class="field-even"><p>titles-as-art-director, credits-as-art-director</p>
+</dd>
+<dt class="field-odd">ascending<span class="colon">:</span></dt>
+<dd class="field-odd"><p>True</p>
+</dd>
+<dt class="field-even">default op<span class="colon">:</span></dt>
+<dd class="field-even"><p>‘~’</p>
+</dd>
+</dl>
+</div></blockquote>
+<p><strong>movies-as-assistant-director</strong> - list of movie titles these people were in as this crew type.</p>
+<blockquote>
+<div><dl class="field-list simple">
+<dt class="field-odd">variants<span class="colon">:</span></dt>
+<dd class="field-odd"><p>len, num</p>
+</dd>
+<dt class="field-even">aliases<span class="colon">:</span></dt>
+<dd class="field-even"><p>titles-as-assistant-director, credits-as-assistant-director</p>
+</dd>
+<dt class="field-odd">ascending<span class="colon">:</span></dt>
+<dd class="field-odd"><p>True</p>
+</dd>
+<dt class="field-even">default op<span class="colon">:</span></dt>
+<dd class="field-even"><p>‘~’</p>
+</dd>
+</dl>
+</div></blockquote>
+<p><strong>movies-as-cast</strong> - list of movie titles these people were in as this crew type.</p>
+<blockquote>
+<div><dl class="field-list simple">
+<dt class="field-odd">variants<span class="colon">:</span></dt>
+<dd class="field-odd"><p>len, num</p>
+</dd>
+<dt class="field-even">aliases<span class="colon">:</span></dt>
+<dd class="field-even"><p>titles-as-cast, credits-as-cast</p>
+</dd>
+<dt class="field-odd">ascending<span class="colon">:</span></dt>
+<dd class="field-odd"><p>True</p>
+</dd>
+<dt class="field-even">default op<span class="colon">:</span></dt>
+<dd class="field-even"><p>‘~’</p>
+</dd>
+</dl>
+</div></blockquote>
+<p><strong>movies-as-casting-director</strong> - list of movie titles these people were in as this crew type.</p>
+<blockquote>
+<div><dl class="field-list simple">
+<dt class="field-odd">variants<span class="colon">:</span></dt>
+<dd class="field-odd"><p>len, num</p>
+</dd>
+<dt class="field-even">aliases<span class="colon">:</span></dt>
+<dd class="field-even"><p>titles-as-casting-director, credits-as-casting-director</p>
+</dd>
+<dt class="field-odd">ascending<span class="colon">:</span></dt>
+<dd class="field-odd"><p>True</p>
+</dd>
+<dt class="field-even">default op<span class="colon">:</span></dt>
+<dd class="field-even"><p>‘~’</p>
+</dd>
+</dl>
+</div></blockquote>
+<p><strong>movies-as-choreographer</strong> - list of movie titles these people were in as this crew type.</p>
+<blockquote>
+<div><dl class="field-list simple">
+<dt class="field-odd">variants<span class="colon">:</span></dt>
+<dd class="field-odd"><p>len, num</p>
+</dd>
+<dt class="field-even">aliases<span class="colon">:</span></dt>
+<dd class="field-even"><p>titles-as-choreographer, credits-as-choreographer</p>
+</dd>
+<dt class="field-odd">ascending<span class="colon">:</span></dt>
+<dd class="field-odd"><p>True</p>
+</dd>
+<dt class="field-even">default op<span class="colon">:</span></dt>
+<dd class="field-even"><p>‘~’</p>
+</dd>
+</dl>
+</div></blockquote>
+<p><strong>movies-as-cinematographer</strong> - list of movie titles these people were in as this crew type.</p>
+<blockquote>
+<div><dl class="field-list simple">
+<dt class="field-odd">variants<span class="colon">:</span></dt>
+<dd class="field-odd"><p>len, num</p>
+</dd>
+<dt class="field-even">aliases<span class="colon">:</span></dt>
+<dd class="field-even"><p>titles-as-cinematographer, credits-as-cinematographer</p>
+</dd>
+<dt class="field-odd">ascending<span class="colon">:</span></dt>
+<dd class="field-odd"><p>True</p>
+</dd>
+<dt class="field-even">default op<span class="colon">:</span></dt>
+<dd class="field-even"><p>‘~’</p>
+</dd>
+</dl>
+</div></blockquote>
+<p><strong>movies-as-composer</strong> - list of movie titles these people were in as this crew type.</p>
+<blockquote>
+<div><dl class="field-list simple">
+<dt class="field-odd">variants<span class="colon">:</span></dt>
+<dd class="field-odd"><p>len, num</p>
+</dd>
+<dt class="field-even">aliases<span class="colon">:</span></dt>
+<dd class="field-even"><p>titles-as-composer, credits-as-composer</p>
+</dd>
+<dt class="field-odd">ascending<span class="colon">:</span></dt>
+<dd class="field-odd"><p>True</p>
+</dd>
+<dt class="field-even">default op<span class="colon">:</span></dt>
+<dd class="field-even"><p>‘~’</p>
+</dd>
+</dl>
+</div></blockquote>
+<p><strong>movies-as-director</strong> - list of movie titles these people were in as this crew type.</p>
+<blockquote>
+<div><dl class="field-list simple">
+<dt class="field-odd">variants<span class="colon">:</span></dt>
+<dd class="field-odd"><p>len, num</p>
+</dd>
+<dt class="field-even">aliases<span class="colon">:</span></dt>
+<dd class="field-even"><p>titles-as-director, credits-as-director</p>
+</dd>
+<dt class="field-odd">ascending<span class="colon">:</span></dt>
+<dd class="field-odd"><p>True</p>
+</dd>
+<dt class="field-even">default op<span class="colon">:</span></dt>
+<dd class="field-even"><p>‘~’</p>
+</dd>
+</dl>
+</div></blockquote>
+<p><strong>movies-as-editor</strong> - list of movie titles these people were in as this crew type.</p>
+<blockquote>
+<div><dl class="field-list simple">
+<dt class="field-odd">variants<span class="colon">:</span></dt>
+<dd class="field-odd"><p>len, num</p>
+</dd>
+<dt class="field-even">aliases<span class="colon">:</span></dt>
+<dd class="field-even"><p>titles-as-editor, credits-as-editor</p>
+</dd>
+<dt class="field-odd">ascending<span class="colon">:</span></dt>
+<dd class="field-odd"><p>True</p>
+</dd>
+<dt class="field-even">default op<span class="colon">:</span></dt>
+<dd class="field-even"><p>‘~’</p>
+</dd>
+</dl>
+</div></blockquote>
+<p><strong>movies-as-executive-producer</strong> - list of movie titles these people were in as this crew type.</p>
+<blockquote>
+<div><dl class="field-list simple">
+<dt class="field-odd">variants<span class="colon">:</span></dt>
+<dd class="field-odd"><p>len, num</p>
+</dd>
+<dt class="field-even">aliases<span class="colon">:</span></dt>
+<dd class="field-even"><p>titles-as-executive-producer, credits-as-executive-producer</p>
+</dd>
+<dt class="field-odd">ascending<span class="colon">:</span></dt>
+<dd class="field-odd"><p>True</p>
+</dd>
+<dt class="field-even">default op<span class="colon">:</span></dt>
+<dd class="field-even"><p>‘~’</p>
+</dd>
+</dl>
+</div></blockquote>
+<p><strong>movies-as-producer</strong> - list of movie titles these people were in as this crew type.</p>
+<blockquote>
+<div><dl class="field-list simple">
+<dt class="field-odd">variants<span class="colon">:</span></dt>
+<dd class="field-odd"><p>len, num</p>
+</dd>
+<dt class="field-even">aliases<span class="colon">:</span></dt>
+<dd class="field-even"><p>titles-as-producer, credits-as-producer</p>
+</dd>
+<dt class="field-odd">ascending<span class="colon">:</span></dt>
+<dd class="field-odd"><p>True</p>
+</dd>
+<dt class="field-even">default op<span class="colon">:</span></dt>
+<dd class="field-even"><p>‘~’</p>
+</dd>
+</dl>
+</div></blockquote>
+<p><strong>movies-as-stuntcast</strong> - list of movie titles these people were in as this crew type.</p>
+<blockquote>
+<div><dl class="field-list simple">
+<dt class="field-odd">variants<span class="colon">:</span></dt>
+<dd class="field-odd"><p>len, num</p>
+</dd>
+<dt class="field-even">aliases<span class="colon">:</span></dt>
+<dd class="field-even"><p>titles-as-stuntcast, credits-as-stuntcast</p>
+</dd>
+<dt class="field-odd">ascending<span class="colon">:</span></dt>
+<dd class="field-odd"><p>True</p>
+</dd>
+<dt class="field-even">default op<span class="colon">:</span></dt>
+<dd class="field-even"><p>‘~’</p>
+</dd>
+</dl>
+</div></blockquote>
+<p><strong>movies-as-writer</strong> - list of movie titles these people were in as this crew type.</p>
+<blockquote>
+<div><dl class="field-list simple">
+<dt class="field-odd">variants<span class="colon">:</span></dt>
+<dd class="field-odd"><p>len, num</p>
+</dd>
+<dt class="field-even">aliases<span class="colon">:</span></dt>
+<dd class="field-even"><p>titles-as-writer, credits-as-writer</p>
+</dd>
+<dt class="field-odd">ascending<span class="colon">:</span></dt>
+<dd class="field-odd"><p>True</p>
+</dd>
+<dt class="field-even">default op<span class="colon">:</span></dt>
+<dd class="field-even"><p>‘~’</p>
+</dd>
+</dl>
+</div></blockquote>
+<p><strong>name</strong> - list of every person’s name.</p>
+<blockquote>
+<div><dl class="field-list simple">
+<dt class="field-odd">variants<span class="colon">:</span></dt>
+<dd class="field-odd"><p>len, num</p>
+</dd>
+<dt class="field-even">aliases<span class="colon">:</span></dt>
+<dd class="field-even"><p>names, person, people</p>
+</dd>
+<dt class="field-odd">ascending<span class="colon">:</span></dt>
+<dd class="field-odd"><p>True</p>
+</dd>
+<dt class="field-even">default op<span class="colon">:</span></dt>
+<dd class="field-even"><p>‘~’</p>
+</dd>
+</dl>
+</div></blockquote>
+<p><strong>origin-uid</strong> - list of every person’s UID in the source from which the data is fetched.</p>
+<blockquote>
+<div><dl class="field-list simple">
+<dt class="field-odd">variants<span class="colon">:</span></dt>
+<dd class="field-odd"><p>len, num</p>
+</dd>
+<dt class="field-even">aliases<span class="colon">:</span></dt>
+<dd class="field-even"><p>origin-id, origin-guid, origin-identifier</p>
+</dd>
+<dt class="field-odd">ascending<span class="colon">:</span></dt>
+<dd class="field-odd"><p>True</p>
+</dd>
+<dt class="field-even">default op<span class="colon">:</span></dt>
+<dd class="field-even"><p>‘~’</p>
+</dd>
+</dl>
+</div></blockquote>
+<p><strong>oscar-noms</strong> - list of Oscar nominations received by these people.</p>
+<blockquote>
+<div><dl class="field-list simple">
+<dt class="field-odd">variants<span class="colon">:</span></dt>
+<dd class="field-odd"><p>len, num</p>
+</dd>
+<dt class="field-even">aliases<span class="colon">:</span></dt>
+<dd class="field-even"><p>oscar-nominations, noms, nominations</p>
+</dd>
+<dt class="field-odd">ascending<span class="colon">:</span></dt>
+<dd class="field-odd"><p>True</p>
+</dd>
+<dt class="field-even">default op<span class="colon">:</span></dt>
+<dd class="field-even"><p>‘~’</p>
+</dd>
+</dl>
+</div></blockquote>
+<p><strong>oscar-wins</strong> - list of Oscars won by these people.</p>
+<blockquote>
+<div><dl class="field-list simple">
+<dt class="field-odd">variants<span class="colon">:</span></dt>
+<dd class="field-odd"><p>len, num</p>
+</dd>
+<dt class="field-even">aliases<span class="colon">:</span></dt>
+<dd class="field-even"><p>oscars, awards</p>
+</dd>
+<dt class="field-odd">ascending<span class="colon">:</span></dt>
+<dd class="field-odd"><p>True</p>
+</dd>
+<dt class="field-even">default op<span class="colon">:</span></dt>
+<dd class="field-even"><p>‘~’</p>
+</dd>
+</dl>
+</div></blockquote>
+<p><strong>professions</strong> - list of crew types occupied by these people.</p>
+<blockquote>
+<div><dl class="field-list simple">
+<dt class="field-odd">variants<span class="colon">:</span></dt>
+<dd class="field-odd"><p>len, num</p>
+</dd>
+<dt class="field-even">aliases<span class="colon">:</span></dt>
+<dd class="field-even"><p>jobs, expertise</p>
+</dd>
+<dt class="field-odd">ascending<span class="colon">:</span></dt>
+<dd class="field-odd"><p>True</p>
+</dd>
+<dt class="field-even">default op<span class="colon">:</span></dt>
+<dd class="field-even"><p>‘~’</p>
+</dd>
+</dl>
+</div></blockquote>
+<p><strong>top-genres</strong> - list of up to 3 genres these people appear in the most.</p>
+<blockquote>
+<div><dl class="field-list simple">
+<dt class="field-odd">variants<span class="colon">:</span></dt>
+<dd class="field-odd"><p>len, num</p>
+</dd>
+<dt class="field-even">aliases<span class="colon">:</span></dt>
+<dd class="field-even"><p>top-genre</p>
+</dd>
+<dt class="field-odd">ascending<span class="colon">:</span></dt>
+<dd class="field-odd"><p>True</p>
+</dd>
+<dt class="field-even">default op<span class="colon">:</span></dt>
+<dd class="field-even"><p>‘~’</p>
+</dd>
+</dl>
+</div></blockquote>
+<p><strong>uid</strong> - the people’s UID in flam.</p>
 <blockquote>
 <div><dl class="field-list simple">
 <dt class="field-odd">variants<span class="colon">:</span></dt>
@@ -1613,6 +2572,10 @@
 </dd>
 </dl>
 </div></blockquote>
+</section>
+<section id="role-attributes">
+<h3>Role attributes<a class="headerlink" href="#role-attributes" title="Link to this heading"></a></h3>
+<p>In addition to the below, <strong>all movie and people attributes are also valid role attributes!</strong></p>
 <p><strong>characters</strong> - list of characters played by this role (mainly for actors).</p>
 <blockquote>
 <div><dl class="field-list simple">
@@ -1627,6 +2590,23 @@
 </dd>
 <dt class="field-even">default op<span class="colon">:</span></dt>
 <dd class="field-even"><p>‘~’</p>
+</dd>
+</dl>
+</div></blockquote>
+<p><strong>episodes-num</strong> - the number of episodes this role appeared in.</p>
+<blockquote>
+<div><dl class="field-list simple">
+<dt class="field-odd">variants<span class="colon">:</span></dt>
+<dd class="field-odd"><p>len, num</p>
+</dd>
+<dt class="field-even">aliases<span class="colon">:</span></dt>
+<dd class="field-even"><p>episodes</p>
+</dd>
+<dt class="field-odd">ascending<span class="colon">:</span></dt>
+<dd class="field-odd"><p>False</p>
+</dd>
+<dt class="field-even">default op<span class="colon">:</span></dt>
+<dd class="field-even"><p>‘=’</p>
 </dd>
 </dl>
 </div></blockquote>
@@ -1647,10 +2627,75 @@
 </dd>
 </dl>
 </div></blockquote>
+<p><strong>jobs</strong> - list of jobs performed by this role (for crew type <a class="reference internal" href="api/flam.html#flam._ml.CrewType.ADDITIONAL" title="flam._ml.CrewType.ADDITIONAL"><code class="xref py py-attr docutils literal notranslate"><span class="pre">ADDITIONAL</span></code></a>).</p>
+<blockquote>
+<div><dl class="field-list simple">
+<dt class="field-odd">variants<span class="colon">:</span></dt>
+<dd class="field-odd"><p>len, num</p>
+</dd>
+<dt class="field-even">aliases<span class="colon">:</span></dt>
+<dd class="field-even"><p>job</p>
+</dd>
+<dt class="field-odd">ascending<span class="colon">:</span></dt>
+<dd class="field-odd"><p>True</p>
+</dd>
+<dt class="field-even">default op<span class="colon">:</span></dt>
+<dd class="field-even"><p>‘~’</p>
+</dd>
+</dl>
+</div></blockquote>
+<p><strong>oscar-noms</strong> - list of Oscar nominations received by this role.</p>
+<blockquote>
+<div><dl class="field-list simple">
+<dt class="field-odd">variants<span class="colon">:</span></dt>
+<dd class="field-odd"><p>len, num</p>
+</dd>
+<dt class="field-even">aliases<span class="colon">:</span></dt>
+<dd class="field-even"><p>oscar-nominations, noms, nominations</p>
+</dd>
+<dt class="field-odd">ascending<span class="colon">:</span></dt>
+<dd class="field-odd"><p>True</p>
+</dd>
+<dt class="field-even">default op<span class="colon">:</span></dt>
+<dd class="field-even"><p>‘~’</p>
+</dd>
+</dl>
+</div></blockquote>
+<p><strong>oscar-wins</strong> - list of Oscar nominations received by this role.</p>
+<blockquote>
+<div><dl class="field-list simple">
+<dt class="field-odd">variants<span class="colon">:</span></dt>
+<dd class="field-odd"><p>len, num</p>
+</dd>
+<dt class="field-even">aliases<span class="colon">:</span></dt>
+<dd class="field-even"><p>oscars, awards</p>
+</dd>
+<dt class="field-odd">ascending<span class="colon">:</span></dt>
+<dd class="field-odd"><p>True</p>
+</dd>
+<dt class="field-even">default op<span class="colon">:</span></dt>
+<dd class="field-even"><p>‘~’</p>
+</dd>
+</dl>
+</div></blockquote>
+<p><strong>uid</strong> - the role’s UID in flam.</p>
+<blockquote>
+<div><dl class="field-list simple">
+<dt class="field-odd">variants<span class="colon">:</span></dt>
+<dd class="field-odd"><p>len, num</p>
+</dd>
+<dt class="field-even">aliases<span class="colon">:</span></dt>
+<dd class="field-even"><p>id, guid, identifier</p>
+</dd>
+<dt class="field-odd">ascending<span class="colon">:</span></dt>
+<dd class="field-odd"><p>True</p>
+</dd>
+<dt class="field-even">default op<span class="colon">:</span></dt>
+<dd class="field-even"><p>‘~’</p>
+</dd>
+</dl>
+</div></blockquote>
 </section>
-</section>
-<section id="implementing-a-custom-attribute">
-<h2>Implementing a custom attribute<a class="headerlink" href="#implementing-a-custom-attribute" title="Link to this heading"></a></h2>
 </section>
 </section>
 
@@ -1658,8 +2703,8 @@
            </div>
           </div>
           <footer><div class="rst-footer-buttons" role="navigation" aria-label="Footer">
-        <a href="filters.html" class="btn btn-neutral float-left" title="Filters" accesskey="p" rel="prev"><span class="fa fa-arrow-circle-left" aria-hidden="true"></span> Previous</a>
-        <a href="predicates.html" class="btn btn-neutral float-right" title="Predicates" accesskey="n" rel="next">Next <span class="fa fa-arrow-circle-right" aria-hidden="true"></span></a>
+        <a href="findables.html" class="btn btn-neutral float-left" title="Findables" accesskey="p" rel="prev"><span class="fa fa-arrow-circle-left" aria-hidden="true"></span> Previous</a>
+        <a href="filters.html" class="btn btn-neutral float-right" title="Filters" accesskey="n" rel="next">Next <span class="fa fa-arrow-circle-right" aria-hidden="true"></span></a>
     </div>
 
   <hr/>
