@@ -28,7 +28,7 @@ Crew type
 
 Flam supports the following crew types:
 
-    .. program-output:: python -c 'import flam; print(", ".join(flam.CrewType))'
+    .. program-output:: python -c 'import flam; print("\n".join(flam.CrewType))'
 
 The same person can have different properties when presented as different crew types.
 For example, Quentin Tarantino will have a different 'num-movies' attribute as a director than as a cast member.
@@ -38,7 +38,7 @@ The 'any' crew type is special - it means you don't care about the crew type, yo
 Group mode
 ~~~~~~~~~~
 
-Grouping lets you turn collaborators into a single entity - when you search for directors, you might want to see the Coen brothers as a single director.
+Grouping lets you turn collaborators into a single entity - when you search for directors, you probably want to see the Coen brothers as a single director.
 
 People objects are always attached to a group mode: 'separate' or 'group'.
 

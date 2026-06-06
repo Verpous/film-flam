@@ -4,8 +4,8 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "film-flam"
-description = "Tools for extracting insights from your movie lists"
-readme = "README.md"
+description = 'FilmFlam (or just "flam") is a commandline tool and API for extracting insights from your movie lists.'
+readme = "README.md" # NOTE: README must have global URL links not relative to the repository for this to work.
 requires-python = ">=3.12.3"
 authors = [ { name="Aviv Edery", email="ederyaviv2@gmail.com" } ]
 license = "GPL-3.0"
@@ -19,6 +19,7 @@ dynamic = ["dependencies", "version"]
 
 [project.urls]
 Repository = "https://github.com/Verpous/film-flam"
+Documentation = "https://verpous.github.io/film-flam"
 
 [project.scripts]
 flam = "flam.__main__:main"

@@ -700,7 +700,7 @@ class SubcommandFind:
     # The printed name will be abbreviated anyway so it's ok to use the qualified name.
     DEFAULT_COLUMN_KEYS = {
         flam.FindableType.MOVIES: ['movies-title', 'movies-runtime', 'movies-release-year', 'movies-rating', 'movies-metascore', 'movies-director'],
-        flam.FindableType.PEOPLE: ['people-name', 'people-birth-year', 'people-height-cm', 'people-num-movies', 'people-avg-rating', 'people-avg-metascore'],
+        flam.FindableType.PEOPLE: ['people-name', 'people-birth-year', 'people-num-movies', 'people-avg-rating'],
         flam.FindableType.ROLES: ['people-name', 'movies-title', 'people-num-movies', 'movies-release-year'],
     }
 
@@ -851,8 +851,8 @@ Read more about filters: {DOCS_URL}/filters.html.''')
         movie_list = ctx.get_movie_list(listdefs if len(listdefs) > 0 else flam.SpecialListType.DEFAULTS)
 
         sort_attrs = cls.parse_sortkeys(args, findable_type, ct_gms, ctx)
-        column_attrs = cls.parse_columns(args, findable_type, ct_gms, sort_attrs, movie_list, filter, ctx)
-        split_indices = cls.parse_splits(args, findable_type, column_attrs, ctx)
+        split_attrs = cls.parse_splits(args, findable_type, ctx)
+        column_attrs = cls.parse_columns(args, findable_type, ct_gms, sort_attrs, split_attrs, movie_list, filter, ctx)
 
         flam.logger.info('Building findables list')
 
@@ -860,6 +860,9 @@ Read more about filters: {DOCS_URL}/filters.html.''')
         # 1. Unless the filter is a movie filter, it's not even possible to apply it anywhere else
         # 2. Even in the case of movie filters, applying it at get_movie_list would've changed program behavior - attributes like people-num-movies will not count filtered films
         # 3. For performance it's much much better to rely on an existing list with precached data than spin an anonymous list
+        # 
+        # The downside is some commands require you to define an ad-hoc composite list which sucks. I considered options to support passing an additional filter,
+        # but we're fighting against argparse here and also complicating things for users.
         findables = [
             findable
             for crew_type, group_mode in ct_gms
@@ -873,9 +876,9 @@ Read more about filters: {DOCS_URL}/filters.html.''')
         values_table = [[findable.extract(attr) for attr, _ in column_attrs] for findable in findables]
 
         # Calling it when there's nothing to split on would be a waste of time to rebuild the same list.
-        if len(split_indices) > 0:
-            flam.logger.info(f'Splitting entries based on indices: {split_indices}')
-            values_table = list(cls.split_values(split_indices, values_table))
+        if len(split_attrs) > 0:
+            flam.logger.info('Splitting entries')
+            values_table = list(cls.split_values(split_attrs, column_attrs, values_table))
 
         flam.logger.info('Stringifying the table')
         strs_table = list(cls.build_strs_table(column_attrs, values_table, args))
@@ -978,7 +981,8 @@ Read more about filters: {DOCS_URL}/filters.html.''')
     # Can't do this at argparse time because it depends on the context and sortkeys.
     @classmethod
     def parse_columns(cls, args: argparse.Namespace, findable_type: flam.FindableType, ct_gms: list[tuple[flam.CrewType, flam.GroupMode]],
-            sort_attrs: list[tuple[flam.Attribute, None | str]], movie_list: flam.MovieList, filter: flam.Filter, ctx: flam.FlamContext) -> list[tuple[flam.Attribute, None | str]]:
+            sort_attrs: list[tuple[flam.Attribute, None | str]], split_attrs: list[tuple[flam.Attribute, str]],
+            movie_list: flam.MovieList, filter: flam.Filter, ctx: flam.FlamContext) -> list[tuple[flam.Attribute, None | str]]:
         # First we'll parse user columns. It's kind of ugly and tricky.
         user_columns = [] if args.columns is None else args.columns.removeprefix('+').split(',')
 
@@ -1055,6 +1059,10 @@ Read more about filters: {DOCS_URL}/filters.html.''')
                 for attr, alias_hint in sort_attrs[:-1]:
                     uniq_insert(attr, alias_hint, len(attributes))
 
+            # Also add a column for every split key in the end.
+            for attr, alias_hint in split_attrs:
+                uniq_insert(attr, alias_hint, len(attributes))
+
             # Add a column for every attribute referenced in the filter.
             # Anonymous composites are not a worry here because at the CLI level those are never filtered (filter is applied at a later phase).
             # First we need to get the composite list filter since we'll want to search both there and in the filter we'll apply later.
@@ -1088,17 +1096,38 @@ Read more about filters: {DOCS_URL}/filters.html.''')
         return attributes
 
     @classmethod
-    def parse_splits(cls, args: argparse.Namespace, findable_type: flam.FindableType, column_attrs: list[tuple[flam.Attribute, None | str]], ctx: flam.FlamContext) -> list[int]:
-        # Waste of compute but the caller won't call this in the None case. The '' case is the user's fault.
+    def parse_splits(cls, args: argparse.Namespace, findable_type: flam.FindableType, ctx: flam.FlamContext) -> list[tuple[flam.Attribute, str]]:
         if args.split is None or args.split == '':
             return []
 
         attribute_names = args.split.split(',')
-        attributes = [ctx.attributes.get(a, type_hint=findable_type) for a in attribute_names]
-        column_indices = []
+        attributes = [(ctx.attributes.get(a, type_hint=findable_type), a) for a in attribute_names]
 
-        for attr_name, attr in zip(attribute_names, attributes):
-            # Find the attribute's index in the columns list. We only care about the index.
+        # Verify the desired type. We also need to verify the attribute is also in the columns list, but we'll do that later.
+        for attr, alias_hint in attributes:
+            if not attr.findable_type.is_applicable_to(findable_type):
+                raise flam.InputError(f"ATTRIBUTE '{alias_hint}' is a {attr.findable_type} attribute, so it is not found on {findable_type}.")
+
+        flam.logger.info(f"Got split attributes: {', '.join(attr.qualified_name for attr, _ in attributes)}")
+        return attributes
+
+    @classmethod
+    def sort_findables(cls, sort_attrs: list[tuple[flam.Attribute, None | str]], findables: list[flam.Findable], args: argparse.Namespace) -> None:
+        for attr, _ in reversed(sort_attrs):
+            # Use functools.partial to silence "cell-var-from-loop" warning by pylint.
+            # NOTE: python guarantees that the key func is applied only once per obj so we won't be extracting the attribute multiple times.
+            is_ascending = attr.is_ascending ^ args.reverse
+            key = functools.partial(lambda a, o, f: a.sort_key(f.extract(a), o), attr, is_ascending)
+            findables.sort(key=key, reverse=not is_ascending)
+
+    @classmethod
+    def split_values(cls, split_attrs: list[tuple[flam.Attribute, str]], column_attrs: list[tuple[flam.Attribute, None | str]],
+            values_table: typing.Iterable[list[flam.AttributeValue]]) -> typing.Iterable[list[flam.AttributeValue]]:
+        # First we need to compute the column index of each split attribute.
+        split_indices = []
+
+        for attr, alias_hint in split_attrs:
+            # Find the attribute's index in the columns list.
             column_index = None
 
             for i, tup in enumerate(column_attrs):
@@ -1108,25 +1137,13 @@ Read more about filters: {DOCS_URL}/filters.html.''')
                     column_index = i
                     break
 
+            # Split attributes are automatically added as smart columns, but that's only if the user didn't hard set his own columns.
             if column_index is None:
-                raise flam.InputError(f"ATTRIBUTE '{attr_name}' is not in the columns list so it can't be a --split option.")
+                raise flam.InputError(f"ATTRIBUTE '{alias_hint}' is not in the columns list so it can't be a --split option.")
 
-            column_indices.append(column_index)
+            split_indices.append(column_index)
 
-        flam.logger.info(f"Got split attributes: {', '.join(attr.qualified_name for attr in attributes)}")
-        return column_indices
-
-    @classmethod
-    def sort_findables(cls, sort_attrs: list[tuple[flam.Attribute, None | str]], findables: list[flam.Findable], args: argparse.Namespace) -> None:
-        for attr, _ in reversed(sort_attrs):
-            # Use functools.partial to silence "cell-var-from-loop" warning by pylint.
-            # NOTE: python guarantees that the key func is applied only once per obj so we won't be extracting the attribute multiple times.
-            key = functools.partial(lambda a, f: a.sort_key(f.extract(a)), attr)
-            findables.sort(key=key, reverse=(not attr.is_ascending) ^ args.reverse)
-
-    @classmethod
-    def split_values(cls, split_indices: list[int], values_table: typing.Iterable[list[flam.AttributeValue]]) -> typing.Iterable[list[flam.AttributeValue]]:
-        # Split the column at a specific index, then split the rest. Do it in the order the user requested, while NOT creating a list for each iteration.
+        # Nowe we can do the split. Do it one by one in the order the user requested, while NOT creating an intermediate list for each iteration.
         for split_index in split_indices:
             values_table = cls.split_single_value(split_index, values_table)
 
@@ -1150,16 +1167,16 @@ Read more about filters: {DOCS_URL}/filters.html.''')
                 yield split_entry
 
     @classmethod
-    def build_strs_table(cls, attributes: list[tuple[flam.Attribute, None | str]], values_table: list[list[flam.AttributeValue]], args: argparse.Namespace) -> typing.Iterable[list[str]]:
+    def build_strs_table(cls, column_attrs: list[tuple[flam.Attribute, None | str]], values_table: list[list[flam.AttributeValue]], args: argparse.Namespace) -> typing.Iterable[list[str]]:
         if not args.no_titles:
             titles = []
 
-            for attr, alias_hint in attributes:
+            for attr, alias_hint in column_attrs:
                 # If the user specified the attribute with an alias or a qualified name we want to also print it with that header.
                 if alias_hint is not None:
                     titles.append(alias_hint)
                 # Use name_without_type unless that would lead to ambiguity.
-                elif all(a == attr or a.name_without_type != attr.name_without_type for a, _ in attributes):
+                elif all(a == attr or a.name_without_type != attr.name_without_type for a, _ in column_attrs):
                     titles.append(attr.name_without_type)
                 else:
                     titles.append(attr.qualified_name)
@@ -1167,7 +1184,7 @@ Read more about filters: {DOCS_URL}/filters.html.''')
             yield titles
 
         for record in values_table:
-            yield [attributes[i][0].str_of_value(record[i], abbreviate=not args.verbose) for i in range(len(attributes))]
+            yield [column_attrs[i][0].str_of_value(record[i], abbreviate=not args.verbose) for i in range(len(column_attrs))]
 
 class SubcommandDocs:
     @classmethod

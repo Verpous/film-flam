@@ -277,9 +277,11 @@ class Attribute(abc.ABC):
         :meta public:
         """
 
-    def sort_key(self, value: AttributeValue) -> typing.Any:
+    def sort_key(self, value: AttributeValue, is_ascending: None | bool = None) -> typing.Any:
         """
         Returns an object which may be used to safely compare values of this attribute, even if some of them are ``None``. For example:
+
+        :param is_ascending: optionally indicate the desired sort order. This will ensure Nones are at the bottom of the sort no matter what. Defaults to :py:attr:`is_ascending`.
         
         .. code-block:: python
 
@@ -288,14 +290,18 @@ class Attribute(abc.ABC):
 
         :param value: a value extracted using this attribute.
         """
-        if isinstance(value, list):
-            return ([self._sort_key_primitive(elem) for elem in value])
-        
-        return self._sort_key_primitive(value)
 
-    def _sort_key_primitive(self, primitive: AttributePrimitive) -> SupportsRichComparison:
+        if is_ascending is None:
+            is_ascending = self.is_ascending
+
+        if isinstance(value, list):
+            return ([self._sort_key_primitive(elem, is_ascending) for elem in value])
+        
+        return self._sort_key_primitive(value, is_ascending)
+
+    def _sort_key_primitive(self, primitive: AttributePrimitive, is_ascending: bool) -> SupportsRichComparison:
         # We xor with the ascending preference so that Nones always end up at the bottom of the sort whether ascending or descending.
-        return ((primitive is not None) ^ self.is_ascending, primitive)
+        return ((primitive is not None) ^ is_ascending, primitive)
 
     # parse_primitive and _str_of_primitive are expected to be inverses of each other, as long as the str isn't abbreviated!
     # Parsing abbreviated strs too is allowed, just not required.

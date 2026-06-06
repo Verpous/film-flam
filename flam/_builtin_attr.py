@@ -892,6 +892,36 @@ def _people_death_reason_extractor(self: attrutils.EasyAttribute, people: _ml.Pe
     """list of every person's death reason."""
     return [mlf_person.death_reason for mlf_person in mlf_people]
 
+def _get_shared_oscars(people: _ml.People, get_oscars: typing.Callable[[_mlf.MLFRole], list[str]]) -> list[str]:
+    # This is a little complicated. A role is usually only one crew type, except in the ANY case.
+    # Our fetcher doesn't even try to sort out awards by crew type. It hands it to the person in every crew type.
+    # So there are 3 levels of oscars to compute:
+    # * Oscars won jointly by this group in a specific movie (intersection of oscar sets).
+    # * Oscars won by this group across all movies (list of oscars, allows duplicates).
+    oscars: list[str] = []
+
+    for role in people.associated_roles():
+        role_oscars: None | set[str] = None
+        mlf_roles = role.underlying_file_roles_readonly
+
+        for mlf_person in people.underlying_file_people_readonly:
+            person_oscars_in_movie = (
+                oscar
+                for ct, mlf_role in mlf_roles[mlf_person.uid].items()
+                    for oscar in get_oscars(mlf_role)
+            )
+
+            if role_oscars is None:
+                role_oscars = set(person_oscars_in_movie)
+            else:
+                role_oscars.intersection_update(person_oscars_in_movie)
+
+        assert role_oscars is not None
+        oscars.extend(role_oscars)
+
+    oscars.sort()
+    return oscars
+
 @_register_easy_attribute(attrutils.EasyAttributeParams(
     name_without_type = 'oscar-noms',
     aliases_without_type = ['oscar-nominations', 'noms', 'nominations'],
@@ -903,37 +933,7 @@ def _people_death_reason_extractor(self: attrutils.EasyAttribute, people: _ml.Pe
 ))
 def _people_oscar_noms_extractor(self: attrutils.EasyAttribute, people: _ml.People, mlf_people: list[_mlf.MLFPerson]) -> list[str]:
     """list of Oscar nominations received by these people."""
-
-    # This is a little complicated. A role is usually only one crew type, except in the ANY case.
-    # Our fetcher doesn't even try to sort out awards by crew type. It hands it to the person in every crew type.
-    # So there are 3 levels of oscars to compute:
-    # * Oscars won jointly by this group in a specific crew type in a specific movie (intersection of oscar sets).
-    # * Oscars won by this group across all crew types in a specific movie (union of oscar sets).
-    # * Oscars won by this group across all movies (list of oscars, allows duplicates).
-    oscars: list[str] = []
-
-    for role in people.associated_roles():
-        role_oscars: set[str] = set()
-
-        for ct in role.underlying_file_roles_readonly[mlf_people[0].uid]:
-            # Find oscars nominated jointly for all people in this role.
-            crew_oscars = None
-
-            for mlf_person in mlf_people:
-                mlf_role = role.underlying_file_roles_readonly[mlf_person.uid][ct]
-
-                if crew_oscars is None:
-                    crew_oscars = set(mlf_role.oscar_noms)
-                else:
-                    crew_oscars.intersection_update(mlf_role.oscar_noms)
-
-            assert crew_oscars is not None
-            role_oscars.update(crew_oscars)
-
-        oscars.extend(role_oscars)
-
-    oscars.sort()
-    return oscars
+    return _get_shared_oscars(people, lambda r: r.oscar_noms)
 
 @_register_easy_attribute(attrutils.EasyAttributeParams(
     name_without_type = 'oscar-wins',
@@ -946,31 +946,7 @@ def _people_oscar_noms_extractor(self: attrutils.EasyAttribute, people: _ml.Peop
 ))
 def _people_oscar_wins_extractor(self: attrutils.EasyAttribute, people: _ml.People, mlf_people: list[_mlf.MLFPerson]) -> list[str]:
     """list of Oscars won by these people."""
-
-    oscars: list[str] = []
-    
-    for role in people.associated_roles():
-        role_oscars: set[str] = set()
-
-        for ct in role.underlying_file_roles_readonly[mlf_people[0].uid]:
-            # Find oscars nominated jointly for all people in this role.
-            crew_oscars = None
-
-            for mlf_person in mlf_people:
-                mlf_role = role.underlying_file_roles_readonly[mlf_person.uid][ct]
-
-                if crew_oscars is None:
-                    crew_oscars = set(mlf_role.oscar_wins)
-                else:
-                    crew_oscars.intersection_update(mlf_role.oscar_wins)
-
-            assert crew_oscars is not None
-            role_oscars.update(crew_oscars)
-
-        oscars.extend(role_oscars)
-
-    oscars.sort()
-    return oscars
+    return _get_shared_oscars(people, lambda r: r.oscar_wins)
 
 #endregion person attributes
 

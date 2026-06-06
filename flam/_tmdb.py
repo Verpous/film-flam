@@ -642,7 +642,7 @@ class TMDBFetcher(_fetch.Fetcher, list_type='tmdb-list', uid_family=_UID_FAMILY)
                 deathday        = cls._parse_date(person_json['deathday']),
                 death_reason    = None,
                 height_cm       = None,
-                countries       = [person_json['place_of_birth']] if person_json['place_of_birth'] is not None else [],
+                countries       = [person_json['place_of_birth'].strip()] if person_json['place_of_birth'] is not None else [],
             )
 
     @classmethod
@@ -1666,7 +1666,7 @@ _crew_type_tmdb2flam_mapping = {
     "assistant set propsman":                               _ml.CrewType.ADDITIONAL,
     "first assistant property master":                      _ml.CrewType.ADDITIONAL,
     "key set painter":                                      _ml.CrewType.ADDITIONAL,
-    "set designer":                                         _ml.CrewType.ADDITIONAL,
+    "set designer":                                         _ml.CrewType.ADDITIONAL, # Props to the set designer!
     "conceptual design":                                    _ml.CrewType.ADDITIONAL,
     "background designer":                                  _ml.CrewType.ADDITIONAL,
     "production illustrator":                               _ml.CrewType.ADDITIONAL,

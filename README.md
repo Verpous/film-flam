@@ -6,9 +6,9 @@ From the commandline, flam enables you to quickly answer questions like "where h
 
 For more powerful uses, you can `import flam` and use the underlying API to access all the data about the movies and people in your movie lists.
 
-![find_movies.gif](docs/source/_static/find_movies.gif)
+![find_movies.gif](https://raw.githubusercontent.com/Verpous/film-flam/refs/heads/master/docs/source/_static/find_movies.gif)
 
-![find_tarantino.gif](docs/source/_static/find_tarantino.gif)
+![find_tarantino.gif](https://raw.githubusercontent.com/Verpous/film-flam/refs/heads/master/docs/source/_static/find_tarantino.gif)
 
 ## Features
 
@@ -47,6 +47,6 @@ If you encounter issues or have questions, please open an issue, or email me at 
 
 This program uses TMDB and the TMDB APIs but is not endorsed, certified, or otherwise approved by TMDB.
 
-Likewise for IMDb, Letterboxd, or what-have-you.
+Likewise IMDb, Letterboxd, or what-have-you.
 
-![tmdb.svg](docs/source/_static/tmdb.svg)
+![tmdb.svg](https://raw.githubusercontent.com/Verpous/film-flam/refs/heads/master/docs/source/_static/tmdb.svg)

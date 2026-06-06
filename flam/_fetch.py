@@ -136,7 +136,7 @@ class Fetcher(abc.ABC):
             }
 
             _remove_unused_people(movie_list_file)
-            _dbg.logger.info(f"Refetch pattern removed {len(movie_list_file.movies_by_uid) - nmovies_before} movies, {len(movie_list_file.people_by_uid) - npeople_before} people")
+            _dbg.logger.info(f"Refetch pattern removed {nmovies_before - len(movie_list_file.movies_by_uid)} movies, {len(movie_list_file.people_by_uid) - npeople_before} people")
 
         with open(os.devnull, 'w') as devnull, contextlib.redirect_stdout(devnull) if quiet else contextlib.nullcontext():
             print(f"Fetching '{self.abstract_listdef.pretty(self._ctx)}'...")

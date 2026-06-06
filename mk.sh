@@ -107,7 +107,6 @@ release() {
             local flavor=test
             local twineargs="--repository testpypi"
             ;;
-        # TODO: When I'm ready to run this for the first time, set up API token.
         actual)
             local flavor=actual
             local twineargs=""
@@ -166,12 +165,13 @@ _gen_requirements() {
     _mktemp req_patterns
 
     # Don't pipe pipreqs to sed, instead write file with pipreqs and edit it inplace with sed. This is to not sweep pipreq failure under the rug.
-    pipreqs --mode no-pin --ignore .mypy_cache,.venv --print > "$req_patterns"
+    pipreqs --mode no-pin --print $mdl > "$req_patterns"
     sed -iE '
 s/IMDbPY/cinemagoer/g
 s/python_dateutil/python-dateutil/g
 s/concurrent_log_handler/concurrent-log-handler/g
 s/Requests/requests/g
+s/currencyconverter/CurrencyConverter/g
 s/.*/^\0==/g' "$req_patterns" # Add a "==" so that the next step will grep these packages exactly and not count substrings.
     grep -E --file="$req_patterns" <(pip freeze) | sed -E 's/==/>=/g' | tee _gen_requirements.txt
 
@@ -219,10 +219,10 @@ sanity() {
     python -m venv --clear .venv
     source .venv/Scripts/activate
     install $flavor
-    cfg
+    coverage
 
     # This mystery function was sourced from the venv, it deactivates the venv.
-    # If cfg fails we miss this but I don't suppose it's important.
+    # If coverage fails we miss this but I don't suppose it's important.
     deactivate
 }
 
@@ -403,7 +403,12 @@ coverage() {
 
         # Fetch is optional since it's so slow.
         if [[ ! "$2" ]]; then
-            time "$cmd" fetch specials
+            # To really get good code coverage we need to fetch:
+            # * At least one movie and one show - handpicked Mandibles and Don't Hug Me I'm Scared because they have small crews and should fetch quickly.
+            # * All special list paths for fetchers which support them: watchlist, liked films, etc.
+            time "$cmd" fetch --refetch 'mandibles|hug me.*scared' specials shows
+            time "$cmd" fetch --refetch 'mandibles|hug me.*scared' lbox-films lbox-likes lbox-reviews lbox-watchlist
+            time "$cmd" fetch --refetch 'mandibles|hug me.*scared' tmdb-movies tmdb-fav-movies tmdb-fav-shows tmdb-rated-movies tmdb-rated-shows tmdb-watchlist-movies tmdb-watchlist-shows
         else
             time "$cmd" fetch --nothing
         fi
