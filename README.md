@@ -27,7 +27,15 @@ Simply:
 pip install the-film-flam
 ```
 
-And you should be good to go!
+If it worked, great! Otherwise, python probably didn't add the folder where scripts get installed to PATH.
+Find where `flam.exe` is installed on your machine - On Windows it will probably be in a folder that looks similar to one of these:
+
+```
+%LOCALAPPDATA%\Python\pythoncore-3.14-64\Scripts
+%LOCALAPPDATA%\Programs\Python\Python312\Scripts
+```
+
+Once you find it, [add the folder to PATH](https://www.thewindowsclub.com/how-to-add-edit-a-path-variable-in-windows) and try again.
 
 ## Usage
 
