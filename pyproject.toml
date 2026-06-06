@@ -3,7 +3,7 @@ requires = ["setuptools>=75.2"]
 build-backend = "setuptools.build_meta"
 
 [project]
-name = "film-flam"
+name = "the-film-flam" # Just "film-flam" is too similar to "flim-flam" which is an existing package >:(
 description = 'FilmFlam (or just "flam") is a commandline tool and API for extracting insights from your movie lists.'
 readme = "README.md" # NOTE: README must have global URL links not relative to the repository for this to work.
 requires-python = ">=3.12.3"

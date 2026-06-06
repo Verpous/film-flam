@@ -26,7 +26,7 @@ cd "$project_folder"
 
 mdl=flam
 cli=flam
-pkg=film-flam
+pkg=the-film-flam
 build=dist
 docs=docs
 
@@ -139,7 +139,7 @@ release() {
     python -m build --outdir $build
 
     # Twine can fail with HTTP 403 if the API token is bad. There should be a ~/.pypirc with the API token, and it's also saved in my Bitwarden.
-    twine upload $twineargs $build/*
+    twine upload --verbose $twineargs $build/*
     sanity $flavor
 
     # For actual releases only, publish the docs to GitHub Pages. They're hosted on https://verpous.github.io/film-flam/.

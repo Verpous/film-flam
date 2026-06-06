@@ -24,7 +24,7 @@ For more powerful uses, you can `import flam` and use the underlying API to acce
 Simply:
 
 ```
-pip install film-flam
+pip install the-film-flam
 ```
 
 And you should be good to go!

@@ -28,7 +28,7 @@ Simply:
 
 .. code-block:: bash
 
-    pip install film-flam
+    pip install the-film-flam
 
 And you should be good to go!
 
