@@ -6,14 +6,14 @@
   <meta charset="utf-8" /><meta name="viewport" content="width=device-width, initial-scale=1" />
 
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Findables &mdash; FilmFlam 2026.5.25.dev1779735591 documentation</title>
+  <title>Findables &mdash; FilmFlam 2026.6.6 documentation</title>
       <link rel="stylesheet" type="text/css" href="_static/pygments.css?v=80d5e7a1" />
       <link rel="stylesheet" type="text/css" href="_static/css/theme.css?v=9edc463e" />
 
   
       <script src="_static/jquery.js?v=5d32c60e"></script>
       <script src="_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
-      <script src="_static/documentation_options.js?v=9950e6dc"></script>
+      <script src="_static/documentation_options.js?v=58bc7555"></script>
       <script src="_static/doctools.js?v=fd6eb6e6"></script>
       <script src="_static/sphinx_highlight.js?v=6ffebe34"></script>
     <script src="_static/js/theme.js"></script>
@@ -116,7 +116,21 @@ But people can also be confined to a specific <strong>crew type</strong> (e.g. d
 <h3>Crew type<a class="headerlink" href="#crew-type" title="Link to this heading"></a></h3>
 <p>Flam supports the following crew types:</p>
 <blockquote>
-<div><div class="highlight-text notranslate"><div class="highlight"><pre><span></span>director, assistant-director, producer, executive-producer, composer, cinematographer, choreographer, editor, writer, cast, stuntcast, casting-director, art-director, additional, any
+<div><div class="highlight-text notranslate"><div class="highlight"><pre><span></span>director
+assistant-director
+producer
+executive-producer
+composer
+cinematographer
+choreographer
+editor
+writer
+cast
+stuntcast
+casting-director
+art-director
+additional
+any
 </pre></div>
 </div>
 </div></blockquote>
@@ -126,7 +140,7 @@ For example, Quentin Tarantino will have a different ‘num-movies’ attribute 
 </section>
 <section id="group-mode">
 <h3>Group mode<a class="headerlink" href="#group-mode" title="Link to this heading"></a></h3>
-<p>Grouping lets you turn collaborators into a single entity - when you search for directors, you might want to see the Coen brothers as a single director.</p>
+<p>Grouping lets you turn collaborators into a single entity - when you search for directors, you probably want to see the Coen brothers as a single director.</p>
 <p>People objects are always attached to a group mode: ‘separate’ or ‘group’.</p>
 <p>When separate, each returned object represents a single person.</p>
 <p>When grouped, flam will find people who’ve collaborated on movies together and return them as a single object.</p>

@@ -28,7 +28,7 @@ Simply:
 
 .. code-block:: bash
 
-    pip install film-flam
+    pip install the-film-flam
 
 And you should be good to go!
 
@@ -115,6 +115,6 @@ Disclaimer
 
 This program uses TMDB and the TMDB APIs but is not endorsed, certified, or otherwise approved by TMDB.
 
-Likewise for IMDb, Letterboxd, or what-have-you.
+Likewise IMDb, Letterboxd, or what-have-you.
 
 .. image:: _static/tmdb.svg

@@ -6,14 +6,14 @@
   <meta charset="utf-8" /><meta name="viewport" content="width=device-width, initial-scale=1" />
 
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>flam &mdash; FilmFlam 2026.5.25.dev1779735591 documentation</title>
+  <title>flam &mdash; FilmFlam 2026.6.6 documentation</title>
       <link rel="stylesheet" type="text/css" href="../_static/pygments.css?v=80d5e7a1" />
       <link rel="stylesheet" type="text/css" href="../_static/css/theme.css?v=9edc463e" />
 
   
       <script src="../_static/jquery.js?v=5d32c60e"></script>
       <script src="../_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
-      <script src="../_static/documentation_options.js?v=9950e6dc"></script>
+      <script src="../_static/documentation_options.js?v=58bc7555"></script>
       <script src="../_static/doctools.js?v=fd6eb6e6"></script>
       <script src="../_static/sphinx_highlight.js?v=6ffebe34"></script>
     <script src="../_static/js/theme.js"></script>
@@ -1888,15 +1888,29 @@ but you need to implement it as part of <a class="reference internal" href="../e
 
 <dl class="py method">
 <dt class="sig sig-object py" id="flam._attr.Attribute.sort_key">
-<span class="sig-name descname"><span class="pre">sort_key</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">value</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference internal" href="#flam._attr.AttributeValue" title="flam._attr.AttributeValue"><span class="pre">AttributeValue</span></a></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">Any</span></span></span><a class="headerlink" href="#flam._attr.Attribute.sort_key" title="Link to this definition"></a></dt>
+<span class="sig-name descname"><span class="pre">sort_key</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">value</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference internal" href="#flam._attr.AttributeValue" title="flam._attr.AttributeValue"><span class="pre">AttributeValue</span></a></span></em>, <em class="sig-param"><span class="n"><span class="pre">is_ascending</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">None</span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><span class="pre">bool</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">None</span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">Any</span></span></span><a class="headerlink" href="#flam._attr.Attribute.sort_key" title="Link to this definition"></a></dt>
 <dd><p>Returns an object which may be used to safely compare values of this attribute, even if some of them are <code class="docutils literal notranslate"><span class="pre">None</span></code>. For example:</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>is_ascending</strong> (<em>None</em><em> | </em><em>bool</em>) – optionally indicate the desired sort order. This will ensure Nones are at the bottom of the sort no matter what. Defaults to <a class="reference internal" href="#flam._attr.Attribute.is_ascending" title="flam._attr.Attribute.is_ascending"><code class="xref py py-attr docutils literal notranslate"><span class="pre">is_ascending</span></code></a>.</p></li>
+<li><p><strong>value</strong> (<a class="reference internal" href="#flam._attr.AttributeValue" title="flam._attr.AttributeValue"><em>AttributeValue</em></a>)</p></li>
+</ul>
+</dd>
+<dt class="field-even">Return type<span class="colon">:</span></dt>
+<dd class="field-even"><p><em>Any</em></p>
+</dd>
+</dl>
 <div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="n">attr_values</span> <span class="o">=</span> <span class="p">[</span><span class="n">movie</span><span class="o">.</span><span class="n">extract</span><span class="p">(</span><span class="n">attr</span><span class="p">)</span> <span class="k">for</span> <span class="n">attr</span> <span class="ow">in</span> <span class="n">movie_list</span><span class="o">.</span><span class="n">find_movies</span><span class="p">()]</span>
 <span class="n">attr_values</span><span class="o">.</span><span class="n">sort</span><span class="p">(</span><span class="n">key</span><span class="o">=</span><span class="n">attr</span><span class="o">.</span><span class="n">sort_key</span><span class="p">,</span> <span class="n">reverse</span><span class="o">=</span><span class="p">(</span><span class="ow">not</span> <span class="n">attr</span><span class="o">.</span><span class="n">is_ascending</span><span class="p">))</span>
 </pre></div>
 </div>
 <dl class="field-list simple">
 <dt class="field-odd">Parameters<span class="colon">:</span></dt>
-<dd class="field-odd"><p><strong>value</strong> (<a class="reference internal" href="#flam._attr.AttributeValue" title="flam._attr.AttributeValue"><em>AttributeValue</em></a>) – a value extracted using this attribute.</p>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>value</strong> (<a class="reference internal" href="#flam._attr.AttributeValue" title="flam._attr.AttributeValue"><em>AttributeValue</em></a>) – a value extracted using this attribute.</p></li>
+<li><p><strong>is_ascending</strong> (<em>None</em><em> | </em><em>bool</em>)</p></li>
+</ul>
 </dd>
 <dt class="field-even">Return type<span class="colon">:</span></dt>
 <dd class="field-even"><p><em>Any</em></p>
