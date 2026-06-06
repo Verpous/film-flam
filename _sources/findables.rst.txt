@@ -42,9 +42,9 @@ Grouping lets you turn collaborators into a single entity - when you search for 
 
 People objects are always attached to a group mode: 'separate' or 'group'.
 
-When separate, each returned object represents a single person.
+* When separate, each returned object represents a single person.
 
-When grouped, flam will find people who've collaborated on movies together and return them as a single object.
+* When grouped, flam will find people who've collaborated on movies together and return them as a single object.
 
 Every crew type has a default group mode that makes sense for it. Directors are grouped by default, actors are separate. This means that if you:
 

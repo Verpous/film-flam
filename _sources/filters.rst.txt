@@ -24,13 +24,13 @@ By default predicates are joined together using AND (i.e., ``-pred1 -pred2`` mea
     This is the default
 * OR: \|, -o, -or
 
-    ``-pred1 -o -pred2``
+    ``-pred1 -or -pred2``
 * NOT: !, -n, -not
     
-    ``-n -pred``
+    ``-not -pred``
 * Parentheses: [ ], ( ), -lparen -rparen
     
-    Control the order of operations: ``[ -pred1 -pred2 ] -o [ -pred3 -pred4 ]``
+    Control the order of operations: ``[ -pred1 -pred2 ] -or [ -pred3 -pred4 ]``
 
 .. tip::
 
