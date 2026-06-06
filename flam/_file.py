@@ -59,8 +59,9 @@ class _FlamSerializable(msgspec.Struct,
         try:
             obj = msgspec.json.decode(contents, type=cls)
         except msgspec.ValidationError as ve:
-            # We are handed this structure in dict format, but really we want it as a sorted list.
-            version_upgrades = sorted(cls._version_upgrades().items(), key=lambda vupg: vupg[0])
+            # We are handed this structure in dict format, but really we want it as a list. It's assumed to be sorted by version order.
+            # Sorting it ourselves would be tricky because it's not actually lexicographic.
+            version_upgrades = list(cls._version_upgrades().items())
 
             try:
                 # A lot of things can go wrong in this check since we did not verify a thing about this JSON.
@@ -109,6 +110,7 @@ class _FlamSerializable(msgspec.Struct,
     # * VERSION is a flam version for which the immediate next version included a change in the file format.
     # * UPGRADE_FROM_VERSION is a function which takes files of version VERSION (or older as long as it had the same file format),
     #   and modifies the JSON to bring it up to the version immediately succeeding VERSION.
+    # * Elements in the dictionary **MUST** be added in version order! Python preserves insertion order in dictionaries.
     # 
     # This setup may seem a little weird. It's this way because when we change the file format,
     # we don't actually know yet what will be the version number it releases under, but we know what version it will definitely be greater than.

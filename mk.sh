@@ -186,7 +186,8 @@ _gen_version() {
 
     {
         # We use date versioning because it requires the least manual intervention.
-        # TestPyPI won't accept the same version twice, so in dev builds, we also version it with the epoch seconds.
+        # PyPI won't accept the same version twice, so in dev builds, we also version it with the epoch seconds.
+        # NOTE: Not having leading zeroes is mandatory even though it sucks because it means we can't sort versions lexicographically.
         local datefmt
         [[ "$1" == actual ]] && datefmt=%Y.%-m.%-d || datefmt=%Y.%-m.%-d.dev%s
         local version="$(date +$datefmt)"
