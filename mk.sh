@@ -122,6 +122,11 @@ release() {
     _gen_requirements
     local version="$(_gen_version $flavor)"
 
+    if [[ "$flavor" == actual ]] && ! grep -Eq -- "^${version}$"  docs/source/changelog.rst; then
+        echo "Version $version is not in the changelog. Please add it then try again."
+        false
+    fi
+
     # Special thanks to the magical person who wrote this guide: https://olgarithms.github.io/sphinx-tutorial/docs/7-hosting-on-github-pages.html
     # We'll be pushing the new docs by mounting a worktree in the path where sphinx generates the html docs.
     # This needs to happen after the `clean` above, but that doesn't actually delete directories, so we must thorougly remove the directory first.

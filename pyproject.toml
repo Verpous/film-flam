@@ -20,6 +20,7 @@ dynamic = ["dependencies", "version"]
 [project.urls]
 Repository = "https://github.com/Verpous/film-flam"
 Documentation = "https://verpous.github.io/film-flam"
+Changelog = "https://verpous.github.io/film-flam/changelog.html"
 
 [project.scripts]
 flam = "flam.__main__:main"
