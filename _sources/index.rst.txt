@@ -25,3 +25,9 @@ FilmFlam |version| documentation
     cli/cli
     api/api
     extending
+
+.. toctree::
+    :maxdepth: 1
+    :caption: Changelog
+
+    changelog
