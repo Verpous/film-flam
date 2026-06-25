@@ -122,15 +122,26 @@ release() {
     _gen_requirements
     local version="$(_gen_version $flavor)"
 
-    if [[ "$flavor" == actual ]] && ! grep -Eq -- "^${version}$"  docs/source/changelog.rst; then
-        echo "Version $version is not in the changelog. Please add it then try again."
-        false
+    # Verify the changelog contains a header for this version, and also nudge the user to double check the changelog is correct.
+    local changelog=docs/source/changelog.rst
+
+    if [[ "$flavor" == actual ]]; then
+        if grep -Eq -- "^${version}$"  docs/source/changelog.rst; then
+            cat -- "$changelog"
+            
+            local confirm;
+            read -ep "Please review the changelog. Are you sure you want to proceed? " confirm;
+            [[ "$confirm" == *([[:space:]])[yY]* ]]
+        else
+            echo "Version $version is not in the changelog. Please add it then try again."
+            false
+        fi
     fi
 
     # Special thanks to the magical person who wrote this guide: https://olgarithms.github.io/sphinx-tutorial/docs/7-hosting-on-github-pages.html
     # We'll be pushing the new docs by mounting a worktree in the path where sphinx generates the html docs.
     # This needs to happen after the `clean` above, but that doesn't actually delete directories, so we must thorougly remove the directory first.
-    html_worktree=docs/build/html
+    local html_worktree=docs/build/html
     rm -rf $html_worktree
     git worktree add --force --force $html_worktree gh-pages
 

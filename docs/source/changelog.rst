@@ -4,6 +4,7 @@ Changelog
 2026.6.25
 ----------
 * Fixed a bug where fetching IMDb lists no longer worked following IMDb site changes
+* Improved stability of letterboxd fetcher
 
 2026.6.7
 ----------
