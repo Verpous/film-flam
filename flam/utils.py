@@ -473,3 +473,19 @@ def move_clobber(src: str, dst: str, must_exist: bool = True) -> None:
     except FileNotFoundError:
         if must_exist:
             raise
+
+def do_with_retries[T](action: typing.Callable[[], T], num_retries: int = 10, sleep_between_retries: float = 1.0) -> T:
+    """
+    Invoke some function until it either succeeds or all retries are spent.
+    """
+    for i in range(num_retries):
+        try:
+            return action()
+        except:
+            if i == num_retries - 1:
+                raise
+
+            time.sleep(sleep_between_retries)
+
+    raise RuntimeError("Shouldn't get here!")
+

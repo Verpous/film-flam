@@ -855,17 +855,9 @@ def _export_lists_handler(requests_queue: multiprocessing.Queue, browser_type: _
         def launch(self) -> WebDriver:
             return webdriver.Firefox(options=self.options) # pylint: disable=not-callable
 
+    # The benefit of this wrapper is we get the defaults that we want here locally.
     def _do_with_retries[T](action: typing.Callable[[], T], num_retries: int = 10, sleep_between_retries: float = 1.0) -> T:
-        for i in range(num_retries):
-            try:
-                return action()
-            except:
-                if i == num_retries - 1:
-                    raise
-
-                time.sleep(sleep_between_retries)
-
-        raise RuntimeError("Shouldn't get here!")
+        return utils.do_with_retries(action, num_retries, sleep_between_retries)
 
     def _is_browser_alive(driver: WebDriver) -> bool:
         try:

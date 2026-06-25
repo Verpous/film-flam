@@ -18,6 +18,7 @@ from __future__ import annotations
 import dataclasses
 import datetime
 import warnings
+import typing
 
 from . import _reg
 from . import _fetch
@@ -82,23 +83,24 @@ class LetterboxdpyFetcher(_fetch.Fetcher, list_type='letterboxd-user-list', uid_
         # NOTE: letterboxdpy has a way to authenticate, and maybe give us access to private lists.
         # But it errors out for me, doesn't work at all. So we won't support it.
         try:
-            user = User(username)
+            # Pretty much everything may sometimes fail with AccessDeniedError so we employ retries all over the place.
+            user = _do_with_retries(lambda: User(username))
         except ResourceNotFoundError as e:
             raise _exc.InputError(f"Invalid LISTDEF: '{self.concrete_listdef}': user '{username}' does not exist.") from e
 
         # We acquire these lists in all cases because they contains some information we'll always want to incorporate, like the user rating and watch date.
         # NOTE: works even when the user has no watched films. For future reference, I found an empty user to test that with: https://letterboxd.com/bbbbbbbbbbbbbbb/.
-        watched_films = user.get_films()
+        watched_films = _do_with_retries(user.get_films)
 
         # NOTE: works even when the user has no reviewed films (because I opened an issue and the letterboxdpy dev fixed it ^_^).
-        reviewed_films = user.get_reviews()
+        reviewed_films = _do_with_retries(user.get_reviews)
 
         # {'entries': {'1309696594': {'name': 'Gangster Squad', 'slug': 'gangster-squad', 'id': None, 'release': 2013, 'runtime': None, 'actions': {'rewatched': False, 'rating': None, 'liked': False, 'reviewed': False}, 'date': '2026-05-09T00:00:00.000000Z', 'page': {'url': 'https://letterboxd.com/verpous/films/diary/page/1/', 'no': 1}}
         # We need to catch warnings here because this may warn "Runtime data is missing for some entries", which is harmless.
         # NOTE: I wanted to capture the warnings and redirect them to the logger but python makes that really difficult.
         with warnings.catch_warnings(action='ignore'):
             # NOTE: works even when the user has no diary entries.
-            diary = user.get_diary()
+            diary = _do_with_retries(user.get_diary)
 
         _dbg.logger.info(f"User '{username}' has {len(watched_films['movies'])} watched films, {len(reviewed_films['reviews'])} reviews, {len(diary['entries'])} diary entries")
 
@@ -119,7 +121,7 @@ class LetterboxdpyFetcher(_fetch.Fetcher, list_type='letterboxd-user-list', uid_
                 
                 # {'movies': {'spider-man-into-the-spider-verse': {'slug': 'spider-man-into-the-spider-verse', 'name': 'Spider-Man: Into the Spider-Verse', 'year': 2018, 'url': 'https://letterboxd.com/film/spider-man-into-the-spider-verse/', 'id': '251943', 'rating': 4.5, 'liked': True}
                 # NOTE: works even when the user has no liked films.
-                liked_films = user.get_liked_films()
+                liked_films = _do_with_retries(user.get_liked_films)
                 movie_basic_infos = [
                     _MovieBasicInfo(
                         slug = m['slug'],
@@ -141,7 +143,7 @@ class LetterboxdpyFetcher(_fetch.Fetcher, list_type='letterboxd-user-list', uid_
                 # {'217531': {'slug': 'anomalisa', 'name': 'Anomalisa', 'year': 2015, 'url': 'https://letterboxd.com/film/anomalisa/', 'page': 1, 'no': 56}
                 try:
                     # NOTE: works even if the user hasn't watchlisted anything.
-                    watchlist = user.get_watchlist_movies()
+                    watchlist = _do_with_retries(user.get_watchlist_movies)
                 except AccessDeniedError as e:
                     raise _exc.InputError(f"Failed to fetch the Letterboxd watchlist for user {username}. It's probably set to private.") from e
 
@@ -156,7 +158,7 @@ class LetterboxdpyFetcher(_fetch.Fetcher, list_type='letterboxd-user-list', uid_
             case _:
                 # {'45944': {'slug': 'escape-from-alcatraz', 'name': 'Escape from Alcatraz', 'year': 1979, 'url': 'https://letterboxd.com/film/escape-from-alcatraz/'}
                 try:
-                    user_list = user.get_list(list_slug).get_movies()
+                    user_list = _do_with_retries(user.get_list(list_slug).get_movies)
                 except ResourceNotFoundError as e:
                     raise _exc.InputError(f"Invalid LISTDEF: '{self.concrete_listdef}': user '{username}' has no such list '{list_slug}'.") from e
 
@@ -212,7 +214,7 @@ class LetterboxdpyFetcher(_fetch.Fetcher, list_type='letterboxd-user-list', uid_
         from letterboxdpy.movie import Movie # type: ignore
 
         _dbg.logger.info(f"Fetching movie: {movie_basic_info}")
-        lbox_movie = Movie(movie_basic_info.slug)
+        lbox_movie = _do_with_retries(lambda: Movie(movie_basic_info.slug))
         lbox_watched_movie = watched_films['movies'].get(movie_basic_info.slug, None)
         lbox_reviews = [r for r in reviewed_films['reviews'].values() if r['movie']['slug'] == movie_basic_info.slug]
 
@@ -225,6 +227,7 @@ class LetterboxdpyFetcher(_fetch.Fetcher, list_type='letterboxd-user-list', uid_
         }
 
         # {'director': [{'name': 'Joel Coen', 'slug': 'joel-coen', 'url': 'https://letterboxd.com/director/joel-coen/'}]
+        # NOTE: There's no need to _do_with_retries every lbox_movie.get_X() call because those are all already fetched when we requested the movie (I checked).
         for lbox_crew_type, lbox_crew in lbox_movie.get_crew().items():
             crew_type = self.crew_type_lbox2flam(lbox_crew_type)
 
@@ -387,3 +390,7 @@ class LetterboxdpyFetcher(_fetch.Fetcher, list_type='letterboxd-user-list', uid_
             case 'hairstyling':                 return _ml.CrewType.ADDITIONAL
             case _:
                 raise RuntimeError(f'Unexpected {lbox_crew_type=}.')
+
+# The benefit of this wrapper is we get the defaults that we want here locally.
+def _do_with_retries[T](action: typing.Callable[[], T], num_retries: int = 3, sleep_between_retries: float = 1.0) -> T:
+    return utils.do_with_retries(action, num_retries, sleep_between_retries)
