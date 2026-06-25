@@ -185,7 +185,7 @@ _gen_version() {
     [[ -f $mdl/_gen_version.py ]] && return
 
     {
-        # We use date versioning because it requires the least manual intervention.
+        # We use date versioning because it requires the least manual intervention. This means we can't release more than once a day though, which sucks.
         # PyPI won't accept the same version twice, so in dev builds, we also version it with the epoch seconds.
         # NOTE: Not having leading zeroes is mandatory even though it sucks because it means we can't sort versions lexicographically.
         local datefmt

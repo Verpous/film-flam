@@ -874,10 +874,10 @@ def _export_lists_handler(requests_queue: multiprocessing.Queue, browser_type: _
         except:
             return False
 
-    def _click_export_button(driver: WebDriver, export_button: WebElement) -> None:
+    def _click_button_possibly_obstructed_by_signin_popup(driver: WebDriver, button: WebElement) -> None:
         # Annoying popup that asks you to sign in hides the export button sometimes.
         try:
-            export_button.click()
+            button.click()
         except ElementClickInterceptedException:
             close_popup_button = driver.find_element(By.XPATH, "//button[@aria-label='Close']")
             close_popup_button.click()
@@ -896,14 +896,34 @@ def _export_lists_handler(requests_queue: multiprocessing.Queue, browser_type: _
             driver.refresh()
             raise
 
+    def _click_export_button(driver: WebDriver) -> None:
+        # It was solid for a long time but at some point IMDb changed the HTML of exporting. Strangely, on my personal Firefox I still have the old way,
+        # but on Firefox via Selenium or in other browsers I have the new way. So we'll support both.
+        try:
+            export_button = _do_with_retries(
+                lambda: driver.find_element(By.XPATH, "//button[@aria-label='Export']"))
+            is_old_export_flow = True
+        except NoSuchElementException:
+            is_old_export_flow = False
+
+        if is_old_export_flow:
+            _do_with_retries(lambda: _click_button_possibly_obstructed_by_signin_popup(driver, export_button))
+        else:
+            # The new way is that the export button is in a dropdown that only reveals after you click the actions menu.
+            actions_button = _do_with_retries(
+                lambda: driver.find_element(By.XPATH, "//button[@aria-label='Actions']/.."))
+            _do_with_retries(lambda: _click_button_possibly_obstructed_by_signin_popup(driver, actions_button))
+
+            export_button = _do_with_retries(
+                lambda: driver.find_element(By.XPATH, "//span[text()='Export']/.."))
+            _do_with_retries(export_button.click)
+
     def _export_list(driver: WebDriver, list_id: str) -> None:
         _dbg.logger.info(f"Exporting {list_id=}. Stage: open list page")
         driver.get(f'https://www.imdb.com/list/ls{list_id}')
 
         _dbg.logger.info("Stage: click export button")
-        export_button = _do_with_retries(
-            lambda: driver.find_element(By.XPATH, "//button[@aria-label='Export']"))
-        _do_with_retries(lambda: _click_export_button(driver, export_button))
+        _click_export_button(driver)
 
         # Opening the link like this instead of below stage might be better but also might not confirm that the export actually started first. Needs more investigation.
         # _dbg.logger.info("Stage: open exports page")
